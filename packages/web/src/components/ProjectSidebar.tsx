@@ -70,6 +70,9 @@ function FileBrowser() {
   const handleFileClick = useCallback(async (subPath: string, filename: string) => {
     if (filename.endsWith('.notebook.json')) {
       const notebookPath = subPath === '.' ? `${activeProjectPath}/${filename}` : `${activeProjectPath}/${subPath}/${filename}`;
+      // Activate loading screen: deactivate file/git tabs so loading screen is visible
+      useStore.getState().deactivateFileTab();
+      useStore.setState({ notebookLoading: true, gitTabOpen: false });
       try {
         const { authToken: token, openNotebookTab: openTab, subscribeToSession: sub } = useStore.getState();
         const res = await fetch('/api/notebooks/open-by-path', {
@@ -87,6 +90,8 @@ function FileBrowser() {
         }
       } catch (err) {
         console.error('Failed to open notebook:', err);
+      } finally {
+        useStore.setState({ notebookLoading: false });
       }
     } else {
       const { sessionId, activeProjectId: projId } = useStore.getState();
