@@ -73,7 +73,7 @@ verify_cmd() {
 
     # 5. Path Traversal & Absolute Paths
     if echo "$cmd" | grep -qE "\.\./|~| /"; then
-        if ! echo "$cmd" | grep -qE "$NB_ROOT"; then
+        if ! echo "$cmd" | grep -qF "$NB_ROOT"; then
             risk="high"
             reason="Path traversal or absolute path outside workspace"
         fi
