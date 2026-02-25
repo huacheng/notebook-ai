@@ -39,4 +39,22 @@ fi
 rm -rf "$NB_WORKSPACES_ROOT"
 rm -f "$DOC_PATH"
 
+# --- Test: read SKILL.md deep mode delegates to research ---
+READ_SKILL="$TASK_AI_ROOT/skills/read/SKILL.md"
+DEPTH_SECTION=$(sed -n '/^## Execution Steps/,/^## /p' "$READ_SKILL" | grep -i "deep" || true)
+if echo "$DEPTH_SECTION" | grep -qi "research"; then
+  emit_pass "read: deep mode references research delegation"
+else
+  emit_fail "read: deep mode should delegate to research, not do inline web search"
+fi
+
+# --- Test: model-routing.md read description ---
+MODEL_ROUTING="$TASK_AI_ROOT/commands/references/model-routing.md"
+READ_ROW=$(grep -i '| \*\*read\*\*' "$MODEL_ROUTING" || true)
+if echo "$READ_ROW" | grep -qi "Web search"; then
+  emit_fail "model-routing: read row still says 'Web search' — should be local ingestion"
+else
+  emit_pass "model-routing: read row does not contain 'Web search'"
+fi
+
 summary
