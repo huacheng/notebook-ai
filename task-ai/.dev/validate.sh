@@ -40,6 +40,7 @@ L2_SCRIPTS=(
   security-functional.sh
   target-functional.sh
   light-functional.sh
+  vfp-applicability.sh
   signal-field-names.py
   injection-category-count.sh
   plugin-slot-consistency.py
