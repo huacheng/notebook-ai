@@ -391,6 +391,10 @@ export function FileViewerRender({
         const scaled = scaleHl(hl);
         const anchorY = computeMarginAnchor(scaled.rects);
         const rightX = Math.max(...scaled.rects.map(r => r.x + r.width));
+        // Hide connecting line when highlight edge is too close to / past the tag
+        const cw = containerRef.current?.clientWidth ?? 800;
+        const tagRightPx = 8; // matches .fv-ann-tag { right: 8px }
+        const showLine = rightX < cw - tagRightPx - 4;
         return (
           <Fragment key={annId}>
             {scaled.rects.map((r, i) => (
@@ -401,9 +405,11 @@ export function FileViewerRender({
               />
             ))}
             {/* SVG connecting line from highlight to margin tag */}
-            <svg className="fv-ann-line" style={{ top: anchorY - 2, left: rightX }}>
-              <line x1="0" y1="4" x2="100%" y2="4" className={`fv-ann-line__stroke fv-ann-line__stroke--${hl.type}`} />
-            </svg>
+            {showLine && (
+              <svg className="fv-ann-line" style={{ top: anchorY - 2, left: rightX }}>
+                <line x1="0" y1="4" x2="100%" y2="4" className={`fv-ann-line__stroke fv-ann-line__stroke--${hl.type}`} />
+              </svg>
+            )}
             <div
               className={`fv-ann-tag fv-ann-tag--${hl.type}${isActive ? ' fv-ann-tag--active' : ''}`}
               style={{ top: anchorY }}

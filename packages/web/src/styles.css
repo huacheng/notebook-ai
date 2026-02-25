@@ -4137,7 +4137,7 @@ button:focus-visible {
 .fv-ann-line {
   position: absolute;
   height: 8px;
-  right: 0;
+  right: 8px;   /* match .fv-ann-tag right — tag z-index covers overlap */
   z-index: 55;
   pointer-events: none;
   overflow: visible;
