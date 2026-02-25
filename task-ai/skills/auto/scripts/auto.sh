@@ -9,28 +9,8 @@ source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
 
 
 NOTEBOOK="${1:-}"
-# 1. Identify Context
-if [[ -z "$NOTEBOOK" ]]; then
-    if ! find_nb_context; then
-        echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
-        exit 1
-    fi
-    NOTEBOOK="$NB_NOTEBOOK"
-    WORK_DIR="$NB_WORKING"
-else
-    # Explicit notebook name provided
-    if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        echo "[ERROR] Invalid notebook name." >&2
-        exit 1
-    fi
-    NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
-fi
-
-if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "[ERROR] Invalid notebook name." >&2
-    exit 1
-fi
+resolve_workdir "$NOTEBOOK"
+NOTEBOOK="$NB_NOTEBOOK"
 
 shift || true
 while [[ $# -gt 0 ]]; do
@@ -41,9 +21,6 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-
-NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
 INDEX_JSON="$WORK_DIR/.index.json"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
