@@ -12,7 +12,7 @@ export class AgentProcess {
   private rl: readline.Interface | null = null;
 
   constructor(
-    private readonly engine: AgentEngine,
+    public readonly engine: AgentEngine,
     private readonly cwd: string,
     private readonly systemPrompt?: string,
   ) {}
@@ -125,7 +125,7 @@ export class AgentProcess {
   }
 
   isAlive(): boolean {
-    return this.proc !== null && this.proc.exitCode === null;
+    return this.proc !== null && this.proc.exitCode === null && !this.proc.killed;
   }
 
   private _waitForFirstOutput(timeoutMs = 20_000): Promise<void> {

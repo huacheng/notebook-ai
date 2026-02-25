@@ -12,6 +12,8 @@ export interface NotebookRow {
   slug: string;
   workspace_dir: string;
   notebook_path: string;
+  project_id: string | null;
+  agent: string;
   status: 'active' | 'archived';
   cell_count: number;
   created_at: string;
@@ -121,16 +123,22 @@ export class NotebookDb {
     try {
       this.db.exec(`ALTER TABLE notebooks ADD COLUMN project_id TEXT REFERENCES projects(id)`);
     } catch { /* column already exists */ }
+
+    // Migration: add agent to notebooks
+    try {
+      this.db.exec(`ALTER TABLE notebooks ADD COLUMN agent TEXT DEFAULT 'claude'`);
+    } catch { /* column already exists */ }
   }
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────
 
-  createNotebook(notebook: Omit<NotebookRow, 'cell_count'>): NotebookRow {
+  createNotebook(notebook: Omit<NotebookRow, 'cell_count' | 'project_id' | 'agent'> & { project_id?: string | null; agent?: string }): NotebookRow {
+    const row = { ...notebook, project_id: notebook.project_id ?? null, agent: notebook.agent ?? 'claude' };
     const stmt = this.db.prepare(`
-      INSERT INTO notebooks (id, user_id, title, slug, workspace_dir, notebook_path, status, cell_count, created_at, updated_at)
-      VALUES (@id, @user_id, @title, @slug, @workspace_dir, @notebook_path, @status, 0, @created_at, @updated_at)
+      INSERT INTO notebooks (id, user_id, title, slug, workspace_dir, notebook_path, project_id, agent, status, cell_count, created_at, updated_at)
+      VALUES (@id, @user_id, @title, @slug, @workspace_dir, @notebook_path, @project_id, @agent, @status, 0, @created_at, @updated_at)
     `);
-    stmt.run(notebook);
+    stmt.run(row);
     return this.getNotebook(notebook.id)!;
   }
 
@@ -213,13 +221,24 @@ export class NotebookDb {
   }
 
   listProjects(): ProjectRow[] {
-    return this.db.prepare(
-      `SELECT * FROM projects WHERE status = 'active' ORDER BY updated_at DESC`
-    ).all() as ProjectRow[];
+    return this.db.prepare(`
+      SELECT p.*, COALESCE(nb_cnt, 0) AS notebook_count
+      FROM projects p
+      LEFT JOIN (SELECT project_id, COUNT(*) AS nb_cnt FROM notebooks WHERE status = 'active' GROUP BY project_id) n
+        ON n.project_id = p.id
+      WHERE p.status = 'active'
+      ORDER BY p.updated_at DESC
+    `).all() as ProjectRow[];
   }
 
   getProject(id: string): ProjectRow | undefined {
-    return this.db.prepare(`SELECT * FROM projects WHERE id = ?`).get(id) as ProjectRow | undefined;
+    return this.db.prepare(`
+      SELECT p.*, COALESCE(nb_cnt, 0) AS notebook_count
+      FROM projects p
+      LEFT JOIN (SELECT project_id, COUNT(*) AS nb_cnt FROM notebooks WHERE status = 'active' GROUP BY project_id) n
+        ON n.project_id = p.id
+      WHERE p.id = ?
+    `).get(id) as ProjectRow | undefined;
   }
 
   updateProject(id: string, updates: Partial<Pick<ProjectRow, 'title' | 'status' | 'notebook_count'>>): ProjectRow | undefined {

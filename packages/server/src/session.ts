@@ -1,6 +1,6 @@
-import { writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import crypto from 'crypto';
-import { ClaudeProcess } from './claude-process.js';
+import { AgentProcess, type AgentEngine } from './agent-process.js';
 import { GitManager } from './git.js';
 import {
   NotebookSchema,
@@ -61,7 +61,7 @@ interface NotebookSession {
   id: string;
   /** Absolute path to the notebook's workspace directory (used for file ops). */
   cwd: string;
-  claudeProcess: ClaudeProcess;
+  agentProcess: AgentProcess;
   notebook: Notebook;
   gitManager: GitManager;
   /** Absolute path to the .notebook.json file on disk. */
@@ -122,10 +122,18 @@ export class SessionManager {
       assets: { intermediate_files: [] },
     });
 
+    // Determine agent engine from notebook file metadata
+    let engine: AgentEngine = 'claude';
+    try {
+      const raw = await readFile(notebookPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed?.metadata?.agent === 'gemini') engine = 'gemini';
+    } catch { /* file doesn't exist yet — default claude */ }
+
     const session: NotebookSession = {
       id: sessionName,
       cwd,
-      claudeProcess: new ClaudeProcess(cwd, MEMORY_SYSTEM_PROMPT),
+      agentProcess: new AgentProcess(engine, cwd, MEMORY_SYSTEM_PROMPT),
       notebook,
       gitManager,
       notebookPath,
@@ -133,8 +141,8 @@ export class SessionManager {
       _execStartTimes: new Map(),
     };
 
-    // Start the Claude process.  Messages arrive asynchronously via stdout.
-    await session.claudeProcess.start(
+    // Start the agent process.  Messages arrive asynchronously via stdout.
+    await session.agentProcess.start(
       (raw: unknown) => this.handleJsonlMessage(session, raw),
       (code) => {
         // Process exited unexpectedly — complete any running cell as an error.
@@ -193,7 +201,7 @@ export class SessionManager {
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
     session._execStartTimes.set(cellId, Date.now());
 
-    session.claudeProcess.sendPrompt(source);
+    session.agentProcess.sendPrompt(source);
   }
 
   getSession(sessionId: string): NotebookSession | undefined {
@@ -204,7 +212,7 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    session.claudeProcess.stop();
+    session.agentProcess.stop();
     session.listeners.clear();
     this.sessions.delete(sessionId);
     console.log(`[session] Closed session "${sessionId}"`);

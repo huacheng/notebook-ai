@@ -120,12 +120,8 @@ export function createProjectsRouter(
       db.createNotebook({
         id: nbId, user_id: null, title, slug: nbSlug,
         workspace_dir: worktreePath, notebook_path: notebookPath,
+        project_id: project.id,
         status: 'active', created_at: now, updated_at: now,
-      });
-
-      // Update project notebook count
-      db.updateProject(project.id, {
-        notebook_count: (project.notebook_count || 0) + 1,
       });
 
       res.json({

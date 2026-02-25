@@ -347,6 +347,7 @@ describe('WSClientMessageSchema', () => {
   it('parses execute_request', () => {
     const result = WSClientMessageSchema.safeParse({
       type: 'execute_request',
+      session_id: 'sess-1',
       cell_id: 'cell-1',
       source: 'Do something',
     });
@@ -356,6 +357,7 @@ describe('WSClientMessageSchema', () => {
   it('parses save_notebook', () => {
     const result = WSClientMessageSchema.safeParse({
       type: 'save_notebook',
+      session_id: 'sess-1',
       path: '/tmp/test.notebook.json',
     });
     expect(result.success).toBe(true);
@@ -364,6 +366,7 @@ describe('WSClientMessageSchema', () => {
   it('parses load_notebook', () => {
     const result = WSClientMessageSchema.safeParse({
       type: 'load_notebook',
+      session_id: 'sess-1',
       path: '/tmp/test.notebook.json',
     });
     expect(result.success).toBe(true);
@@ -372,6 +375,7 @@ describe('WSClientMessageSchema', () => {
   it('parses export_html', () => {
     const result = WSClientMessageSchema.safeParse({
       type: 'export_html',
+      session_id: 'sess-1',
     });
     expect(result.success).toBe(true);
   });
@@ -379,6 +383,7 @@ describe('WSClientMessageSchema', () => {
   it('parses export_html with options', () => {
     const result = WSClientMessageSchema.safeParse({
       type: 'export_html',
+      session_id: 'sess-1',
       options: {
         include_slice: false,
         include_replay: false,
@@ -391,6 +396,7 @@ describe('WSClientMessageSchema', () => {
   it('parses slice_update', () => {
     const result = WSClientMessageSchema.safeParse({
       type: 'slice_update',
+      session_id: 'sess-1',
       sections: [
         {
           id: 'sec-1',
@@ -434,6 +440,7 @@ describe('WSServerMessageSchema', () => {
   it('parses cell_output', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'cell_output',
+      session_id: 'sess-1',
       cell_id: 'cell-1',
       output: { type: 'text', content: 'result' },
     });
@@ -443,6 +450,7 @@ describe('WSServerMessageSchema', () => {
   it('parses execution_complete', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'execution_complete',
+      session_id: 'sess-1',
       cell_id: 'cell-1',
       duration_ms: 1500,
     });
@@ -452,6 +460,7 @@ describe('WSServerMessageSchema', () => {
   it('parses execution_complete without duration_ms', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'execution_complete',
+      session_id: 'sess-1',
       cell_id: 'cell-1',
     });
     expect(result.success).toBe(true);
@@ -460,6 +469,7 @@ describe('WSServerMessageSchema', () => {
   it('parses git_diff', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'git_diff',
+      session_id: 'sess-1',
       cell_id: 'cell-1',
       diff: '+added line\n-removed line',
     });
@@ -469,6 +479,7 @@ describe('WSServerMessageSchema', () => {
   it('parses git_diff with files_changed default', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'git_diff',
+      session_id: 'sess-1',
       cell_id: 'cell-1',
       diff: 'diff content',
     });
@@ -481,6 +492,7 @@ describe('WSServerMessageSchema', () => {
   it('parses export_complete', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'export_complete',
+      session_id: 'sess-1',
       html: '<html></html>',
     });
     expect(result.success).toBe(true);
@@ -506,6 +518,7 @@ describe('WSServerMessageSchema', () => {
   it('parses slice_update', () => {
     const result = WSServerMessageSchema.safeParse({
       type: 'slice_update',
+      session_id: 'sess-1',
       sections: [],
     });
     expect(result.success).toBe(true);
