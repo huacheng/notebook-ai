@@ -52,6 +52,32 @@ else
     emit_fail "merge: failed to delete branch"
 fi
 
+# --- Test: merge SKILL.md resolves signal path before worktree removal ---
+MERGE_SKILL="$TASK_AI_ROOT/skills/merge/SKILL.md"
+STEPS=$(extract_steps "$MERGE_SKILL")
+
+# Find the line numbers for signal path resolution and worktree removal
+RESOLVE_LINE=$(echo "$STEPS" | grep -n "Resolve main worktree path\|resolve.*signal.*path\|cache.*main.*path" | head -1 | cut -d: -f1)
+REMOVE_LINE=$(echo "$STEPS" | grep -n "worktree remove\|worktree.*removal" | head -1 | cut -d: -f1)
+
+if [[ -n "$RESOLVE_LINE" && -n "$REMOVE_LINE" ]]; then
+  if [[ "$RESOLVE_LINE" -lt "$REMOVE_LINE" ]]; then
+    emit_pass "merge: signal path resolved before worktree removal"
+  else
+    emit_fail "merge: signal path resolved AFTER worktree removal — path may be invalid"
+  fi
+else
+  # If resolve is embedded in the signal step (step 9) which comes after step 8 (removal),
+  # that's the bug — resolution should be a separate earlier step
+  SIGNAL_STEP=$(echo "$STEPS" | grep -n "auto-signal" | head -1 | cut -d: -f1)
+  WORKTREE_STEP=$(echo "$STEPS" | grep -n "worktree remove" | head -1 | cut -d: -f1)
+  if [[ -n "$SIGNAL_STEP" && -n "$WORKTREE_STEP" && "$SIGNAL_STEP" -gt "$WORKTREE_STEP" ]]; then
+    emit_fail "merge: signal write (with path resolution) comes after worktree removal step"
+  else
+    emit_pass "merge: signal write order is safe"
+  fi
+fi
+
 # Cleanup
 git branch -D "$BRANCH" > /dev/null 2>&1
 rm -rf "$NB_WORKSPACES_ROOT"
