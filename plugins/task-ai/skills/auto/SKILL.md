@@ -231,9 +231,6 @@ After each step, the agent evaluates the result and determines the next step int
 | check | REPLAN | plan | — | Fundamental issues, revise plan |
 | check | BLOCKED | (stop) | — | Cannot continue |
 | check | CONTINUE | exec | — | Progress OK, resume execution |
-| check | NEEDS_FIX | exec | mid-exec | Fixable issues, exec addresses then continues |
-| check | REPLAN | plan | — | Fundamental issues, revise plan |
-| check | BLOCKED | (stop) | — | Cannot continue |
 | plan | (generated) | verify | post-plan | Plan ready, run verification before assessment |
 | exec | (done) | verify | post-exec | All steps completed, run verification before assessment |
 | exec | (mid-exec) | verify | mid-exec | Significant issue encountered, run verification before checkpoint |

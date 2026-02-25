@@ -107,7 +107,7 @@ For each implementation step:
    - If all steps complete: signal `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }`
    - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
    - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-   - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
+   - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
 10. **Report** execution summary with per-step results
 
 ## State Transitions
@@ -145,7 +145,7 @@ For long-running executions, intermediate progress can be observed by:
 | All steps done | `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }` |
 | Significant issue | `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }` |
 | Single step (--step N) | `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }` |
-| Blocking dependency | `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
+| Blocking dependency | `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 
 ## Notes
 

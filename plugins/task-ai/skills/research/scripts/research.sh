@@ -9,33 +9,8 @@ source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
 
 
 NOTEBOOK="${1:-}"
-# 1. Identify Context
-if [[ -z "$NOTEBOOK" ]]; then
-    if ! find_nb_context; then
-        echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
-        exit 1
-    fi
-    NOTEBOOK="$NB_NOTEBOOK"
-    WORK_DIR="$NB_WORKING"
-else
-    # Explicit notebook name provided
-    if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        echo "[ERROR] Invalid notebook name." >&2
-        exit 1
-    fi
-    NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
-    if [[ -z "$NB_DIR" ]]; then
-        echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
-        exit 1
-    fi
-    WORK_DIR="$NB_DIR/.working"
-fi
-
-if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "[ERROR] Invalid notebook name." >&2
-    exit 1
-fi
+resolve_workdir "$NOTEBOOK"
+NOTEBOOK="$NB_NOTEBOOK"
 
 shift || true
 while [[ $# -gt 0 ]]; do
@@ -46,15 +21,6 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-
-NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-# 更鲁棒的目录查找逻辑
-NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
-if [[ -z "$NB_DIR" ]]; then
-    echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
-    exit 1
-fi
-WORK_DIR="$NB_DIR/.working"
 TARGET_MD="$WORK_DIR/.target.md"
 
 if [[ ! -f "$TARGET_MD" ]]; then

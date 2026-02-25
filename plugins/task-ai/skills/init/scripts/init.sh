@@ -20,7 +20,7 @@ shift 2 || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --title) TITLE="$2"; shift 2 ;;
-    --tags)  TAGS="["$(echo $2 | sed 's/,/","/g')"]"; shift 2 ;;
+    --tags)  TAGS=$(printf '%s' "$2" | sed 's/[^a-zA-Z0-9_,-]//g' | sed 's/,/","/g' | sed 's/.*$/["&"]/'); shift 2 ;;
     --worktree) USE_WORKTREE=1; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac

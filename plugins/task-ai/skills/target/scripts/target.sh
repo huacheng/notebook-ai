@@ -49,12 +49,12 @@ EOF
 else
     # Update only the ## Objective section using a temporary file
     TMP_FILE=$(mktemp)
-    awk -v obj="$OBJECTIVE" '
+    AWK_OBJ="$OBJECTIVE" awk '
       BEGIN { in_obj=0; found=0 }
-      /^## Objective/ { print $0; print obj; in_obj=1; found=1; next }
+      /^## Objective/ { print $0; print ENVIRON["AWK_OBJ"]; in_obj=1; found=1; next }
       /^## / && in_obj { in_obj=0 }
       !in_obj { print $0 }
-      END { if (!found) { print "## Objective"; print obj } }
+      END { if (!found) { print "## Objective"; print ENVIRON["AWK_OBJ"] } }
     ' "$TARGET_FILE" > "$TMP_FILE"
     mv "$TMP_FILE" "$TARGET_FILE"
 fi
