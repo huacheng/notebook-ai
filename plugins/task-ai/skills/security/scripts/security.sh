@@ -27,7 +27,12 @@ else
         exit 1
     fi
     NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
+    NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
+    if [[ -z "$NB_DIR" ]]; then
+        echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
+        exit 1
+    fi
+    WORK_DIR="$NB_DIR/.working"
 fi
 
 if [[ -z "$ACTION" ]]; then
@@ -73,7 +78,7 @@ verify_cmd() {
 
     # 5. Path Traversal & Absolute Paths
     if echo "$cmd" | grep -qE "\.\./|~| /"; then
-        if ! echo "$cmd" | grep -qE "$NB_ROOT"; then
+        if ! echo "$cmd" | grep -qF "$NB_ROOT"; then
             risk="high"
             reason="Path traversal or absolute path outside workspace"
         fi

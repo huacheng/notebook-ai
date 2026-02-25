@@ -47,7 +47,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 12. **Extract** implementation steps from `.plan.md` (ordered by heading structure)
 13. **Build** execution order respecting any noted dependencies
 
-**Context management**: When `.summary.md` exists, read it as the primary context source instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest (last by filename sort) file from each directory for detailed info on the most recent assessment/issue/note.
+**Context management (exec)**: When `.summary.md` exists, read it as the primary context source for implementation instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest file from each directory for the most recent assessment/issue/note. See also `plan/SKILL.md` for the equivalent plan-phase context rule.
 
 ### Per-Step Execution
 
@@ -155,6 +155,7 @@ For long-running executions, intermediate progress can be observed by:
 - When `--step N` is used, the executor verifies prerequisites for that step are met, then signals `(step-N)` on completion for mid-exec checkpoint
 - After successful execution of all steps, the user should run `/moonview:check --checkpoint post-exec`
 - Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec evaluation by `check`
+- **VFP protocol reference**: The Verification-First Protocol (VH confirmation, HS confirmation, Cumulative Green Gate, Refactor window) is defined in `commands/references/verification-first-protocol.md`. Refer to that document for full VFP applicability rules, VH stub design patterns, and CGG thresholds
 - **Evidence-based decisions**: When uncertain about APIs, library usage, or compatibility, use shell commands to verify (curl official docs, check installed versions, read node_modules source, etc.) before implementing
 - **Experience invalidation**: If implementation reveals that a previously loaded experience file (`<notebook>-impl.md`, `-verify.md`, or `-eval.md`) provided guidance that contradicts actual runtime behavior (e.g., documented API signature doesn't match, performance claim is wrong), set `quality_status: invalidated` on that file — acquire `.memory/.experiences/.lock` → update frontmatter → write atomically (`.tmp → rename`) → append `experience` changelog line with tag `quality_status:invalidated` → release lock
 - **Concurrency**: Exec acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
