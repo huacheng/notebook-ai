@@ -51,6 +51,14 @@ else
     emit_fail "init: failed to block branch collision"
 fi
 
+# --- Test: init.sh builds tags JSON safely (no unquoted variable expansion) ---
+INIT_SCRIPT="$TASK_AI_ROOT/skills/init/scripts/init.sh"
+if grep -n 'echo \$2\|echo $2' "$INIT_SCRIPT" | grep -qv '^#'; then
+  emit_fail "init: unquoted \$2 in tags construction — JSON injection risk"
+else
+  emit_pass "init: tags argument is properly quoted"
+fi
+
 # Cleanup
 git checkout "$CURRENT_BRANCH" > /dev/null 2>&1
 git branch -D "task/$TEST_NB" > /dev/null 2>&1
