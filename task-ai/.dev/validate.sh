@@ -10,6 +10,7 @@ L1_SCRIPTS=(
   step-numbering.sh
   sub-step-numbering.sh
   script-reachability.sh
+  deleted-files.sh
   cross-refs.sh
   signal-whitelist.sh
   naming-conventions.sh
