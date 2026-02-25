@@ -36,6 +36,20 @@ else
     emit_fail "security: failed to block VFP injection"
 fi
 
+# --- Test: security.sh uses fixed-string grep for NB_ROOT (not regex) ---
+if grep -n 'grep -qE "\$NB_ROOT"' "$SECURITY_SH" | grep -v '^#'; then
+  emit_fail "security: uses grep -qE for NB_ROOT comparison — regex metachar bypass risk"
+else
+  emit_pass "security: NB_ROOT comparison does not use -qE regex mode"
+fi
+
+# --- Test: NB_ROOT path traversal check uses fixed-string matching ---
+if grep -n 'grep.*-q.*"$NB_ROOT"' "$SECURITY_SH" | grep -qv -- '-F\|-qF'; then
+  emit_fail "security: NB_ROOT match should use -F (fixed string) not regex"
+else
+  emit_pass "security: NB_ROOT match uses fixed-string mode"
+fi
+
 # Cleanup
 rm -rf "$NB_WORKSPACES_ROOT"
 

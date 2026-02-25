@@ -42,4 +42,22 @@ else
   emit_warn "concurrency: .working lock not documented"
 fi
 
+# --- Test: state.py uses O_CREAT|O_EXCL, not fcntl.flock ---
+STATE_PY="$TASK_AI_ROOT/core/state.py"
+if [[ -f "$STATE_PY" ]]; then
+  if grep -q 'fcntl.flock' "$STATE_PY"; then
+    emit_fail "state.py: uses fcntl.flock (advisory lock) — spec requires O_CREAT|O_EXCL (atomic)"
+  else
+    emit_pass "state.py: does not use advisory flock"
+  fi
+
+  if grep -q 'O_CREAT.*O_EXCL\|O_EXCL.*O_CREAT' "$STATE_PY"; then
+    emit_pass "state.py: uses O_CREAT|O_EXCL for lock acquisition"
+  else
+    emit_fail "state.py: missing O_CREAT|O_EXCL lock — see write-protocol.md"
+  fi
+else
+  emit_warn "state.py not found"
+fi
+
 summary

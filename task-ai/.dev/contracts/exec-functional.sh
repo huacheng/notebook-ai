@@ -45,6 +45,14 @@ else
     emit_fail "exec: failed to increment progress"
 fi
 
+# --- Test: exec SKILL.md references verification-first-protocol.md ---
+EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
+if grep -q "verification-first-protocol.md" "$EXEC_SKILL"; then
+  emit_pass "exec: references verification-first-protocol.md"
+else
+  emit_fail "exec: uses VFP concepts (VH/HS/CGG) but missing cross-reference to verification-first-protocol.md"
+fi
+
 # Cleanup
 rm -rf "$NB_WORKSPACES_ROOT"
 

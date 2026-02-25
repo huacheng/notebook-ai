@@ -11,6 +11,8 @@ L1_SCRIPTS=(
   sub-step-numbering.sh
   script-reachability.sh
   deleted-files.sh
+  find-result-validation.sh
+  dedup-paragraphs.sh
   publish-sync.sh
   cross-refs.sh
   signal-whitelist.sh

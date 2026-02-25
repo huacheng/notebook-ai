@@ -35,6 +35,16 @@ else
     emit_fail "auto: wrong routing for planning"
 fi
 
+# --- Test: auto SKILL.md validates depends_on ---
+AUTO_SKILL="$TASK_AI_ROOT/skills/auto/SKILL.md"
+AUTO_STEPS=$(extract_steps "$AUTO_SKILL")
+
+if echo "$AUTO_STEPS" | grep -qi "depends_on\|dependency.*gate\|validate.*dependenc"; then
+  emit_pass "auto: execution steps include depends_on validation"
+else
+  emit_fail "auto: missing depends_on validation in loop — exec/merge have it but auto does not"
+fi
+
 # Cleanup
 rm -rf "$NB_WORKSPACES_ROOT"
 
