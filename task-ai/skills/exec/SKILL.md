@@ -47,7 +47,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 12. **Extract** implementation steps from `.plan.md` (ordered by heading structure)
 13. **Build** execution order respecting any noted dependencies
 
-**Context management**: When `.summary.md` exists, read it as the primary context source instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest (last by filename sort) file from each directory for detailed info on the most recent assessment/issue/note.
+**Context management (exec)**: When `.summary.md` exists, read it as the primary context source for implementation instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest file from each directory for the most recent assessment/issue/note. See also `plan/SKILL.md` for the equivalent plan-phase context rule.
 
 ### Per-Step Execution
 
