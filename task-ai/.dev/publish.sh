@@ -30,7 +30,7 @@ echo "L1 pre-publish validation passed."
 echo "--- Publishing to $PLUGIN_DIR ---"
 
 # Publishable directories and files
-SYNC_DIRS=(skills commands)
+SYNC_DIRS=(skills commands core)
 SYNC_FILES=(REFERENCE-INDEX.md plugin.json)
 
 for dir in "${SYNC_DIRS[@]}"; do

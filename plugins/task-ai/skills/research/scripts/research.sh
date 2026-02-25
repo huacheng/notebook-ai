@@ -12,6 +12,9 @@ NOTEBOOK="${1:-}"
 resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
+CALLER=""
+PHASE=""
+SCOPE=""
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in

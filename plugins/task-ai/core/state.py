@@ -2,7 +2,6 @@
 import json
 import sys
 import argparse
-import fcntl
 import os
 from datetime import datetime
 
@@ -10,17 +9,15 @@ VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "co
 
 def get_lock(index_path):
     lock_path = index_path + ".lock"
-    fd = open(lock_path, 'w')
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         return fd, lock_path
-    except IOError:
+    except FileExistsError:
         print(f"[ERROR] Could not acquire lock for {index_path}. Is another process running?", file=sys.stderr)
         sys.exit(1)
 
 def release_lock(fd, lock_path):
-    fcntl.flock(fd, fcntl.LOCK_UN)
-    fd.close()
+    os.close(fd)
     try:
         os.remove(lock_path)
     except OSError:
