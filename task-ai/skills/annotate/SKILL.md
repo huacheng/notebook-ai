@@ -91,3 +91,4 @@ task-ai(<notebook>):annotate annotations processed
 - Comments add `> 💬`/`> 📝` blockquotes, never modify existing content
 - **Content sanitization**: Before writing annotation content to task files, strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (U+0000–U+001F except `\n` and `\t`, and U+007F) to prevent hidden prompt injection. Preserve markdown formatting and visible text
 - **Concurrency**: Annotate acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
+- **Frontend integration**: The `.tmp-annotations.json` → annotate flow is not yet integrated with the frontend. Interface contract TBD
