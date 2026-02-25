@@ -1,6 +1,6 @@
 {
-  "_meta": { "version": "1.0", "last_verified": "2026-02-24", "note": "20 transitions (P19: +5 cancel +2 self-loop)" },
-  "states": ["draft","planning","review","executing","re-planning","complete","blocked","cancelled"],
+  "_meta": { "version": "1.1", "last_verified": "2026-02-25", "note": "23 transitions (P19 +3 light-exec)" },
+  "states": ["draft","planning","review","executing","re-planning","complete","blocked","cancelled","light-exec"],
   "terminal": ["complete", "cancelled"],
   "transitions": [
     { "from": "draft",        "to": "planning",     "via": "plan" },
@@ -22,6 +22,9 @@
     { "from": "re-planning",  "to": "blocked",      "via": "check BLOCKED" },
     { "from": "re-planning",  "to": "cancelled",    "via": "cancel" },
     { "from": "blocked",      "to": "planning",     "via": "plan" },
-    { "from": "blocked",      "to": "cancelled",    "via": "cancel" }
+    { "from": "blocked",      "to": "cancelled",    "via": "cancel" },
+    { "from": "light-exec",   "to": "complete",     "via": "light finish" },
+    { "from": "light-exec",   "to": "cancelled",    "via": "cancel" },
+    { "from": "light-exec",   "to": "planning",     "via": "light promote" }
   ]
 }
