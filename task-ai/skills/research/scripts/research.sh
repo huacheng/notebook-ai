@@ -24,7 +24,12 @@ else
         exit 1
     fi
     NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
+    NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
+    if [[ -z "$NB_DIR" ]]; then
+        echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
+        exit 1
+    fi
+    WORK_DIR="$NB_DIR/.working"
 fi
 
 if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -44,7 +49,12 @@ done
 
 NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
 # 更鲁棒的目录查找逻辑
-WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
+NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
+if [[ -z "$NB_DIR" ]]; then
+    echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
+    exit 1
+fi
+WORK_DIR="$NB_DIR/.working"
 TARGET_MD="$WORK_DIR/.target.md"
 
 if [[ ! -f "$TARGET_MD" ]]; then

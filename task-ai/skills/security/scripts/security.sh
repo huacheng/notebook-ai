@@ -27,7 +27,12 @@ else
         exit 1
     fi
     NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
+    NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
+    if [[ -z "$NB_DIR" ]]; then
+        echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
+        exit 1
+    fi
+    WORK_DIR="$NB_DIR/.working"
 fi
 
 if [[ -z "$ACTION" ]]; then
