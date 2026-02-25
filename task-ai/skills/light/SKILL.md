@@ -1,6 +1,6 @@
 ---
 name: light
-description: "Shadow task execution for lightweight fixes and adjustments. No physical directory creation, single commit delivery, and automatic branch cleanup."
+description: "Shadow task execution for lightweight fixes and adjustments. Single commit delivery, automatic branch cleanup."
 model_tier: light
 auto_delegatable: true
 arguments:
@@ -32,8 +32,7 @@ To maintain the "lightweight" nature of this mode, the following thresholds are 
 1. **Context discovery**:
    - Locate the project root (where `.git/` exists).
 2. **Start shadow session** (if `objective` provided):
-   - **Initialize**: Call `/moonview:init` to create a minimalist notebook directory (maintains system architecture).
-   - **Registry**: The `init` command records the task; `light.sh` adds `mode: light` to `.index.json`.
+   - **Registry**: Append task record to `.light-tasks.jsonl` in project root.
    - **Branch**: `git checkout -b light/<slug>-<timestamp>`.
    - **Verify**: Output a confirmation message. 
 3. **Status & Monitoring**:
@@ -48,7 +47,8 @@ To maintain the "lightweight" nature of this mode, the following thresholds are 
    - **Commit**: Single commit: `task-ai(<project>):light <objective>`.
    - **Cleanup**: Delete the shadow branch and the transient notebook directory.
 7. **Promotion** (if `--promote` provided):
-   - **Upgrade**: Convert the transient notebook into a standard task (remove `light` mode flag, set status to `planning`, rename branch to `task/`).
+   - **Initialize**: Call `/moonview:init` to create a full notebook directory (maintains system architecture).
+   - **Upgrade**: Convert the transient task into a standard task (remove `light` mode flag, set status to `planning`, rename branch to `task/`).
 
 
 ## State Transitions

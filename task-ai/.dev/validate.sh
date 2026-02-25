@@ -8,6 +8,10 @@ CONTRACTS="$SCRIPT_DIR/contracts"
 
 L1_SCRIPTS=(
   step-numbering.sh
+  sub-step-numbering.sh
+  script-reachability.sh
+  deleted-files.sh
+  publish-sync.sh
   cross-refs.sh
   signal-whitelist.sh
   naming-conventions.sh
@@ -38,6 +42,8 @@ L2_SCRIPTS=(
   security-functional.sh
   target-functional.sh
   light-functional.sh
+  vfp-applicability.sh
+  annotate-functional.sh
   signal-field-names.py
   injection-category-count.sh
   plugin-slot-consistency.py

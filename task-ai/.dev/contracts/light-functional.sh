@@ -123,4 +123,23 @@ fi
 # Cleanup
 rm -rf "$NB_WORKSPACES_ROOT"
 
+# --- Test: SKILL.md description contradiction ---
+LIGHT_SKILL="$TASK_AI_ROOT/skills/light/SKILL.md"
+FRONTMATTER=$(extract_frontmatter "$LIGHT_SKILL")
+if echo "$FRONTMATTER" | grep -qi "No physical directory creation"; then
+  emit_fail "light: description still says 'No physical directory creation' — contradicts init call"
+else
+  emit_pass "light: description does not claim 'No physical directory creation'"
+fi
+
+# --- Test: init only under promote ---
+STEPS=$(extract_steps "$LIGHT_SKILL")
+# Check that init call appears only inside promote section, not in start section
+START_SECTION=$(echo "$STEPS" | sed -n '/Start shadow session/,/Promotion\|Finish/p')
+if echo "$START_SECTION" | grep -qi '/moonview:init\|Call.*init'; then
+  emit_fail "light: init appears in start section — should only be in promote"
+else
+  emit_pass "light: init not called unconditionally in start section"
+fi
+
 summary

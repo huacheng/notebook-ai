@@ -56,17 +56,17 @@ Read the `type` field from `.index.json` to determine the task domain. Execution
 For each implementation step:
 
 1. **Read** relevant files (source code, configs, scripts, documentation)
-2. **VH confirmation** (software types with VH stubs): If `type` contains `software` AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[Red: ...]` annotations in `.plan.md`) before implementing:
+2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[Red: ...]` annotations in `.plan.md`) before implementing:
    - **Expected: all Red (failing)** → proceed to implementation
    - **Unexpected: any Green (passing)** → log warning in `.notes/`: "Step N: test X was Green before implementation — test may be trivially satisfied or implementation leaked from a prior step". Continue implementation but flag for review
 3. **Implement** the change using **domain-appropriate methods** as described in the plan (see `init/references/seed-types/<type>.md` for per-type seed methodology, or `.type-profile.md` for task-specific guidance)
    - **Security Audit (Pre-hook)**: Before issuing any shell command that modifies state (file deletion, system config, package installation, network requests), MUST invoke `/moonview:security <notebook> verify-cmd "<command>"`. If verdict is `REJECT`, execution is halted immediately, signal `(mid-exec)`, state becomes `NEEDS_FIX`, and trigger lineage tracing to invalidate the source reference.
    - **Optional delegation — capability check**: Before implementing, follow `auto/references/plugin-delegation.md` to check if the current step matches a capability slot: `type` containing `frontend`/`web`/`ui` → `frontend-design` slot; `type` containing `bugfix` or NEEDS_FIX resumption → `debugging` slot; `type` containing `software` with `.test/` criteria → `tdd` slot; otherwise → `domain-*` semantic scan. If matched, invoke via Task subagent — guidance is incorporated into the implementation approach. No match or failure → use existing inline methods
-4. **HS confirmation** (software types with VH stubs): After implementing, run the same step-specific tests:
+4. **HS confirmation** (VFP-applicable types with VH stubs): After implementing, run the same step-specific tests:
    - **All Green (passing)** → record successful VH→HS transition, proceed
    - **Still Red (failing)** → mark step as `NEEDS_FIX`, record failure details (which tests still fail and why). If minor, attempt a targeted fix and re-run. If unresolvable, signal `(mid-exec)` for check evaluation
-5. **Cumulative Green Gate (CGG)** (software types, after HS confirmation): Run all previously-passed VH stubs (step-1..N-1) to confirm no regressions. Append results to `.test/<date>-cumulative-green.jsonl`. For human VH types, store approval snapshots in `.test/hil-snapshots/`. On regression → fix (≤1 attempt) → re-run; still failing → signal `(mid-exec)`. Skip if step=1 or no VH stubs exist
-6. **Refactor window** (software types, after HS confirmation): With tests passing, check for obvious refactoring opportunities in the code just written (duplication, naming, dead code). If refactored, run the **full** test suite (not just step tests) to confirm no regressions. Skip if the step was straightforward with no refactoring opportunities
+5. **Cumulative Green Gate (CGG)** (VFP-applicable types, after HS confirmation): Run all previously-passed VH stubs (step-1..N-1) to confirm no regressions. Append results to `.test/<date>-cumulative-green.jsonl`. For human VH types, store approval snapshots in `.test/hil-snapshots/`. On regression → fix (≤1 attempt) → re-run; still failing → signal `(mid-exec)`. Skip if step=1 or no VH stubs exist
+6. **Refactor window** (VFP-applicable types, after HS confirmation): With tests passing, check for obvious refactoring opportunities in the code just written (duplication, naming, dead code). If refactored, run the **full** test suite (not just step tests) to confirm no regressions. Skip if the step was straightforward with no refactoring opportunities
 7. **Verify** the step succeeded against `.test/` criteria using **domain-appropriate verification** (see per-type seed file or `.type-profile.md` for domain verification methods)
 8. **Record** what was done (files changed, commands run, tools invoked, approach taken)
 9. **Create** `.notes/<YYYY-MM-DD>-<summary>-exec.md` when implementation deviates from plan, an unexpected workaround is needed, or a non-obvious API behavior is discovered. Skip for straightforward steps that follow the plan exactly. For software types, include a **VFP Cycle Summary** section per step: `Red (N failing) → Green (N passing) → Refactor (yes/no)`
@@ -91,15 +91,15 @@ For each implementation step:
 6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files, using the most recent file (by filename date) as the primary fix guidance. `.bugfix/` entries indicate mid-exec issues; `.analysis/` entries indicate post-exec issues. Address fix items before continuing remaining steps
 7. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
 8. **For each step** (follow Per-Step Execution flow above):
-   a. Read required files
-   b. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
-   c. Implement the change
-   d. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
-   e. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
-   f. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
-   f. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
-   g. Record result (include VFP cycle summary for software types)
-   h. Update `.index.json` `completed_steps` to current step number
+   8.1. Read required files
+   8.2. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
+   8.3. Implement the change
+   8.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
+   8.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
+   8.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
+   8.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
+   8.8. Record result (include VFP cycle summary for software types)
+   8.9. Update `.index.json` `completed_steps` to current step number
 9. **After all steps** (or on failure):
    - Update `.index.json` timestamp
    - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
