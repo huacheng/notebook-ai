@@ -410,6 +410,11 @@ export function FileViewerRender({
               onClick={() => handleHighlightClick(annId)}
             >
               {formatTagLabel(hl.type, ann.content)}
+              <span
+                className="fv-ann-tag__delete"
+                onClick={(e) => { e.stopPropagation(); removeAnnotation(annId); }}
+                title="删除批注"
+              >×</span>
             </div>
           </Fragment>
         );
