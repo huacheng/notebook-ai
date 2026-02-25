@@ -9,6 +9,8 @@ export interface FileAnnotation {
   author: string;
   timestamp: string;            // ISO
   updatedAt: number;            // ms epoch
+  highlightRects?: { x: number; y: number; width: number; height: number }[];
+  capturedScale?: number;
 }
 
 export interface FileAnnotations {

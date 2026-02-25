@@ -135,6 +135,41 @@ export function scaleHighlightCoordsWithOffset(
   return { rects, bottomY };
 }
 
+/** Compute adjusted scrollTop when zoom scale changes, keeping content position stable. */
+export function computeZoomScrollTop(
+  oldScrollTop: number,
+  oldScale: number,
+  newScale: number,
+  paddingY: number,
+): number {
+  if (oldScale === newScale) return oldScrollTop;
+  if (oldScrollTop <= 0) return 0;
+  const ratio = newScale / oldScale;
+  return paddingY + (oldScrollTop - paddingY) * ratio;
+}
+
+/** Rebuild HighlightsMap from persisted annotation data (for restoring highlights after re-open). */
+export function rebuildHighlightsFromAnnotations(
+  annotations: ReadonlyArray<{
+    id: string;
+    type: AnnotationHighlight['type'];
+    highlightRects?: Rect[];
+    capturedScale?: number;
+  }>,
+): HighlightsMap {
+  const map: HighlightsMap = {};
+  for (const ann of annotations) {
+    if (!ann.highlightRects || ann.highlightRects.length === 0) continue;
+    map[ann.id] = {
+      rects: ann.highlightRects,
+      bottomY: computeBottomY(ann.highlightRects),
+      type: ann.type,
+      capturedScale: ann.capturedScale ?? 1.0,
+    };
+  }
+  return map;
+}
+
 /** Compute scroll target Y for a given annotation's highlight. */
 export function computeScrollTarget(
   highlights: HighlightsMap,

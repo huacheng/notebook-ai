@@ -255,6 +255,8 @@ import {
   scaleHighlightCoords,
   scaleRectWithOffset,
   scaleHighlightCoordsWithOffset,
+  computeZoomScrollTop,
+  rebuildHighlightsFromAnnotations,
 } from '../utils/annotationHighlight';
 import type { HighlightsMap } from '../utils/annotationHighlight';
 
@@ -548,5 +550,60 @@ describe('scaleHighlightCoordsWithOffset — applies offset-aware scaling to all
     // x = 24 + (174-24)*1.5 = 24 + 225 = 249 ← 偏移了!
     expect(wrongResult.rects[0].x).toBeCloseTo(249, 0);
     expect(wrongResult.rects[0].x).not.toBeCloseTo(capturedX, 0); // 证明双重缩放
+  });
+});
+
+describe('computeZoomScrollTop — adjusts scroll position on zoom change', () => {
+  it('scales scrollTop proportionally around padding offset', () => {
+    // scrollTop=520, oldScale=1.0, newScale=1.5, paddingY=20
+    // newScroll = 20 + (520 - 20) * (1.5 / 1.0) = 20 + 750 = 770
+    const result = computeZoomScrollTop(520, 1.0, 1.5, 20);
+    expect(result).toBe(770);
+  });
+
+  it('returns 0 when scrollTop is at origin', () => {
+    const result = computeZoomScrollTop(0, 1.0, 2.0, 20);
+    expect(result).toBe(0);
+  });
+
+  it('keeps scrollTop unchanged when scale ratio is 1', () => {
+    const result = computeZoomScrollTop(300, 1.5, 1.5, 20);
+    expect(result).toBe(300);
+  });
+
+  it('zooming out reduces scrollTop', () => {
+    // scrollTop=770, oldScale=1.5, newScale=1.0
+    // newScroll = 20 + (770-20)*(1.0/1.5) = 20 + 500 = 520
+    const result = computeZoomScrollTop(770, 1.5, 1.0, 20);
+    expect(result).toBeCloseTo(520, 0);
+  });
+});
+
+describe('rebuildHighlightsFromAnnotations — restores highlights from persisted data', () => {
+  it('rebuilds HighlightsMap from annotations with rects', () => {
+    const annotations = [
+      { id: 'a1', type: 'comment' as const, highlightRects: [{ x: 100, y: 200, width: 300, height: 20 }], capturedScale: 1.5 },
+      { id: 'a2', type: 'replace' as const, highlightRects: [{ x: 50, y: 80, width: 200, height: 15 }], capturedScale: 1.0 },
+    ];
+    const result = rebuildHighlightsFromAnnotations(annotations);
+    expect(Object.keys(result)).toEqual(['a1', 'a2']);
+    expect(result.a1.rects).toEqual([{ x: 100, y: 200, width: 300, height: 20 }]);
+    expect(result.a1.capturedScale).toBe(1.5);
+    expect(result.a1.type).toBe('comment');
+    expect(result.a2.capturedScale).toBe(1.0);
+  });
+
+  it('skips annotations without rects', () => {
+    const annotations = [
+      { id: 'a1', type: 'comment' as const },
+      { id: 'a2', type: 'replace' as const, highlightRects: [{ x: 10, y: 20, width: 100, height: 12 }], capturedScale: 1.0 },
+    ];
+    const result = rebuildHighlightsFromAnnotations(annotations);
+    expect(Object.keys(result)).toEqual(['a2']);
+  });
+
+  it('returns empty map for empty annotations', () => {
+    const result = rebuildHighlightsFromAnnotations([]);
+    expect(result).toEqual({});
   });
 });

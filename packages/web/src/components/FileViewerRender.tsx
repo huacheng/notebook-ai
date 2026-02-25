@@ -21,6 +21,8 @@ import {
   computeScrollTarget,
   computeMarginAnchor,
   scaleHighlightCoordsWithOffset,
+  computeZoomScrollTop,
+  rebuildHighlightsFromAnnotations,
 } from '../utils/annotationHighlight';
 
 import { isJsonFile, formatJsonContent } from '../utils/jsonFormat';
@@ -206,6 +208,31 @@ export function FileViewerRender({
     return scaleHighlightCoordsWithOffset(hl, ratio, PADDING_X, PADDING_Y);
   }, [pdfScale]);
 
+  // Zoom scroll adjustment — keep content position stable when scale changes
+  const prevScaleRef = useRef(pdfScale);
+
+  useEffect(() => {
+    const oldScale = prevScaleRef.current;
+    prevScaleRef.current = pdfScale;
+    if (oldScale === pdfScale) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const newScrollTop = computeZoomScrollTop(container.scrollTop, oldScale, pdfScale, PADDING_Y);
+    container.scrollTop = newScrollTop;
+  }, [pdfScale]);
+
+  // Restore highlights from persisted annotation data (after file re-open)
+  useEffect(() => {
+    const missing = annotations.items.filter(
+      a => a.highlightRects && a.highlightRects.length > 0 && !highlights[a.id]
+    );
+    if (missing.length === 0) return;
+    setHighlights(prev => {
+      const rebuilt = rebuildHighlightsFromAnnotations(missing);
+      return { ...prev, ...rebuilt };
+    });
+  }, [annotations]); // deliberately omit highlights — one-shot restore
+
   const handlePageVisible = useCallback((pageNum: number, isVisible: boolean) => {
     const set = visiblePagesRef.current;
     if (isVisible) set.add(pageNum);
@@ -240,6 +267,8 @@ export function FileViewerRender({
       author: 'user',
       timestamp: new Date().toISOString(),
       updatedAt: Date.now(),
+      highlightRects: float?.rects,
+      capturedScale: pdfScale,
     };
     onAnnotationsChange({ items: [...annotations.items, ann], updatedAt: Date.now() });
     // Persist selection rects as highlight (record current scale for proportional re-scaling).
