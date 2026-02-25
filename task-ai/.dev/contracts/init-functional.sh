@@ -11,6 +11,7 @@ CURRENT_BRANCH=$(git branch --show-current)
 
 # --- Test 1: Successful Initialization ---
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 rm -rf "$NB_WORKSPACES_ROOT"
 mkdir -p "$NB_WORKSPACES_ROOT"
 

@@ -9,6 +9,7 @@ STATE_PY="$TASK_AI_ROOT/core/state.py"
 TEST_PROJECT="test-project"
 TEST_OBJ="Fix spelling"
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a project
 rm -rf "$NB_WORKSPACES_ROOT"

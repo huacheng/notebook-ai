@@ -7,6 +7,7 @@ source "$(dirname "$0")/lib.sh"
 PLAN_SH="$TASK_AI_ROOT/skills/plan/scripts/plan.sh"
 TEST_NB="plan-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/plan-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"

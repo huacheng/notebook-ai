@@ -8,6 +8,7 @@ EXEC_SH="$TASK_AI_ROOT/skills/exec/scripts/exec.sh"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
 TEST_NB="exec-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/exec-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"

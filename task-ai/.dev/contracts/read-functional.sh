@@ -6,6 +6,7 @@ source "$(dirname "$0")/lib.sh"
 
 READ_SH="$TASK_AI_ROOT/skills/read/scripts/read.sh"
 export NB_WORKSPACES_ROOT="/tmp/read-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 LIB_PATH="$NB_WORKSPACES_ROOT/.library"
 
 # Setup

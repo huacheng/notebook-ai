@@ -8,6 +8,7 @@ AUTO_SH="$TASK_AI_ROOT/skills/auto/scripts/auto.sh"
 JSON_GET="$TASK_AI_ROOT/.dev/contracts/json_get.py"
 TEST_NB="auto-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/auto-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"

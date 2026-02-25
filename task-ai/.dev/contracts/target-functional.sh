@@ -9,6 +9,7 @@ INIT_SH="$TASK_AI_ROOT/skills/init/scripts/init.sh"
 TEST_PROJECT="test-project"
 TEST_NB="target-test-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a notebook
 rm -rf "$NB_WORKSPACES_ROOT"
