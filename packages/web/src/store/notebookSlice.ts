@@ -57,7 +57,7 @@ function makeCell(type: CellType): Cell {
 
 export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'notebook' | 'sliceLoading' | 'notebookLoading'
-  | 'setNotebook' | 'updateTitle' | 'addCell' | 'submitPrompt' | 'removeCell' | 'moveCell'
+  | 'setNotebook' | 'updateTitle' | 'updateAgent' | 'addCell' | 'submitPrompt' | 'removeCell' | 'moveCell'
   | 'updateCellSource' | 'setCellStatus' | 'appendCellOutput' | 'updateToolResult'
   | 'setCellGitDiff'
   | 'generateSlice' | 'updateSliceSections'
@@ -85,6 +85,22 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
           metadata: {
             ...state.notebook.metadata,
             title,
+            updated: new Date().toISOString(),
+          },
+        },
+      };
+    });
+  },
+
+  updateAgent(agent) {
+    set((state) => {
+      if (!state.notebook) return {};
+      return {
+        notebook: {
+          ...state.notebook,
+          metadata: {
+            ...state.notebook.metadata,
+            agent,
             updated: new Date().toISOString(),
           },
         },

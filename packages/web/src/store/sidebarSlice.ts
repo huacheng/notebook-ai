@@ -13,6 +13,7 @@ function makeBlankNotebook(): Notebook {
       created: now,
       updated: now,
       git_repo: false,
+      agent: 'claude',
     },
     cells: [],
     slice: { generated: false, sections: [] },

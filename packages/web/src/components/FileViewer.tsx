@@ -94,8 +94,17 @@ export function FileViewer() {
         onZoomIn={showZoom ? handleZoomIn : undefined}
         onZoomOut={showZoom ? handleZoomOut : undefined}
       />
-      {fileState.status === 'loading' && <div className="fv-loading">Loading…</div>}
-      {fileState.status === 'converting' && <div className="fv-loading">Converting document…</div>}
+      {(fileState.status === 'loading' || fileState.status === 'converting') && (
+        <div className="fv-loading">
+          <div className="fv-loading-bar" />
+          <div className="fv-loading-body">
+            <div className="fv-loading-spinner" />
+            <p className="fv-loading-text">
+              {fileState.status === 'converting' ? 'Converting document…' : 'Loading…'}
+            </p>
+          </div>
+        </div>
+      )}
       {fileState.status === 'error' && <div className="fv-error">Error: {fileState.error}</div>}
       {fileState.status === 'complete' && mode === 'render' && (
         <FileViewerRender

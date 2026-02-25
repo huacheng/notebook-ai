@@ -3859,8 +3859,50 @@ button:focus-visible {
   border-top: 1px solid var(--border-default);
 }
 .fv-loading {
-  padding: 60px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.fv-loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--border-default);
+  overflow: hidden;
+}
+.fv-loading-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: var(--color-primary);
+  animation: nb-progress-slide 1.4s ease-in-out infinite;
+}
+.fv-loading-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+.fv-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-default);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: nb-spinner 0.8s linear infinite;
+}
+.fv-loading-text {
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
 .fv-error {
