@@ -30,7 +30,7 @@ Ingests user-provided documents, extracts novel information, applies strict 10-c
 3. **Deduplication**: Run `library search` using concepts. Isolate the "delta" (novel information).
 4. **Depth Processing**:
    - `shallow`: Format the delta directly.
-   - `deep`: Delegate to `research --caller read --scope gap` to cross-reference and supplement the delta with web research. Read delegates the research work; it does not perform web searches itself.
+   - `deep`: Delegate to `research --caller exec --scope gap` to cross-reference and supplement the delta with web research. Read delegates the research work; it does not perform web searches itself.
 5. **Sanitization (Detox)**: Apply 10-category injection rules (`library/references/injection-rules.md`). Compute risk and hashes.
 6. **Library Write Protocol**: Acquire `.references/.lock`, write to `.memory/.references/<topic>.md`, append to `.changelog`, update `.index.md`, release lock.
 7. **Rebuild**: Trigger `library maintain --rebuild-index`.

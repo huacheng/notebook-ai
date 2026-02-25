@@ -60,9 +60,12 @@ fi
 mkdir -p "$WORKING_DIR"
 
 # 5. Metadata Creation (.index.json)
+# Escape TITLE for safe JSON embedding (handle backslashes then double quotes)
+SAFE_TITLE="${TITLE//\\/\\\\}"
+SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
 cat > "$WORKING_DIR/.index.json" <<EOF
 {
-  "title": "$TITLE",
+  "title": "$SAFE_TITLE",
   "type": "",
   "status": "draft",
   "phase": "",
