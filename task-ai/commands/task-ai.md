@@ -225,12 +225,6 @@ Sub-commands have different cognitive demands. Each SKILL.md frontmatter declare
 
 > **See `commands/references/model-routing.md`** for tier definitions, the full routing table for all 16 skills, and the auto mode delegation protocol.
 
-### Lifecycle Hooks (Extension Point)
-
-Status transitions can optionally trigger external notifications via `$NB_WORKSPACES_ROOT/.hooks.md`. Hooks are best-effort — failures do not block status transitions.
-
-> **See `commands/references/lifecycle-hooks.md`** for hook configuration format, implementation details, and environment variables.
-
 ---
 
 ## Sub-commands
