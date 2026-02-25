@@ -16,7 +16,6 @@
 | `git-details.md` | Branch/commit conventions, worktree, rollback, `.gitignore` |
 | `library-repo-protocol.md` | Independent git repository protocol for knowledge library |
 | `library-write-protocol.md` | 6-step library write protocol, changelog format |
-| `lifecycle-hooks.md` | Status transition hooks configuration |
 | `model-routing.md` | Tier definitions (heavy/medium/light), routing table |
 | `state-matrix.md` | State x command matrix with all combinations |
 | `summary-formats.md` | `.summary.md` table formats for experiences/references |

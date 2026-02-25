@@ -185,17 +185,17 @@ The auto skill runs this loop within a single the agent session:
 
 1. Read .index.json → determine entry point (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
 2. LOOP:
-   a. Check for .auto-stop file → if exists, break loop
-   b. Context check: if context window usage ≥ 70%, run prompt "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working." to compress context
-   c. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
+   2.1. Check for .auto-stop file → if exists, break loop
+   2.2. Context check: if context window usage ≥ 70%, run prompt "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working." to compress context
+   2.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - **If `auto_delegatable: true`**: Invoke via Task subagent with `model = tier_to_model(model_tier)` (heavy→opus, medium→sonnet, light→haiku). Subagent receives SKILL.md + `.summary.md` + `.index.json` + input files. On subagent completion, read output files (`.auto-signal`, `.summary.md`, result files) to restore context. On subagent failure/timeout → fallback to inline execution below
       - **If `auto_delegatable: false`**: Execute inline (Read SKILL.md steps, execute in main session)
-      — In both paths, SKIP the sub-command's own .auto-signal write step (auto loop handles it at step 2e)
-   d. Evaluate result → determine next step (result-based routing)
-   e. Write .auto-signal (progress report for daemon, WITH iteration and compaction_count fields)
-   f. Increment iteration counter
-   g. If next == "(stop)" → break loop
-   h. Set current step = next step → continue loop
+      — In both paths, SKIP the sub-command's own .auto-signal write step (auto loop handles it at step 2.5)
+   2.4. Evaluate result → determine next step (result-based routing)
+   2.5. Write .auto-signal (progress report for daemon, WITH iteration and compaction_count fields)
+   2.6. Increment iteration counter
+   2.7. If next == "(stop)" → break loop
+   2.8. Set current step = next step → continue loop
 3. Cleanup: delete .auto-signal, report final status
 
 **Signal ownership in auto mode**: Each sub-command's SKILL.md includes a "write `.auto-signal`" step. In auto mode, the auto loop **subsumes** that step — the agent writes the signal once at step 2e (with the `iteration` field included). The sub-command's own signal-write instruction is skipped to avoid double-writing. In manual (non-auto) execution, sub-commands write `.auto-signal` themselves (without `iteration` field).

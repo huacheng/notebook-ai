@@ -100,13 +100,13 @@ On backend server restart, auto state is recovered from SQLite:
 
 1. **Read** all `task_auto` rows with `status = 'running'`
 2. **For each active row**:
-   a. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted the agent from immediately exiting due to leftover stop file from pre-crash state)
-   b. Check terminal state via `tmux capture-pane`:
+   2.1. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted the agent from immediately exiting due to leftover stop file from pre-crash state)
+   2.2. Check terminal state via `tmux capture-pane`:
       - If the agent auto session still running → re-establish monitoring (fs.watch + heartbeat)
       - If shell prompt visible (the agent exited) → restart with backoff: send `/moonview:auto <task_dir>` to the prompt input window (the agent's internal loop reads `.index.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in a new SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
-   c. Reset `stall_count` to `0` and `last_capture_hash` to `""` (fresh monitoring baseline)
-   d. Start heartbeat polling timer
-   e. Re-establish `fs.watch` on `task_dir` for `.auto-signal`
+   2.3. Reset `stall_count` to `0` and `last_capture_hash` to `""` (fresh monitoring baseline)
+   2.4. Start heartbeat polling timer
+   2.5. Re-establish `fs.watch` on `task_dir` for `.auto-signal`
 3. **Resume** normal daemon operation (signal watching + heartbeat polling)
 
 On restart, the agent's auto loop re-reads `.index.json` and `.summary.md` to reconstruct context. The conversation context from the previous session is lost, but `.summary.md` provides the condensed recovery information.

@@ -1,7 +1,7 @@
 ---
 name: target
 description: "Define, refine, and review task objectives and requirements in .target.md. Supports both conversational definition and file-based editing."
-model_tier: light
+model_tier: heavy
 auto_delegatable: true
 arguments:
   - name: objective
