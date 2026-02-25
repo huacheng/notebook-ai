@@ -9,6 +9,7 @@ STATE_PY="$TASK_AI_ROOT/core/state.py"
 TEST_PROJECT="test-project"
 TEST_OBJ="Fix spelling"
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a project
 rm -rf "$NB_WORKSPACES_ROOT"
@@ -140,6 +141,21 @@ if echo "$START_SECTION" | grep -qi '/moonview:init\|Call.*init'; then
   emit_fail "light: init appears in start section — should only be in promote"
 else
   emit_pass "light: init not called unconditionally in start section"
+fi
+
+# --- Test: light-exec in canonical status lists ---
+STATE_PY="$TASK_AI_ROOT/core/state.py"
+if grep -q 'light-exec' "$STATE_PY"; then
+  emit_pass "light: light-exec in state.py VALID_STATUSES"
+else
+  emit_fail "light: light-exec missing from state.py VALID_STATUSES"
+fi
+
+EXPECTED_STATES="$DEV_ROOT/fixtures/expected-states.json"
+if grep -q 'light-exec' "$EXPECTED_STATES"; then
+  emit_pass "light: light-exec in expected-states.json"
+else
+  emit_fail "light: light-exec missing from expected-states.json"
 fi
 
 summary

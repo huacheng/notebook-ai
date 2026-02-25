@@ -6,6 +6,7 @@ source "$(dirname "$0")/lib.sh"
 
 SECURITY_SH="$TASK_AI_ROOT/skills/security/scripts/security.sh"
 export NB_WORKSPACES_ROOT="/tmp/security-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 TEST_NB="security-test-nb"
 
 rm -rf "$NB_WORKSPACES_ROOT" && mkdir -p "$NB_WORKSPACES_ROOT/$TEST_NB/.working"

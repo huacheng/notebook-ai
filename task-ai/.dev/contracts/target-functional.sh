@@ -9,6 +9,7 @@ INIT_SH="$TASK_AI_ROOT/skills/init/scripts/init.sh"
 TEST_PROJECT="test-project"
 TEST_NB="target-test-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a notebook
 rm -rf "$NB_WORKSPACES_ROOT"
@@ -63,6 +64,14 @@ if [[ -f "$TARGET_SH" ]]; then
     else
         emit_fail "target: failed context awareness in sub-directory"
     fi
+fi
+
+# --- Test: target.sh does not pass raw user input to awk -v ---
+TARGET_SCRIPT="$TASK_AI_ROOT/skills/target/scripts/target.sh"
+if grep -n 'awk.*-v.*\$OBJECTIVE\|awk.*-v.*"\$1"' "$TARGET_SCRIPT" | grep -qv '^#'; then
+  emit_fail "target: passes raw user input to awk -v — backslash/newline injection risk"
+else
+  emit_pass "target: awk does not receive raw user input via -v"
 fi
 
 # Cleanup

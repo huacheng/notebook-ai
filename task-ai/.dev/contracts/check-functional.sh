@@ -8,6 +8,7 @@ CHECK_SH="$TASK_AI_ROOT/skills/check/scripts/check.sh"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
 TEST_NB="check-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/check-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"

@@ -2,10 +2,17 @@
 # L1: Verify scripts validate find() results before using them
 source "$(dirname "$0")/lib.sh"
 
-# Scripts that use find to locate notebook directories
+# All scripts that use find to locate notebook directories
 SCRIPTS_WITH_FIND=(
+  "$TASK_AI_ROOT/skills/auto/scripts/auto.sh"
+  "$TASK_AI_ROOT/skills/check/scripts/check.sh"
+  "$TASK_AI_ROOT/skills/exec/scripts/exec.sh"
+  "$TASK_AI_ROOT/skills/merge/scripts/merge.sh"
+  "$TASK_AI_ROOT/skills/plan/scripts/plan.sh"
+  "$TASK_AI_ROOT/skills/report/scripts/report.sh"
   "$TASK_AI_ROOT/skills/research/scripts/research.sh"
   "$TASK_AI_ROOT/skills/security/scripts/security.sh"
+  "$TASK_AI_ROOT/skills/verify/scripts/verify.sh"
 )
 
 for script in "${SCRIPTS_WITH_FIND[@]}"; do

@@ -8,6 +8,7 @@ AUTO_SH="$TASK_AI_ROOT/skills/auto/scripts/auto.sh"
 JSON_GET="$TASK_AI_ROOT/.dev/contracts/json_get.py"
 TEST_NB="auto-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/auto-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"
@@ -43,6 +44,19 @@ if echo "$AUTO_STEPS" | grep -qi "depends_on\|dependency.*gate\|validate.*depend
   emit_pass "auto: execution steps include depends_on validation"
 else
   emit_fail "auto: missing depends_on validation in loop — exec/merge have it but auto does not"
+fi
+
+# --- Test: auto SKILL.md Result-Based Routing has no duplicate rows ---
+AUTO_SKILL="$TASK_AI_ROOT/skills/auto/SKILL.md"
+ROUTING_SECTION=$(extract_section "$AUTO_SKILL" "### Result-Based Routing")
+# Extract table rows (skip header and separator), sort, find duplicates
+ROUTING_ROWS=$(echo "$ROUTING_SECTION" | grep '^|' | grep -v '^| step\|^|---' | sed 's/ *| */|/g')
+DUPES=$(echo "$ROUTING_ROWS" | sort | uniq -d)
+if [[ -n "$DUPES" ]]; then
+  DUPE_COUNT=$(echo "$DUPES" | wc -l)
+  emit_fail "auto: $DUPE_COUNT duplicate row(s) in Result-Based Routing table"
+else
+  emit_pass "auto: no duplicate rows in Result-Based Routing table"
 fi
 
 # Cleanup

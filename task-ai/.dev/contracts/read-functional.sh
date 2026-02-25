@@ -6,6 +6,7 @@ source "$(dirname "$0")/lib.sh"
 
 READ_SH="$TASK_AI_ROOT/skills/read/scripts/read.sh"
 export NB_WORKSPACES_ROOT="/tmp/read-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 LIB_PATH="$NB_WORKSPACES_ROOT/.library"
 
 # Setup
@@ -55,6 +56,23 @@ if echo "$READ_ROW" | grep -qi "Web search"; then
   emit_fail "model-routing: read row still says 'Web search' — should be local ingestion"
 else
   emit_pass "model-routing: read row does not contain 'Web search'"
+fi
+
+# --- Test: read SKILL.md uses valid --caller for research delegation ---
+READ_SKILL="$TASK_AI_ROOT/skills/read/SKILL.md"
+RESEARCH_SKILL="$TASK_AI_ROOT/skills/research/SKILL.md"
+# Extract valid callers from research SKILL.md argument definition
+VALID_CALLERS=$(grep -oE 'target\|plan\|test\|verify\|check\|exec' "$RESEARCH_SKILL" | head -1)
+# Find any --caller value used in read's delegation to research
+CALLER_USED=$(grep -oE '\-\-caller [a-z]+' "$READ_SKILL" | awk '{print $2}' | head -1)
+if [[ -n "$CALLER_USED" ]]; then
+  if echo "$VALID_CALLERS" | grep -qw "$CALLER_USED"; then
+    emit_pass "read: --caller $CALLER_USED is valid for research"
+  else
+    emit_fail "read: --caller $CALLER_USED is not in research's accepted callers ($VALID_CALLERS)"
+  fi
+else
+  emit_pass "read: no --caller found (ok)"
 fi
 
 summary

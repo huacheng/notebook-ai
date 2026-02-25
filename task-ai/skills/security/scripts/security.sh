@@ -11,29 +11,8 @@ source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
 NOTEBOOK="${1:-}"
 ACTION="${2:-}"
 PAYLOAD="${3:-}"
-
-# 1. Identify Context
-if [[ -z "$NOTEBOOK" ]]; then
-    if ! find_nb_context; then
-        echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
-        exit 1
-    fi
-    NOTEBOOK="$NB_NOTEBOOK"
-    WORK_DIR="$NB_WORKING"
-else
-    # Explicit notebook name provided
-    if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        echo "[ERROR] Invalid notebook name." >&2
-        exit 1
-    fi
-    NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    NB_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)
-    if [[ -z "$NB_DIR" ]]; then
-        echo "[ERROR] Notebook directory '$NOTEBOOK' not found under $NB_ROOT" >&2
-        exit 1
-    fi
-    WORK_DIR="$NB_DIR/.working"
-fi
+resolve_workdir "$NOTEBOOK"
+NOTEBOOK="$NB_NOTEBOOK"
 
 if [[ -z "$ACTION" ]]; then
     echo "[ERROR] Action is required." >&2

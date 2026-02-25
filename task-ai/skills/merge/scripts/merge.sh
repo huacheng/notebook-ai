@@ -9,24 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
 
 NOTEBOOK="${1:-}"
-
-# 1. Identify Context
-if [[ -z "$NOTEBOOK" ]]; then
-    if ! find_nb_context; then
-        echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
-        exit 1
-    fi
-    NOTEBOOK="$NB_NOTEBOOK"
-    WORK_DIR="$NB_WORKING"
-else
-    # Explicit notebook name provided
-    if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        echo "[ERROR] Invalid notebook name." >&2
-        exit 1
-    fi
-    NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    WORK_DIR=$(find "$NB_ROOT" -name "$NOTEBOOK" -type d | head -n 1)/.working
-fi
+resolve_workdir "$NOTEBOOK"
+NOTEBOOK="$NB_NOTEBOOK"
 
 if [[ ! -d "$WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2

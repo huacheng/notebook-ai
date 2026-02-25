@@ -13,6 +13,9 @@ L1_SCRIPTS=(
   deleted-files.sh
   find-result-validation.sh
   dedup-paragraphs.sh
+  test-hygiene.sh
+  shared-workdir.sh
+  variable-defaults.sh
   publish-sync.sh
   cross-refs.sh
   signal-whitelist.sh

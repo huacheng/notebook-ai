@@ -7,6 +7,7 @@ source "$(dirname "$0")/lib.sh"
 VERIFY_SH="$TASK_AI_ROOT/skills/verify/scripts/verify.sh"
 TEST_NB="verify-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/verify-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"

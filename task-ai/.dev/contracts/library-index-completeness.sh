@@ -7,6 +7,7 @@ source "$(dirname "$0")/lib.sh"
 
 # Use temp directory for testing to avoid /.library access errors
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT}/.library}"
 MASTER_INDEX="$LIB_PATH/.master-index.md"
 

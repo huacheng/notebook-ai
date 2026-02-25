@@ -8,6 +8,7 @@ EXEC_SH="$TASK_AI_ROOT/skills/exec/scripts/exec.sh"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
 TEST_NB="exec-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/exec-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"
@@ -45,12 +46,29 @@ else
     emit_fail "exec: failed to increment progress"
 fi
 
+# --- Test: exec SKILL.md uses "dependency-blocked" checkpoint (consistent with merge) ---
+EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
+# Check the .auto-signal table for blocking dependency row
+if grep -A1 'Blocking dependency' "$EXEC_SKILL" | grep -q 'dependency-blocked'; then
+  emit_pass "exec: dependency-blocked checkpoint matches merge convention"
+else
+  emit_fail "exec: blocking dependency signal uses empty checkpoint — should use 'dependency-blocked' like merge"
+fi
+
 # --- Test: exec SKILL.md references verification-first-protocol.md ---
 EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
 if grep -q "verification-first-protocol.md" "$EXEC_SKILL"; then
   emit_pass "exec: references verification-first-protocol.md"
 else
   emit_fail "exec: uses VFP concepts (VH/HS/CGG) but missing cross-reference to verification-first-protocol.md"
+fi
+
+# --- Test: exec SKILL.md injection category count says "ten" not "nine" ---
+EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
+if grep -qi 'nine.*categor' "$EXEC_SKILL"; then
+  emit_fail "exec: says 'nine categories' but injection-rules.md defines ten"
+else
+  emit_pass "exec: injection category count is correct"
 fi
 
 # Cleanup

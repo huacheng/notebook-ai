@@ -11,6 +11,7 @@ CURRENT_BRANCH=$(git branch --show-current)
 
 # --- Test 1: Successful Initialization ---
 export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 rm -rf "$NB_WORKSPACES_ROOT"
 mkdir -p "$NB_WORKSPACES_ROOT"
 
@@ -49,6 +50,23 @@ if echo "$OUTPUT" | grep -q "Git branch already exists"; then
     emit_pass "init: correctly blocked branch collision"
 else
     emit_fail "init: failed to block branch collision"
+fi
+
+# --- Test: init.sh builds tags JSON safely (no unquoted variable expansion) ---
+INIT_SCRIPT="$TASK_AI_ROOT/skills/init/scripts/init.sh"
+if grep -n 'echo \$2\|echo $2' "$INIT_SCRIPT" | grep -qv '^#'; then
+  emit_fail "init: unquoted \$2 in tags construction — JSON injection risk"
+else
+  emit_pass "init: tags argument is properly quoted"
+fi
+
+# --- Test: init.sh escapes $TITLE before JSON injection ---
+# The heredoc on line ~65 injects $TITLE raw into JSON. If TITLE contains
+# double quotes or backslashes, it will produce broken JSON.
+if grep -n '"title": "\$TITLE"' "$INIT_SH" | grep -qv '^#'; then
+  emit_fail "init: raw \$TITLE in JSON heredoc — quotes/backslashes break JSON"
+else
+  emit_pass "init: \$TITLE is escaped or sanitized before JSON injection"
 fi
 
 # Cleanup

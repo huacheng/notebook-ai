@@ -40,6 +40,34 @@ while IFS= read -r dev_file; do
   fi
 done < <(find "$TASK_AI_ROOT/commands" -name "*.md" | sort)
 
+# Compare scripts
+while IFS= read -r dev_file; do
+  rel=$(realpath --relative-to="$TASK_AI_ROOT" "$dev_file")
+  pub_file="$PLUGIN_DIR/$rel"
+  if [[ ! -f "$pub_file" ]]; then
+    emit_fail "publish-sync: '$rel' missing from plugins/task-ai/"
+    DIFFS_FOUND=1
+  elif ! diff -q "$dev_file" "$pub_file" > /dev/null 2>&1; then
+    emit_fail "publish-sync: '$rel' differs between dev and publish"
+    DIFFS_FOUND=1
+  fi
+done < <(find "$TASK_AI_ROOT/skills" -name "*.sh" -o -name "*.py" | sort)
+
+# Compare core/
+if [[ -d "$TASK_AI_ROOT/core" ]]; then
+  while IFS= read -r dev_file; do
+    rel=$(realpath --relative-to="$TASK_AI_ROOT" "$dev_file")
+    pub_file="$PLUGIN_DIR/$rel"
+    if [[ ! -f "$pub_file" ]]; then
+      emit_fail "publish-sync: '$rel' missing from plugins/task-ai/"
+      DIFFS_FOUND=1
+    elif ! diff -q "$dev_file" "$pub_file" > /dev/null 2>&1; then
+      emit_fail "publish-sync: '$rel' differs between dev and publish"
+      DIFFS_FOUND=1
+    fi
+  done < <(find "$TASK_AI_ROOT/core" -type f -name "*.py" | sort)
+fi
+
 # Compare root files
 for root_file in REFERENCE-INDEX.md plugin.json; do
   dev="$TASK_AI_ROOT/$root_file"

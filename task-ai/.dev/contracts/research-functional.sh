@@ -7,6 +7,7 @@ source "$(dirname "$0")/lib.sh"
 RESEARCH_SH="$TASK_AI_ROOT/skills/research/scripts/research.sh"
 TEST_NB="research-test-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/task-ai-research-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a dummy notebook
 rm -rf "$NB_WORKSPACES_ROOT"

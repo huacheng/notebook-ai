@@ -155,6 +155,38 @@ find_nb_context() {
   return 1
 }
 
+# --- Notebook Workdir Resolution ---
+
+# Resolves NOTEBOOK and WORK_DIR from argument or context.
+# Usage: resolve_workdir "$1"
+# Sets: NB_NOTEBOOK, WORK_DIR (exported)
+# Exits on failure.
+resolve_workdir() {
+  local notebook="${1:-}"
+  if [[ -z "$notebook" ]]; then
+    if ! find_nb_context; then
+      echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
+      exit 1
+    fi
+    notebook="$NB_NOTEBOOK"
+    export WORK_DIR="$NB_WORKING"
+  else
+    if [[ ! "$notebook" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      echo "[ERROR] Invalid notebook name." >&2
+      exit 1
+    fi
+    local nb_root="${NB_WORKSPACES_ROOT:-$(pwd)}"
+    local nb_dir
+    nb_dir=$(find "$nb_root" -name "$notebook" -type d | head -n 1)
+    if [[ -z "$nb_dir" ]]; then
+      echo "[ERROR] Notebook directory '$notebook' not found under $nb_root" >&2
+      exit 1
+    fi
+    export WORK_DIR="$nb_dir/.working"
+  fi
+  export NB_NOTEBOOK="$notebook"
+}
+
 # --- Summary ---
 
 summary() {

@@ -7,6 +7,7 @@ source "$(dirname "$0")/lib.sh"
 MERGE_SH="$TASK_AI_ROOT/skills/merge/scripts/merge.sh"
 TEST_NB="merge-tdd-$(date +%s)"
 export NB_WORKSPACES_ROOT="/tmp/merge-functional-test"
+trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a real git branch to merge
 rm -rf "$NB_WORKSPACES_ROOT" && mkdir -p "$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working"

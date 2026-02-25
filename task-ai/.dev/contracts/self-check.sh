@@ -53,8 +53,11 @@ for md_file in "${ALL_MD[@]}"; do
   rel_path=$(realpath --relative-to="$TASK_AI_ROOT" "$md_file")
   covered=0
 
-  # Broad contracts cover all .md files
-  covered=1
+  # Broad contracts cover all .md files via find_all_md()
+  # But we still need to verify the file is reachable by find_all_md
+  if [[ "$rel_path" == skills/*/SKILL.md || "$rel_path" == commands/*.md || "$rel_path" == commands/references/*.md || "$rel_path" == skills/*/references/*.md || "$rel_path" == REFERENCE-INDEX.md ]]; then
+    covered=1
+  fi
 
   # Additionally check if SKILL.md files are covered by skill-specific contracts
   if [[ "$rel_path" == */SKILL.md ]]; then
