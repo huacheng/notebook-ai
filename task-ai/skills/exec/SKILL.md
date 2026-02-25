@@ -91,15 +91,15 @@ For each implementation step:
 6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files, using the most recent file (by filename date) as the primary fix guidance. `.bugfix/` entries indicate mid-exec issues; `.analysis/` entries indicate post-exec issues. Address fix items before continuing remaining steps
 7. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
 8. **For each step** (follow Per-Step Execution flow above):
-   a. Read required files
-   b. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
-   c. Implement the change
-   d. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
-   e. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
-   f. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
-   f. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
-   g. Record result (include VFP cycle summary for software types)
-   h. Update `.index.json` `completed_steps` to current step number
+   8.1. Read required files
+   8.2. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
+   8.3. Implement the change
+   8.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
+   8.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
+   8.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
+   8.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
+   8.8. Record result (include VFP cycle summary for software types)
+   8.9. Update `.index.json` `completed_steps` to current step number
 9. **After all steps** (or on failure):
    - Update `.index.json` timestamp
    - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
