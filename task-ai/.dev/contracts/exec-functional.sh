@@ -45,6 +45,15 @@ else
     emit_fail "exec: failed to increment progress"
 fi
 
+# --- Test: exec SKILL.md uses "dependency-blocked" checkpoint (consistent with merge) ---
+EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
+# Check the .auto-signal table for blocking dependency row
+if grep -A1 'Blocking dependency' "$EXEC_SKILL" | grep -q 'dependency-blocked'; then
+  emit_pass "exec: dependency-blocked checkpoint matches merge convention"
+else
+  emit_fail "exec: blocking dependency signal uses empty checkpoint — should use 'dependency-blocked' like merge"
+fi
+
 # --- Test: exec SKILL.md references verification-first-protocol.md ---
 EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
 if grep -q "verification-first-protocol.md" "$EXEC_SKILL"; then

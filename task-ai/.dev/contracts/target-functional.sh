@@ -65,6 +65,14 @@ if [[ -f "$TARGET_SH" ]]; then
     fi
 fi
 
+# --- Test: target.sh does not pass raw user input to awk -v ---
+TARGET_SCRIPT="$TASK_AI_ROOT/skills/target/scripts/target.sh"
+if grep -n 'awk.*-v.*\$OBJECTIVE\|awk.*-v.*"\$1"' "$TARGET_SCRIPT" | grep -qv '^#'; then
+  emit_fail "target: passes raw user input to awk -v — backslash/newline injection risk"
+else
+  emit_pass "target: awk does not receive raw user input via -v"
+fi
+
 # Cleanup
 git checkout master > /dev/null 2>&1
 git branch -D "task/$TEST_NB" > /dev/null 2>&1
