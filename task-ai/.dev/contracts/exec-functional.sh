@@ -63,6 +63,14 @@ else
   emit_fail "exec: uses VFP concepts (VH/HS/CGG) but missing cross-reference to verification-first-protocol.md"
 fi
 
+# --- Test: exec SKILL.md injection category count says "ten" not "nine" ---
+EXEC_SKILL="$TASK_AI_ROOT/skills/exec/SKILL.md"
+if grep -qi 'nine.*categor' "$EXEC_SKILL"; then
+  emit_fail "exec: says 'nine categories' but injection-rules.md defines ten"
+else
+  emit_pass "exec: injection category count is correct"
+fi
+
 # Cleanup
 rm -rf "$NB_WORKSPACES_ROOT"
 

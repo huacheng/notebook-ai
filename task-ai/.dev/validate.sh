@@ -15,6 +15,7 @@ L1_SCRIPTS=(
   dedup-paragraphs.sh
   test-hygiene.sh
   shared-workdir.sh
+  variable-defaults.sh
   publish-sync.sh
   cross-refs.sh
   signal-whitelist.sh

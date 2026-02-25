@@ -2,8 +2,9 @@
 # L1: Verify functional tests have proper cleanup (trap handlers)
 source "$(dirname "$0")/lib.sh"
 
-# All functional test scripts that create temp directories should have trap cleanup
-FUNCTIONAL_TESTS=$(find "$DEV_ROOT/contracts" -name "*-functional.sh" -type f | sort)
+# All test scripts that create temp directories should have trap cleanup
+# Includes both *-functional.sh and L2 library tests
+FUNCTIONAL_TESTS=$(find "$DEV_ROOT/contracts" \( -name "*-functional.sh" -o -name "library-*.sh" \) -type f | sort)
 
 for test_script in $FUNCTIONAL_TESTS; do
   rel=$(basename "$test_script")

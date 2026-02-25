@@ -60,6 +60,15 @@ else
   emit_pass "init: tags argument is properly quoted"
 fi
 
+# --- Test: init.sh escapes $TITLE before JSON injection ---
+# The heredoc on line ~65 injects $TITLE raw into JSON. If TITLE contains
+# double quotes or backslashes, it will produce broken JSON.
+if grep -n '"title": "\$TITLE"' "$INIT_SH" | grep -qv '^#'; then
+  emit_fail "init: raw \$TITLE in JSON heredoc — quotes/backslashes break JSON"
+else
+  emit_pass "init: \$TITLE is escaped or sanitized before JSON injection"
+fi
+
 # Cleanup
 git checkout "$CURRENT_BRANCH" > /dev/null 2>&1
 git branch -D "task/$TEST_NB" > /dev/null 2>&1
