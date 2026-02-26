@@ -163,6 +163,7 @@ export function createProjectsRouter(
     '.auto-stop',
     '.lock',
     '.library-state.json',
+    '.gitignore',
   ]);
   // Top-level dotdirs that should always be hidden from project file browser
   // .deliverables is shown via the right panel, not the file browser
