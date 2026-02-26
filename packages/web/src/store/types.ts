@@ -124,6 +124,10 @@ export interface NotebookStore {
   // ── Project actions ───────────────────────────────────────────────────
   fetchProjects(): Promise<void>;
   createProject(title: string): Promise<void>;
+  deleteProject(projectId: string): Promise<void>;
+  importProject(file: File): Promise<void>;
+  deleteProjectNotebook(projectId: string, notebookRelPath: string): Promise<void>;
+  importProjectNotebook(projectId: string, file: File): Promise<void>;
   setActiveProject(id: string, path: string): void;
   goBackToProjectList(): void;
   navigateFileBrowser(subPath: string): void;

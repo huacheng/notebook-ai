@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { mkdtemp, rm, mkdir, writeFile, readFile } from 'fs/promises';
+import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
 import { createProjectsRouter } from '../routes/projects.js';
@@ -16,16 +17,20 @@ import { createProjectsRouter } from '../routes/projects.js';
 // ── Minimal mock db ────────────────────────────────────────────────────────
 
 function createMockDb(project: { id: string; path: string; title: string }) {
+  const notebooks: any[] = [];
   return {
     getProject: (id: string) => (id === project.id ? { ...project, slug: 'test', status: 'active' } : null),
     listProjects: () => [project],
-    createProject: () => project,
+    createProject: (p: any) => p,
     deleteProject: () => {},
     updateProject: () => {},
     listProjectNotebooks: () => [],
     getActiveSession: () => null,
-    createNotebook: () => {},
+    createNotebook: (nb: any) => { notebooks.push(nb); return nb; },
     updateNotebook: () => {},
+    getNotebookByPath: (p: string) => notebooks.find((n: any) => n.notebook_path === p) || null,
+    deleteNotebook: (id: string) => { const idx = notebooks.findIndex((n: any) => n.id === id); if (idx >= 0) notebooks.splice(idx, 1); },
+    _notebooks: notebooks,
   } as any;
 }
 
@@ -383,5 +388,155 @@ describe('GET /:projectId/files/zip', () => {
       .get('/api/projects/nonexistent/files/zip');
 
     expect(res.status).toBe(404);
+  });
+});
+
+// ── 10. POST /import — import project from tar.gz ──────────────────────────
+
+describe('POST /import — import project from tar.gz', () => {
+  let archivePath: string;
+
+  beforeEach(async () => {
+    // Create a fake project directory to export, then tar.gz it
+    const srcDir = path.join(tmpDir, 'export-src');
+    await mkdir(srcDir, { recursive: true });
+    await writeFile(path.join(srcDir, '.index.json'), JSON.stringify({
+      id: 'old-id', title: 'Exported Project', status: 'active',
+    }));
+    await writeFile(path.join(srcDir, 'readme.md'), 'hello from export');
+    await mkdir(path.join(srcDir, 'docs'));
+    await writeFile(path.join(srcDir, 'docs', 'task.md'), 'task content');
+
+    // Create tar.gz
+    archivePath = path.join(tmpDir, 'project.tar.gz');
+    execSync(`tar czf "${archivePath}" -C "${srcDir}" .`);
+  });
+
+  it('imports a tar.gz and returns new project info', async () => {
+    const created: any[] = [];
+    const db = {
+      ...createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test Project' }),
+      createProject: (p: any) => { created.push(p); return p; },
+      createNotebook: () => {},
+    };
+    const router = createProjectsRouter(db, mockSessionManager, mockNotebookStore, tmpDir);
+    const importApp = express();
+    importApp.use(express.json());
+    importApp.use('/api/projects', router);
+
+    const res = await request(importApp)
+      .post('/api/projects/import')
+      .attach('archive', archivePath);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('title', 'Exported Project');
+    expect(res.body).toHaveProperty('slug');
+    expect(created.length).toBe(1);
+  });
+
+  it('falls back to filename when .index.json has no title', async () => {
+    // Create archive without title in .index.json
+    const srcDir2 = path.join(tmpDir, 'export-src2');
+    await mkdir(srcDir2, { recursive: true });
+    await writeFile(path.join(srcDir2, '.index.json'), JSON.stringify({ id: 'x' }));
+    const archivePath2 = path.join(tmpDir, 'my-cool-project.tar.gz');
+    execSync(`tar czf "${archivePath2}" -C "${srcDir2}" .`);
+
+    const created: any[] = [];
+    const db = {
+      ...createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test Project' }),
+      createProject: (p: any) => { created.push(p); return p; },
+    };
+    const router = createProjectsRouter(db, mockSessionManager, mockNotebookStore, tmpDir);
+    const importApp = express();
+    importApp.use(express.json());
+    importApp.use('/api/projects', router);
+
+    const res = await request(importApp)
+      .post('/api/projects/import')
+      .attach('archive', archivePath2);
+
+    expect(res.status).toBe(200);
+    // Title should be derived from filename
+    expect(res.body.title).toBe('my-cool-project');
+  });
+
+  it('rejects request with no file', async () => {
+    const res = await request(app)
+      .post('/api/projects/import');
+
+    expect(res.status).toBe(400);
+  });
+
+  it('copies files from archive to new project directory', async () => {
+    let createdPath = '';
+    const db = {
+      ...createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test Project' }),
+      createProject: (p: any) => { createdPath = p.path; return p; },
+      createNotebook: () => {},
+    };
+    const router = createProjectsRouter(db, mockSessionManager, mockNotebookStore, tmpDir);
+    const importApp = express();
+    importApp.use(express.json());
+    importApp.use('/api/projects', router);
+
+    await request(importApp)
+      .post('/api/projects/import')
+      .attach('archive', archivePath)
+      .expect(200);
+
+    // Verify extracted files exist in the new project directory
+    const readme = await readFile(path.join(createdPath, 'readme.md'), 'utf-8');
+    expect(readme).toBe('hello from export');
+
+    const task = await readFile(path.join(createdPath, 'docs', 'task.md'), 'utf-8');
+    expect(task).toBe('task content');
+  });
+});
+
+// ── 11. DELETE /:projectId/notebooks/by-path — delete notebook by file path ──
+
+describe('DELETE /:projectId/notebooks/by-path', () => {
+  it('deletes a notebook by its relative file path', async () => {
+    // Register a notebook in the mock DB
+    const nbPath = path.join(projectDir, 'my-task', 'my-task.notebook.json');
+    await mkdir(path.join(projectDir, 'my-task'), { recursive: true });
+    await writeFile(nbPath, '{}');
+
+    const db = createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test Project' });
+    db.createNotebook({
+      id: 'nb-1', user_id: null, title: 'My Task', slug: 'my-task',
+      workspace_dir: projectDir, notebook_path: nbPath,
+      project_id: PROJECT_ID, status: 'active',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+
+    const mockSM = { closeSession: async () => {} } as any;
+    const router = createProjectsRouter(db, mockSM, mockNotebookStore, tmpDir);
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.use('/api/projects', router);
+
+    const res = await request(testApp)
+      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent('my-task/my-task.notebook.json')}`)
+      .expect(204);
+
+    // Verify notebook removed from DB
+    expect(db._notebooks.length).toBe(0);
+  });
+
+  it('returns 404 when notebook path does not exist in DB', async () => {
+    const res = await request(app)
+      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent('nonexistent.notebook.json')}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when no path provided', async () => {
+    const res = await request(app)
+      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path`);
+
+    expect(res.status).toBe(400);
   });
 });

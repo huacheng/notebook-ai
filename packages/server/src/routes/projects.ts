@@ -1,16 +1,20 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, copyFile, unlink, stat, rm } from 'fs/promises';
-import { createReadStream } from 'fs';
+import { mkdir, writeFile, copyFile, readFile, unlink, stat, rm, readdir } from 'fs/promises';
+import { createReadStream, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import multer from 'multer';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import type { NotebookDb } from '../db.js';
 import type { SessionManager } from '../session.js';
 import type { NotebookStore } from '../notebook-store.js';
 import { GitManager } from '../git.js';
 import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
+
+const execFileAsync = promisify(execFile);
 
 function titleToSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'project';
@@ -327,6 +331,140 @@ export function createProjectsRouter(
     tar.stdout.pipe(res);
     tar.stderr.on('data', (d: Buffer) => console.error('[tar]', d.toString()));
     tar.on('error', (err: Error) => { if (!res.headersSent) res.status(500).json({ error: String(err) }); });
+  });
+
+  // Import project from tar.gz
+  const importUpload = multer({
+    dest: path.join(os.tmpdir(), 'nb-import'),
+    limits: { fileSize: 500 * 1024 * 1024, files: 1 },
+  });
+
+  router.post('/import', importUpload.single('archive'), async (req: Request, res: Response) => {
+    const file = req.file;
+    if (!file) { res.status(400).json({ error: 'No archive file provided.' }); return; }
+
+    let tmpExtract = '';
+    try {
+      // Extract to temp directory
+      const { mkdtemp } = await import('fs/promises');
+      tmpExtract = await mkdtemp(path.join(os.tmpdir(), 'nb-import-extract-'));
+      await execFileAsync('tar', ['xzf', file.path, '-C', tmpExtract]);
+
+      // Read .index.json for title (fallback to filename)
+      let title = '';
+      const indexPath = path.join(tmpExtract, '.index.json');
+      try {
+        const indexData = JSON.parse(await readFile(indexPath, 'utf-8'));
+        title = indexData.title || '';
+      } catch { /* no .index.json or invalid */ }
+
+      if (!title) {
+        // Derive title from uploaded filename: "my-project.tar.gz" → "my-project"
+        const orig = file.originalname || 'imported-project';
+        title = orig.replace(/\.(tar\.gz|tgz)$/i, '');
+      }
+
+      // Create new project
+      const slug = titleToSlug(title);
+      const id = randomUUID();
+      const now = new Date().toISOString();
+
+      // Ensure unique directory
+      let projectPath = path.join(workspacesRoot, slug);
+      if (existsSync(projectPath)) {
+        projectPath = path.join(workspacesRoot, `${slug}-${id.slice(0, 6)}`);
+      }
+
+      // Copy extracted files to project directory (exclude .git, .worktrees)
+      await mkdir(projectPath, { recursive: true });
+      await execFileAsync('rsync', [
+        '-a', '--exclude', '.git', '--exclude', '.worktrees',
+        tmpExtract + '/', projectPath + '/',
+      ]);
+
+      // Rewrite .index.json with new id and timestamps
+      await writeFile(path.join(projectPath, '.index.json'), JSON.stringify({
+        id, title, status: 'active', created_at: now, updated_at: now,
+      }, null, 2));
+
+      // Ensure .deliverables directory exists
+      await mkdir(path.join(projectPath, '.deliverables'), { recursive: true });
+
+      // Initialize fresh git repo
+      const git = new GitManager(projectPath);
+      await git.ensureRepo();
+
+      // Save to DB
+      const project = db.createProject({
+        id, title, slug, path: projectPath,
+        status: 'active', created_at: now, updated_at: now,
+      });
+
+      // Scan for .notebook.json files and register in DB (best-effort)
+      try {
+        const entries = await readdir(projectPath, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const subEntries = await readdir(path.join(projectPath, entry.name));
+            for (const sub of subEntries) {
+              if (sub.endsWith('.notebook.json')) {
+                const nbPath = path.join(projectPath, entry.name, sub);
+                const nbId = randomUUID();
+                const nbSlug = sub.replace('.notebook.json', '');
+                db.createNotebook({
+                  id: nbId, user_id: null, title: nbSlug, slug: nbSlug,
+                  workspace_dir: projectPath, notebook_path: nbPath,
+                  project_id: id,
+                  status: 'active', created_at: now, updated_at: now,
+                });
+              }
+            }
+          }
+        }
+      } catch { /* ignore scan errors */ }
+
+      res.json(project);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    } finally {
+      // Cleanup temp files
+      await unlink(file.path).catch(() => {});
+      if (tmpExtract) await rm(tmpExtract, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  // Delete notebook by file path within project
+  router.delete('/:projectId/notebooks/by-path', async (req, res) => {
+    try {
+      const project = db.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: 'project not found' });
+
+      const relPath = typeof req.query['path'] === 'string' ? req.query['path'] : '';
+      if (!relPath) return res.status(400).json({ error: 'path required' });
+
+      const absPath = path.join(project.path, relPath);
+      const nbRow = db.getNotebookByPath(absPath);
+      if (!nbRow) return res.status(404).json({ error: 'notebook not found' });
+
+      // Close active session
+      const activeSession = db.getActiveSession(nbRow.id);
+      if (activeSession) {
+        await sessionManager.closeSession(activeSession.tmux_session);
+      }
+
+      // Remove notebook directory from disk (the parent dir of the .notebook.json)
+      const nbDir = path.dirname(absPath);
+      if (nbDir !== project.path) {
+        await rm(nbDir, { recursive: true, force: true }).catch(() => {});
+      }
+
+      // Remove from DB
+      db.deleteNotebook(nbRow.id);
+
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Delete project (cascades: close sessions, remove worktrees, delete from disk + DB)

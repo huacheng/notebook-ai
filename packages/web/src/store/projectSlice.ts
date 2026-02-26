@@ -15,7 +15,9 @@ export interface ProjectListItem {
 export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'projects' | 'projectsLoading' | 'activeProjectId' | 'activeProjectPath'
   | 'sidebarLevel' | 'fileBrowserPath'
-  | 'fetchProjects' | 'createProject' | 'setActiveProject' | 'goBackToProjectList'
+  | 'fetchProjects' | 'createProject' | 'deleteProject' | 'importProject'
+  | 'deleteProjectNotebook' | 'importProjectNotebook'
+  | 'setActiveProject' | 'goBackToProjectList'
   | 'navigateFileBrowser' | 'createNotebook'
 >> = (set, get) => ({
   projects: [],
@@ -53,6 +55,90 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     if (res.ok) {
       await get().fetchProjects();
     }
+  },
+
+  deleteProject: async (projectId: string) => {
+    const token = get().authToken;
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.ok) {
+      if (get().activeProjectId === projectId) get().goBackToProjectList();
+      await get().fetchProjects();
+    }
+  },
+
+  importProject: async (file: File) => {
+    const token = get().authToken;
+    const form = new FormData();
+    form.append('archive', file);
+    const res = await fetch('/api/projects/import', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (res.ok) await get().fetchProjects();
+  },
+
+  deleteProjectNotebook: async (projectId: string, notebookRelPath: string) => {
+    const token = get().authToken;
+    await fetch(
+      `/api/projects/${projectId}/notebooks/by-path?path=${encodeURIComponent(notebookRelPath)}`,
+      {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    // File listing in FileSection will auto-refresh
+  },
+
+  importProjectNotebook: async (projectId: string, file: File) => {
+    const token = get().authToken;
+    const headers = (extra?: Record<string, string>) => ({
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extra,
+    });
+
+    // Parse the file
+    let notebook: any;
+    try {
+      if (file.name.endsWith('.zip')) {
+        const form = new FormData();
+        form.append('file', file);
+        const extractRes = await fetch('/api/notebooks/extract-zip', {
+          method: 'POST',
+          headers: headers(),
+          body: form,
+        });
+        if (!extractRes.ok) return;
+        notebook = await extractRes.json();
+      } else {
+        notebook = JSON.parse(await file.text());
+      }
+    } catch { return; }
+
+    const title = notebook?.metadata?.title || file.name.replace(/\.(notebook\.json|json|zip)$/i, '') || 'Imported';
+
+    // Create notebook in project
+    const createRes = await fetch(`/api/projects/${projectId}/notebooks`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ title }),
+    });
+    if (!createRes.ok) return;
+
+    const data = await createRes.json();
+
+    // Import content
+    await fetch(`/api/notebooks/${encodeURIComponent(data.notebookId)}/import-content`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        ...notebook,
+        metadata: { ...notebook.metadata, title, updated: new Date().toISOString() },
+      }),
+    });
   },
 
   setActiveProject: (id: string, path: string) => {

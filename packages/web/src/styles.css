@@ -4293,6 +4293,7 @@ button:focus-visible {
 }
 
 .project-list-item {
+  position: relative;
   padding: var(--space-sm) var(--space-lg);
   cursor: pointer;
   display: flex;
@@ -4315,20 +4316,94 @@ button:focus-visible {
   color: var(--text-secondary);
 }
 
-.project-create-btn {
-  padding: var(--space-sm) var(--space-lg);
-  background: none;
-  border: none;
-  border-top: 1px solid var(--border-default);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  color: var(--color-primary);
-  text-align: left;
-  font-family: var(--font-sans);
+.project-list-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.project-create-btn:hover {
+.project-item-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.project-list-item:hover .project-item-menu-btn {
+  display: inline-flex;
+}
+
+.project-item-menu-btn:hover {
+  background: var(--border-default);
+  color: var(--text-primary);
+}
+
+.project-item-menu {
+  position: absolute;
+  right: var(--space-sm);
+  margin-top: 2px;
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 50;
+  min-width: 100px;
+  overflow: hidden;
+}
+
+.project-item-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.project-item-menu-item:hover {
+  background: var(--bg-cell-hover);
+}
+
+.project-item-menu-item--danger {
+  color: var(--color-error);
+}
+
+.project-item-menu-item--danger:hover {
+  background: var(--bg-error);
+}
+
+.project-actions-bar {
+  display: flex;
+  border-top: 1px solid var(--border-default);
+}
+
+.project-action-btn {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  color: var(--color-primary);
+  text-align: center;
+}
+
+.project-action-btn:hover {
   background: var(--color-primary-light);
+}
+
+.project-action-btn + .project-action-btn {
+  border-left: 1px solid var(--border-default);
 }
 
 .project-create-form {

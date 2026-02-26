@@ -205,6 +205,8 @@ export interface FileSectionProps {
   initialPath?: string;
   /** Files matching this filter are NOT draggable (e.g. notebook files in sidebar). */
   noDragFilter?: (filename: string) => boolean;
+  /** Custom action buttons for specific file entries. Return non-null to replace defaults. */
+  renderItemActions?: (file: { name: string; type: string }, subPath: string) => React.ReactNode | null;
 }
 
 export function FileSection({
@@ -216,6 +218,7 @@ export function FileSection({
   onFileClick,
   initialPath = '.',
   noDragFilter,
+  renderItemActions,
 }: FileSectionProps) {
   const [subPath, setSubPath] = useState(initialPath);
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -505,6 +508,7 @@ export function FileSection({
               <FileIcon name={f.name} />
               <span className="fp-name" title={f.name}>{f.name}</span>
               <TypeBadge name={f.name} />
+              {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions">
                 {confirmDelete === f.name ? (
                   <span className="fp-confirm">
@@ -520,6 +524,7 @@ export function FileSection({
                   </>
                 )}
               </div>
+              )}
             </div>
           ))}
 

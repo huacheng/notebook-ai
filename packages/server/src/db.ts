@@ -180,6 +180,10 @@ export class NotebookDb {
     return this.getNotebook(id);
   }
 
+  getNotebookByPath(notebookPath: string): NotebookRow | undefined {
+    return this.db.prepare('SELECT * FROM notebooks WHERE notebook_path = ? AND status = ?').get(notebookPath, 'active') as NotebookRow | undefined;
+  }
+
   deleteNotebook(id: string): void {
     // Hard-delete: remove sessions first (no ON DELETE CASCADE), then the notebook.
     this.db.prepare('DELETE FROM sessions WHERE notebook_id = ?').run(id);

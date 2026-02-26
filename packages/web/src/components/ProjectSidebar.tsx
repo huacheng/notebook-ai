@@ -2,16 +2,60 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { FileSection } from './FileSection';
 
+function ProjectItemMenu({ projectId, projectSlug, onClose }: { projectId: string; projectSlug: string; onClose: () => void }) {
+  const deleteProject = useStore(s => s.deleteProject);
+  const authToken = useStore(s => s.authToken);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const handleExport = () => {
+    const url = `/api/projects/${projectId}/files/zip`;
+    const a = document.createElement('a');
+    a.href = authToken ? `${url}?token=${encodeURIComponent(authToken)}` : url;
+    a.download = `${projectSlug}.tar.gz`;
+    a.click();
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this project? This cannot be undone.')) return;
+    await deleteProject(projectId);
+    onClose();
+  };
+
+  return (
+    <div className="project-item-menu" ref={menuRef}>
+      <button className="project-item-menu-item" onClick={handleExport}>Export</button>
+      <button className="project-item-menu-item project-item-menu-item--danger" onClick={handleDelete}>Delete</button>
+    </div>
+  );
+}
+
 function ProjectList() {
-  const { projects, projectsLoading, createProject, setActiveProject } = useStore();
+  const { projects, projectsLoading, createProject, setActiveProject, importProject } = useStore();
   const [newTitle, setNewTitle] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
     await createProject(newTitle.trim());
     setNewTitle('');
     setShowCreate(false);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) importProject(file);
+    e.target.value = '';
   };
 
   return (
@@ -27,13 +71,34 @@ function ProjectList() {
             className="project-list-item"
             onClick={() => setActiveProject(p.id, p.path)}
           >
-            <span className="project-list-item-title">{p.title}</span>
+            <div className="project-list-item-row">
+              <span className="project-list-item-title">{p.title}</span>
+              <button
+                className="project-item-menu-btn"
+                onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id); }}
+                title="Project actions"
+              >⋯</button>
+            </div>
             <span className="project-list-item-meta">
               {p.notebook_count} notebooks
             </span>
+            {menuOpenId === p.id && (
+              <ProjectItemMenu
+                projectId={p.id}
+                projectSlug={p.slug}
+                onClose={() => setMenuOpenId(null)}
+              />
+            )}
           </div>
         ))}
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".tar.gz,.tgz"
+        style={{ display: 'none' }}
+        onChange={handleImport}
+      />
       {showCreate ? (
         <div className="project-create-form">
           <input
@@ -46,10 +111,48 @@ function ProjectList() {
           <button onClick={handleCreate}>Create</button>
         </div>
       ) : (
-        <button className="project-create-btn" onClick={() => setShowCreate(true)}>
-          + New Project
-        </button>
+        <div className="project-actions-bar">
+          <button className="project-action-btn" onClick={() => setShowCreate(true)}>+ New</button>
+          <button className="project-action-btn" onClick={() => fileInputRef.current?.click()}>&#8593; Import</button>
+        </div>
       )}
+    </div>
+  );
+}
+
+function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, onClose }: {
+  projectId: string; relPath: string; baseUrl: string; authToken: string | null; onClose: () => void;
+}) {
+  const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const handleExport = () => {
+    const url = `${baseUrl}/files/download?path=${encodeURIComponent(relPath)}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = relPath.split('/').pop() || 'notebook.json';
+    a.click();
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this notebook? This cannot be undone.')) return;
+    await deleteProjectNotebook(projectId, relPath);
+    onClose();
+  };
+
+  return (
+    <div className="project-item-menu" ref={menuRef}>
+      <button className="project-item-menu-item" onClick={handleExport}>Export</button>
+      <button className="project-item-menu-item project-item-menu-item--danger" onClick={handleDelete}>Delete</button>
     </div>
   );
 }
@@ -60,17 +163,19 @@ function FileBrowser() {
   const goBackToProjectList = useStore(s => s.goBackToProjectList);
   const authToken = useStore(s => s.authToken);
   const openFileTab = useStore(s => s.openFileTab);
+  const importProjectNotebook = useStore(s => s.importProjectNotebook);
 
   const projectTitle = useStore(s => s.projects.find(p => p.id === s.activeProjectId)?.title ?? 'Project');
 
   const [showNbCreate, setShowNbCreate] = useState(false);
   const [nbTitle, setNbTitle] = useState('');
   const [nbCreating, setNbCreating] = useState(false);
+  const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
+  const nbImportRef = useRef<HTMLInputElement>(null);
 
   const handleFileClick = useCallback(async (subPath: string, filename: string) => {
     if (filename.endsWith('.notebook.json')) {
       const notebookPath = subPath === '.' ? `${activeProjectPath}/${filename}` : `${activeProjectPath}/${subPath}/${filename}`;
-      // Activate loading screen: deactivate file/git tabs so loading screen is visible
       useStore.getState().deactivateFileTab();
       useStore.setState({ notebookLoading: true, gitTabOpen: false });
       try {
@@ -115,6 +220,35 @@ function FileBrowser() {
     }
   };
 
+  const handleNbImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeProjectId) importProjectNotebook(activeProjectId, file);
+    e.target.value = '';
+  };
+
+  const renderItemActions = useCallback((file: { name: string; type: string }, subPath: string) => {
+    if (!file.name.endsWith('.notebook.json')) return null;
+    const relPath = subPath === '.' ? file.name : `${subPath}/${file.name}`;
+    return (
+      <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="fp-action"
+          onClick={() => setNbMenuPath(nbMenuPath === relPath ? null : relPath)}
+          title="Notebook actions"
+        >⋯</button>
+        {nbMenuPath === relPath && activeProjectId && (
+          <NotebookItemMenu
+            projectId={activeProjectId}
+            relPath={relPath}
+            baseUrl={`/api/projects/${activeProjectId}`}
+            authToken={authToken}
+            onClose={() => setNbMenuPath(null)}
+          />
+        )}
+      </div>
+    );
+  }, [nbMenuPath, activeProjectId, authToken]);
+
   return (
     <div className="file-browser">
       <div className="file-browser-header" onClick={goBackToProjectList}>
@@ -126,6 +260,14 @@ function FileBrowser() {
         authToken={authToken}
         onFileClick={handleFileClick}
         noDragFilter={(name) => name.endsWith('.notebook.json')}
+        renderItemActions={renderItemActions}
+      />
+      <input
+        ref={nbImportRef}
+        type="file"
+        accept=".notebook.json,.json,.zip"
+        style={{ display: 'none' }}
+        onChange={handleNbImport}
       />
       {showNbCreate ? (
         <div className="project-create-form">
@@ -142,9 +284,10 @@ function FileBrowser() {
           </button>
         </div>
       ) : (
-        <button className="file-browser-create-btn" onClick={() => setShowNbCreate(true)}>
-          + New Notebook
-        </button>
+        <div className="project-actions-bar">
+          <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>+ New</button>
+          <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>&#8593; Import</button>
+        </div>
       )}
     </div>
   );
