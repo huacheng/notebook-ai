@@ -232,14 +232,11 @@ export function FileSection({
   onSubPathChange,
   refreshKey,
 }: FileSectionProps) {
-  const [subPath, setSubPathRaw] = useState(initialPath);
-  const setSubPath = useCallback((v: string | ((prev: string) => string)) => {
-    setSubPathRaw((prev) => {
-      const next = typeof v === 'function' ? v(prev) : v;
-      if (next !== prev) onSubPathChange?.(next);
-      return next;
-    });
-  }, [onSubPathChange]);
+  const [subPath, setSubPath] = useState(initialPath);
+
+  useEffect(() => {
+    onSubPathChange?.(subPath);
+  }, [subPath]); // eslint-disable-line
   const isReadOnly = readOnlyPath?.(subPath) ?? false;
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentDirPath, setCurrentDirPath] = useState<string | null>(null);
