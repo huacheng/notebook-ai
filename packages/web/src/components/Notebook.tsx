@@ -14,9 +14,10 @@ function NotebookStatusBar() {
   const setActiveTab = useStore((s) => s.setActiveTab);
   const saveNotebook = useStore((s) => s.saveNotebook);
   const restartSession = useStore((s) => s.restartSession);
-  const sessionRestarting = useStore((s) => s.sessionRestarting);
+  const restartPhase = useStore((s) => s.restartPhase);
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
+  const isRestarting = restartPhase === 'restarting' || restartPhase === 'done';
 
   const listTitle = notebookList.find((n) => n.id === activeNotebookId)?.title;
   const title = listTitle ?? notebook?.metadata.title ?? 'Untitled Notebook';
@@ -40,10 +41,10 @@ function NotebookStatusBar() {
         <button
           className="notebook-statusbar-btn notebook-statusbar-restart-btn"
           onClick={restartSession}
-          disabled={!connected || sessionRestarting}
-          title={sessionRestarting ? 'Restarting session…' : 'Restart agent session'}
+          disabled={!connected || isRestarting}
+          title={isRestarting ? 'Restarting session…' : 'Restart agent session'}
         >
-          {sessionRestarting ? '...' : 'Restart'}
+          {isRestarting ? '...' : 'Restart'}
         </button>
         <button
           className="notebook-statusbar-btn"
@@ -239,6 +240,59 @@ function NotebookInputBar() {
   );
 }
 
+// ── Restart overlay ──────────────────────────────────────────────────────────
+
+function RestartOverlay() {
+  const restartPhase = useStore((s) => s.restartPhase);
+  const restartError = useStore((s) => s.restartError);
+
+  if (restartPhase === 'idle') return null;
+
+  return (
+    <div className="annotation-modal-overlay">
+      <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
+        {restartPhase === 'restarting' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Restarting session...
+            </p>
+          </div>
+        )}
+        {restartPhase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-completed)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              Session restarted
+            </p>
+          </div>
+        )}
+        {restartPhase === 'error' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-error)' }}>&#10007;</div>
+            <p style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-sm)', fontWeight: 500, marginBottom: 'var(--space-md)' }}>
+              Restart failed: {restartError}
+            </p>
+            <button
+              className="notebook-statusbar-btn"
+              onClick={() => useStore.getState().restartSession()}
+              style={{ marginRight: 'var(--space-sm)' }}
+            >
+              Retry
+            </button>
+            <button
+              className="notebook-statusbar-btn"
+              onClick={() => useStore.setState({ restartPhase: 'idle', restartError: '' })}
+            >
+              Close
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Notebook component ─────────────────────────────────────────────────
 
 export function Notebook() {
@@ -255,6 +309,7 @@ export function Notebook() {
   return (
     <div className="notebook-container">
       <NotebookStatusBar />
+      <RestartOverlay />
 
       {activeTab === 'notebook' && (
         <>

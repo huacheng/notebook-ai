@@ -1,5 +1,5 @@
 /**
- * sessionRestart tests — restartSession action + WS response handling.
+ * sessionRestart tests — restartSession action + WS response handling + restartPhase transitions.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -43,7 +43,7 @@ describe('restartSession', () => {
     });
   });
 
-  it('should set sessionRestarting to true when called', () => {
+  it('should set restartPhase to "restarting" when called', () => {
     const { state } = createTestWsSlice();
     const sendFn = vi.fn();
 
@@ -52,7 +52,7 @@ describe('restartSession', () => {
 
     state.restartSession();
 
-    expect(state.sessionRestarting).toBe(true);
+    expect(state.restartPhase).toBe('restarting');
   });
 
   it('should not send if WS is not connected', () => {
@@ -65,5 +65,15 @@ describe('restartSession', () => {
     state.restartSession();
 
     expect(sendFn).not.toHaveBeenCalled();
+  });
+
+  it('should initialize restartPhase as "idle"', () => {
+    const { state } = createTestWsSlice();
+    expect(state.restartPhase).toBe('idle');
+  });
+
+  it('should initialize restartError as empty string', () => {
+    const { state } = createTestWsSlice();
+    expect(state.restartError).toBe('');
   });
 });

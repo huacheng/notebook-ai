@@ -72,6 +72,8 @@ interface NotebookSession {
   notebookDbId?: string;
   /** Tracks per-cell execution start times (ms) for duration calculation. */
   _execStartTimes: Map<string, number>;
+  /** Claude CLI session ID captured from system.init — used for --resume on restart. */
+  claudeSessionId?: string;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -216,6 +218,9 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
+    // Capture Claude session ID for --resume before stopping
+    const resumeSessionId = session.claudeSessionId;
+
     // Stop old process
     session.agentProcess.stop();
 
@@ -223,7 +228,7 @@ export class SessionManager {
     const engine = session.agentProcess.engine;
     session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT);
 
-    // Start new process with same handlers
+    // Start new process with same handlers — pass resumeSessionId for context recovery
     await session.agentProcess.start(
       (raw: unknown) => this.handleJsonlMessage(session, raw),
       (code) => {
@@ -236,9 +241,10 @@ export class SessionManager {
           this.completeCell(session, cellId, true);
         }
       },
+      resumeSessionId,
     );
 
-    console.log(`[session] Restarted session "${sessionId}"`);
+    console.log(`[session] Restarted session "${sessionId}"${resumeSessionId ? ` (resumed ${resumeSessionId})` : ''}`);
   }
 
   async closeSession(sessionId: string): Promise<void> {
@@ -446,6 +452,27 @@ export class SessionManager {
               cell_id: cellId,
               output,
             });
+
+            // Drive the live StreamingText/StreamingThinking components.
+            // Claude CLI stream-json doesn't emit token-level deltas — it
+            // only sends complete assistant blocks.  Feed the full text into
+            // cell_stream so the frontend can render it progressively as
+            // each block arrives (tool-use turns produce many blocks).
+            if (block.type === 'text') {
+              this.broadcast(session, {
+                type: 'cell_stream',
+                cell_id: cellId,
+                delta: block.text,
+                block_type: 'text',
+              });
+            } else if (block.type === 'thinking') {
+              this.broadcast(session, {
+                type: 'cell_stream',
+                cell_id: cellId,
+                delta: block.thinking,
+                block_type: 'thinking',
+              });
+            }
           }
         }
         break;
@@ -541,8 +568,17 @@ export class SessionManager {
         break;
       }
 
+      case 'system': {
+        // Capture Claude session_id from system.init for --resume support.
+        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string };
+        if (sysMsg.subtype === 'init' && sysMsg.session_id) {
+          session.claudeSessionId = sysMsg.session_id;
+          console.log(`[session ${session.id}] Captured Claude session_id: ${sysMsg.session_id}`);
+        }
+        break;
+      }
+
       default:
-        // system and other message types are silently ignored.
         break;
     }
   }

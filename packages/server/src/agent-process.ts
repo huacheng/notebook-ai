@@ -10,6 +10,7 @@ export type AgentEngine = 'claude' | 'gemini';
 export class AgentProcess {
   private proc: ChildProcess | null = null;
   private rl: readline.Interface | null = null;
+  private claudeSessionId: string | null = null;
 
   constructor(
     public readonly engine: AgentEngine,
@@ -17,12 +18,17 @@ export class AgentProcess {
     private readonly systemPrompt?: string,
   ) {}
 
+  getClaudeSessionId(): string | null {
+    return this.claudeSessionId;
+  }
+
   /**
    * Spawns the agent process and sets up persistent communication.
    */
   async start(
     onMessage: (msg: unknown) => void,
     onExit?: (code: number | null) => void,
+    resumeSessionId?: string,
   ): Promise<void> {
     const env = { ...process.env };
     delete env['CLAUDECODE'];
@@ -38,6 +44,9 @@ export class AgentProcess {
         '--dangerously-skip-permissions',
         '--tools', 'default',
       );
+      if (resumeSessionId) {
+        args.push('--resume', resumeSessionId);
+      }
       if (this.systemPrompt) {
         args.push('--append-system-prompt', this.systemPrompt);
       }
@@ -81,6 +90,10 @@ export class AgentProcess {
       if (!trimmed) return;
       try {
         const msg = JSON.parse(trimmed);
+        // Capture Claude session_id from system.init message
+        if (msg.type === 'system' && msg.subtype === 'init' && msg.session_id) {
+          this.claudeSessionId = msg.session_id;
+        }
         onMessage(msg);
       } catch (e) {
         // Silently ignore non-JSON output

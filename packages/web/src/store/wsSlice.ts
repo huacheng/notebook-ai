@@ -3,7 +3,7 @@ import type { WSServerMessage } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'ws' | 'wsStatus' | 'sessionId' | 'sessionRestarting'
+  | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession'
@@ -11,7 +11,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   ws: null,
   wsStatus: 'disconnected',
   sessionId: null,
-  sessionRestarting: false,
+  restartPhase: 'idle',
+  restartError: '',
 
   connectWebSocket() {
     const existing = get().ws;
@@ -161,10 +162,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           });
           break;
         case 'session_restarted':
-          set({ sessionRestarting: false });
+          set({ restartPhase: 'done' });
+          setTimeout(() => {
+            if (get().restartPhase === 'done') set({ restartPhase: 'idle' });
+          }, 800);
           break;
         case 'session_restart_failed':
-          set({ sessionRestarting: false, sessionNotice: `Session restart failed: ${parsed.error}` });
+          set({ restartPhase: 'error', restartError: parsed.error ?? 'Unknown error' });
           break;
         case 'error':
           if (parsed.cell_id) {
@@ -276,7 +280,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   restartSession() {
     const { ws, sessionId } = get();
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
-      set({ sessionRestarting: true });
+      set({ restartPhase: 'restarting', restartError: '' });
       ws.send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
     }
   },

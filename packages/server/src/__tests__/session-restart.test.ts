@@ -107,6 +107,63 @@ describe('SessionManager.restartSession()', () => {
     );
   });
 
+  it('should pass claudeSessionId as resumeSessionId on restart', async () => {
+    const nbPath = path.join(tempDir, 'resume.notebook.json');
+    await ns.save(nbPath, ns.createNew('Resume Test', tempDir));
+
+    // Mock: on initial start, simulate system.init with session_id
+    let startCallCount = 0;
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      startCallCount++;
+      onMsg({ type: 'system', subtype: 'hook_started' });
+      if (startCallCount === 1) {
+        // First start: simulate system.init
+        onMsg({ type: 'system', subtype: 'init', session_id: 'claude-sess-xyz' });
+      }
+    });
+
+    const session = await sm.createSession(nbPath, tempDir);
+
+    // Session should have captured the claudeSessionId
+    expect(session.claudeSessionId).toBe('claude-sess-xyz');
+
+    await sm.restartSession(session.id);
+
+    // The second start() call should receive the resumeSessionId
+    expect(startSpy).toHaveBeenCalledTimes(2);
+    const secondCall = startSpy.mock.calls[1];
+    // Third arg is resumeSessionId
+    expect(secondCall[2]).toBe('claude-sess-xyz');
+  });
+
+  it('should capture claudeSessionId from system.init in handleJsonlMessage', async () => {
+    const nbPath = path.join(tempDir, 'init-capture.notebook.json');
+    await ns.save(nbPath, ns.createNew('Init Capture', tempDir));
+
+    // Let handleJsonlMessage process the system.init
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMsg({ type: 'system', subtype: 'hook_started' });
+      onMsg({ type: 'system', subtype: 'init', session_id: 'captured-id-999' });
+    });
+
+    const session = await sm.createSession(nbPath, tempDir);
+    expect(session.claudeSessionId).toBe('captured-id-999');
+  });
+
+  it('should not pass resume when claudeSessionId is null', async () => {
+    const nbPath = path.join(tempDir, 'no-resume.notebook.json');
+    await ns.save(nbPath, ns.createNew('No Resume', tempDir));
+
+    // Default mock: no system.init message emitted
+    const session = await sm.createSession(nbPath, tempDir);
+    expect(session.claudeSessionId).toBeUndefined();
+
+    await sm.restartSession(session.id);
+
+    const secondCall = startSpy.mock.calls[1];
+    expect(secondCall[2]).toBeUndefined();
+  });
+
   it('should mark running cell as error when process exits unexpectedly (regression)', async () => {
     const nbPath = path.join(tempDir, 'crash.notebook.json');
     await ns.save(nbPath, ns.createNew('Crash Test', tempDir));
