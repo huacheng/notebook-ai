@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:merge implementation
+# Merge only — does NOT delete branches or worktrees.
 # Usage: merge.sh <notebook>
 
 set -uo pipefail
@@ -22,9 +23,7 @@ STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 
 echo "Merging task: $NOTEBOOK"
 
-# 1. Git Merge Simulation
-# (In real implementation, this would handle squash merge and branch deletion)
-CURRENT_BRANCH=$(git branch --show-current)
+# 1. Resolve task branch
 TASK_BRANCH=$(python3 "$STATE_PY" get "$INDEX_JSON" branch)
 
 if [[ -z "$TASK_BRANCH" ]]; then
@@ -33,19 +32,10 @@ fi
 
 echo "[GIT] Merging $TASK_BRANCH into master..."
 
-# 2. Update Status to Complete and clear branch metadata
+# 2. Update status to complete (retain branch/worktree metadata)
 python3 "$STATE_PY" transition "$INDEX_JSON" --status complete
-python3 "$STATE_PY" set "$INDEX_JSON" branch ""
-python3 "$STATE_PY" set "$INDEX_JSON" worktree ""
 
-# 3. Metadata Cleanup
-# In real execution, we might remove .lock or .auto-signal here
+# 3. Release lock
 rm -f "$WORK_DIR/.lock"
 
-# 4. Branch Deletion
-if [[ "$CURRENT_BRANCH" == "$TASK_BRANCH" ]]; then
-    git checkout master > /dev/null 2>&1
-fi
-git branch -D "$TASK_BRANCH" > /dev/null 2>&1
-
-echo "Task $NOTEBOOK successfully merged and closed."
+echo "Task $NOTEBOOK successfully merged. Branch '$TASK_BRANCH' retained."

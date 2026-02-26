@@ -1,6 +1,6 @@
 ---
 name: merge
-description: "Merge completed task branch to main — with conflict resolution, verification retry, and cleanup. Triggered after check post-exec ACCEPT verdict confirms all tests pass."
+description: "Merge completed task branch to main — with conflict resolution and verification retry. Does not delete branches or worktrees. Triggered after check post-exec ACCEPT verdict confirms all tests pass."
 model_tier: medium
 auto_delegatable: false
 arguments:
@@ -52,17 +52,15 @@ If merge conflict detected:
 5. **If verification fails**: abort merge (`git merge --abort`), retry from Phase 2 with different resolution strategy
 6. **Max 3 resolution attempts** — after 3 failures → stay `executing`, report unresolvable conflicts (user can manually resolve then re-run merge)
 
-### Phase 4: Post-Merge Cleanup
+### Phase 4: Post-Merge Finalization
 
 On successful merge:
 
-1. **Update** `.index.json` status → `complete`, update timestamp — retain `branch` and `worktree` values (needed for cleanup in steps 5–6)
+1. **Update** `.index.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values (branch/worktree cleanup is the user's responsibility)
 2. **Write** `.summary.md` with final task summary: completion status, plan overview, key changes, verification outcome, lessons learned (integrate from directory summaries)
-3. **Git commit** state FIRST: `task-ai(<notebook>):merge task completed` — commit state changes before any destructive cleanup, so status is persisted even if cleanup fails
-4. **Resolve main worktree path** (before any destructive cleanup): If worktree mode, read `.git` file in task worktree → extract `gitdir` → resolve to main worktree root → cache the resolved `$MAIN_WORKING_DIR` path. Or use `git -C <main-repo> rev-parse --show-toplevel`. This MUST happen before step 5 removes the worktree
-5. **If worktree exists**: `git worktree remove .worktrees/task-<module>` (failure is non-fatal — log warning, continue)
-6. **Delete** merged branch: `git branch -d task/<notebook>` (failure is non-fatal — branch may already be deleted or have extra commits; log warning, continue)
-7. **Clear** `branch` to `""` and `worktree` to `""` in `.index.json` (atomic write), git commit: `task-ai(<notebook>):merge cleanup branch metadata`
+3. **Git commit** state: `task-ai(<notebook>):merge task completed`
+
+> **Note**: Merge does NOT delete branches or worktrees. The user can clean them up manually or via a separate cleanup command when ready.
 
 ## Execution Steps
 
@@ -77,8 +75,8 @@ On successful merge:
    7.2. Attempt resolution (up to 3 tries)
    7.3. Each resolution: fix conflicts → verify (build + test) → if pass commit, if fail abort and retry
    7.4. If all 3 attempts fail → stay `executing`, abort merge, report unresolvable conflicts
-8. **Phase 4**: Post-merge cleanup (status → `complete` with branch retained, write `.summary.md`, git commit state FIRST, resolve main worktree path, then worktree removal + branch deletion — cleanup failures are non-fatal — finally clear `branch`/`worktree` fields and commit metadata cleanup)
-9. **Write** `.auto-signal` to `$MAIN_WORKING_DIR` (resolved in Phase 4 step 4) — MUST be written AFTER Phase 4 status update to `complete`, so the daemon reads correct status when routing to `report`
+8. **Phase 4**: Post-merge finalization (status → `complete` with branch/worktree retained, write `.summary.md`, git commit state)
+9. **Write** `.auto-signal` — MUST be written AFTER Phase 4 status update to `complete`, so the daemon reads correct status when routing to `report`
 10. **Report** merge result
 
 ## State Transitions
@@ -96,7 +94,6 @@ On successful merge:
 | Merge commit | `task-ai(<notebook>):merge merge completed task` |
 | Conflict resolution | `task-ai(<notebook>):merge resolve merge conflict` |
 | State update | `task-ai(<notebook>):merge task completed` |
-| Metadata cleanup | `task-ai(<notebook>):merge cleanup branch metadata` |
 
 ## .auto-signal
 
@@ -115,5 +112,5 @@ On successful merge:
 - On merge failure, status stays `executing` (not `blocked`) so merge can be retried. The user should manually resolve conflicts and then run `/task-ai:merge` again
 - After manual resolution, if the user has already merged manually, they can update `.index.json` status to `complete` directly
 - Pre-merge refactoring is optional — if no cleanup needed, skip directly to merge
-- **Worktree signal race prevention**: In worktree mode, `.auto-signal` is written to the main worktree's `$NB_WORKSPACES_ROOT/<project>/<notebook_name>/.working/` path (not the task worktree), ensuring the daemon can read it after worktree removal. The daemon MUST watch the main worktree path for all signal files
+- Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
 - **Concurrency**: Merge acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
