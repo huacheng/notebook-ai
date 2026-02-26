@@ -23,7 +23,7 @@ codex plugin add huacheng/moonview
 
 ## 插件
 
-### task-ai (v0.8.0)
+### task-ai (v0.8.3)
 ## 一、概述
 
 task-ai 是一套**纯 Markdown 指令驱动**的任务生命周期管理框架。它作为一个通用的、模型解耦的插件运行，管理从任务初始化到完成报告的完整生命周期。框架支持领域自适应验证（VFP 协议）、跨任务知识复用和高度自动化的自主执行。
@@ -54,7 +54,7 @@ task-ai 是一套**纯 Markdown 指令驱动**的任务生命周期管理框架�
 
 | 子命令 | 模型层级 | 职责 |
 |--------|---------|------|
-| `light` | light | **轻量级影子任务**：闪击模式，瞬时 Notebook，完成后自动清理。 |
+| `light` | light | **轻量内联操作**：在当前分支直接修改并提交，无状态变更。 |
 | `read` | medium | **系统免疫**：从外部文档/URL 安全吸纳知识到图书馆。 |
 | `security` | heavy | **安全网关**：前置审计计划和验证高危命令。 |
 | `auto` | heavy | 自主执行循环：单会话编排，通过 `.auto-signal` 驱动。 |
@@ -89,13 +89,11 @@ graph TD
     merge --> report[report]
 ```
 
-#### 2. 轻量级影子任务 (Light Path)
+#### 2. 轻量内联操作 (Light Path)
 ```mermaid
 graph LR
-    light[light] --> exec_l[exec]
-    exec_l --> finish[light --finish]
-    exec_l --> promote[light --promote]
-    promote --> plan[Standard: planning]
+    light["light &lt;描述&gt;"] --> edit[直接修改文件]
+    edit --> commit["light --commit"]
 ```
 
 #### 3. 辅助与全局命令 (Auxiliary)
@@ -105,16 +103,11 @@ graph LR
 
 ---
 
-## 三、状态机升级 (9 状态 25 转换)
-
-### 新增状态与路径
-- **`light-exec`**: `light` 模式专用状态，表示正在执行影子任务。
-- **`post-target`**: `target` 命令完成后到达的中间检查点。
+## 三、状态机 (8 状态 20 转换)
 
 ### 关键设计约束
-1. **轻量限制**: `light` 模式若修改文件 > 3 或失败 > 3 次，必须执行 `--promote` 转正。
-2. **Notebook 绑定**: 即使是 `light` 模式也必须创建临时 Notebook 目录以承载状态。
-3. **安全前置**: 所有 `exec` 执行前必须通过 `security` 校验。
+1. **`light` 无状态**：`light` 模式在当前分支直接操作，不参与状态机转换。
+2. **安全前置**: 所有 `exec` 执行前必须通过 `security` 校验。
 
 ---
 
@@ -156,11 +149,11 @@ graph LR
 |------|------|------|
 | 子命令总数 | 18 | 覆盖从调研到交付全流程 |
 | 契约测试通过数 | **617 PASS** | 0 FAIL, 0 ERROR |
-| 状态机状态数 | 9 | 包含 light-exec 扩展 |
+| 状态机状态数 | 8 | light 无状态转换 |
 | 文档覆盖度 | 100% | 每个 Skill 均有完整 SKILL.md |
 
 ---
-*总结由 task-ai (v0.8.0) 自动生成并验证。*
+*总结由 task-ai (v0.8.3) 自动生成并验证。*
 
 ## 相关项目
 

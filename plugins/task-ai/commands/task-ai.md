@@ -255,7 +255,7 @@ Sub-commands have different cognitive demands. Each SKILL.md frontmatter declare
 
 | 命令 | 说明 |
 |------|------|
-| `light` | 轻量级影子任务（无目录、影子分支、自动合并） |
+| `light` | 当前分支轻量操作（人工干预、单次 commit） |
 | `cancel` | 取消任务 |
 | `list` | 查询任务状态与依赖 |
 | `annotate` | 处理 Plan 面板批注 |
