@@ -331,15 +331,32 @@ export function createProjectsRouter(
     }
   });
 
-  // Download all as tar.gz
+  // Download as tar.gz (whole project or subdirectory via ?path=)
   router.get('/:projectId/files/zip', async (req, res) => {
     const project = db.getProject(req.params.projectId);
     if (!project) { res.status(404).json({ error: 'not found' }); return; }
 
+    const subPath = typeof req.query['path'] === 'string' ? req.query['path'] : '';
+
+    // Determine target directory and archive filename
+    let targetDir = project.path;
+    let archiveName = project.slug || 'project';
+
+    if (subPath) {
+      const resolved = path.resolve(project.path, subPath);
+      const projectRoot = path.resolve(project.path);
+      if (!resolved.startsWith(projectRoot + path.sep) && resolved !== projectRoot) {
+        res.status(403).json({ error: 'path traversal' });
+        return;
+      }
+      targetDir = resolved;
+      archiveName = path.basename(resolved);
+    }
+
     const { spawn } = await import('child_process');
     res.setHeader('Content-Type', 'application/gzip');
-    res.setHeader('Content-Disposition', `attachment; filename="${project.slug || 'project'}.tar.gz"`);
-    const tar = spawn('tar', ['czf', '-', '-C', project.path, '.']);
+    res.setHeader('Content-Disposition', `attachment; filename="${archiveName}.tar.gz"`);
+    const tar = spawn('tar', ['czf', '-', '-C', targetDir, '.']);
     tar.stdout.pipe(res);
     tar.stderr.on('data', (d: Buffer) => console.error('[tar]', d.toString()));
     tar.on('error', (err: Error) => { if (!res.headersSent) res.status(500).json({ error: String(err) }); });

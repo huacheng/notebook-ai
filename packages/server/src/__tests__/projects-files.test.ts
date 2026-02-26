@@ -418,6 +418,28 @@ describe('GET /:projectId/files/zip', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('exports a subdirectory as tar.gz when path is provided', async () => {
+    const subDir = path.join(projectDir, 'my-task');
+    await mkdir(subDir, { recursive: true });
+    await writeFile(path.join(subDir, 'task.notebook.json'), '{"cells":[]}');
+    await writeFile(path.join(subDir, 'notes.md'), 'hello');
+
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files/zip?path=my-task`)
+      .expect(200);
+
+    expect(res.headers['content-type']).toMatch(/gzip/);
+    expect(res.headers['content-disposition']).toMatch(/my-task\.tar\.gz/);
+    expect(res.body.length).toBeGreaterThan(0);
+  });
+
+  it('rejects path traversal in zip path param', async () => {
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files/zip?path=../../etc`);
+
+    expect([400, 403]).toContain(res.status);
+  });
 });
 
 // ── 10. POST /import — import project from tar.gz ──────────────────────────

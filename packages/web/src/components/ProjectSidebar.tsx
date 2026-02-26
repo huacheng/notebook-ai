@@ -15,12 +15,18 @@ function ProjectItemMenu({ projectId, projectSlug, onClose }: { projectId: strin
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const url = `/api/projects/${projectId}/files/zip`;
+    const res = await fetch(url, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
     const a = document.createElement('a');
-    a.href = authToken ? `${url}?token=${encodeURIComponent(authToken)}` : url;
+    a.href = URL.createObjectURL(blob);
     a.download = `${projectSlug}.tar.gz`;
     a.click();
+    URL.revokeObjectURL(a.href);
     onClose();
   };
 
@@ -134,12 +140,18 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, onClose }: {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const handleExport = () => {
-    const url = `${baseUrl}/files/download?path=${encodeURIComponent(relPath)}`;
+  const handleExport = async () => {
+    const url = `${baseUrl}/files/zip?path=${encodeURIComponent(relPath)}`;
+    const res = await fetch(url, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
     const a = document.createElement('a');
-    a.href = url;
-    a.download = relPath.split('/').pop() || 'notebook.json';
+    a.href = URL.createObjectURL(blob);
+    a.download = `${relPath.split('/').pop() || 'notebook'}.tar.gz`;
     a.click();
+    URL.revokeObjectURL(a.href);
     onClose();
   };
 
@@ -227,7 +239,8 @@ function FileBrowser() {
   };
 
   const renderItemActions = useCallback((file: { name: string; type: string }, subPath: string) => {
-    if (!file.name.endsWith('.notebook.json')) return null;
+    const isNb = file.name.endsWith('.notebook.json') || (file.type === 'directory' && (file as any).isNotebook);
+    if (!isNb) return null;
     const relPath = subPath === '.' ? file.name : `${subPath}/${file.name}`;
     return (
       <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
