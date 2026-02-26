@@ -1,13 +1,65 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
 import { FileSection } from './FileSection';
+import { runDeleteFlow } from './deleteFlow';
+import { runCreateFlow, type CreatePhase } from './createFlow';
 
-function ProjectItemMenu({ projectId, projectSlug, projectTitle, onClose }: {
-  projectId: string; projectSlug: string; projectTitle: string; onClose: () => void;
+const MAX_TITLE_LENGTH = 80;
+
+function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
+  phase: 'creating' | 'done' | 'error';
+  label: string;
+  errorMsg: string;
+  onDismiss: () => void;
 }) {
-  const deleteProject = useStore(s => s.deleteProject);
-  const authToken = useStore(s => s.authToken);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  return (
+    <div className="annotation-modal-overlay" onClick={phase === 'error' ? onDismiss : undefined}>
+      <div className="annotation-modal" onClick={e => e.stopPropagation()}>
+        {phase === 'creating' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Creating <strong>{label}</strong>...
+            </p>
+          </div>
+        )}
+        {phase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              {label} created
+            </p>
+          </div>
+        )}
+        {phase === 'error' && (
+          <>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Create Failed</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              {errorMsg}
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onDismiss}>Close</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function validateTitle(title: string): string {
+  const t = title.trim();
+  if (!t) return '';
+  if (t.length > MAX_TITLE_LENGTH) return `Name too long (max ${MAX_TITLE_LENGTH} chars)`;
+  if (!/[a-zA-Z0-9]/.test(t)) return 'Name must contain at least one letter or number';
+  if (/^[.\-_]/.test(t)) return 'Name cannot start with . - or _';
+  return '';
+}
+
+function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete }: {
+  projectId: string; projectSlug: string; authToken: string | null;
+  onClose: () => void; onRequestDelete: () => void;
+}) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,35 +86,46 @@ function ProjectItemMenu({ projectId, projectSlug, projectTitle, onClose }: {
   };
 
   return (
-    <>
-      <div className="project-item-menu" ref={menuRef}>
-        <button className="project-item-menu-item" onClick={handleExport}>Export</button>
-        <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>Delete</button>
-      </div>
-      {showDeleteModal && (
-        <ConfirmDeleteModal
-          name={projectTitle}
-          label="Project"
-          onCancel={() => { setShowDeleteModal(false); onClose(); }}
-          onConfirm={() => deleteProject(projectId)}
-        />
-      )}
-    </>
+    <div className="project-item-menu" ref={menuRef} onClick={e => e.stopPropagation()}>
+      <button className="project-item-menu-item" onClick={handleExport}>Export</button>
+      <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>Delete</button>
+    </div>
   );
 }
 
 function ProjectList() {
   const { projects, projectsLoading, createProject, setActiveProject, importProject } = useStore();
+  const deleteProject = useStore(s => s.deleteProject);
+  const authToken = useStore(s => s.authToken);
   const [newTitle, setNewTitle] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [createPhase, setCreatePhase] = useState<CreatePhase>('idle');
+  const [createError, setCreateError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleCreate = async () => {
-    if (!newTitle.trim()) return;
-    await createProject(newTitle.trim());
-    setNewTitle('');
-    setShowCreate(false);
+  const titleError = useMemo(() => validateTitle(newTitle), [newTitle]);
+  const canCreate = newTitle.trim().length > 0 && !titleError;
+
+  const handleCreate = () => {
+    if (!canCreate) return;
+    const title = newTitle.trim();
+    runCreateFlow(
+      () => createProject(title),
+      {
+        setPhase: setCreatePhase,
+        setErrorMsg: setCreateError,
+        onDone: () => {
+          setNewTitle('');
+          setShowCreate(false);
+          setTimeout(() => {
+            setCreatePhase('idle');
+            useStore.getState().fetchProjects();
+          }, 800);
+        },
+      },
+    );
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,13 +162,31 @@ function ProjectList() {
               <ProjectItemMenu
                 projectId={p.id}
                 projectSlug={p.slug}
-                projectTitle={p.title}
+                authToken={authToken}
                 onClose={() => setMenuOpenId(null)}
+                onRequestDelete={() => setDeleteTarget({ id: p.id, title: p.title })}
               />
             )}
           </div>
         ))}
       </div>
+
+      {/* Delete modal rendered OUTSIDE projects.map — survives list refresh */}
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          name={deleteTarget.title}
+          label="Project"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => deleteProject(deleteTarget.id)}
+          onDone={() => {
+            setDeleteTarget(null);
+            const { activeProjectId, goBackToProjectList, fetchProjects } = useStore.getState();
+            if (activeProjectId === deleteTarget.id) goBackToProjectList();
+            fetchProjects();
+          }}
+        />
+      )}
+
       <input
         ref={fileInputRef}
         type="file"
@@ -114,15 +195,20 @@ function ProjectList() {
         onChange={handleImport}
       />
       {showCreate ? (
-        <div className="project-create-form">
-          <input
-            autoFocus
-            value={newTitle}
-            onChange={e => setNewTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowCreate(false); }}
-            placeholder="Project name..."
-          />
-          <button onClick={handleCreate}>Create</button>
+        <div className="project-create-form-wrap">
+          <div className="project-create-form">
+            <input
+              autoFocus
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowCreate(false); }}
+              placeholder="Project name..."
+              maxLength={MAX_TITLE_LENGTH}
+              className={titleError ? 'input-error' : ''}
+            />
+            <button onClick={handleCreate} disabled={!canCreate}>Create</button>
+          </div>
+          {titleError && <div className="create-form-error">{titleError}</div>}
         </div>
       ) : (
         <div className="project-actions-bar">
@@ -130,29 +216,38 @@ function ProjectList() {
           <button className="project-action-btn" onClick={() => fileInputRef.current?.click()}>&#8593; Import</button>
         </div>
       )}
+
+      {createPhase !== 'idle' && (
+        <CreateOverlay
+          phase={createPhase as 'creating' | 'done' | 'error'}
+          label="Project"
+          errorMsg={createError}
+          onDismiss={() => setCreatePhase('idle')}
+        />
+      )}
     </div>
   );
 }
 
-function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm }: {
+function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onDone }: {
   name: string;
   label?: string;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
+  /** Called after successful delete + success display. Use for state cleanup. */
+  onDone?: () => void;
 }) {
   const [phase, setPhase] = useState<'confirm' | 'deleting' | 'done' | 'error'>('confirm');
   const [errorMsg, setErrorMsg] = useState('');
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
-  const handleConfirm = async () => {
-    setPhase('deleting');
-    try {
-      await onConfirm();
-      setPhase('done');
-      setTimeout(onCancel, 800);
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Delete failed');
-      setPhase('error');
-    }
+  const handleConfirm = () => {
+    runDeleteFlow(onConfirm, {
+      setPhase,
+      setErrorMsg,
+      onDone: () => setTimeout(() => onDoneRef.current?.(), 800),
+    });
   };
 
   return (
@@ -202,20 +297,21 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm }: {
   );
 }
 
-function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose }: {
-  projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; onClose: () => void;
+function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted }: {
+  projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; onClose: () => void; onDeleted?: () => void;
 }) {
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (showDeleteModal) return;
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
+  }, [onClose, showDeleteModal]);
 
   const handleExport = async () => {
     const url = `${baseUrl}/files/zip?path=${encodeURIComponent(relPath)}`;
@@ -245,6 +341,7 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
           name={displayName}
           onCancel={() => { setShowDeleteModal(false); onClose(); }}
           onConfirm={() => deleteProjectNotebook(projectId, relPath)}
+          onDone={() => { setShowDeleteModal(false); onClose(); onDeleted?.(); }}
         />
       )}
     </>
@@ -263,9 +360,11 @@ function FileBrowser() {
 
   const [showNbCreate, setShowNbCreate] = useState(false);
   const [nbTitle, setNbTitle] = useState('');
-  const [nbCreating, setNbCreating] = useState(false);
+  const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
+  const [nbCreateError, setNbCreateError] = useState('');
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
   const [currentSubPath, setCurrentSubPath] = useState('.');
+  const [fileRefreshKey, setFileRefreshKey] = useState(0);
   const nbImportRef = useRef<HTMLInputElement>(null);
   const isInsideNotebook = currentSubPath !== '.';
 
@@ -302,18 +401,27 @@ function FileBrowser() {
     }
   }, [activeProjectPath, openFileTab]);
 
-  const handleCreateNotebook = async () => {
-    if (!nbTitle.trim() || !activeProjectId || nbCreating) return;
-    setNbCreating(true);
-    try {
-      await useStore.getState().createNotebook(activeProjectId, nbTitle.trim());
-      setNbTitle('');
-      setShowNbCreate(false);
-    } catch (err) {
-      console.error('Failed to create notebook:', err);
-    } finally {
-      setNbCreating(false);
-    }
+  const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);
+  const canCreateNb = nbTitle.trim().length > 0 && !nbTitleError;
+
+  const handleCreateNotebook = () => {
+    if (!canCreateNb || !activeProjectId || nbCreatePhase === 'creating') return;
+    const title = nbTitle.trim();
+    runCreateFlow(
+      async () => { await useStore.getState().createNotebook(activeProjectId, title); },
+      {
+        setPhase: setNbCreatePhase,
+        setErrorMsg: setNbCreateError,
+        onDone: () => {
+          setNbTitle('');
+          setShowNbCreate(false);
+          setTimeout(() => {
+            setNbCreatePhase('idle');
+            setFileRefreshKey(k => k + 1);
+          }, 800);
+        },
+      },
+    );
   };
 
   const handleNbImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,6 +450,7 @@ function FileBrowser() {
             authToken={authToken}
             showExport={isNbDir}
             onClose={() => setNbMenuPath(null)}
+            onDeleted={() => setFileRefreshKey(k => k + 1)}
           />
         )}
       </div>
@@ -361,6 +470,7 @@ function FileBrowser() {
         noDragFilter={(name) => name.endsWith('.notebook.json')}
         renderItemActions={renderItemActions}
         onSubPathChange={setCurrentSubPath}
+        refreshKey={fileRefreshKey}
       />
       {!isInsideNotebook && (
         <>
@@ -372,24 +482,38 @@ function FileBrowser() {
             onChange={handleNbImport}
           />
           {showNbCreate ? (
-            <div className="project-create-form">
-              <input
-                autoFocus
-                value={nbTitle}
-                onChange={e => setNbTitle(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleCreateNotebook(); if (e.key === 'Escape') setShowNbCreate(false); }}
-                placeholder="Notebook name..."
-                disabled={nbCreating}
-              />
-              <button onClick={handleCreateNotebook} disabled={nbCreating || !nbTitle.trim()}>
-                {nbCreating ? '...' : 'Create'}
-              </button>
+            <div className="project-create-form-wrap">
+              <div className="project-create-form">
+                <input
+                  autoFocus
+                  value={nbTitle}
+                  onChange={e => setNbTitle(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleCreateNotebook(); if (e.key === 'Escape') setShowNbCreate(false); }}
+                  placeholder="Notebook name..."
+                  disabled={nbCreatePhase === 'creating'}
+                  maxLength={MAX_TITLE_LENGTH}
+                  className={nbTitleError ? 'input-error' : ''}
+                />
+                <button onClick={handleCreateNotebook} disabled={nbCreatePhase === 'creating' || !canCreateNb}>
+                  Create
+                </button>
+              </div>
+              {nbTitleError && <div className="create-form-error">{nbTitleError}</div>}
             </div>
           ) : (
             <div className="project-actions-bar">
               <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>+ New</button>
               <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>&#8593; Import</button>
             </div>
+          )}
+
+          {nbCreatePhase !== 'idle' && (
+            <CreateOverlay
+              phase={nbCreatePhase as 'creating' | 'done' | 'error'}
+              label="Notebook"
+              errorMsg={nbCreateError}
+              onDismiss={() => setNbCreatePhase('idle')}
+            />
           )}
         </>
       )}

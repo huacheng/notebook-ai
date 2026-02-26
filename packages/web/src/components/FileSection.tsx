@@ -209,6 +209,8 @@ export interface FileSectionProps {
   renderItemActions?: (file: { name: string; type: string }, subPath: string) => React.ReactNode | null;
   /** When returns true for a file/directory name + subPath, the delete button is hidden. */
   noDeleteFilter?: (name: string, subPath: string) => boolean;
+  /** Increment to force an immediate file list refresh. */
+  refreshKey?: number;
   /** When returns true for a subPath, all write operations (upload/create/delete/download) are hidden. */
   readOnlyPath?: (subPath: string) => boolean;
   /** Called when the user navigates to a different sub-path. */
@@ -228,6 +230,7 @@ export function FileSection({
   noDeleteFilter,
   readOnlyPath,
   onSubPathChange,
+  refreshKey,
 }: FileSectionProps) {
   const [subPath, setSubPathRaw] = useState(initialPath);
   const setSubPath = useCallback((v: string | ((prev: string) => string)) => {
@@ -293,6 +296,10 @@ export function FileSection({
     if (prevPath.current === null) { prevPath.current = subPath; return; }
     if (prevPath.current !== subPath) { prevPath.current = subPath; fetchFiles(subPath); }
   }, [subPath, fetchFiles]);
+
+  useEffect(() => {
+    if (refreshKey) fetchFiles(subPath, true);
+  }, [refreshKey]); // eslint-disable-line
 
   useEffect(() => {
     autoRefreshRef.current = setInterval(() => {

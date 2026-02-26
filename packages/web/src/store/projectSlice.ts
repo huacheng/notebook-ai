@@ -52,9 +52,12 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       },
       body: JSON.stringify({ title }),
     });
-    if (res.ok) {
-      await get().fetchProjects();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Create failed' }));
+      throw new Error(body.error || `Create failed (${res.status})`);
     }
+    // State refresh (fetchProjects) is intentionally NOT done here —
+    // the caller must show the success phase first, then refresh explicitly.
   },
 
   deleteProject: async (projectId: string) => {
@@ -67,8 +70,9 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       const body = await res.json().catch(() => ({ error: 'Delete failed' }));
       throw new Error(body.error || `Delete failed (${res.status})`);
     }
-    if (get().activeProjectId === projectId) get().goBackToProjectList();
-    await get().fetchProjects();
+    // State cleanup (goBackToProjectList, fetchProjects) is intentionally
+    // NOT done here — the caller (ConfirmDeleteModal) must show the success
+    // phase first, then call cleanup explicitly after the user sees it.
   },
 
   importProject: async (file: File) => {

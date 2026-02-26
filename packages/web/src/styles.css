@@ -4432,11 +4432,14 @@ button:focus-visible {
   border-left: 1px solid var(--border-default);
 }
 
+.project-create-form-wrap {
+  border-top: 1px solid var(--border-default);
+}
+
 .project-create-form {
   padding: var(--space-sm) var(--space-lg);
   display: flex;
   gap: var(--space-xs);
-  border-top: 1px solid var(--border-default);
 }
 
 .project-create-form input {
@@ -4448,6 +4451,10 @@ button:focus-visible {
   font-family: var(--font-sans);
 }
 
+.project-create-form input.input-error {
+  border-color: var(--color-error);
+}
+
 .project-create-form button {
   padding: 4px 12px;
   background: var(--color-primary);
@@ -4457,6 +4464,18 @@ button:focus-visible {
   cursor: pointer;
   font-size: var(--font-size-sm);
   font-family: var(--font-sans);
+}
+
+.project-create-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.create-form-error {
+  padding: 2px var(--space-lg) var(--space-xs);
+  font-size: 11px;
+  color: var(--color-error);
+  line-height: 1.3;
 }
 
 .project-list-loading {
