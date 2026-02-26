@@ -222,8 +222,7 @@ textarea.cell-input {
 .toolbar-version {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  color: var(--text-secondary);
-  opacity: 0.6;
+  color: rgba(255, 255, 255, 0.5);
   margin-left: 6px;
   letter-spacing: 0;
 }
