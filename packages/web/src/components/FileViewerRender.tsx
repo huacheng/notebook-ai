@@ -1,6 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 import DOMPurify from 'dompurify';
+import { useMermaidRender } from '../hooks/useMermaidRender';
+import { extractHeadings, headingComponents, MarkdownToc } from './MarkdownToc';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -244,6 +249,32 @@ export function FileViewerRender({
   const isMd = filename.endsWith('.md');
   const isJson = isJsonFile(filename);
 
+  // ── Markdown enhancements ──────────────────────────────────────────────
+  const mdRef = useRef<HTMLDivElement>(null);
+  const [tocOpen, setTocOpen] = useState(() => {
+    try { return localStorage.getItem('fv-toc-open') === '1'; } catch { return false; }
+  });
+  const mdHeadings = useMemo(() => isMd ? extractHeadings(content) : [], [isMd, content]);
+  const mdComponents = useMemo(() => {
+    const comps = headingComponents();
+    // MermaidCodeBlock: render mermaid fences as-is so the hook can find them
+    const MermaidCodeBlock = ({ className, children, ...rest }: any) => {
+      if (className === 'language-mermaid') {
+        return <pre><code className={className} {...rest}>{children}</code></pre>;
+      }
+      return <code className={className} {...rest}>{children}</code>;
+    };
+    return { ...comps, code: MermaidCodeBlock };
+  }, []);
+  useMermaidRender(mdRef, content);
+  const handleTocToggle = useCallback(() => {
+    setTocOpen(v => {
+      const next = !v;
+      try { localStorage.setItem('fv-toc-open', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  }, []);
+
   // Copy buffer for PDF.js — postMessage transfers ArrayBuffer ownership,
   // so we must give it a fresh copy each time to avoid "detached" errors on re-render.
   const pdfFile = useMemo(() => {
@@ -448,8 +479,17 @@ export function FileViewerRender({
           }}
         >
           {isMd && (
-            <div className="fv-render__markdown">
-              <ReactMarkdown>{content}</ReactMarkdown>
+            <div className="fv-render__markdown" ref={mdRef}>
+              {mdHeadings.length > 0 && (
+                <MarkdownToc headings={mdHeadings} isOpen={tocOpen} onToggle={handleTocToggle} />
+              )}
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={mdComponents}
+              >
+                {content}
+              </ReactMarkdown>
             </div>
           )}
           {!isMd && isJson && (
