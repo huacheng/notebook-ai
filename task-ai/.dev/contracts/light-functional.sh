@@ -1,161 +1,135 @@
 #!/usr/bin/env bash
-# L2: Functional test for light sub-command (Notebook-bound)
-# Verifies shadow task lifecycle with transient notebook directory.
+# L2: Functional test for light sub-command (refactored — inline operation on current branch)
+# Verifies: commit helper, context discovery, no shadow branch, no light-exec state.
 
 source "$(dirname "$0")/lib.sh"
 
 LIGHT_SH="$TASK_AI_ROOT/skills/light/scripts/light.sh"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
-TEST_PROJECT="test-project"
-TEST_OBJ="Fix spelling"
-export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
+LIGHT_SKILL="$TASK_AI_ROOT/skills/light/SKILL.md"
+EXPECTED_STATES="$DEV_ROOT/fixtures/expected-states.json"
+
+export NB_WORKSPACES_ROOT="/tmp/task-ai-light-test-$$"
 trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
-# Setup: Create a project
+# --- Setup: Git repo with a notebook context ---
 rm -rf "$NB_WORKSPACES_ROOT"
-mkdir -p "$NB_WORKSPACES_ROOT/$TEST_PROJECT"
-cd "$NB_WORKSPACES_ROOT/$TEST_PROJECT" || exit 1
-git init > /dev/null
+mkdir -p "$NB_WORKSPACES_ROOT/test-project/my-notebook/.working"
+cd "$NB_WORKSPACES_ROOT/test-project" || exit 1
+git init > /dev/null 2>&1
 git config user.email "test@example.com"
 git config user.name "Test User"
-git commit --allow-empty -m "Initial commit" > /dev/null
+echo '{}' > my-notebook/.working/.index.json
+git add -A && git commit -m "Initial commit" > /dev/null 2>&1
 
-# --- Test 1: Start Mode (Notebook-bound Start) ---
-"$LIGHT_SH" "$TEST_PROJECT" "$TEST_OBJ" > /dev/null
-
-# 1. Check if notebook directory exists
-NB_DIR=$(find . -name "light-fix-spelling-*" -type d)
-if [[ -d "$NB_DIR/.working" ]]; then
-    emit_pass "light: created notebook directory"
-else
-    emit_fail "light: failed to create notebook directory"
-fi
-
-# 2. Check for shadow branch
-CURRENT_BRANCH=$(git branch --show-current)
-if [[ "$CURRENT_BRANCH" =~ ^light/light-fix-spelling- ]]; then
-    emit_pass "light: successfully switched to shadow branch"
-else
-    emit_fail "light: failed to switch branch (Current: $CURRENT_BRANCH)"
-fi
-
-# Move to the notebook directory for context before finishing
-cd "$NB_DIR" || exit 1
-
-# --- Test 2: Finish Mode ---
-echo "Fixed typo" > README.md
+# ============================================================
+# Test 1: Commit in notebook context — correct message format
+# ============================================================
+cd "$NB_WORKSPACES_ROOT/test-project/my-notebook" || exit 1
+echo "hello" > README.md
 git add README.md
 
-# Move back to project root before finishing because the notebook dir will be deleted
-cd ..
-"$LIGHT_SH" --finish > /dev/null
-
-# 1. Check if on master branch
-CURRENT_BRANCH=$(git branch --show-current)
-if [[ "$CURRENT_BRANCH" == "master" ]]; then
-    emit_pass "light: successfully returned to master"
+"$LIGHT_SH" --commit "fix typo in README" > /dev/null 2>&1
+COMMIT_MSG=$(git log -1 --format=%s)
+EXPECTED="task-ai(my-notebook):light fix typo in README"
+if [[ "$COMMIT_MSG" == "$EXPECTED" ]]; then
+    emit_pass "light --commit: correct message format in notebook context"
 else
-    emit_fail "light: failed to return to master"
+    emit_fail "light --commit: expected '$EXPECTED', got '$COMMIT_MSG'"
 fi
 
-# 2. Check for squash commit
-if git log -n 1 --oneline | grep -q "task-ai($TEST_PROJECT):light $TEST_OBJ"; then
-    emit_pass "light: successfully squash-merged changes"
+# ============================================================
+# Test 2: Commit at git root (no notebook context) — fallback scope
+# ============================================================
+cd "$NB_WORKSPACES_ROOT/test-project" || exit 1
+echo "world" > file.txt
+git add file.txt
+
+"$LIGHT_SH" --commit "add file" > /dev/null 2>&1
+COMMIT_MSG=$(git log -1 --format=%s)
+EXPECTED="task-ai(test-project):light add file"
+if [[ "$COMMIT_MSG" == "$EXPECTED" ]]; then
+    emit_pass "light --commit: correct fallback scope at git root"
 else
-    emit_fail "light: missing squash commit on master"
+    emit_fail "light --commit: expected '$EXPECTED', got '$COMMIT_MSG'"
 fi
 
-# 3. Check if notebook directory is deleted
-if [[ -z $(find . -name "light-fix-spelling-*" -type d) ]]; then
-    emit_pass "light: successfully deleted transient notebook directory"
+# ============================================================
+# Test 3: --commit with nothing staged — should fail gracefully
+# ============================================================
+OUTPUT=$("$LIGHT_SH" --commit "empty commit" 2>&1)
+RC=$?
+if [[ $RC -ne 0 ]]; then
+    emit_pass "light --commit: exits non-zero when nothing to commit"
 else
-    emit_fail "light: failed to delete notebook directory after finish"
+    emit_fail "light --commit: should fail when nothing staged"
 fi
 
-# --- Test 3: Promote Mode ---
-# Setup a fresh light task to promote
-cd "$NB_WORKSPACES_ROOT/$TEST_PROJECT" || exit 1
-"$LIGHT_SH" "$TEST_PROJECT" "Complex Fix" > /dev/null
-NB_DIR=$(find . -name "light-complex-fix-*" -type d)
-cd "$NB_DIR" || exit 1
+# ============================================================
+# Test 4: SKILL.md does NOT contain old shadow-task concepts
+# ============================================================
+OLD_CONCEPTS=("shadow branch" "shadow task" "\\-\\-finish" "\\-\\-promote" "\\-\\-status" "light-exec" "squash merge" ".light-tasks.jsonl")
+for concept in "${OLD_CONCEPTS[@]}"; do
+    if grep -qi -- "$concept" "$LIGHT_SKILL"; then
+        emit_fail "SKILL.md: still contains old concept '${concept//\\/}'"
+    else
+        emit_pass "SKILL.md: no reference to '${concept//\\/}'"
+    fi
+done
 
-"$LIGHT_SH" "--promote" > /dev/null
+# ============================================================
+# Test 5: SKILL.md contains new expected concepts
+# ============================================================
+NEW_CONCEPTS=("current branch" "\\-\\-commit" "description")
+for concept in "${NEW_CONCEPTS[@]}"; do
+    if grep -qi -- "$concept" "$LIGHT_SKILL"; then
+        emit_pass "SKILL.md: contains expected concept '${concept//\\/}'"
+    else
+        emit_fail "SKILL.md: missing expected concept '${concept//\\/}'"
+    fi
+done
 
-# 1. Check if mode flag is removed
-INDEX_JSON=".working/.index.json"
-MODE=$(python3 "$STATE_PY" get "$INDEX_JSON" mode)
-if [[ "$MODE" != "light" ]]; then
-    emit_pass "light: successfully removed light mode flag during promotion"
-else
-    emit_fail "light: failed to remove light mode flag"
-fi
-
-# 2. Check if branch is renamed to task/
-CURRENT_BRANCH=$(git branch --show-current)
-if [[ "$CURRENT_BRANCH" =~ ^task/light-complex-fix- ]]; then
-    emit_pass "light: successfully renamed branch to task/ prefix"
-else
-    emit_fail "light: failed to rename branch (Current: $CURRENT_BRANCH)"
-fi
-
-# 3. Check if status is planning
-STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status)
-if [[ "$STATUS" == "planning" ]]; then
-    emit_pass "light: status set to planning after promotion"
-else
-    emit_fail "light: failed to set status to planning"
-fi
-
-# --- Test 4: Threshold Detection ---
-# Setup a fresh light task
-cd "$NB_WORKSPACES_ROOT/$TEST_PROJECT" || exit 1
-"$LIGHT_SH" "$TEST_PROJECT" "Bulk Update" > /dev/null
-# Modify 4 files
-touch file1 file2 file3 file4
-git add file1 file2 file3 file4
-
-OUTPUT=$("$LIGHT_SH" --status 2>&1)
-if echo "$OUTPUT" | grep -q "Complexity warning: 4 files modified"; then
-    emit_pass "light: correctly detected file modification threshold"
-else
-    emit_fail "light: failed to detect complexity threshold (Output: $OUTPUT)"
-fi
-
-# Cleanup
-rm -rf "$NB_WORKSPACES_ROOT"
-
-# --- Test: SKILL.md description contradiction ---
-LIGHT_SKILL="$TASK_AI_ROOT/skills/light/SKILL.md"
-FRONTMATTER=$(extract_frontmatter "$LIGHT_SKILL")
-if echo "$FRONTMATTER" | grep -qi "No physical directory creation"; then
-  emit_fail "light: description still says 'No physical directory creation' — contradicts init call"
-else
-  emit_pass "light: description does not claim 'No physical directory creation'"
-fi
-
-# --- Test: init only under promote ---
-STEPS=$(extract_steps "$LIGHT_SKILL")
-# Check that init call appears only inside promote section, not in start section
-START_SECTION=$(echo "$STEPS" | sed -n '/Start shadow session/,/Promotion\|Finish/p')
-if echo "$START_SECTION" | grep -qi '/task-ai:init\|Call.*init'; then
-  emit_fail "light: init appears in start section — should only be in promote"
-else
-  emit_pass "light: init not called unconditionally in start section"
-fi
-
-# --- Test: light-exec in canonical status lists ---
-STATE_PY="$TASK_AI_ROOT/core/state.py"
+# ============================================================
+# Test 6: light-exec NOT in state.py VALID_STATUSES
+# ============================================================
 if grep -q 'light-exec' "$STATE_PY"; then
-  emit_pass "light: light-exec in state.py VALID_STATUSES"
+    emit_fail "state.py: still contains light-exec"
 else
-  emit_fail "light: light-exec missing from state.py VALID_STATUSES"
+    emit_pass "state.py: light-exec removed"
 fi
 
-EXPECTED_STATES="$DEV_ROOT/fixtures/expected-states.json"
+# ============================================================
+# Test 7: light-exec NOT in expected-states.json
+# ============================================================
 if grep -q 'light-exec' "$EXPECTED_STATES"; then
-  emit_pass "light: light-exec in expected-states.json"
+    emit_fail "expected-states.json: still contains light-exec"
 else
-  emit_fail "light: light-exec missing from expected-states.json"
+    emit_pass "expected-states.json: light-exec removed"
+fi
+
+# ============================================================
+# Test 8: No light-exec anywhere in task-ai/
+# ============================================================
+RESIDUAL=$(grep -r 'light-exec' "$TASK_AI_ROOT" --include="*.py" --include="*.json" --include="*.sh" --include="*.md" -l 2>/dev/null | grep -v '.dev/contracts/light-functional.sh' || true)
+if [[ -z "$RESIDUAL" ]]; then
+    emit_pass "no light-exec residual in task-ai/"
+else
+    emit_fail "light-exec residual found in: $RESIDUAL"
+fi
+
+# ============================================================
+# Test 9: light.sh accepts --commit with description
+# ============================================================
+cd "$NB_WORKSPACES_ROOT/test-project/my-notebook" || exit 1
+echo "more content" >> README.md
+git add README.md
+
+"$LIGHT_SH" --commit "update readme" > /dev/null 2>&1
+RC=$?
+if [[ $RC -eq 0 ]]; then
+    emit_pass "light.sh: --commit exits 0 on success"
+else
+    emit_fail "light.sh: --commit exited $RC on valid staged files"
 fi
 
 summary

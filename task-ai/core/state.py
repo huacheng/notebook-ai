@@ -5,7 +5,7 @@ import argparse
 import os
 from datetime import datetime
 
-VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "complete", "blocked", "cancelled", "light-exec"}
+VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "complete", "blocked", "cancelled"}
 
 def get_lock(index_path):
     lock_path = index_path + ".lock"

@@ -1,71 +1,67 @@
 ---
 name: light
-description: "Shadow task execution for lightweight fixes and adjustments. Single commit delivery, automatic branch cleanup."
+description: "Lightweight inline operation on current branch. For quick manual interventions during task execution — no branch creation, no init, single commit delivery."
 model_tier: light
 auto_delegatable: true
 arguments:
-  - name: objective
-    description: "The task objective or action to perform"
+  - name: description
+    description: "What to do (e.g., 'fix typo in README', 'add missing import')"
     required: true
 ---
 
-# /task-ai:light — Lightweight Shadow Task
+# /task-ai:light — Lightweight Inline Operation
 
-A "fast-track" mode for small, self-contained tasks (e.g., typos, simple CSS tweaks, minor logs). This mode avoids the overhead of directory creation and heavy lifecycle tracking while maintaining project-level audit trails.
+A quick-action mode for small, self-contained modifications on the **current branch**. No branch creation, no lifecycle tracking, no state transitions — just edit files and commit.
 
 ## Usage
 
-- **Start**: `/task-ai:light "Objective content..."` — Creates a shadow branch and records the task.
-- **Finish**: `/task-ai:light --finish` — Squash merges changes to master, deletes the branch, and clears the record.
-- **Promote**: `/task-ai:light --promote` — Converts the shadow task into a standard heavy-duty notebook (creates directory, etc.).
+```
+/task-ai:light "<description>"
+```
 
-## Complexity Constraints
+The agent reads this skill, performs the described change directly on the current branch, then commits using the helper script.
 
-To maintain the "lightweight" nature of this mode, the following thresholds are enforced:
+### Commit Helper
 
-1.  **File Limit**: If more than **3 files** are modified, the agent MUST suggest `/task-ai:light --promote`.
-2.  **Attempt Limit**: If more than **3 verification attempts** fail during the `exec` phase, the agent MUST suggest `/task-ai:light --promote`.
-3.  **Scope Creep**: If the task objective evolves beyond a single self-contained fix, promote it.
+```bash
+light.sh --commit "<description>"
+```
+
+The script auto-detects scope from notebook context or git root and creates a commit with the format:
+
+```
+task-ai(<scope>):light <description>
+```
+
+- **scope** = notebook slug (if in a notebook context) or project directory name (fallback)
+
+## Context Discovery
+
+1. Walk up from CWD looking for `.working/.index.json` → notebook context (scope = notebook name)
+2. If no notebook found, use the git repository root directory name as scope
 
 ## Execution Steps
 
-1. **Context discovery**:
-   - Locate the project root (where `.git/` exists).
-2. **Start shadow session** (if `objective` provided):
-   - **Registry**: Append task record to `.light-tasks.jsonl` in project root.
-   - **Branch**: `git checkout -b light/<slug>-<timestamp>`.
-   - **Verify**: Output a confirmation message. 
-3. **Status & Monitoring**:
-   - `/task-ai:light --status` — Checks the number of modified files and displays the current objective.
-4. **Execute change**:
-   - The agent modifies files directly in the codebase.
-   - **Check Complexity**: Periodically run `--status` or manually count changed files.
-5. **Quick Verification**:
-   - Run lightweight checks (e.g., `npm run lint`, `tsc`).
-6. **Atomic Finish** (if `--finish` provided):
-   - **Merge**: Squash merge the shadow branch into the main branch.
-   - **Commit**: Single commit: `task-ai(<project>):light <objective>`.
-   - **Cleanup**: Delete the shadow branch and the transient notebook directory.
-7. **Promotion** (if `--promote` provided):
-   - **Initialize**: Call `/task-ai:init` to create a full notebook directory (maintains system architecture).
-   - **Upgrade**: Convert the transient task into a standard task (remove `light` mode flag, set status to `planning`, rename branch to `task/`).
+1. **Context discovery**: Determine scope automatically (notebook or project root).
+2. **Modify files**: The agent edits files directly based on the description.
+3. **Stage and commit**: Run `light.sh --commit "<description>"` to create the commit.
 
+## Complexity Guidance
+
+If the change touches more than **3 files**, consider using a full task (`/task-ai:exec`) instead. This is a recommendation, not a hard limit.
 
 ## State Transitions
 
-| Current Status | Result | Next Status | Checkpoint | Rationale |
-| :--- | :--- | :--- | :--- | :--- |
-| (none) | (started) | `light-exec` | `start` | Shadow task initiated. |
-| `light-exec` | (success) | `complete` | `finish` | Changes merged and cleaned up. |
-| `light-exec` | (complex) | `planning` | `promote` | Promoted to standard task. |
+None. `light` does not modify `.index.json` status. It operates orthogonally to the task lifecycle.
 
 ## Git
 
-| Command | Type | Scope | Subject |
-| :--- | :--- | :--- | :--- |
-| `light --finish` | `light` | `feat/fix` | `<objective>` (Squash commit on master) |
+| Action | Commit Format |
+| :--- | :--- |
+| `--commit` | `task-ai(<scope>):light <description>` |
 
 ## Notes
 
-- **Complexity Limit**: If more than 3 files are modified or 3 verification attempts fail, the agent should proactively suggest `/task-ai:light --promote`.
-- **Registry Privacy**: `.light-tasks.jsonl` should be added to the project's `.gitignore` if permanence is not desired, though keeping it allows for simple project history.
+- No branch creation or deletion — works on whatever branch is currently checked out.
+- No `.auto-signal` written — `light` is not part of the automation loop.
+- Designed for human-initiated quick fixes during or outside task execution.
