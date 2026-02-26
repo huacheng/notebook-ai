@@ -207,6 +207,17 @@ export class NotebookDb {
     ).get(notebookId, 'active') as SessionRow | undefined;
   }
 
+  /** Look up an active session row by its session name (tmux_session column). */
+  getActiveSessionByName(sessionName: string): (SessionRow & { notebook_path: string; workspace_dir: string; title: string }) | undefined {
+    return this.db.prepare(`
+      SELECT s.*, n.notebook_path, n.workspace_dir, n.title
+      FROM sessions s
+      JOIN notebooks n ON n.id = s.notebook_id
+      WHERE s.tmux_session = ? AND s.status = ?
+      ORDER BY s.created_at DESC LIMIT 1
+    `).get(sessionName, 'active') as any;
+  }
+
   closeSessionRecord(id: string): void {
     this.db.prepare(
       'UPDATE sessions SET status = ?, closed_at = ? WHERE id = ?'

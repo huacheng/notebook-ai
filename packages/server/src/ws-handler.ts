@@ -81,7 +81,44 @@ export function setupWebSocket(
             break;
           }
 
-          const session = sessionManager.getSession(session_id);
+          let session = sessionManager.getSession(session_id);
+
+          // Auto-restore: session not in memory (e.g. after server restart)
+          // but exists in DB — recreate it transparently.
+          if (!session) {
+            const row = db.getActiveSessionByName(session_id);
+            if (row) {
+              try {
+                let notebook;
+                try {
+                  notebook = await notebookStore.load(row.notebook_path);
+                } catch {
+                  notebook = notebookStore.createNew(row.title, row.workspace_dir);
+                }
+                const result = await sessionManager.reconnectSession(
+                  session_id, row.notebook_path, row.workspace_dir,
+                  notebook, row.jsonl_path, row.notebook_id,
+                );
+                session = result.session;
+                if (!result.reconnected) {
+                  db.closeSessionRecord(row.id);
+                  db.createSessionRecord({
+                    id: result.session.id,
+                    notebook_id: row.notebook_id,
+                    tmux_session: result.session.id,
+                    jsonl_path: null,
+                    cwd: row.workspace_dir,
+                    status: 'active',
+                    created_at: new Date().toISOString(),
+                  });
+                }
+                console.log(`[ws] Auto-restored session ${session_id} from DB`);
+              } catch (err) {
+                console.error(`[ws] Failed to auto-restore session ${session_id}:`, err);
+              }
+            }
+          }
+
           if (!session) {
             sendToClient(ws, {
               type: 'error',
