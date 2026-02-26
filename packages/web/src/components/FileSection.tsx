@@ -209,6 +209,8 @@ export interface FileSectionProps {
   renderItemActions?: (file: { name: string; type: string }, subPath: string) => React.ReactNode | null;
   /** When returns true for a file/directory name + subPath, the delete button is hidden. */
   noDeleteFilter?: (name: string, subPath: string) => boolean;
+  /** When returns true for a subPath, all write operations (upload/create/delete/download) are hidden. */
+  readOnlyPath?: (subPath: string) => boolean;
 }
 
 export function FileSection({
@@ -222,8 +224,10 @@ export function FileSection({
   noDragFilter,
   renderItemActions,
   noDeleteFilter,
+  readOnlyPath,
 }: FileSectionProps) {
   const [subPath, setSubPath] = useState(initialPath);
+  const isReadOnly = readOnlyPath?.(subPath) ?? false;
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentDirPath, setCurrentDirPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -412,6 +416,8 @@ export function FileSection({
           })}
         </div>
         <div className="fp-toolbar-btns">
+          {!isReadOnly && (
+          <>
           <button className="fp-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload files">
             <IconUpload />
           </button>
@@ -422,7 +428,9 @@ export function FileSection({
           <button className="fp-btn" onClick={() => setCreating('folder')} title="New folder">
             <IconNewFolder />
           </button>
-          {showDownloadAll && (
+          </>
+          )}
+          {showDownloadAll && !isReadOnly && (
             <button className="fp-btn" onClick={() => triggerDl(`${baseUrl}/files/zip`)} title="Download all (.tar.gz)">
               <IconDownload />
             </button>
@@ -484,11 +492,13 @@ export function FileSection({
           )}
 
           {/* Entries */}
-          {!loading && files.map((f) => f.type === 'directory' ? (
+          {!loading && files.map((f) => {
+            const isNbDir = f.type === 'directory' && (f as any).isNotebook;
+            return f.type === 'directory' && !isNbDir ? (
             <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => navigateInto(f.name)}>
               <IconFolder />
               <span className="fp-name" title={f.name}>{f.name}</span>
-              {!noDeleteFilter?.(f.name, subPath) && (
+              {!isReadOnly && !noDeleteFilter?.(f.name, subPath) && (
               <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
                 {confirmDelete === f.name ? (
                   <span className="fp-confirm">
@@ -504,26 +514,29 @@ export function FileSection({
           ) : (
             <div
               key={f.name}
-              className={`fp-entry${!noDragFilter?.(f.name) ? ' fp-entry-draggable' : ''}`}
-              draggable={!noDragFilter?.(f.name)}
-              onDragStart={!noDragFilter?.(f.name) ? (e) => startFileDrag(e, f.name) : undefined}
-              onClick={() => onFileClick?.(subPath, f.name)}
+              className={`fp-entry${!isNbDir && !noDragFilter?.(f.name) ? ' fp-entry-draggable' : ''}`}
+              draggable={!isNbDir && !noDragFilter?.(f.name)}
+              onDragStart={!isNbDir && !noDragFilter?.(f.name) ? (e) => startFileDrag(e, f.name) : undefined}
+              onClick={() => isNbDir
+                ? onFileClick?.(subPath === '.' ? f.name : `${subPath}/${f.name}`, `${f.name}.notebook.json`)
+                : onFileClick?.(subPath, f.name)
+              }
               style={{ cursor: onFileClick ? 'pointer' : undefined }}
             >
-              <FileIcon name={f.name} />
+              <FileIcon name={isNbDir ? `${f.name}.notebook.json` : f.name} />
               <span className="fp-name" title={f.name}>{f.name}</span>
-              <TypeBadge name={f.name} />
+              <TypeBadge name={isNbDir ? `${f.name}.notebook.json` : f.name} />
               {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions">
-                {confirmDelete === f.name ? (
+                {isReadOnly ? null : confirmDelete === f.name ? (
                   <span className="fp-confirm">
                     <button className="fp-confirm-ok" onClick={() => deleteEntry(f.name)}>del?</button>
                     <button className="fp-confirm-cancel" onClick={() => setConfirmDelete(null)}>✗</button>
                   </span>
                 ) : (
                   <>
-                    <button className="fp-action" onClick={() => downloadFile(f.name)} title="Download">↓</button>
-                    {!noDeleteFilter?.(f.name, subPath) && f.name !== 'MEMORY.md' && (
+                    {!isReadOnly && <button className="fp-action" onClick={() => downloadFile(f.name)} title="Download">↓</button>}
+                    {!isReadOnly && !noDeleteFilter?.(f.name, subPath) && f.name !== 'MEMORY.md' && (
                       <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
                     )}
                   </>
@@ -531,7 +544,7 @@ export function FileSection({
               </div>
               )}
             </div>
-          ))}
+          )})}
 
           {!loading && files.length === 0 && !error && (
             <div className="fp-empty">Drop files here or click <IconUpload /> upload</div>

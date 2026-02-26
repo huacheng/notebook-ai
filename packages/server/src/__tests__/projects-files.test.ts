@@ -66,6 +66,35 @@ afterEach(async () => {
   await rm(tmpDir, { recursive: true, force: true });
 });
 
+// ── 0. Notebook directory detection ──────────────────────────────────────
+
+describe('GET /:projectId/files — notebook directory marking', () => {
+  it('marks a directory as isNotebook when it contains {name}.notebook.json', async () => {
+    const nbDir = path.join(projectDir, 'my-task');
+    await mkdir(nbDir, { recursive: true });
+    await writeFile(path.join(nbDir, 'my-task.notebook.json'), '{}');
+
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files`)
+      .expect(200);
+
+    const entry = res.body.files.find((f: any) => f.name === 'my-task');
+    expect(entry).toBeDefined();
+    expect(entry.type).toBe('directory');
+    expect(entry.isNotebook).toBe(true);
+  });
+
+  it('does NOT mark a regular directory as isNotebook', async () => {
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files`)
+      .expect(200);
+
+    const entry = res.body.files.find((f: any) => f.name === 'docs');
+    expect(entry).toBeDefined();
+    expect(entry.isNotebook).toBeUndefined();
+  });
+});
+
 // ── 1. Dotfile filter ────────────────────────────────────────────────────
 
 describe('GET /:projectId/files — dotfile filter', () => {

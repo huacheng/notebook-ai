@@ -348,6 +348,10 @@ export function ProjectSidebar() {
             // Everything under .memory/ is system-managed
             return subPath === '.memory' || subPath.startsWith('.memory/');
           }}
+          readOnlyPath={(subPath) => {
+            // System directories: .memory and its subdirectories
+            return subPath === '.memory' || subPath.startsWith('.memory/');
+          }}
           onFileClick={(subPath, name) => {
             const relPath = subPath === '.' ? name : `${subPath}/${name}`;
             openFileTab({ path: relPath, source: 'library', sessionId: sessionId ?? '' });

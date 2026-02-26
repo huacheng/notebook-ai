@@ -175,6 +175,18 @@ export function createProjectsRouter(
     try {
       const result = await listWorkspaceFiles(project.path, subPath);
       result.files = result.files.filter(f => isVisibleEntry(f.name));
+
+      // Mark directories that contain {name}.notebook.json as notebook dirs
+      const dirTarget = path.resolve(project.path, subPath);
+      for (const f of result.files) {
+        if (f.type === 'directory') {
+          const nbFile = path.join(dirTarget, f.name, `${f.name}.notebook.json`);
+          if (existsSync(nbFile)) {
+            (f as any).isNotebook = true;
+          }
+        }
+      }
+
       res.json(result);
     } catch (err: any) {
       if (err.message === 'Path outside workspace') {
