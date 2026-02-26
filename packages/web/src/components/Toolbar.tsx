@@ -95,6 +95,7 @@ export function Toolbar() {
     <header className="toolbar">
       <div className="toolbar-left">
         <span className="toolbar-logo" aria-label="Notebook AI">NoteBook AI</span>
+        <span className="toolbar-version">v{__APP_VERSION__}</span>
       </div>
 
       <div className="toolbar-right">

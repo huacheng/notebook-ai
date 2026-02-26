@@ -219,6 +219,15 @@ textarea.cell-input {
   white-space: nowrap;
 }
 
+.toolbar-version {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+
 .toolbar-title {
   background: none;
   border: none;
