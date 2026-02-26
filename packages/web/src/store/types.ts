@@ -1,5 +1,6 @@
 import type {
   Notebook,
+  Cell,
   CellType,
   CellStatus,
   CellOutput,
@@ -24,6 +25,8 @@ export interface NotebookStore {
   notebook: Notebook | null;
   sliceLoading: boolean;
   notebookLoading: boolean;
+  cellsOffset: number;
+  loadingOlderCells: boolean;
 
   // ── Sidebar / history state ────────────────────────────────────────────
   sidebarOpen: boolean;
@@ -45,6 +48,10 @@ export interface NotebookStore {
   fileViewerMaximized: boolean;
   sidebarWidth: number;
   rightPanelWidth: number;
+  editMode: boolean;
+  pendingDeletes: Set<string>;
+  editSavePhase: 'idle' | 'saving' | 'error';
+  editSaveError: string;
 
   // ── Project state ─────────────────────────────────────────────────────
   projects: ProjectListItem[];
@@ -99,6 +106,8 @@ export interface NotebookStore {
   appendCellOutput(cellId: string, output: CellOutput): void;
   updateToolResult(cellId: string, toolUseId: string, content: string, isError?: boolean): void;
   setCellGitDiff(cellId: string, diff: string): void;
+  prependCells(cells: Cell[], newOffset: number): void;
+  setCellsOffset(offset: number): void;
 
   // ── Slice actions ──────────────────────────────────────────────────────
   generateSlice(): Promise<void>;
@@ -121,6 +130,9 @@ export interface NotebookStore {
   toggleFileViewerMaximized(): void;
   setSidebarWidth(px: number): void;
   setRightPanelWidth(px: number): void;
+  setEditMode(on: boolean): void;
+  togglePendingDelete(cellId: string): void;
+  commitEdits(): void;
 
   // ── Project actions ───────────────────────────────────────────────────
   fetchProjects(): Promise<void>;

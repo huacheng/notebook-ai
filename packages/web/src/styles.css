@@ -1033,6 +1033,26 @@ textarea.cell-input {
 }
 
 
+.notebook-load-more {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-cell-hover);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-bottom: var(--space-sm);
+  transition: background 0.15s, color 0.15s;
+}
+.notebook-load-more:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.notebook-load-more:disabled { opacity: 0.6; cursor: wait; }
+
 .notebook-empty {
   text-align: center;
   padding: var(--space-2xl) 0;

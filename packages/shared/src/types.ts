@@ -319,6 +319,21 @@ export const RestartSessionSchema = z.object({
   session_id: z.string(),
 });
 
+// Client → Server: load older cells (pagination)
+export const LoadCellsSchema = z.object({
+  type: z.literal('load_cells'),
+  session_id: z.string(),
+  offset: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+});
+
+// Client → Server: remove cells (batch delete)
+export const RemoveCellsSchema = z.object({
+  type: z.literal('remove_cells'),
+  session_id: z.string(),
+  cell_ids: z.array(z.string()),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -334,6 +349,8 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   AnnotationLoadSchema,
   AnnotationSyncSchema,
   RestartSessionSchema,
+  LoadCellsSchema,
+  RemoveCellsSchema,
 ]);
 
 // Server → Client: all session-scoped messages carry session_id
@@ -464,6 +481,26 @@ export const SessionRestartFailedSchema = z.object({
   error: z.string(),
 });
 
+// Server → Client: cells loaded (pagination response)
+export const CellsLoadedSchema = z.object({
+  type: z.literal('cells_loaded'),
+  session_id: z.string(),
+  cells: z.array(CellSchema),
+  offset: z.number().int().nonnegative(),
+});
+
+// Server → Client: cells removed responses
+export const CellsRemovedSchema = z.object({
+  type: z.literal('cells_removed'),
+  session_id: z.string(),
+});
+
+export const CellsRemoveFailedSchema = z.object({
+  type: z.literal('cells_remove_failed'),
+  session_id: z.string(),
+  error: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -485,6 +522,9 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   AnnotationSyncOkSchema,
   SessionRestartedSchema,
   SessionRestartFailedSchema,
+  CellsLoadedSchema,
+  CellsRemovedSchema,
+  CellsRemoveFailedSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -583,6 +623,8 @@ export type AnnotationSyncOk = z.infer<typeof AnnotationSyncOkSchema>;
 export type RestartSession = z.infer<typeof RestartSessionSchema>;
 export type SessionRestarted = z.infer<typeof SessionRestartedSchema>;
 export type SessionRestartFailed = z.infer<typeof SessionRestartFailedSchema>;
+export type LoadCells = z.infer<typeof LoadCellsSchema>;
+export type CellsLoaded = z.infer<typeof CellsLoadedSchema>;
 
 export type NotebookListItem = z.infer<typeof NotebookListItemSchema>;
 export type WorkspaceInfo = z.infer<typeof WorkspaceInfoSchema>;

@@ -184,7 +184,11 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
         reconnected: boolean;
         notebookId: string;
         workspaceDir: string;
+        totalCells?: number;
       };
+
+      const totalCells = data.totalCells ?? data.notebook.cells.length;
+      const cellsOffset = totalCells - data.notebook.cells.length;
 
       set({
         notebook: data.notebook,
@@ -192,6 +196,8 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
         activeNotebookId: data.notebookId,
         workspaceDir: data.workspaceDir,
         notebookLoading: false,
+        cellsOffset,
+        loadingOlderCells: false,
       });
 
       _persistNotebook(data.notebookId, data.notebook);

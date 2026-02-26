@@ -19,9 +19,18 @@ function NotebookStatusBar() {
   const connected = wsStatus === 'connected';
   const isRestarting = restartPhase === 'restarting' || restartPhase === 'done';
 
+  const editMode = useStore((s) => s.editMode);
+  const pendingDeletes = useStore((s) => s.pendingDeletes);
+  const editSavePhase = useStore((s) => s.editSavePhase);
+  const setEditMode = useStore((s) => s.setEditMode);
+
+  const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
+
   const listTitle = notebookList.find((n) => n.id === activeNotebookId)?.title;
   const title = listTitle ?? notebook?.metadata.title ?? 'Untitled Notebook';
   const inSlice = activeTab === 'slice';
+
+  const [showCommitModal, setShowCommitModal] = useState(false);
 
   function handleExport() {
     if (!sessionId) return;
@@ -34,14 +43,41 @@ function NotebookStatusBar() {
     document.body.removeChild(a);
   }
 
+  function handleEditDone() {
+    if (pendingDeletes.size === 0) {
+      setEditMode(false);
+      return;
+    }
+    setShowCommitModal(true);
+  }
+
   return (
     <div className="notebook-statusbar">
       <span className="notebook-statusbar-title" title={title}>{title}</span>
       <div className="notebook-statusbar-actions">
+        {!editMode ? (
+          <button
+            className="notebook-statusbar-btn notebook-statusbar-edit-btn"
+            onClick={() => setEditMode(true)}
+            disabled={!connected || isRunning || inSlice}
+            title="Edit mode — select cells to delete"
+          >
+            Edit
+          </button>
+        ) : (
+          <button
+            className="notebook-statusbar-btn notebook-statusbar-edit-btn active"
+            onClick={handleEditDone}
+            disabled={editSavePhase === 'saving'}
+            title={pendingDeletes.size > 0 ? `Done — delete ${pendingDeletes.size} cell(s)` : 'Done — exit edit mode'}
+          >
+            Done{pendingDeletes.size > 0 ? ` (${pendingDeletes.size})` : ''}
+          </button>
+        )}
         <button
           className="notebook-statusbar-btn notebook-statusbar-restart-btn"
           onClick={restartSession}
-          disabled={!connected || isRestarting}
+          disabled={!connected || isRestarting || editMode}
           title={isRestarting ? 'Restarting session…' : 'Restart agent session'}
         >
           {isRestarting ? '...' : 'Restart'}
@@ -49,7 +85,7 @@ function NotebookStatusBar() {
         <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}
-          disabled={!connected}
+          disabled={!connected || editMode}
           title={connected ? 'Save notebook' : 'Not connected'}
         >
           Save
@@ -57,7 +93,7 @@ function NotebookStatusBar() {
         <button
           className="notebook-statusbar-btn"
           onClick={handleExport}
-          disabled={!sessionId}
+          disabled={!sessionId || editMode}
           title={sessionId ? 'Export notebook as bundle' : 'No active session'}
         >
           Export
@@ -65,10 +101,43 @@ function NotebookStatusBar() {
         <button
           className={`notebook-statusbar-btn notebook-statusbar-slice-btn${inSlice ? ' active' : ''}`}
           onClick={() => setActiveTab(inSlice ? 'notebook' : 'slice')}
+          disabled={editMode}
           title={inSlice ? 'Back to Notebook' : 'Open Slice view'}
         >
           {inSlice ? '◂ Notebook' : 'Slice ▸'}
         </button>
+      </div>
+
+      {showCommitModal && (
+        <EditCommitModal
+          count={pendingDeletes.size}
+          onCancel={() => setShowCommitModal(false)}
+          onConfirm={() => {
+            setShowCommitModal(false);
+            useStore.getState().commitEdits();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Edit commit modal ───────────────────────────────────────────────────────
+
+function EditCommitModal({ count, onCancel, onConfirm }: { count: number; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="annotation-modal-overlay" onClick={onCancel}>
+      <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: 'var(--font-size-lg)' }}>
+          Delete {count} cell{count > 1 ? 's' : ''}?
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-xl) 0' }}>
+          This will permanently remove the selected cell{count > 1 ? 's' : ''} and {count > 1 ? 'their' : 'its'} responses.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)' }}>
+          <button className="annotation-modal-btn" onClick={onCancel}>Cancel</button>
+          <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>Delete</button>
+        </div>
       </div>
     </div>
   );
@@ -86,6 +155,7 @@ function NotebookInputBar() {
   const sessionId = useStore((s) => s.sessionId);
   const notebook = useStore((s) => s.notebook);
   const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
+  const editMode = useStore((s) => s.editMode);
 
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -178,7 +248,7 @@ function NotebookInputBar() {
     }
   }
 
-  const disabled = isRunning || uploading;
+  const disabled = isRunning || uploading || editMode;
 
   return (
     <div className="notebook-input-bar">
@@ -213,7 +283,7 @@ function NotebookInputBar() {
           }}
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
           disabled={disabled}
-          placeholder="Enter a prompt… (Ctrl+Enter to run)"
+          placeholder={editMode ? 'Exit edit mode to send prompts' : 'Enter a prompt… (Ctrl+Enter to run)'}
           rows={3}
           spellCheck={false}
         />
@@ -293,34 +363,130 @@ function RestartOverlay() {
   );
 }
 
+// ── Edit save overlay ────────────────────────────────────────────────────────
+
+function EditSaveOverlay() {
+  const editSavePhase = useStore((s) => s.editSavePhase);
+  const editSaveError = useStore((s) => s.editSaveError);
+
+  if (editSavePhase === 'idle') return null;
+
+  return (
+    <div className="annotation-modal-overlay">
+      <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
+        {editSavePhase === 'saving' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Saving changes...
+            </p>
+          </div>
+        )}
+        {editSavePhase === 'error' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-error)' }}>&#10007;</div>
+            <p style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-sm)', fontWeight: 500, marginBottom: 'var(--space-md)' }}>
+              {editSaveError}
+            </p>
+            <button
+              className="notebook-statusbar-btn"
+              onClick={() => useStore.getState().commitEdits()}
+              style={{ marginRight: 'var(--space-sm)' }}
+            >
+              Retry
+            </button>
+            <button
+              className="notebook-statusbar-btn"
+              onClick={() => useStore.setState({ editSavePhase: 'idle', editSaveError: '' })}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Notebook component ─────────────────────────────────────────────────
 
 export function Notebook() {
   const notebook = useStore((s) => s.notebook);
   const activeTab = useStore((s) => s.activeTab);
+  const editMode = useStore((s) => s.editMode);
+  const pendingDeletes = useStore((s) => s.pendingDeletes);
+  const togglePendingDelete = useStore((s) => s.togglePendingDelete);
+  const cellsOffset = useStore((s) => s.cellsOffset);
+  const loadingOlderCells = useStore((s) => s.loadingOlderCells);
   const cells = notebook?.cells ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
+  const cellsContainerRef = useRef<HTMLDivElement>(null);
+  const prevHeightRef = useRef(0);
 
-  // Scroll to bottom whenever a new cell is added
+  // Scroll to bottom whenever a new cell is appended (not when loading older)
+  const prevCellsLenRef = useRef(cells.length);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [cells.length]);
+    // Only auto-scroll when cells grow at the tail (new prompt), not on prepend
+    if (cells.length > prevCellsLenRef.current && cellsOffset === useStore.getState().cellsOffset) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevCellsLenRef.current = cells.length;
+  }, [cells.length, cellsOffset]);
+
+  // Scroll position preservation after prepending older cells
+  useEffect(() => {
+    const el = cellsContainerRef.current?.parentElement;
+    if (!el) return;
+    const prevHeight = prevHeightRef.current;
+    if (prevHeight > 0 && el.scrollHeight > prevHeight) {
+      el.scrollTop += el.scrollHeight - prevHeight;
+    }
+    prevHeightRef.current = el.scrollHeight;
+  }, [cells.length, cellsOffset]);
+
+  const handleLoadMore = useCallback(() => {
+    const { ws, sessionId } = useStore.getState();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    const BATCH = 10;
+    const newOffset = Math.max(0, cellsOffset - BATCH);
+    const limit = cellsOffset - newOffset;
+    if (limit <= 0) return;
+    ws.send(JSON.stringify({ type: 'load_cells', session_id: sessionId, offset: newOffset, limit }));
+    useStore.setState({ loadingOlderCells: true });
+  }, [cellsOffset]);
 
   return (
     <div className="notebook-container">
       <NotebookStatusBar />
       <RestartOverlay />
+      <EditSaveOverlay />
 
       {activeTab === 'notebook' && (
         <>
-          <div className="notebook-cells">
-            {cells.length === 0 && (
+          <div className="notebook-cells" ref={cellsContainerRef}>
+            {cellsOffset > 0 && (
+              <button
+                className="notebook-load-more"
+                onClick={handleLoadMore}
+                disabled={loadingOlderCells}
+              >
+                {loadingOlderCells ? '加载中…' : `↑ ${cellsOffset} 条更早的对话`}
+              </button>
+            )}
+            {cells.length === 0 && cellsOffset === 0 && (
               <div className="notebook-empty">
                 <p>Send a prompt below to get started.</p>
               </div>
             )}
-            {cells.map((cell, index) => (
-              <Cell key={cell.id} cell={cell} index={index} />
+            {cells.map((cell, i) => (
+              <Cell
+                key={cell.id}
+                cell={cell}
+                index={cellsOffset + i}
+                editMode={editMode}
+                pendingDelete={pendingDeletes.has(cell.id)}
+                onToggleDelete={togglePendingDelete}
+              />
             ))}
             <div ref={bottomRef} />
           </div>

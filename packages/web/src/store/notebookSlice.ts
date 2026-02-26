@@ -57,9 +57,11 @@ function makeCell(type: CellType): Cell {
 
 export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'notebook' | 'sliceLoading' | 'notebookLoading'
+  | 'cellsOffset' | 'loadingOlderCells'
   | 'setNotebook' | 'updateTitle' | 'updateAgent' | 'addCell' | 'submitPrompt' | 'removeCell' | 'moveCell'
   | 'updateCellSource' | 'setCellStatus' | 'appendCellOutput' | 'updateToolResult'
   | 'setCellGitDiff'
+  | 'prependCells' | 'setCellsOffset'
   | 'generateSlice' | 'updateSliceSections'
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
   | 'openNotebookTab' | 'closeNotebookTab' | 'setActiveNotebookTab'
@@ -68,6 +70,8 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   notebook: null,
   sliceLoading: false,
   notebookLoading: false,
+  cellsOffset: 0,
+  loadingOlderCells: false,
   openNotebooks: {},
   activeNotebookTabId: null,
   streamBuffer: {},
@@ -288,6 +292,23 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     });
   },
 
+  prependCells(cells, newOffset) {
+    set((state) => {
+      if (!state.notebook) return {};
+      return {
+        notebook: {
+          ...state.notebook,
+          cells: [...cells, ...state.notebook.cells],
+        },
+        cellsOffset: newOffset,
+      };
+    });
+  },
+
+  setCellsOffset(offset) {
+    set({ cellsOffset: offset });
+  },
+
   async generateSlice() {
     const { sessionId } = get();
     if (!sessionId) return;
@@ -375,6 +396,8 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         activeNotebookTabId: newActiveId,
         notebook: newActiveId ? rest[newActiveId]?.notebook ?? null : null,
         sessionId: newActiveId ? rest[newActiveId]?.sessionId ?? null : null,
+        editMode: false,
+        pendingDeletes: new Set<string>(),
       };
     });
   },
@@ -385,7 +408,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       const current = state.activeNotebookTabId;
       const updated = { ...state.openNotebooks };
       if (current && updated[current]) {
-        updated[current] = { ...updated[current], scrollY: window.scrollY };
+        updated[current] = { ...updated[current], scrollY: typeof window !== 'undefined' ? window.scrollY : 0 };
       }
       return {
         openNotebooks: updated,
@@ -393,6 +416,8 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         notebook: updated[notebookId]?.notebook ?? null,
         sessionId: updated[notebookId]?.sessionId ?? null,
         openFile: null, // C3: clear FileViewer when switching tabs
+        editMode: false,
+        pendingDeletes: new Set<string>(),
       };
     });
   },

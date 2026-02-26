@@ -364,12 +364,19 @@ export function createNotebooksRouter(
 
       db.updateNotebook(notebookId, { updated_at: new Date().toISOString() });
 
+      const CELL_PAGE_SIZE = 10;
+      const totalCells = notebook.cells.length;
+      const paginatedNotebook = totalCells > CELL_PAGE_SIZE
+        ? { ...notebook, cells: notebook.cells.slice(-CELL_PAGE_SIZE) }
+        : notebook;
+
       res.json({
-        notebook,
+        notebook: paginatedNotebook,
         sessionId,
         reconnected,
         notebookId,
         workspaceDir: row.workspace_dir,
+        totalCells,
       });
     } catch (err) {
       res.status(500).json({ error: String(err) });

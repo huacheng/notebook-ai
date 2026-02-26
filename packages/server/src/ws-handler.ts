@@ -420,6 +420,42 @@ export function setupWebSocket(
           break;
         }
 
+        case 'load_cells': {
+          const { session_id, offset, limit } = msg;
+          const session = sessionManager.getSession(session_id);
+          if (!session) {
+            sendToClient(ws, { type: 'error', session_id, message: `Session "${session_id}" not found.` });
+            break;
+          }
+          const cells = session.notebook.cells.slice(offset, offset + limit);
+          sendToClient(ws, { type: 'cells_loaded', session_id, cells, offset });
+          break;
+        }
+
+        case 'remove_cells': {
+          const { session_id, cell_ids } = msg;
+          const session = sessionManager.getSession(session_id);
+          if (!session) {
+            sendToClient(ws, { type: 'error', session_id, message: `Session "${session_id}" not found.` });
+            break;
+          }
+          try {
+            const cellIdSet = new Set(cell_ids);
+            session.notebook.cells = session.notebook.cells.filter(c => !cellIdSet.has(c.id));
+            await notebookStore.save(session.notebookPath, session.notebook);
+            if (session.notebookDbId) {
+              db.updateNotebook(session.notebookDbId, {
+                cell_count: session.notebook.cells.length,
+                updated_at: new Date().toISOString(),
+              });
+            }
+            sendToClient(ws, { type: 'cells_removed', session_id });
+          } catch (err) {
+            sendToClient(ws, { type: 'cells_remove_failed', session_id, error: String(err) });
+          }
+          break;
+        }
+
         default: {
           msg satisfies never;
           sendToClient(ws, { type: 'error', message: 'Unknown message type.' });

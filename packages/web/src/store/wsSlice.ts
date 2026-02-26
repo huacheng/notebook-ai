@@ -161,6 +161,30 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             sessionNotice: '此 Notebook 已在另一个标签页中打开，请先关闭它。',
           });
           break;
+        case 'cells_removed':
+          set((s: any) => {
+            const pending = s.pendingDeletes as Set<string>;
+            return {
+              notebook: s.notebook ? {
+                ...s.notebook,
+                cells: s.notebook.cells.filter((c: any) => !pending.has(c.id)),
+              } : null,
+              editMode: false,
+              pendingDeletes: new Set<string>(),
+              editSavePhase: 'idle',
+              editSaveError: '',
+            };
+          });
+          break;
+        case 'cells_loaded': {
+          const { cells, offset } = parsed as any;
+          store.prependCells(cells, offset);
+          set({ loadingOlderCells: false });
+          break;
+        }
+        case 'cells_remove_failed':
+          set({ editSavePhase: 'error', editSaveError: (parsed as any).error ?? 'Unknown error' });
+          break;
         case 'session_restarted':
           set({ restartPhase: 'done' });
           setTimeout(() => {
