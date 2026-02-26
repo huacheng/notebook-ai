@@ -502,38 +502,38 @@ export function FileSection({
           {/* Entries */}
           {!loading && files.map((f) => {
             const isNbDir = f.type === 'directory' && (f as any).isNotebook;
-            return f.type === 'directory' && !isNbDir ? (
+            return f.type === 'directory' ? (
             <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => navigateInto(f.name)}>
-              <IconFolder />
+              {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
               <span className="fp-name" title={f.name}>{f.name}</span>
-              {!isReadOnly && !noDeleteFilter?.(f.name, subPath) && (
-              <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
-                {confirmDelete === f.name ? (
-                  <span className="fp-confirm">
-                    <button className="fp-confirm-ok" onClick={() => deleteEntry(f.name)}>del?</button>
-                    <button className="fp-confirm-cancel" onClick={() => setConfirmDelete(null)}>✗</button>
-                  </span>
-                ) : (
-                  <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
-                )}
-              </div>
+              {isNbDir && <TypeBadge name={`${f.name}.notebook.json`} />}
+              {renderItemActions?.(f, subPath) ?? (
+                !isReadOnly && !noDeleteFilter?.(f.name, subPath) && (
+                <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
+                  {confirmDelete === f.name ? (
+                    <span className="fp-confirm">
+                      <button className="fp-confirm-ok" onClick={() => deleteEntry(f.name)}>del?</button>
+                      <button className="fp-confirm-cancel" onClick={() => setConfirmDelete(null)}>✗</button>
+                    </span>
+                  ) : (
+                    <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
+                  )}
+                </div>
+                )
               )}
             </div>
           ) : (
             <div
               key={f.name}
-              className={`fp-entry${!isNbDir && !noDragFilter?.(f.name) ? ' fp-entry-draggable' : ''}`}
-              draggable={!isNbDir && !noDragFilter?.(f.name)}
-              onDragStart={!isNbDir && !noDragFilter?.(f.name) ? (e) => startFileDrag(e, f.name) : undefined}
-              onClick={() => isNbDir
-                ? onFileClick?.(subPath === '.' ? f.name : `${subPath}/${f.name}`, `${f.name}.notebook.json`)
-                : onFileClick?.(subPath, f.name)
-              }
+              className={`fp-entry${!noDragFilter?.(f.name) ? ' fp-entry-draggable' : ''}`}
+              draggable={!noDragFilter?.(f.name)}
+              onDragStart={!noDragFilter?.(f.name) ? (e) => startFileDrag(e, f.name) : undefined}
+              onClick={() => onFileClick?.(subPath, f.name)}
               style={{ cursor: onFileClick ? 'pointer' : undefined }}
             >
-              <FileIcon name={isNbDir ? `${f.name}.notebook.json` : f.name} />
+              <FileIcon name={f.name} />
               <span className="fp-name" title={f.name}>{f.name}</span>
-              <TypeBadge name={isNbDir ? `${f.name}.notebook.json` : f.name} />
+              <TypeBadge name={f.name} />
               {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions">
                 {isReadOnly ? null : confirmDelete === f.name ? (
