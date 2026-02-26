@@ -353,12 +353,20 @@ export function FileSection({
 
   function downloadFile(name: string) {
     const fp = subPath === '.' ? name : `${subPath}/${name}`;
-    triggerDl(`${baseUrl}/files/download?path=${encodeURIComponent(fp)}`);
+    triggerDl(`${baseUrl}/files/download?path=${encodeURIComponent(fp)}`, name);
   }
 
-  function triggerDl(url: string) {
-    const a = document.createElement('a'); a.href = url; a.download = '';
+  async function triggerDl(url: string, filename?: string) {
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || '';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
   }
 
   function startFileDrag(e: React.DragEvent, name: string) {
