@@ -30,7 +30,7 @@ task-ai 是一套**纯 Markdown 指令驱动**的任务生命周期管理框架�
 
 **核心哲学**: “任务即 Notebook”。所有任务都绑定到独立的 Notebook 结构中，确保责任边界清晰和审计追踪完整。
 
-**入口命令**: 在 Prompt 窗口输入 `/moonview:<subcommand> [args]`
+**入口命令**: 在 Prompt 窗口输入 `/task-ai:<subcommand> [args]`
 
 ---
 

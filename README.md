@@ -28,7 +28,7 @@ codex plugin add huacheng/moonview
 Structured task lifecycle management with **18 skills** for AI-driven development. Git-integrated branch-per-task workflow with project/notebook hierarchy, domain-aware verification, knowledge library, and autonomous execution.
 
 ```
-/moonview:task-ai <subcommand> [args]
+/task-ai:<subcommand> [args]
 ```
 
 ## Lifecycle
@@ -78,27 +78,27 @@ draft → planning → review → executing → complete
 
 ```bash
 # 1. Initialize a notebook under a project
-/moonview:task-ai init my-project auth-refactor --title "Refactor auth to JWT"
+/task-ai:init my-project auth-refactor --title "Refactor auth to JWT"
 
 # 2. Write requirements in .target.md, then let research deepen them
-/moonview:task-ai research my-project/auth-refactor --caller target
+/task-ai:research my-project/auth-refactor --caller target
 
 # 3. Generate plan
-/moonview:task-ai plan auth-refactor --generate
+/task-ai:plan auth-refactor --generate
 
 # 4. Verify → check plan quality
-/moonview:task-ai verify auth-refactor
-/moonview:task-ai check auth-refactor --checkpoint post-plan
+/task-ai:verify auth-refactor
+/task-ai:check auth-refactor --checkpoint post-plan
 
 # 5. Execute the plan
-/moonview:task-ai exec auth-refactor
+/task-ai:exec auth-refactor
 
 # 6. Merge to main + generate report
-/moonview:task-ai merge auth-refactor
-/moonview:task-ai report auth-refactor
+/task-ai:merge auth-refactor
+/task-ai:report auth-refactor
 
 # Or run the full lifecycle automatically:
-/moonview:task-ai auto auth-refactor --start
+/task-ai:auto auth-refactor --start
 ```
 
 ## Features
