@@ -45,17 +45,17 @@ export function FileViewerEditor({ content, format, sessionId, filePath, source,
     if (!editor || !ws) return;
     setSaving(true);
     setSaveStatus('idle');
+    const savedContent = format === 'html' ? editor.getHTML() : editor.getText();
     const msg: Record<string, string> = {
       type: 'file-save',
       session_id: sessionId,
       path: filePath,
       source,
-      content: editor.getHTML(),
-      format: 'html',
+      content: savedContent,
     };
     if (projectId) msg.project_id = projectId;
     ws.send(JSON.stringify(msg));
-  }, [editor, ws, sessionId, filePath, source, projectId]);
+  }, [editor, ws, sessionId, filePath, source, projectId, format]);
 
   return (
     <div className="fv-editor">
