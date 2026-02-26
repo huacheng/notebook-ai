@@ -472,23 +472,38 @@ export function createProjectsRouter(
       if (!relPath) return res.status(400).json({ error: 'path required' });
 
       const absPath = path.join(project.path, relPath);
-      const nbRow = db.getNotebookByPath(absPath);
-      if (!nbRow) return res.status(404).json({ error: 'notebook not found' });
+      let nbRow = db.getNotebookByPath(absPath);
 
-      // Close active session
-      const activeSession = db.getActiveSession(nbRow.id);
-      if (activeSession) {
-        await sessionManager.closeSession(activeSession.tmux_session);
+      // Frontend sends directory name (e.g. "my-task"), but DB stores full
+      // .notebook.json path (e.g. "my-task/my-task.notebook.json").
+      if (!nbRow) {
+        const basename = path.basename(absPath);
+        const nbFilePath = path.join(absPath, `${basename}.notebook.json`);
+        nbRow = db.getNotebookByPath(nbFilePath);
       }
 
-      // Remove notebook directory from disk (the parent dir of the .notebook.json)
-      const nbDir = path.dirname(absPath);
+      if (nbRow) {
+        // Close active session
+        const activeSession = db.getActiveSession(nbRow.id);
+        if (activeSession) {
+          await sessionManager.closeSession(activeSession.tmux_session);
+        }
+        db.deleteNotebook(nbRow.id);
+      }
+
+      // Determine the notebook directory to remove from disk.
+      // absPath may be the dir itself or a .notebook.json file inside it.
+      const nbDir = absPath.endsWith('.notebook.json') ? path.dirname(absPath) : absPath;
+
+      const { existsSync } = await import('fs');
+      if (!nbRow && !existsSync(nbDir)) {
+        return res.status(404).json({ error: 'notebook not found' });
+      }
+
+      // Remove notebook directory from disk
       if (nbDir !== project.path) {
         await rm(nbDir, { recursive: true, force: true }).catch(() => {});
       }
-
-      // Remove from DB
-      db.deleteNotebook(nbRow.id);
 
       res.status(204).send();
     } catch (err: any) {

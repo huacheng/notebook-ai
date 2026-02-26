@@ -587,11 +587,54 @@ describe('DELETE /:projectId/notebooks/by-path', () => {
     expect(db._notebooks.length).toBe(0);
   });
 
-  it('returns 404 when notebook path does not exist in DB', async () => {
-    const res = await request(app)
-      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent('nonexistent.notebook.json')}`);
+  it('resolves directory path to notebook file path (e.g. "my-task" → "my-task/my-task.notebook.json")', async () => {
+    // This is how the frontend actually calls: path=my-task (directory name only)
+    const nbPath = path.join(projectDir, 'my-task', 'my-task.notebook.json');
+    await mkdir(path.join(projectDir, 'my-task'), { recursive: true });
+    await writeFile(nbPath, '{}');
 
-    expect(res.status).toBe(404);
+    const db = createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test Project' });
+    db.createNotebook({
+      id: 'nb-2', user_id: null, title: 'My Task', slug: 'my-task',
+      workspace_dir: projectDir, notebook_path: nbPath,
+      project_id: PROJECT_ID, status: 'active',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+
+    const mockSM = { closeSession: async () => {} } as any;
+    const router = createProjectsRouter(db, mockSM, mockNotebookStore, tmpDir);
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.use('/api/projects', router);
+
+    // Frontend sends just the directory name, not the full .notebook.json path
+    const res = await request(testApp)
+      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent('my-task')}`)
+      .expect(204);
+
+    expect(db._notebooks.length).toBe(0);
+  });
+
+  it('deletes notebook directory from disk even when not registered in DB', async () => {
+    // Notebook dir exists on disk but has no DB record (e.g. created outside the API)
+    const nbDir = path.join(projectDir, 'orphan-task');
+    await mkdir(nbDir, { recursive: true });
+    await writeFile(path.join(nbDir, 'orphan-task.notebook.json'), '{}');
+    await writeFile(path.join(nbDir, 'notes.md'), 'hello');
+
+    const res = await request(app)
+      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent('orphan-task')}`)
+      .expect(204);
+
+    // Verify directory removed from disk
+    const { existsSync } = await import('fs');
+    expect(existsSync(nbDir)).toBe(false);
+  });
+
+  it('returns 404 when path does not exist on disk or in DB', async () => {
+    const res = await request(app)
+      .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent('nonexistent')}`)
+      .expect(404);
   });
 
   it('returns 400 when no path provided', async () => {

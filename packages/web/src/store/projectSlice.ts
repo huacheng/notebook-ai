@@ -63,10 +63,12 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       method: 'DELETE',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (res.ok) {
-      if (get().activeProjectId === projectId) get().goBackToProjectList();
-      await get().fetchProjects();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Delete failed' }));
+      throw new Error(body.error || `Delete failed (${res.status})`);
     }
+    if (get().activeProjectId === projectId) get().goBackToProjectList();
+    await get().fetchProjects();
   },
 
   importProject: async (file: File) => {
@@ -83,13 +85,17 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
 
   deleteProjectNotebook: async (projectId: string, notebookRelPath: string) => {
     const token = get().authToken;
-    await fetch(
+    const res = await fetch(
       `/api/projects/${projectId}/notebooks/by-path?path=${encodeURIComponent(notebookRelPath)}`,
       {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       },
     );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Delete failed' }));
+      throw new Error(body.error || `Delete failed (${res.status})`);
+    }
     // File listing in FileSection will auto-refresh
   },
 

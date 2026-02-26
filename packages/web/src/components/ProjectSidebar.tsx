@@ -2,9 +2,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { FileSection } from './FileSection';
 
-function ProjectItemMenu({ projectId, projectSlug, onClose }: { projectId: string; projectSlug: string; onClose: () => void }) {
+function ProjectItemMenu({ projectId, projectSlug, projectTitle, onClose }: {
+  projectId: string; projectSlug: string; projectTitle: string; onClose: () => void;
+}) {
   const deleteProject = useStore(s => s.deleteProject);
   const authToken = useStore(s => s.authToken);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,17 +33,21 @@ function ProjectItemMenu({ projectId, projectSlug, onClose }: { projectId: strin
     onClose();
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this project? This cannot be undone.')) return;
-    await deleteProject(projectId);
-    onClose();
-  };
-
   return (
-    <div className="project-item-menu" ref={menuRef}>
-      <button className="project-item-menu-item" onClick={handleExport}>Export</button>
-      <button className="project-item-menu-item project-item-menu-item--danger" onClick={handleDelete}>Delete</button>
-    </div>
+    <>
+      <div className="project-item-menu" ref={menuRef}>
+        <button className="project-item-menu-item" onClick={handleExport}>Export</button>
+        <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>Delete</button>
+      </div>
+      {showDeleteModal && (
+        <ConfirmDeleteModal
+          name={projectTitle}
+          label="Project"
+          onCancel={() => { setShowDeleteModal(false); onClose(); }}
+          onConfirm={() => deleteProject(projectId)}
+        />
+      )}
+    </>
   );
 }
 
@@ -92,6 +99,7 @@ function ProjectList() {
               <ProjectItemMenu
                 projectId={p.id}
                 projectSlug={p.slug}
+                projectTitle={p.title}
                 onClose={() => setMenuOpenId(null)}
               />
             )}
@@ -126,10 +134,79 @@ function ProjectList() {
   );
 }
 
+function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm }: {
+  name: string;
+  label?: string;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [phase, setPhase] = useState<'confirm' | 'deleting' | 'done' | 'error'>('confirm');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleConfirm = async () => {
+    setPhase('deleting');
+    try {
+      await onConfirm();
+      setPhase('done');
+      setTimeout(onCancel, 800);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Delete failed');
+      setPhase('error');
+    }
+  };
+
+  return (
+    <div className="annotation-modal-overlay" onClick={phase === 'confirm' || phase === 'error' ? onCancel : undefined}>
+      <div className="annotation-modal" onClick={e => e.stopPropagation()}>
+        {phase === 'confirm' && (
+          <>
+            <div className="annotation-modal-title">Delete {label}</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              Are you sure you want to delete <strong>{name}</strong>? This cannot be undone.
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Cancel</button>
+              <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={handleConfirm}>Delete</button>
+            </div>
+          </>
+        )}
+        {phase === 'deleting' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Deleting <strong>{name}</strong>...
+            </p>
+          </div>
+        )}
+        {phase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              {label} deleted
+            </p>
+          </div>
+        )}
+        {phase === 'error' && (
+          <>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Delete Failed</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              {errorMsg}
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Close</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose }: {
   projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; onClose: () => void;
 }) {
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -155,17 +232,22 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
     onClose();
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this notebook? This cannot be undone.')) return;
-    await deleteProjectNotebook(projectId, relPath);
-    onClose();
-  };
+  const displayName = relPath.split('/').pop() || relPath;
 
   return (
-    <div className="project-item-menu" ref={menuRef}>
-      {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>Export</button>}
-      <button className="project-item-menu-item project-item-menu-item--danger" onClick={handleDelete}>Delete</button>
-    </div>
+    <>
+      <div className="project-item-menu" ref={menuRef}>
+        {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>Export</button>}
+        <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>Delete</button>
+      </div>
+      {showDeleteModal && (
+        <ConfirmDeleteModal
+          name={displayName}
+          onCancel={() => { setShowDeleteModal(false); onClose(); }}
+          onConfirm={() => deleteProjectNotebook(projectId, relPath)}
+        />
+      )}
+    </>
   );
 }
 
