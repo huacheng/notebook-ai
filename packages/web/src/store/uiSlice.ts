@@ -15,7 +15,9 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'toggleRightPanel' | 'setRightPanelOpen' | 'setRightPanelSplitRatio'
   | 'sidebarWidth' | 'rightPanelWidth'
   | 'setSidebarWidth' | 'setRightPanelWidth'
->> = (set) => ({
+  | 'editMode' | 'pendingDeletes' | 'editSavePhase' | 'editSaveError'
+  | 'setEditMode' | 'togglePendingDelete' | 'commitEdits'
+>> = (set, get) => ({
   activeTab: 'notebook',
   gitTabOpen: false,
   sessionNotice: null,
@@ -30,9 +32,13 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   rightPanelSplitRatio: 0.5,
   sidebarWidth: 272,
   rightPanelWidth: 300,
+  editMode: false,
+  pendingDeletes: new Set<string>(),
+  editSavePhase: 'idle',
+  editSaveError: '',
 
   setActiveTab(tab) {
-    set({ activeTab: tab, gitTabOpen: tab === 'git' });
+    set({ activeTab: tab, gitTabOpen: tab === 'git', editMode: false, pendingDeletes: new Set<string>() });
   },
 
   openGitTab() {
@@ -120,5 +126,37 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   setRightPanelWidth(px) {
     set({ rightPanelWidth: Math.min(500, Math.max(180, px)) });
+  },
+
+  setEditMode(on) {
+    if (on) {
+      set({ editMode: true, pendingDeletes: new Set<string>(), editSaveError: '' });
+    } else {
+      set({ editMode: false, pendingDeletes: new Set<string>() });
+    }
+  },
+
+  togglePendingDelete(cellId) {
+    set((s: any) => {
+      const next = new Set(s.pendingDeletes as Set<string>);
+      if (next.has(cellId)) {
+        next.delete(cellId);
+      } else {
+        next.add(cellId);
+      }
+      return { pendingDeletes: next };
+    });
+  },
+
+  commitEdits() {
+    set({ editSavePhase: 'saving' });
+    const { ws, sessionId, pendingDeletes } = get();
+    if (ws && (ws as WebSocket).readyState === WebSocket.OPEN && sessionId) {
+      (ws as WebSocket).send(JSON.stringify({
+        type: 'remove_cells',
+        session_id: sessionId,
+        cell_ids: [...(pendingDeletes as Set<string>)],
+      }));
+    }
   },
 });

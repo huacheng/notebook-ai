@@ -21,16 +21,33 @@ const StatusIndicator = memo(function StatusIndicator({ status }: { status: Cell
 interface CellProps {
   cell: CellData;
   index: number;
+  editMode?: boolean;
+  pendingDelete?: boolean;
+  onToggleDelete?: (cellId: string) => void;
 }
 
-export function Cell({ cell, index }: CellProps) {
+export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: CellProps) {
   if (cell.type !== 'prompt') return null;
 
   const execNum = cell.execution_count || index + 1;
   const hasResponse = cell.outputs.length > 0 || cell.status === 'running';
 
   return (
-    <div className="cell" data-cell-id={cell.id}>
+    <div
+      className={`cell${pendingDelete ? ' cell--pending-delete' : ''}`}
+      data-cell-id={cell.id}
+    >
+      {editMode && (
+        <button
+          className="cell-delete-btn"
+          onClick={() => onToggleDelete?.(cell.id)}
+          title={pendingDelete ? 'Undo delete' : 'Mark for deletion'}
+          aria-label={pendingDelete ? 'Undo delete' : 'Mark for deletion'}
+        >
+          {pendingDelete ? '\u21A9' : '\u2715'}
+        </button>
+      )}
+
       {/* ── Section 1: User prompt — right aligned bubble ── */}
       <div className="cell-prompt-row">
         <span className="cell-index">[{execNum}]</span>

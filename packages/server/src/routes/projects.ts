@@ -152,13 +152,28 @@ export function createProjectsRouter(
     }
   });
 
-  // Dotfile whitelist for project file listing — exact matches only
-  const DOTFILE_WHITELIST = new Set(['.index.json', '.working']);
-  function isVisibleEntry(name: string): boolean {
+  // Dotfile visibility for project file listing.
+  // Strategy: hide ephemeral/lock files (mirrors GITIGNORE_ENTRIES in task-init.ts),
+  // show everything else — task-ai system files (.target.md, .plan.md, .summary.md,
+  // .index.json, .analysis/, .test/, .bugfix/, .notes/, etc.) should be browsable.
+  const DOTFILE_HIDDEN = new Set([
+    '.tmp-annotations.json',
+    '.auto-signal',
+    '.auto-signal.tmp',
+    '.auto-stop',
+    '.lock',
+    '.library-state.json',
+  ]);
+  // Top-level dotdirs that should always be hidden from project file browser
+  // .deliverables is shown via the right panel, not the file browser
+  const HIDDEN_TOPDIRS = new Set(['.worktrees', '.git', '.deliverables']);
+  function isVisibleEntry(name: string, isTopLevel: boolean): boolean {
     if (!name.startsWith('.')) return true;
-    if (DOTFILE_WHITELIST.has(name)) return true;
     if (name.endsWith('.notebook.json')) return true;
-    return false;
+    if (isTopLevel && HIDDEN_TOPDIRS.has(name)) return false;
+    if (DOTFILE_HIDDEN.has(name)) return false;
+    if (name.startsWith('.lock.stale.')) return false;
+    return true;
   }
 
   const upload = multer({
@@ -174,7 +189,8 @@ export function createProjectsRouter(
     const subPath = (req.query.path as string) || '.';
     try {
       const result = await listWorkspaceFiles(project.path, subPath);
-      result.files = result.files.filter(f => isVisibleEntry(f.name));
+      const isTopLevel = subPath === '.' || subPath === '';
+      result.files = result.files.filter(f => isVisibleEntry(f.name, isTopLevel));
 
       // Mark directories that contain {name}.notebook.json as notebook dirs
       const dirTarget = path.resolve(project.path, subPath);
