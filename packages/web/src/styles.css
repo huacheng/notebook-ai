@@ -388,26 +388,6 @@ textarea.cell-input {
   display: inline-block;
 }
 
-/* ── Sidebar toggle button ──────────────────────────────── */
-.toolbar-sidebar-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  color: var(--toolbar-text);
-  font-size: 1.1rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-
-.toolbar-sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
 
 /* ============================================================
    Sidebar
