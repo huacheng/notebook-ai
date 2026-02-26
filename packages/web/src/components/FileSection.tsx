@@ -211,6 +211,8 @@ export interface FileSectionProps {
   noDeleteFilter?: (name: string, subPath: string) => boolean;
   /** When returns true for a subPath, all write operations (upload/create/delete/download) are hidden. */
   readOnlyPath?: (subPath: string) => boolean;
+  /** Called when the user navigates to a different sub-path. */
+  onSubPathChange?: (subPath: string) => void;
 }
 
 export function FileSection({
@@ -225,8 +227,16 @@ export function FileSection({
   renderItemActions,
   noDeleteFilter,
   readOnlyPath,
+  onSubPathChange,
 }: FileSectionProps) {
-  const [subPath, setSubPath] = useState(initialPath);
+  const [subPath, setSubPathRaw] = useState(initialPath);
+  const setSubPath = useCallback((v: string | ((prev: string) => string)) => {
+    setSubPathRaw((prev) => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      if (next !== prev) onSubPathChange?.(next);
+      return next;
+    });
+  }, [onSubPathChange]);
   const isReadOnly = readOnlyPath?.(subPath) ?? false;
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentDirPath, setCurrentDirPath] = useState<string | null>(null);

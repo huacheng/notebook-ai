@@ -183,7 +183,9 @@ function FileBrowser() {
   const [nbTitle, setNbTitle] = useState('');
   const [nbCreating, setNbCreating] = useState(false);
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
+  const [currentSubPath, setCurrentSubPath] = useState('.');
   const nbImportRef = useRef<HTMLInputElement>(null);
+  const isInsideNotebook = currentSubPath !== '.';
 
   const handleFileClick = useCallback(async (subPath: string, filename: string) => {
     if (filename.endsWith('.notebook.json')) {
@@ -276,33 +278,38 @@ function FileBrowser() {
         onFileClick={handleFileClick}
         noDragFilter={(name) => name.endsWith('.notebook.json')}
         renderItemActions={renderItemActions}
+        onSubPathChange={setCurrentSubPath}
       />
-      <input
-        ref={nbImportRef}
-        type="file"
-        accept=".notebook.json,.json,.zip"
-        style={{ display: 'none' }}
-        onChange={handleNbImport}
-      />
-      {showNbCreate ? (
-        <div className="project-create-form">
+      {!isInsideNotebook && (
+        <>
           <input
-            autoFocus
-            value={nbTitle}
-            onChange={e => setNbTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleCreateNotebook(); if (e.key === 'Escape') setShowNbCreate(false); }}
-            placeholder="Notebook name..."
-            disabled={nbCreating}
+            ref={nbImportRef}
+            type="file"
+            accept=".notebook.json,.json,.zip"
+            style={{ display: 'none' }}
+            onChange={handleNbImport}
           />
-          <button onClick={handleCreateNotebook} disabled={nbCreating || !nbTitle.trim()}>
-            {nbCreating ? '...' : 'Create'}
-          </button>
-        </div>
-      ) : (
-        <div className="project-actions-bar">
-          <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>+ New</button>
-          <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>&#8593; Import</button>
-        </div>
+          {showNbCreate ? (
+            <div className="project-create-form">
+              <input
+                autoFocus
+                value={nbTitle}
+                onChange={e => setNbTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateNotebook(); if (e.key === 'Escape') setShowNbCreate(false); }}
+                placeholder="Notebook name..."
+                disabled={nbCreating}
+              />
+              <button onClick={handleCreateNotebook} disabled={nbCreating || !nbTitle.trim()}>
+                {nbCreating ? '...' : 'Create'}
+              </button>
+            </div>
+          ) : (
+            <div className="project-actions-bar">
+              <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>+ New</button>
+              <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>&#8593; Import</button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

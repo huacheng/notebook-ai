@@ -52,6 +52,7 @@ beforeEach(async () => {
   // Create standard project directory structure
   await mkdir(path.join(projectDir, '.deliverables'), { recursive: true });
   await mkdir(path.join(projectDir, '.git'), { recursive: true });
+  await mkdir(path.join(projectDir, '.working'), { recursive: true });
   await mkdir(path.join(projectDir, 'docs'), { recursive: true });
   await writeFile(path.join(projectDir, '.index.json'), '{}');
 
@@ -133,6 +134,15 @@ describe('GET /:projectId/files — dotfile filter', () => {
 
     const names = res.body.files.map((f: any) => f.name);
     expect(names).toContain('test.notebook.json');
+  });
+
+  it('shows .working directory', async () => {
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files`)
+      .expect(200);
+
+    const names = res.body.files.map((f: any) => f.name);
+    expect(names).toContain('.working');
   });
 
   it('shows non-dot files normally', async () => {

@@ -153,7 +153,7 @@ export function createProjectsRouter(
   });
 
   // Dotfile whitelist for project file listing — exact matches only
-  const DOTFILE_WHITELIST = new Set(['.index.json']);
+  const DOTFILE_WHITELIST = new Set(['.index.json', '.working']);
   function isVisibleEntry(name: string): boolean {
     if (!name.startsWith('.')) return true;
     if (DOTFILE_WHITELIST.has(name)) return true;
