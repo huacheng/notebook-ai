@@ -7,6 +7,17 @@ import { createReadStream } from 'fs';
 import { ensureLibraryDir } from '../workspace.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
 
+/** Check if a library path refers to a system-predefined entry that must not be deleted. */
+function isProtectedLibraryPath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const firstSegment = normalized.split('/')[0];
+  // Root-level dot-prefixed entries (.memory/, .changelog, .master-index.md, etc.)
+  if (firstSegment.startsWith('.')) return true;
+  // MEMORY.md at root
+  if (normalized === 'MEMORY.md') return true;
+  return false;
+}
+
 export function createLibraryRouter(): IRouter {
   const router = Router();
 
@@ -155,6 +166,11 @@ export function createLibraryRouter(): IRouter {
 
     if (!filePath || filePath === '.') {
       res.status(400).json({ error: 'Cannot delete library root.' });
+      return;
+    }
+
+    if (isProtectedLibraryPath(filePath)) {
+      res.status(403).json({ error: 'Cannot delete system library files.' });
       return;
     }
 

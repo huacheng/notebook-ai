@@ -207,6 +207,8 @@ export interface FileSectionProps {
   noDragFilter?: (filename: string) => boolean;
   /** Custom action buttons for specific file entries. Return non-null to replace defaults. */
   renderItemActions?: (file: { name: string; type: string }, subPath: string) => React.ReactNode | null;
+  /** When returns true for a file/directory name + subPath, the delete button is hidden. */
+  noDeleteFilter?: (name: string, subPath: string) => boolean;
 }
 
 export function FileSection({
@@ -219,6 +221,7 @@ export function FileSection({
   initialPath = '.',
   noDragFilter,
   renderItemActions,
+  noDeleteFilter,
 }: FileSectionProps) {
   const [subPath, setSubPath] = useState(initialPath);
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -485,6 +488,7 @@ export function FileSection({
             <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => navigateInto(f.name)}>
               <IconFolder />
               <span className="fp-name" title={f.name}>{f.name}</span>
+              {!noDeleteFilter?.(f.name, subPath) && (
               <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
                 {confirmDelete === f.name ? (
                   <span className="fp-confirm">
@@ -495,6 +499,7 @@ export function FileSection({
                   <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
                 )}
               </div>
+              )}
             </div>
           ) : (
             <div
@@ -518,7 +523,7 @@ export function FileSection({
                 ) : (
                   <>
                     <button className="fp-action" onClick={() => downloadFile(f.name)} title="Download">↓</button>
-                    {f.name !== 'MEMORY.md' && (
+                    {!noDeleteFilter?.(f.name, subPath) && f.name !== 'MEMORY.md' && (
                       <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
                     )}
                   </>

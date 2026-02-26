@@ -342,6 +342,12 @@ export function ProjectSidebar() {
           showDownloadAll
           dropLabel="Drop to add to Library"
           workspaceDir={workspaceDir}
+          noDeleteFilter={(name, subPath) => {
+            // Root-level dot-prefixed entries and MEMORY.md are system files
+            if (subPath === '.') return name.startsWith('.') || name === 'MEMORY.md';
+            // Everything under .memory/ is system-managed
+            return subPath === '.memory' || subPath.startsWith('.memory/');
+          }}
           onFileClick={(subPath, name) => {
             const relPath = subPath === '.' ? name : `${subPath}/${name}`;
             openFileTab({ path: relPath, source: 'library', sessionId: sessionId ?? '' });
