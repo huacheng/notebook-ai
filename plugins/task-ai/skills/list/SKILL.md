@@ -15,17 +15,17 @@ arguments:
     required: false
 ---
 
-# /moonview:list — Read-Only Task Query
+# /task-ai:list — Read-Only Task Query
 
 Query task status, details, and relationships. Pure read-only — no files written, no status changes, no git commits.
 
 ## Usage
 
 ```
-/moonview:list                           # List all tasks
-/moonview:list <notebook_name>             # Single notebook details
-/moonview:list --deps                      # Dependency graph (all notebooks)
-/moonview:list --timeline <notebook_name>  # Status transition timeline
+/task-ai:list                           # List all tasks
+/task-ai:list <notebook_name>             # Single notebook details
+/task-ai:list --deps                      # Dependency graph (all notebooks)
+/task-ai:list --timeline <notebook_name>  # Status transition timeline
 ```
 
 ## Modes

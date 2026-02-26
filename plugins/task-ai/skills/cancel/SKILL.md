@@ -15,14 +15,14 @@ arguments:
     required: false
 ---
 
-# /moonview:cancel — Cancel Task Module
+# /task-ai:cancel — Cancel Task Module
 
 Cancel a task module, stopping any active auto loop and optionally cleaning up the git worktree.
 
 ## Usage
 
 ```
-/moonview:cancel <notebook_name> [--reason "..."] [--cleanup]
+/task-ai:cancel <notebook_name> [--reason "..."] [--cleanup]
 ```
 
 ## Arguments

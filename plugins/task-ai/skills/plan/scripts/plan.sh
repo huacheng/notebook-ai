@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:plan implementation
+# /task-ai:plan implementation
 # Usage: plan.sh <notebook> [--generate]
 
 set -uo pipefail

@@ -9,7 +9,7 @@ arguments:
     required: false
 ---
 
-# /moonview:task-ai — Task Lifecycle Management
+# /task-ai:task-ai — Task Lifecycle Management
 
 Single entry point for task lifecycle management in the `$NB_WORKSPACES_ROOT/` directory.
 
@@ -273,28 +273,28 @@ deepening requirements, or building testing methodology before each phase.
 ```bash
 # ── Target Deepening (two phases, human confirmation between) ──
 # Phase 1: Research domain standards → propose refined Objective
-/moonview:research <module> --caller target --phase objective
+/task-ai:research <module> --caller target --phase objective
 
 # Phase 2: Based on confirmed Objective → propose missing Requirements
-/moonview:research <module> --caller target --phase requirements
+/task-ai:research <module> --caller target --phase requirements
 
 # ── Plan Support ──
 # Full collection before plan (when target research was skipped)
-/moonview:research <module> --caller plan --scope full
+/task-ai:research <module> --caller plan --scope full
 
 # Gap-only collection (supplementing existing references)
-/moonview:research <module> --caller plan --scope gap
+/task-ai:research <module> --caller plan --scope gap
 
 # ── Test Intelligence ──
 # Testing methodology (call before plan, when status=planning)
-/moonview:research <module> --caller test
+/task-ai:research <module> --caller test
 
 # Testing tools + benchmarks (call before verify, when status=executing)
-/moonview:research <module> --caller test
+/task-ai:research <module> --caller test
 
 # ── Mid-execution Supplement ──
 # Encountered unknown technology during exec
-/moonview:research <module> --caller exec --scope gap
+/task-ai:research <module> --caller exec --scope gap
 ```
 
 #### Caller Quick Reference

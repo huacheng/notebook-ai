@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:target implementation
+# /task-ai:target implementation
 # Usage: target.sh [objective_content]
 
 set -uo pipefail

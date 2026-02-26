@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:report implementation
+# /task-ai:report implementation
 # Usage: report.sh <notebook> [--format full|summary]
 
 set -uo pipefail

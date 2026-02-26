@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:auto implementation
+# /task-ai:auto implementation
 # Usage: auto.sh <notebook> [--start|--stop|--status]
 
 set -uo pipefail

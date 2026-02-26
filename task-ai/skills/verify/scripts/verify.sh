@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:verify implementation
+# /task-ai:verify implementation
 # Usage: verify.sh <notebook> [--checkpoint quick|full|step-N]
 
 set -uo pipefail

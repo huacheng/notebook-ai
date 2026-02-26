@@ -137,7 +137,7 @@ fi
 STEPS=$(extract_steps "$LIGHT_SKILL")
 # Check that init call appears only inside promote section, not in start section
 START_SECTION=$(echo "$STEPS" | sed -n '/Start shadow session/,/Promotion\|Finish/p')
-if echo "$START_SECTION" | grep -qi '/moonview:init\|Call.*init'; then
+if echo "$START_SECTION" | grep -qi '/task-ai:init\|Call.*init'; then
   emit_fail "light: init appears in start section — should only be in promote"
 else
   emit_pass "light: init not called unconditionally in start section"

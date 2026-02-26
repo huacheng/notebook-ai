@@ -9,14 +9,14 @@ arguments:
     required: false
 ---
 
-# /moonview:target — Define and Review Task Objective
+# /task-ai:target — Define and Review Task Objective
 
 Define or review the core mission for a notebook. This command acts as the cognitive anchor for `plan` and `exec`. It provides a bidirectional bridge between the user's natural language and the physical `.target.md` file.
 
 ## Usage
 
-- **Write Mode**: `/moonview:target "Objective content..."` — Updates `.target.md` and commits the change.
-- **Read Mode**: `/moonview:target` — Reads and displays the current `.target.md` to ensure common understanding.
+- **Write Mode**: `/task-ai:target "Objective content..."` — Updates `.target.md` and commits the change.
+- **Read Mode**: `/task-ai:target` — Reads and displays the current `.target.md` to ensure common understanding.
 
 ## Execution Steps
 
@@ -49,4 +49,4 @@ Define or review the core mission for a notebook. This command acts as the cogni
 ## Notes
 
 - **Manual editing**: Users can directly edit `.target.md` in their IDE. The `target` command is a shortcut for conversational interaction and ensuring Git traceability.
-- **Context Loading**: If the agent's context is compressed, `/moonview:target` without arguments is the standard way to reload the task's mission into memory.
+- **Context Loading**: If the agent's context is compressed, `/task-ai:target` without arguments is the standard way to reload the task's mission into memory.

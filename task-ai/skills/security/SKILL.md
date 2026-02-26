@@ -15,15 +15,15 @@ arguments:
     required: false
 ---
 
-# /moonview:security — Runtime Guardian
+# /task-ai:security — Runtime Guardian
 
 Acts as the mandatory Pre-hook for existing sub-commands (`check` and `exec`), ensuring system integrity by blocking destructive or obfuscated instructions.
 
 ## Usage
 
 ```bash
-/moonview:security <notebook> audit-plan
-/moonview:security <notebook> verify-cmd "<command>"
+/task-ai:security <notebook> audit-plan
+/task-ai:security <notebook> verify-cmd "<command>"
 ```
 
 ## Execution Steps

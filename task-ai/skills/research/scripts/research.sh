@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:research implementation
+# /task-ai:research implementation
 # Usage: research.sh <notebook> [--caller target|plan|test|verify|check|exec] [--phase objective|requirements] [--scope full|gap]
 
 set -uo pipefail

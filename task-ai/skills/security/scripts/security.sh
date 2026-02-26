@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:security implementation
+# /task-ai:security implementation
 # Usage: security.sh <notebook> <action> [payload]
 
 set -uo pipefail

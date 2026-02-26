@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:light implementation
+# /task-ai:light implementation
 # Usage: light.sh <project> <objective> | --finish | --promote | --status
 
 set -uo pipefail

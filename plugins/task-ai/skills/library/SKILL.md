@@ -30,7 +30,7 @@ arguments:
     required: false
 ---
 
-# /moonview:library — Knowledge Library Management
+# /task-ai:library — Knowledge Library Management
 
 The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross-task experiences, external references, domain type profiles, and Thinking CoT patterns. This sub-command provides four operations: `search`, `list`, `status`, and `maintain`.
 
@@ -41,10 +41,10 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 ## Usage
 
 ```
-/moonview:library search "<query>" [--type <type>] [--topic <topic>]
-/moonview:library list [--type <type>]
-/moonview:library status
-/moonview:library maintain [--rebuild-index] [--compact] [--check-staleness] [--all]
+/task-ai:library search "<query>" [--type <type>] [--topic <topic>]
+/task-ai:library list [--type <type>]
+/task-ai:library status
+/task-ai:library maintain [--rebuild-index] [--compact] [--check-staleness] [--all]
 ```
 
 ## Library Directory Structure

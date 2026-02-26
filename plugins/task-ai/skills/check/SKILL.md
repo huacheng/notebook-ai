@@ -13,14 +13,14 @@ arguments:
     default: post-plan
 ---
 
-# /moonview:check — Plan Feasibility Check
+# /task-ai:check — Plan Feasibility Check
 
 Check the implementation plan at three lifecycle checkpoints. Acts as the decision maker in the task state machine.
 
 ## Usage
 
 ```
-/moonview:check <notebook_name> [--checkpoint post-plan|mid-exec|post-exec]
+/task-ai:check <notebook_name> [--checkpoint post-plan|mid-exec|post-exec]
 ```
 
 ## Checkpoints
@@ -139,7 +139,7 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 8. **Gap check**: if `.type-profile.md` lacks evaluation criteria OR `.references/` lacks domain evaluation standards/benchmarks for the task `type`, trigger `research --scope gap --caller check` to collect missing references before proceeding
 9. **Incorporate verify results**: If fresh verification results exist in `.test/` (from a prior `verify` run, same day and matching checkpoint), read and incorporate them. Otherwise, run verification procedures inline as part of evaluation — inline scope is limited to the criteria in the latest `.test/` criteria file only (build + test + acceptance). For comprehensive domain-adapted verification, invoke `verify` explicitly before `check`
 10. **Evaluate** against criteria
-    - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/moonview:security <notebook> audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
+    - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/task-ai:security <notebook> audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
     - **Optional delegation — code-review** (post-exec checkpoint only): Follow `auto/references/plugin-delegation.md` to attempt matching the `code-review` capability slot. If matched, invoke via Task subagent with a git diff summary as input — review results serve as supplementary evaluation evidence. No match or failure → continue standard inline evaluation
 11. **Write** output files per outcome: evaluation to `.analysis/` or `.bugfix/` (per Outcomes tables above), and test results to `.test/<date>-<checkpoint>-results.md` when tests are evaluated (mid-exec and post-exec checkpoints)
     - **REPLAN with traceable reference**: if verdict is REPLAN AND evaluation identifies a specific `.memory/.references/<file>` as misleading (e.g., bad API docs caused wrong approach), increment `failure_count` in that reference file's frontmatter (acquire `.memory/.references/.lock` → read frontmatter → `failure_count++` → write atomically → append `reference` changelog update line → release lock)

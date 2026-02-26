@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:check implementation
+# /task-ai:check implementation
 # Usage: check.sh <notebook> [--checkpoint post-plan|mid-exec|post-exec]
 
 set -uo pipefail

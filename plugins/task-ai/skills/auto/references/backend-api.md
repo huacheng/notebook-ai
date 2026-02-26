@@ -34,7 +34,7 @@ When `POST /api/sessions/:id/task-auto` is called:
 
 1. **Validate**: check no active auto loop for this session or task_dir
 2. **Insert** `task_auto` row into SQLite
-3. **Send** `/moonview:auto <taskDir>` to the prompt input window of the active session
+3. **Send** `/task-ai:auto <taskDir>` to the prompt input window of the active session
 4. **Start** `fs.watch` on `taskDir` for `.auto-signal` changes
 5. **Start** heartbeat polling timer (60s interval)
 
@@ -103,7 +103,7 @@ On backend server restart, auto state is recovered from SQLite:
    2.1. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted the agent from immediately exiting due to leftover stop file from pre-crash state)
    2.2. Check terminal state via `tmux capture-pane`:
       - If the agent auto session still running → re-establish monitoring (fs.watch + heartbeat)
-      - If shell prompt visible (the agent exited) → restart with backoff: send `/moonview:auto <task_dir>` to the prompt input window (the agent's internal loop reads `.index.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in a new SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
+      - If shell prompt visible (the agent exited) → restart with backoff: send `/task-ai:auto <task_dir>` to the prompt input window (the agent's internal loop reads `.index.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in a new SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
    2.3. Reset `stall_count` to `0` and `last_capture_hash` to `""` (fresh monitoring baseline)
    2.4. Start heartbeat polling timer
    2.5. Re-establish `fs.watch` on `task_dir` for `.auto-signal`

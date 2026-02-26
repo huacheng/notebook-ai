@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:merge implementation
+# /task-ai:merge implementation
 # Usage: merge.sh <notebook>
 
 set -uo pipefail

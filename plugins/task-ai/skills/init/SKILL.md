@@ -21,14 +21,14 @@ arguments:
     required: false
 ---
 
-# /moonview:init — Initialize Notebook Working Directory
+# /task-ai:init — Initialize Notebook Working Directory
 
 Create a new notebook directory under `$NB_WORKSPACES_ROOT/<project>/` with the standard system file structure.
 
 ## Usage
 
 ```
-/moonview:init <project_name> <notebook_name> [--title "Task Title"] [--tags feature,backend] [--worktree]
+/task-ai:init <project_name> <notebook_name> [--title "Task Title"] [--tags feature,backend] [--worktree]
 ```
 
 ## Directory Structure Created
@@ -166,7 +166,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 - Project names and notebook names are ASCII only: letters, digits, hyphens, underscores (`[a-zA-Z0-9_-]+`). No whitespace, no leading dot, no path separators. Examples: `project-a`, `notebook-1`, `my-research`
 - The `.target.md` is for human authoring — users fill in requirements via the Plan annotation panel. The default template (Objective / Requirements / Constraints) is domain-generic; users may freely restructure it for their domain (e.g., Synopsis / Characters for literary tasks). The `plan` skill reads `.target.md` content, not its structure
 - System files (dot-prefixed) should not be manually edited except `.target.md`
-- After init, the typical workflow is: edit `.working/.target.md` → `/moonview:plan` → `/moonview:check` → `/moonview:exec`
+- After init, the typical workflow is: edit `.working/.target.md` → `/task-ai:plan` → `/task-ai:check` → `/task-ai:exec`
 - With `--worktree`, the task runs in an isolated directory; multiple tasks can execute simultaneously
 - **Branch collision check**: if `task/<notebook_name>` branch already exists (from a previous cancelled/completed notebook), init aborts. User should delete the old branch first (`git branch -d task/<name>`) or choose a different notebook name
 - **Clean working tree**: init requires no uncommitted changes to **tracked** files — untracked/gitignored files are allowed. User should `git commit` or `git stash` tracked changes first

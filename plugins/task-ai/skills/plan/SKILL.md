@@ -12,14 +12,14 @@ arguments:
     required: false
 ---
 
-# /moonview:plan — Plan Generation
+# /task-ai:plan — Plan Generation
 
 Generate an implementation plan from `.target.md`. Annotation processing is handled by the `annotate` sub-command.
 
 ## Usage
 
 ```
-/moonview:plan <notebook_name> [--generate]
+/task-ai:plan <notebook_name> [--generate]
 ```
 
 `--generate` is the default behavior — the flag exists for explicitness when invoked from auto mode or scripts. Omitting it has the same effect.
@@ -27,7 +27,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 ## Execution Steps
 
 1. Read `.target.md` for requirements
-2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/moonview:research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
+2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/task-ai:research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
    - **First plan** (status `draft`/`planning`, no existing `.plan.md`):
      - Check if `.target.md` contains `## Research Insights` section (indicates `research --caller target` was already run)
      - **If `## Research Insights` present**: invoke research with `--scope gap --caller plan` — target research already provided comprehensive coverage, only fill plan-specific gaps

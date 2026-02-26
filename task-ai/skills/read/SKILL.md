@@ -13,14 +13,14 @@ arguments:
     default: shallow
 ---
 
-# /moonview:read — Knowledge Synthesizer
+# /task-ai:read — Knowledge Synthesizer
 
 Ingests user-provided documents, extracts novel information, applies strict 10-category detox rules, and saves the validated reference to `$NB_WORKSPACES_LIBRARY/.memory/.references/`.
 
 ## Usage
 
 ```bash
-/moonview:read <file_path> [--depth shallow|deep]
+/task-ai:read <file_path> [--depth shallow|deep]
 ```
 
 ## Execution Steps

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:exec implementation
+# /task-ai:exec implementation
 # Usage: exec.sh <notebook> [--step N]
 
 set -uo pipefail

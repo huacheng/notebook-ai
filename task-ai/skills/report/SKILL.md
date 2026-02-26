@@ -13,14 +13,14 @@ arguments:
     default: full
 ---
 
-# /moonview:report — Generate Completion Report
+# /task-ai:report — Generate Completion Report
 
 Generate a structured completion report for a task module, documenting what was planned, executed, and verified.
 
 ## Usage
 
 ```
-/moonview:report <notebook_name> [--format full|summary]
+/task-ai:report <notebook_name> [--format full|summary]
 ```
 
 ## Prerequisites

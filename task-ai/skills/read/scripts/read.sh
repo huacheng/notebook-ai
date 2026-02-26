@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /moonview:read implementation
+# /task-ai:read implementation
 # Usage: read.sh <file_path> [--depth shallow|deep]
 
 set -uo pipefail

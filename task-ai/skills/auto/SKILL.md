@@ -13,19 +13,19 @@ arguments:
     default: start
 ---
 
-# /moonview:auto — Autonomous Execution Loop
+# /task-ai:auto — Autonomous Execution Loop
 
 Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction on failures. Runs as a **single the agent session** that internally dispatches sub-commands, preserving context across all steps.
 
 ## Usage
 
 ```
-/moonview:auto <notebook_name> [--start|--stop|--status]
+/task-ai:auto <notebook_name> [--start|--stop|--status]
 ```
 
 ## Architecture
 
-Auto mode runs as a **single long-lived the agent session** started by entering `/moonview:auto <notebook_name>` into the prompt input window. The daemon starts the session and monitors it externally; it does NOT dispatch individual commands.
+Auto mode runs as a **single long-lived the agent session** started by entering `/task-ai:auto <notebook_name>` into the prompt input window. The daemon starts the session and monitors it externally; it does NOT dispatch individual commands.
 
 ### Components
 
@@ -33,7 +33,7 @@ Auto mode runs as a **single long-lived the agent session** started by entering 
 ┌─────────────────────────────────────────────────┐
 │  the agent (single session)                         │
 │                                                  │
-│  /moonview:auto <module>                      │
+│  /task-ai:auto <module>                      │
 │    ├→ execute plan logic    ─┐                   │
 │    ├→ execute check logic    │  internal loop    │
 │    ├→ execute exec logic     │  (shared context) │
@@ -288,7 +288,7 @@ When `type` contains `software`, the auto loop tracks VH→HS cycle progress dur
 - **Context management**: proactive context compaction (prompt: "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working.") at ≥ 70% context window usage, with `.summary.md` as compaction safety net
 - **Quota exhaustion**: detected and handled as wait (not stall), timeout clock paused during quota-wait
 - **Pause on blocked**: Auto stops immediately on `blocked` status (the agent's internal loop exits)
-- **Manual override**: User can `/moonview:auto --stop` at any time, or daemon writes `.auto-stop` via `DELETE` API
+- **Manual override**: User can `/task-ai:auto --stop` at any time, or daemon writes `.auto-stop` via `DELETE` API
 - **Graceful stop**: the agent checks for `.auto-stop` before each iteration, ensuring clean exit between steps (not mid-step)
 - **Single instance per session/task**: enforced by SQLite constraints (see `references/backend-api.md`)
 
@@ -306,7 +306,7 @@ Auto mode inherits git behavior from each sub-command it invokes. No additional 
 
 ## Notes
 
-- Auto mode starts by entering the `/moonview:auto <notebook_name>` command in the prompt input window; all subsequent steps execute within that same session
+- Auto mode starts by entering the `/task-ai:auto <notebook_name>` command in the prompt input window; all subsequent steps execute within that same session
 - The daemon's only active intervention is writing `.auto-stop`; all other daemon activity is passive monitoring
 - `.auto-signal` and `.auto-stop` are transient files — should be in `.gitignore`
 - The daemon logs all signal events and stall detections to server console for debugging
