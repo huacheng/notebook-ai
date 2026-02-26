@@ -126,6 +126,12 @@ export class GitManager {
     await this.git.raw(['worktree', 'remove', path, '--force']);
   }
 
+  /** Stage all files and commit with the given message */
+  async commitAll(message: string): Promise<void> {
+    await this.git.add('-A');
+    await this.git.commit(message);
+  }
+
   /** List all worktrees and their checked-out branches */
   async listWorktrees(): Promise<Array<{ path: string; branch: string }>> {
     const output = await this.git.raw(['worktree', 'list', '--porcelain']);

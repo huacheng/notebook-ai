@@ -9,6 +9,7 @@ import type { NotebookDb } from '../db.js';
 import type { SessionManager } from '../session.js';
 import type { NotebookStore } from '../notebook-store.js';
 import { GitManager } from '../git.js';
+import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
 
 function titleToSlug(title: string): string {
@@ -103,6 +104,10 @@ export function createProjectsRouter(
       //   .working/             — task workspace files
       await mkdir(path.join(nbDir, '.working'), { recursive: true });
 
+      // Initialize task-ai working directory files
+      await initTaskWorkingDir({ nbDir, nbSlug, title, branchName, worktreePath });
+      await ensureLibrarySkeleton(workspacesRoot, project.path);
+
       const notebook = notebookStore.createNew(title, worktreePath);
       notebook.metadata.project_id = project.id;
       notebook.metadata.worktree_path = worktreePath;
@@ -110,6 +115,12 @@ export function createProjectsRouter(
 
       const notebookPath = path.join(nbDir, `${nbSlug}.notebook.json`);
       await notebookStore.save(notebookPath, notebook);
+
+      // Commit initial task files in the worktree (best-effort)
+      try {
+        const worktreeGit = new GitManager(worktreePath);
+        await worktreeGit.commitAll(`task-ai(${nbSlug}): initialize notebook`);
+      } catch { /* ignore if worktree has no changes or git fails */ }
 
       // Create session with worktree as cwd
       const session = await sessionManager.createSession(notebookPath, worktreePath);
@@ -130,6 +141,7 @@ export function createProjectsRouter(
         notebookPath,
         worktreePath,
         branch: branchName,
+        taskStatus: 'draft',
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -10,7 +10,7 @@ beforeEach(async () => {
   tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'workspace-test-'));
   workspaceDir = path.join(tmpRoot, 'my-notebook');
   await mkdir(workspaceDir, { recursive: true });
-  await mkdir(path.join(tmpRoot, '_library'), { recursive: true });
+  await mkdir(path.join(tmpRoot, '.library'), { recursive: true });
   process.env['NB_WORKSPACE_DIR'] = tmpRoot;
 });
 
@@ -32,7 +32,7 @@ describe('initWorkspaceMemory', () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
 
-    const expectedRel = path.relative(workspaceDir, path.join(tmpRoot, '_library'));
+    const expectedRel = path.relative(workspaceDir, path.join(tmpRoot, '.library'));
     const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
     expect(content).toContain(expectedRel);
   });

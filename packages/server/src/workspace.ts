@@ -13,7 +13,7 @@ function getWorkspaceRoot(): string {
  * Returns the shared library directory path (shared across all notebooks).
  */
 export function getLibraryDir(): string {
-  return path.join(getWorkspaceRoot(), '_library');
+  return path.join(getWorkspaceRoot(), '.library');
 }
 
 /**
