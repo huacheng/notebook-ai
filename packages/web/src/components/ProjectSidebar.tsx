@@ -126,8 +126,8 @@ function ProjectList() {
   );
 }
 
-function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, onClose }: {
-  projectId: string; relPath: string; baseUrl: string; authToken: string | null; onClose: () => void;
+function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose }: {
+  projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; onClose: () => void;
 }) {
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -163,7 +163,7 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, onClose }: {
 
   return (
     <div className="project-item-menu" ref={menuRef}>
-      <button className="project-item-menu-item" onClick={handleExport}>Export</button>
+      {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>Export</button>}
       <button className="project-item-menu-item project-item-menu-item--danger" onClick={handleDelete}>Delete</button>
     </div>
   );
@@ -239,8 +239,9 @@ function FileBrowser() {
   };
 
   const renderItemActions = useCallback((file: { name: string; type: string }, subPath: string) => {
-    const isNb = file.name.endsWith('.notebook.json') || (file.type === 'directory' && (file as any).isNotebook);
-    if (!isNb) return null;
+    const isNbDir = file.type === 'directory' && (file as any).isNotebook;
+    const isNbFile = file.name.endsWith('.notebook.json');
+    if (!isNbDir && !isNbFile) return null;
     const relPath = subPath === '.' ? file.name : `${subPath}/${file.name}`;
     return (
       <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
@@ -255,6 +256,7 @@ function FileBrowser() {
             relPath={relPath}
             baseUrl={`/api/projects/${activeProjectId}`}
             authToken={authToken}
+            showExport={isNbDir}
             onClose={() => setNbMenuPath(null)}
           />
         )}
