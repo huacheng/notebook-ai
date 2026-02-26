@@ -372,6 +372,17 @@ export function setupWebSocket(
           break;
         }
 
+        case 'restart_session': {
+          const { session_id } = msg;
+          try {
+            await sessionManager.restartSession(session_id);
+            sendToClient(ws, { type: 'session_restarted', session_id });
+          } catch (err) {
+            sendToClient(ws, { type: 'session_restart_failed', session_id, error: String(err) });
+          }
+          break;
+        }
+
         default: {
           msg satisfies never;
           sendToClient(ws, { type: 'error', message: 'Unknown message type.' });

@@ -13,6 +13,8 @@ function NotebookStatusBar() {
   const activeTab = useStore((s) => s.activeTab);
   const setActiveTab = useStore((s) => s.setActiveTab);
   const saveNotebook = useStore((s) => s.saveNotebook);
+  const restartSession = useStore((s) => s.restartSession);
+  const sessionRestarting = useStore((s) => s.sessionRestarting);
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
 
@@ -35,6 +37,14 @@ function NotebookStatusBar() {
     <div className="notebook-statusbar">
       <span className="notebook-statusbar-title" title={title}>{title}</span>
       <div className="notebook-statusbar-actions">
+        <button
+          className="notebook-statusbar-btn notebook-statusbar-restart-btn"
+          onClick={restartSession}
+          disabled={!connected || sessionRestarting}
+          title={sessionRestarting ? 'Restarting session…' : 'Restart agent session'}
+        >
+          {sessionRestarting ? '...' : 'Restart'}
+        </button>
         <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}

@@ -67,6 +67,7 @@ export interface NotebookStore {
   ws: WebSocket | null;
   wsStatus: 'disconnected' | 'connecting' | 'connected';
   sessionId: string | null;
+  sessionRestarting: boolean;
 
   // ── Auth actions ───────────────────────────────────────────────────────
   checkAuthStatus(): Promise<void>;
@@ -149,4 +150,5 @@ export interface NotebookStore {
   saveNotebook(path?: string): void;
   loadNotebook(path: string): void;
   exportHtml(): void;
+  restartSession(): void;
 }

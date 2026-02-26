@@ -313,6 +313,12 @@ export const AnnotationSyncSchema = z.object({
   updated_at: z.number(),
 });
 
+// Client → Server: restart session
+export const RestartSessionSchema = z.object({
+  type: z.literal('restart_session'),
+  session_id: z.string(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -327,6 +333,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   FileSaveSchema,
   AnnotationLoadSchema,
   AnnotationSyncSchema,
+  RestartSessionSchema,
 ]);
 
 // Server → Client: all session-scoped messages carry session_id
@@ -445,6 +452,18 @@ export const AnnotationSyncOkSchema = z.object({
   updated_at: z.number(),
 });
 
+// Server → Client: session restart responses
+export const SessionRestartedSchema = z.object({
+  type: z.literal('session_restarted'),
+  session_id: z.string(),
+});
+
+export const SessionRestartFailedSchema = z.object({
+  type: z.literal('session_restart_failed'),
+  session_id: z.string(),
+  error: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -464,6 +483,8 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   FileSaveErrorSchema,
   AnnotationDataSchema,
   AnnotationSyncOkSchema,
+  SessionRestartedSchema,
+  SessionRestartFailedSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -559,6 +580,9 @@ export type FileSaveOk = z.infer<typeof FileSaveOkSchema>;
 export type FileSaveError = z.infer<typeof FileSaveErrorSchema>;
 export type AnnotationData = z.infer<typeof AnnotationDataSchema>;
 export type AnnotationSyncOk = z.infer<typeof AnnotationSyncOkSchema>;
+export type RestartSession = z.infer<typeof RestartSessionSchema>;
+export type SessionRestarted = z.infer<typeof SessionRestartedSchema>;
+export type SessionRestartFailed = z.infer<typeof SessionRestartFailedSchema>;
 
 export type NotebookListItem = z.infer<typeof NotebookListItemSchema>;
 export type WorkspaceInfo = z.infer<typeof WorkspaceInfoSchema>;

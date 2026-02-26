@@ -3,14 +3,15 @@ import type { WSServerMessage } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'ws' | 'wsStatus' | 'sessionId'
+  | 'ws' | 'wsStatus' | 'sessionId' | 'sessionRestarting'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
-  | 'loadNotebook' | 'exportHtml'
+  | 'loadNotebook' | 'exportHtml' | 'restartSession'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
   sessionId: null,
+  sessionRestarting: false,
 
   connectWebSocket() {
     const existing = get().ws;
@@ -159,6 +160,12 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             sessionNotice: '此 Notebook 已在另一个标签页中打开，请先关闭它。',
           });
           break;
+        case 'session_restarted':
+          set({ sessionRestarting: false });
+          break;
+        case 'session_restart_failed':
+          set({ sessionRestarting: false, sessionNotice: `Session restart failed: ${parsed.error}` });
+          break;
         case 'error':
           if (parsed.cell_id) {
             store.setCellStatus(parsed.cell_id, 'error');
@@ -263,6 +270,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           },
         })
       );
+    }
+  },
+
+  restartSession() {
+    const { ws, sessionId } = get();
+    if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
+      set({ sessionRestarting: true });
+      ws.send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
     }
   },
 });

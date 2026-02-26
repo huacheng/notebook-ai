@@ -208,6 +208,39 @@ export class SessionManager {
     return this.sessions.get(sessionId);
   }
 
+  /**
+   * Restarts the agent process for an existing session.
+   * Preserves the session ID, notebook state, and listeners.
+   */
+  async restartSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+
+    // Stop old process
+    session.agentProcess.stop();
+
+    // Create new AgentProcess with same config
+    const engine = session.agentProcess.engine;
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT);
+
+    // Start new process with same handlers
+    await session.agentProcess.start(
+      (raw: unknown) => this.handleJsonlMessage(session, raw),
+      (code) => {
+        const cellId = findRunningCellId(session.notebook);
+        if (cellId) {
+          console.error(
+            `[session ${sessionId}] Agent process exited (code ${String(code)}) ` +
+            `while cell "${cellId}" was running.`,
+          );
+          this.completeCell(session, cellId, true);
+        }
+      },
+    );
+
+    console.log(`[session] Restarted session "${sessionId}"`);
+  }
+
   async closeSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
