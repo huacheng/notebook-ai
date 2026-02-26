@@ -40,5 +40,12 @@ export function StreamingThinking({ cellId }: { cellId: string }) {
     return () => clearInterval(interval);
   }, [cellId]);
 
-  return <pre ref={containerRef} className="output-thinking streaming" />;
+  return (
+    <div className="output-thinking streaming">
+      <div className="output-thinking-header-streaming">Thinking…</div>
+      <div className="output-thinking-content">
+        <pre ref={containerRef} className="output-thinking-text" />
+      </div>
+    </div>
+  );
 }

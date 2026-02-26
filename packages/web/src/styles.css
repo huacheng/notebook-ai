@@ -4711,6 +4711,13 @@ button:focus-visible {
   animation: pulse-border 1s ease-in-out infinite;
 }
 
+.output-thinking-header-streaming {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 @keyframes pulse-border {
   0%, 100% { border-left-color: var(--color-running); }
   50% { border-left-color: transparent; }
