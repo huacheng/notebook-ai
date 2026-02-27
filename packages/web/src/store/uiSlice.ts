@@ -8,7 +8,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'clearSessionNotice' | 'setLatency'
   | 'setWsReconnectExhausted'
   | 'openFiles' | 'activeFileTabId' | 'fileViewerMaximized'
-  | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'setFileTabLoading'
+  | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'setFileTabLoading'
   | 'toggleFileViewerMaximized'
   | 'leftSidebarSplitRatio' | 'setLeftSidebarSplitRatio'
   | 'rightPanelOpen' | 'rightPanelSplitRatio'
@@ -28,7 +28,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   openFiles: {},
   activeFileTabId: null,
   fileViewerMaximized: false,
-  rightPanelOpen: true,
+  rightPanelOpen: false,
   rightPanelSplitRatio: 0.5,
   sidebarWidth: 272,
   rightPanelWidth: 300,
@@ -90,6 +90,23 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   closeAllFileTabs() {
     set({ openFiles: {}, activeFileTabId: null });
+  },
+
+  closeProjectFileTabs(projectId, pathPrefix) {
+    set(s => {
+      const remaining: typeof s.openFiles = {};
+      for (const [tabId, file] of Object.entries(s.openFiles)) {
+        const match = file.projectId === projectId
+          && (!pathPrefix || file.path.startsWith(pathPrefix));
+        if (!match) remaining[tabId] = file;
+      }
+      const activeGone = s.activeFileTabId && !(s.activeFileTabId in remaining);
+      const ids = Object.keys(remaining);
+      return {
+        openFiles: remaining,
+        activeFileTabId: activeGone ? (ids[0] ?? null) : s.activeFileTabId,
+      };
+    });
   },
 
   setFileTabLoading(tabId, loading) {

@@ -125,6 +125,7 @@ export interface NotebookStore {
   setActiveFileTab(tabId: string): void;
   deactivateFileTab(): void;
   closeAllFileTabs(): void;
+  closeProjectFileTabs(projectId: string, pathPrefix?: string): void;
   setFileTabLoading(tabId: string, loading: boolean): void;
   setLeftSidebarSplitRatio(ratio: number): void;
   toggleFileViewerMaximized(): void;

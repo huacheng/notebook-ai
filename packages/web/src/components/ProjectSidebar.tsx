@@ -180,7 +180,8 @@ function ProjectList() {
           onConfirm={() => deleteProject(deleteTarget.id)}
           onDone={() => {
             setDeleteTarget(null);
-            const { activeProjectId, goBackToProjectList, fetchProjects } = useStore.getState();
+            const { activeProjectId, goBackToProjectList, fetchProjects, closeProjectFileTabs } = useStore.getState();
+            closeProjectFileTabs(deleteTarget.id);
             if (activeProjectId === deleteTarget.id) goBackToProjectList();
             fetchProjects();
           }}
@@ -341,7 +342,10 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
           name={displayName}
           onCancel={() => { setShowDeleteModal(false); onClose(); }}
           onConfirm={() => deleteProjectNotebook(projectId, relPath)}
-          onDone={() => { setShowDeleteModal(false); onClose(); onDeleted?.(); }}
+          onDone={() => {
+            useStore.getState().closeProjectFileTabs(projectId, relPath.endsWith('/') ? relPath : relPath + '/');
+            setShowDeleteModal(false); onClose(); onDeleted?.();
+          }}
         />
       )}
     </>

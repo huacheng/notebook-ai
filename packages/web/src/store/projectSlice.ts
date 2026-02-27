@@ -157,6 +157,7 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       activeProjectPath: path,
       sidebarLevel: 'L2' as const,
       fileBrowserPath: '',
+      rightPanelOpen: true,
     });
   },
 
@@ -166,6 +167,7 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       activeProjectPath: null,
       sidebarLevel: 'L1' as const,
       fileBrowserPath: '',
+      rightPanelOpen: false,
     });
   },
 

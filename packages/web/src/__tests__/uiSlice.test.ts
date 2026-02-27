@@ -200,17 +200,17 @@ describe('interaction contract regression', () => {
     expect(state.fileViewerMaximized).toBe(false);
   });
 
-  it('rightPanelOpen defaults to true', () => {
+  it('rightPanelOpen defaults to false (closed at project list level)', () => {
     const { state } = createTestSlice();
-    expect(state.rightPanelOpen).toBe(true);
+    expect(state.rightPanelOpen).toBe(false);
   });
 
   it('toggleRightPanel flips rightPanelOpen', () => {
     const { state, getAction } = createTestSlice();
     getAction('toggleRightPanel')();
-    expect(state.rightPanelOpen).toBe(false);
-    getAction('toggleRightPanel')();
     expect(state.rightPanelOpen).toBe(true);
+    getAction('toggleRightPanel')();
+    expect(state.rightPanelOpen).toBe(false);
   });
 
   it('openFiles defaults to empty and activeFileTabId defaults to null', () => {
@@ -331,24 +331,101 @@ describe('rightPanelWidth', () => {
 // ── setRightPanelOpen ──────────────────────────────────────────────────
 
 describe('setRightPanelOpen', () => {
-  it('explicitly sets rightPanelOpen to false', () => {
-    const { state, getAction } = createTestSlice();
-    expect(state.rightPanelOpen).toBe(true);
-    getAction('setRightPanelOpen')(false);
-    expect(state.rightPanelOpen).toBe(false);
-  });
-
   it('explicitly sets rightPanelOpen to true', () => {
     const { state, getAction } = createTestSlice();
-    getAction('setRightPanelOpen')(false);
     expect(state.rightPanelOpen).toBe(false);
     getAction('setRightPanelOpen')(true);
     expect(state.rightPanelOpen).toBe(true);
+  });
+
+  it('explicitly sets rightPanelOpen to false', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('setRightPanelOpen')(true);
+    expect(state.rightPanelOpen).toBe(true);
+    getAction('setRightPanelOpen')(false);
+    expect(state.rightPanelOpen).toBe(false);
   });
 
   it('idempotent: setting true when already true', () => {
     const { state, getAction } = createTestSlice();
     getAction('setRightPanelOpen')(true);
     expect(state.rightPanelOpen).toBe(true);
+  });
+});
+
+// ── closeProjectFileTabs ──────────────────────────────────────────────
+
+describe('closeProjectFileTabs', () => {
+  function setupTabsForProject(state: any, getAction: any) {
+    // Open tabs for project "proj-1"
+    getAction('openFileTab')({ path: '.deliverables/report.pdf', source: 'deliverables', sessionId: 's1', projectId: 'proj-1' });
+    getAction('openFileTab')({ path: '.worktrees/task-nb-a/.deliverables/spec.md', source: 'deliverables', sessionId: 's1', projectId: 'proj-1' });
+    getAction('openFileTab')({ path: 'src/main.ts', source: 'workspace', sessionId: 's1', projectId: 'proj-1' });
+    // Open tabs for project "proj-2"
+    getAction('openFileTab')({ path: '.deliverables/other.pdf', source: 'deliverables', sessionId: 's2', projectId: 'proj-2' });
+    // Open a tab without projectId (standalone notebook)
+    getAction('openFileTab')({ path: 'notes.md', source: 'workspace', sessionId: 's3' });
+  }
+
+  it('closes all file tabs belonging to a specific project', () => {
+    const { state, getAction } = createTestSlice();
+    setupTabsForProject(state, getAction);
+    expect(Object.keys(state.openFiles).length).toBe(5);
+
+    getAction('closeProjectFileTabs')('proj-1');
+
+    expect(Object.keys(state.openFiles).length).toBe(2);
+    // proj-2 and standalone tabs remain
+    expect(state.openFiles['deliverables::.deliverables/other.pdf']).toBeDefined();
+    expect(state.openFiles['workspace::notes.md']).toBeDefined();
+  });
+
+  it('resets activeFileTabId when the active tab is closed', () => {
+    const { state, getAction } = createTestSlice();
+    setupTabsForProject(state, getAction);
+    // Make a proj-1 tab active
+    getAction('setActiveFileTab')('deliverables::.deliverables/report.pdf');
+    expect(state.activeFileTabId).toBe('deliverables::.deliverables/report.pdf');
+
+    getAction('closeProjectFileTabs')('proj-1');
+
+    // Active tab should fallback to a remaining tab or null
+    expect(state.activeFileTabId).not.toBe('deliverables::.deliverables/report.pdf');
+  });
+
+  it('keeps activeFileTabId when the active tab belongs to a different project', () => {
+    const { state, getAction } = createTestSlice();
+    setupTabsForProject(state, getAction);
+    getAction('setActiveFileTab')('deliverables::.deliverables/other.pdf');
+
+    getAction('closeProjectFileTabs')('proj-1');
+
+    expect(state.activeFileTabId).toBe('deliverables::.deliverables/other.pdf');
+  });
+
+  it('with pathPrefix closes only tabs whose path starts with the prefix', () => {
+    const { state, getAction } = createTestSlice();
+    setupTabsForProject(state, getAction);
+    expect(Object.keys(state.openFiles).length).toBe(5);
+
+    // Close only notebook-a's worktree tabs within proj-1
+    getAction('closeProjectFileTabs')('proj-1', '.worktrees/task-nb-a/');
+
+    expect(Object.keys(state.openFiles).length).toBe(4);
+    // The worktree tab is gone
+    expect(state.openFiles['deliverables::.worktrees/task-nb-a/.deliverables/spec.md']).toBeUndefined();
+    // Other proj-1 tabs remain
+    expect(state.openFiles['deliverables::.deliverables/report.pdf']).toBeDefined();
+    expect(state.openFiles['workspace::src/main.ts']).toBeDefined();
+  });
+
+  it('no-op when projectId has no matching tabs', () => {
+    const { state, getAction } = createTestSlice();
+    setupTabsForProject(state, getAction);
+    const before = Object.keys(state.openFiles).length;
+
+    getAction('closeProjectFileTabs')('nonexistent');
+
+    expect(Object.keys(state.openFiles).length).toBe(before);
   });
 });
