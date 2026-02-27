@@ -375,6 +375,9 @@ export class SessionManager {
       },
     );
 
+    // Persist the updated metadata to disk so the model survives restarts
+    await this.autoSave(session);
+
     console.log(`[session] Model changed to "${model}" for session "${sessionId}"`);
   }
 
