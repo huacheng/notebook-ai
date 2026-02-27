@@ -5253,6 +5253,7 @@ button:focus-visible {
 .git-commit-expanded {
   display: flex;
   flex-direction: row;
+  padding-left: 10px;
 }
 
 .git-graph-continuation {
