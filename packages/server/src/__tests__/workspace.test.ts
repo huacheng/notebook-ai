@@ -61,3 +61,54 @@ describe('initWorkspaceMemory', () => {
     expect(content).toContain('# MEMORY');
   });
 });
+
+// ── titleToSlug Unicode support tests ─────────────────────────────────────
+
+describe('titleToSlug', () => {
+  it('preserves Chinese characters', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('测试1')).toBe('测试1');
+  });
+
+  it('converts Chinese with spaces to hyphenated slug', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('用户认证 v2')).toBe('用户认证-v2');
+  });
+
+  it('lowercases ASCII and strips special chars', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('My Task!')).toBe('my-task');
+  });
+
+  it('trims leading/trailing hyphens from whitespace/special chars', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('  --test--  ')).toBe('test');
+  });
+
+  it('preserves Japanese characters', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('テスト項目')).toBe('テスト項目');
+  });
+
+  it('preserves Korean characters', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('테스트')).toBe('테스트');
+  });
+
+  it('handles mixed Unicode and ASCII', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('项目Alpha-测试')).toBe('项目alpha-测试');
+  });
+
+  it('falls back to "notebook" for empty/whitespace input', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    expect(titleToSlug('   ')).toBe('notebook');
+    expect(titleToSlug('')).toBe('notebook');
+  });
+
+  it('truncates to 60 characters', async () => {
+    const { titleToSlug } = await import('../workspace.js');
+    const long = 'a'.repeat(100);
+    expect(titleToSlug(long).length).toBeLessThanOrEqual(60);
+  });
+});

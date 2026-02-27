@@ -420,6 +420,17 @@ export function setupWebSocket(
           break;
         }
 
+        case 'rerun_notebook': {
+          const { session_id } = msg;
+          try {
+            await sessionManager.rerunNotebook(session_id);
+            sendToClient(ws, { type: 'rerun_started', session_id });
+          } catch (err) {
+            sendToClient(ws, { type: 'rerun_failed', session_id, error: String(err) });
+          }
+          break;
+        }
+
         case 'load_cells': {
           const { session_id, offset, limit } = msg;
           const session = sessionManager.getSession(session_id);

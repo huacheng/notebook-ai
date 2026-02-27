@@ -6,7 +6,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
-  | 'loadNotebook' | 'exportHtml' | 'restartSession'
+  | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -194,6 +194,26 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'session_restart_failed':
           set({ restartPhase: 'error', restartError: parsed.error ?? 'Unknown error' });
           break;
+        case 'rerun_started':
+          // Rerun initiated: clear all cell outputs and reset status to pending
+          set((state) => {
+            if (!state.notebook) return {};
+            return {
+              notebook: {
+                ...state.notebook,
+                cells: state.notebook.cells.map((c: any) => ({
+                  ...c,
+                  ...(c.outputs ? { outputs: [] } : {}),
+                  status: 'pending',
+                })),
+              },
+            };
+          });
+          break;
+        case 'rerun_failed':
+          // Surface rerun error via restartPhase/restartError (shared UI)
+          set({ restartPhase: 'error', restartError: (parsed as any).error ?? 'Rerun failed' });
+          break;
         case 'error':
           if (parsed.cell_id) {
             store.setCellStatus(parsed.cell_id, 'error');
@@ -306,6 +326,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
       set({ restartPhase: 'restarting', restartError: '' });
       ws.send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
+    }
+  },
+
+  rerunNotebook() {
+    const { ws, sessionId } = get();
+    if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
+      ws.send(JSON.stringify({ type: 'rerun_notebook', session_id: sessionId }));
     }
   },
 });

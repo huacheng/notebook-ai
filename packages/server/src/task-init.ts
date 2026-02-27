@@ -16,13 +16,12 @@ export interface TaskIndexJson {
 }
 
 export async function initTaskWorkingDir(opts: {
-  nbDir: string;
+  worktreePath: string;
   nbSlug: string;
   title: string;
   branchName: string;
-  worktreePath: string;
 }): Promise<TaskIndexJson> {
-  const workingDir = path.join(opts.nbDir, '.working');
+  const workingDir = path.join(opts.worktreePath, '.working');
   const now = new Date().toISOString();
 
   const index: TaskIndexJson = {

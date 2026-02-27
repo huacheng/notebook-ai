@@ -27,14 +27,16 @@ export function ensureLibraryDir(): string {
 
 /**
  * Converts a title string into a URL-safe slug.
+ * Preserves Unicode letters (CJK, Japanese, Korean, etc.) and digits.
  */
 export function titleToSlug(title: string): string {
   return title
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
-    || 'untitled';
+    .slice(0, 60)
+    || 'notebook';
 }
 
 /**

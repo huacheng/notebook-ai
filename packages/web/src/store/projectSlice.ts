@@ -183,7 +183,10 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       },
       body: JSON.stringify({ title }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Create failed' }));
+      throw new Error(body.error || `Create failed (${res.status})`);
+    }
     const data = await res.json();
     return { sessionId: data.sessionId, notebookPath: data.notebookPath };
   },

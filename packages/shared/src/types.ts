@@ -50,6 +50,7 @@ export const CellOutputSchema = z.discriminatedUnion('type', [
 
 export const CellStatusSchema = z.enum([
   'idle',
+  'pending',
   'running',
   'completed',
   'error',
@@ -351,6 +352,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   RestartSessionSchema,
   LoadCellsSchema,
   RemoveCellsSchema,
+  z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
 ]);
 
 // Server → Client: all session-scoped messages carry session_id
@@ -501,6 +503,18 @@ export const CellsRemoveFailedSchema = z.object({
   error: z.string(),
 });
 
+// Server → Client: rerun responses
+export const RerunStartedSchema = z.object({
+  type: z.literal('rerun_started'),
+  session_id: z.string(),
+});
+
+export const RerunFailedSchema = z.object({
+  type: z.literal('rerun_failed'),
+  session_id: z.string(),
+  error: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -525,6 +539,8 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellsLoadedSchema,
   CellsRemovedSchema,
   CellsRemoveFailedSchema,
+  RerunStartedSchema,
+  RerunFailedSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───

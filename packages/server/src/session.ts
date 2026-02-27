@@ -90,8 +90,9 @@ export class SessionManager {
    *
    * @param notebookPath  Absolute path to the .notebook.json file.
    * @param cwd           Working directory for the Claude process.
+   * @param gitRoot       Root directory for GitManager (defaults to cwd).
    */
-  async createSession(notebookPath: string, cwd: string): Promise<NotebookSession> {
+  async createSession(notebookPath: string, cwd: string, gitRoot?: string): Promise<NotebookSession> {
     // Derive a short, deterministic session name from the notebook path.
     const hash = crypto
       .createHash('sha1')
@@ -104,8 +105,9 @@ export class SessionManager {
     const existing = this.sessions.get(sessionName);
     if (existing) return existing;
 
-    // Initialise (or adopt) the git repo for this working directory.
-    const gitManager = new GitManager(cwd);
+    // Initialise (or adopt) the git repo. GitManager uses gitRoot (worktree root),
+    // while AgentProcess uses cwd (e.g. .deliverables/).
+    const gitManager = new GitManager(gitRoot ?? cwd);
     await gitManager.ensureRepo();
 
     const notebook: Notebook = NotebookSchema.parse({
@@ -247,6 +249,50 @@ export class SessionManager {
     console.log(`[session] Restarted session "${sessionId}"${resumeSessionId ? ` (resumed ${resumeSessionId})` : ''}`);
   }
 
+  /**
+   * Reruns the notebook from scratch: clears all outputs, resets statuses,
+   * and rebuilds the agent process without resume (clean context).
+   */
+  async rerunNotebook(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+
+    // 1. Clear all cells' outputs and reset status to pending
+    session.notebook = {
+      ...session.notebook,
+      cells: session.notebook.cells.map((c) =>
+        'outputs' in c
+          ? { ...c, outputs: [], status: 'pending' as const }
+          : { ...c, status: 'pending' as const }
+      ),
+    };
+
+    // 2. Stop old agent process
+    session.agentProcess.stop();
+
+    // 3. Create new AgentProcess WITHOUT resumeSessionId (clean context)
+    const engine = session.agentProcess.engine;
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT);
+
+    // 4. Start new process — no resume
+    await session.agentProcess.start(
+      (raw: unknown) => this.handleJsonlMessage(session, raw),
+      (code) => {
+        const cellId = findRunningCellId(session.notebook);
+        if (cellId) {
+          console.error(
+            `[session ${sessionId}] Agent process exited (code ${String(code)}) ` +
+            `while cell "${cellId}" was running during rerun.`,
+          );
+          this.completeCell(session, cellId, true);
+        }
+      },
+      // No resumeSessionId — intentionally undefined for clean context
+    );
+
+    console.log(`[session] Rerun initiated for session "${sessionId}" (clean context)`);
+  }
+
   async closeSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
@@ -271,9 +317,10 @@ export class SessionManager {
     notebook: Notebook,
     _jsonlPath?: string | null,
     notebookDbId?: string,
+    gitRoot?: string,
   ): Promise<{ session: NotebookSession; reconnected: boolean }> {
     const existed = this.sessions.has(sessionName);
-    const session = await this.createSession(notebookPath, cwd);
+    const session = await this.createSession(notebookPath, cwd, gitRoot);
     if (!existed) {
       session.notebook = notebook;
       session.notebookDbId = notebookDbId;

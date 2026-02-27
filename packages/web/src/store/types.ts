@@ -168,4 +168,5 @@ export interface NotebookStore {
   loadNotebook(path: string): void;
   exportHtml(): void;
   restartSession(): void;
+  rerunNotebook(): void;
 }

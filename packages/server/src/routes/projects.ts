@@ -13,12 +13,9 @@ import type { NotebookStore } from '../notebook-store.js';
 import { GitManager } from '../git.js';
 import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
+import { titleToSlug } from '../workspace.js';
 
 const execFileAsync = promisify(execFile);
-
-function titleToSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'project';
-}
 
 export function createProjectsRouter(
   db: NotebookDb,
@@ -42,6 +39,12 @@ export function createProjectsRouter(
 
       const slug = titleToSlug(title);
       const projectPath = path.join(workspacesRoot, slug);
+
+      // Reject duplicate project slug
+      if (existsSync(projectPath)) {
+        return res.status(409).json({ error: `Project "${title}" already exists` });
+      }
+
       const id = randomUUID();
       const now = new Date().toISOString();
 
@@ -85,31 +88,26 @@ export function createProjectsRouter(
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
 
-      let nbSlug = titleToSlug(title);
-
-      // Avoid slug collisions by appending a short suffix
-      const { existsSync } = await import('fs');
-      let nbDir = path.join(project.path, nbSlug);
-      if (existsSync(nbDir)) {
-        nbSlug = `${nbSlug}-${randomUUID().slice(0, 6)}`;
-        nbDir = path.join(project.path, nbSlug);
-      }
-
+      const nbSlug = titleToSlug(title);
       const branchName = `task/${nbSlug}`;
       const worktreePath = path.join(project.path, '.worktrees', `task-${nbSlug}`);
+
+      // Reject duplicate notebook slug (check worktree path, not old nbDir)
+      if (existsSync(worktreePath)) {
+        return res.status(409).json({ error: `Notebook "${title}" already exists in this project` });
+      }
 
       // Create branch + worktree
       const git = new GitManager(project.path);
       await git.createBranch(branchName);
       await git.addWorktree(worktreePath, branchName);
 
-      // Create notebook directory: project/{slug}/
-      //   {slug}.notebook.json  — notebook file
-      //   .working/             — task workspace files
-      await mkdir(path.join(nbDir, '.working'), { recursive: true });
+      // Create directories inside worktree (notebook's sole home)
+      await mkdir(path.join(worktreePath, '.working'), { recursive: true });
+      await mkdir(path.join(worktreePath, '.deliverables'), { recursive: true });
 
-      // Initialize task-ai working directory files
-      await initTaskWorkingDir({ nbDir, nbSlug, title, branchName, worktreePath });
+      // Initialize task-ai working directory files (within worktree)
+      await initTaskWorkingDir({ worktreePath, nbSlug, title, branchName });
       await ensureLibrarySkeleton(workspacesRoot, project.path);
 
       const notebook = notebookStore.createNew(title, worktreePath);
@@ -117,7 +115,8 @@ export function createProjectsRouter(
       notebook.metadata.worktree_path = worktreePath;
       notebook.metadata.branch = branchName;
 
-      const notebookPath = path.join(nbDir, `${nbSlug}.notebook.json`);
+      // notebook.json lives inside worktree (git-tracked)
+      const notebookPath = path.join(worktreePath, `${nbSlug}.notebook.json`);
       await notebookStore.save(notebookPath, notebook);
 
       // Commit initial task files in the worktree (best-effort)

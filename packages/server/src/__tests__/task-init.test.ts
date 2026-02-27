@@ -18,18 +18,17 @@ afterEach(async () => {
 describe('initTaskWorkingDir', () => {
   it('creates .index.json in .working/ with correct schema', async () => {
     const { initTaskWorkingDir } = await import('../task-init.js');
-    const nbDir = path.join(tmpRoot, 'my-task');
-    await mkdir(path.join(nbDir, '.working'), { recursive: true });
+    const worktreePath = path.join(tmpRoot, '.worktrees', 'task-my-task');
+    await mkdir(path.join(worktreePath, '.working'), { recursive: true });
 
     await initTaskWorkingDir({
-      nbDir,
+      worktreePath,
       nbSlug: 'my-task',
       title: 'My Task',
       branchName: 'task/my-task',
-      worktreePath: '.worktrees/task-my-task',
     });
 
-    const indexPath = path.join(nbDir, '.working', '.index.json');
+    const indexPath = path.join(worktreePath, '.working', '.index.json');
     expect(existsSync(indexPath)).toBe(true);
 
     const data = JSON.parse(await readFile(indexPath, 'utf-8'));
@@ -46,38 +45,36 @@ describe('initTaskWorkingDir', () => {
 
   it('sets branch and worktree correctly in .index.json', async () => {
     const { initTaskWorkingDir } = await import('../task-init.js');
-    const nbDir = path.join(tmpRoot, 'my-task');
-    await mkdir(path.join(nbDir, '.working'), { recursive: true });
+    const worktreePath = path.join(tmpRoot, '.worktrees', 'task-my-task');
+    await mkdir(path.join(worktreePath, '.working'), { recursive: true });
 
     await initTaskWorkingDir({
-      nbDir,
+      worktreePath,
       nbSlug: 'my-task',
       title: 'My Task',
       branchName: 'task/my-task',
-      worktreePath: '.worktrees/task-my-task',
     });
 
     const data = JSON.parse(
-      await readFile(path.join(nbDir, '.working', '.index.json'), 'utf-8'),
+      await readFile(path.join(worktreePath, '.working', '.index.json'), 'utf-8'),
     );
     expect(data.branch).toBe('task/my-task');
-    expect(data.worktree).toBe('.worktrees/task-my-task');
+    expect(data.worktree).toBe(worktreePath);
   });
 
   it('creates .target.md with title and template structure', async () => {
     const { initTaskWorkingDir } = await import('../task-init.js');
-    const nbDir = path.join(tmpRoot, 'my-task');
-    await mkdir(path.join(nbDir, '.working'), { recursive: true });
+    const worktreePath = path.join(tmpRoot, '.worktrees', 'task-my-task');
+    await mkdir(path.join(worktreePath, '.working'), { recursive: true });
 
     await initTaskWorkingDir({
-      nbDir,
+      worktreePath,
       nbSlug: 'my-task',
       title: 'My Task',
       branchName: 'task/my-task',
-      worktreePath: '.worktrees/task-my-task',
     });
 
-    const targetPath = path.join(nbDir, '.working', '.target.md');
+    const targetPath = path.join(worktreePath, '.working', '.target.md');
     expect(existsSync(targetPath)).toBe(true);
     const content = await readFile(targetPath, 'utf-8');
     expect(content).toContain('# Task Target: My Task');
@@ -88,15 +85,14 @@ describe('initTaskWorkingDir', () => {
 
   it('returns the TaskIndexJson object', async () => {
     const { initTaskWorkingDir } = await import('../task-init.js');
-    const nbDir = path.join(tmpRoot, 'my-task');
-    await mkdir(path.join(nbDir, '.working'), { recursive: true });
+    const worktreePath = path.join(tmpRoot, '.worktrees', 'task-my-task');
+    await mkdir(path.join(worktreePath, '.working'), { recursive: true });
 
     const result = await initTaskWorkingDir({
-      nbDir,
+      worktreePath,
       nbSlug: 'my-task',
       title: 'My Task',
       branchName: 'task/my-task',
-      worktreePath: '.worktrees/task-my-task',
     });
 
     expect(result.title).toBe('My Task');

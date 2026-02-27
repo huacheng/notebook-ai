@@ -2,9 +2,11 @@ import simpleGit, { SimpleGit } from 'simple-git';
 
 export class GitManager {
   private git: SimpleGit;
+  readonly repoRoot: string;
 
   constructor(cwd: string) {
     this.git = simpleGit(cwd);
+    this.repoRoot = cwd;
   }
 
   /** Check if the cwd is a git repo */
@@ -130,6 +132,19 @@ export class GitManager {
   async commitAll(message: string): Promise<void> {
     await this.git.add('-A');
     await this.git.commit(message);
+  }
+
+  /**
+   * Selectively merge only .deliverables/ from a task branch into the current branch.
+   * Does NOT bring .working/ or *.notebook.json into main.
+   */
+  async mergeDeliverables(branch: string): Promise<void> {
+    await this.git.raw(['checkout', branch, '--', '.deliverables/']);
+    await this.git.add('.deliverables/');
+    const status = await this.git.status();
+    if (status.staged.length > 0) {
+      await this.git.commit(`task-ai: merge deliverables from ${branch}`);
+    }
   }
 
   /** List all worktrees and their checked-out branches */

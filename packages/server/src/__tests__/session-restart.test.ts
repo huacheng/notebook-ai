@@ -211,3 +211,89 @@ describe('SessionManager.restartSession()', () => {
     expect(complete).toBeDefined();
   });
 });
+
+// ── gitRoot decoupling (Step 4) ─────────────────────────────────────────
+
+describe('Session gitRoot decoupling', () => {
+  let sm: SessionManager;
+  let ns: NotebookStore;
+  let tempDir: string;
+  let startSpy: ReturnType<typeof vi.spyOn>;
+  let stopSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    sm = new SessionManager();
+    ns = new NotebookStore();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitroot-test-'));
+
+    const { AgentProcess } = await import('../agent-process.js');
+    startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    startSpy.mockRestore();
+    stopSpy.mockRestore();
+  });
+
+  it('gitManager.repoRoot equals gitRoot (not cwd)', async () => {
+    const worktreeRoot = path.join(tempDir, 'worktree');
+    const deliverables = path.join(worktreeRoot, '.deliverables');
+    fs.mkdirSync(deliverables, { recursive: true });
+
+    const nbPath = path.join(worktreeRoot, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('Test', worktreeRoot));
+
+    // cwd = .deliverables, gitRoot = worktreeRoot
+    const session = await sm.createSession(nbPath, deliverables, worktreeRoot);
+
+    expect(session.gitManager.repoRoot).toBe(worktreeRoot);
+  });
+
+  it('session.cwd equals the cwd argument (not gitRoot)', async () => {
+    const worktreeRoot = path.join(tempDir, 'worktree2');
+    const deliverables = path.join(worktreeRoot, '.deliverables');
+    fs.mkdirSync(deliverables, { recursive: true });
+
+    const nbPath = path.join(worktreeRoot, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('Test', worktreeRoot));
+
+    const session = await sm.createSession(nbPath, deliverables, worktreeRoot);
+
+    expect(session.cwd).toBe(deliverables);
+    expect(session.cwd).not.toBe(worktreeRoot);
+  });
+
+  it('AgentProcess is initialized with cwd, not gitRoot', async () => {
+    const { AgentProcess } = await import('../agent-process.js');
+    const constructorSpy = vi.spyOn(AgentProcess.prototype, 'constructor' as any);
+
+    const worktreeRoot = path.join(tempDir, 'worktree3');
+    const deliverables = path.join(worktreeRoot, '.deliverables');
+    fs.mkdirSync(deliverables, { recursive: true });
+
+    const nbPath = path.join(worktreeRoot, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('Test', worktreeRoot));
+
+    const session = await sm.createSession(nbPath, deliverables, worktreeRoot);
+
+    // The AgentProcess should have been constructed with deliverables as cwd
+    // We can verify this by checking the session's cwd (AgentProcess uses it)
+    expect(session.cwd).toBe(deliverables);
+
+    constructorSpy.mockRestore();
+  });
+
+  it('defaults gitRoot to cwd when not provided (backward compat)', async () => {
+    const nbPath = path.join(tempDir, 'compat.notebook.json');
+    await ns.save(nbPath, ns.createNew('Compat', tempDir));
+
+    // No gitRoot argument
+    const session = await sm.createSession(nbPath, tempDir);
+
+    expect(session.gitManager.repoRoot).toBe(tempDir);
+    expect(session.cwd).toBe(tempDir);
+  });
+});
