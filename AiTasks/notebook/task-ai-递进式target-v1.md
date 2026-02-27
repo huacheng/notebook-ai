@@ -90,16 +90,20 @@ step 2: Write Mode（objective 已提供）
     写入 target.md + commit
 
   ELSE (正常模式，含首次定义):
-    → [多阶段分析]
-    评估目标复杂度:
-      - 是否超出单次 plan→exec→merge 能力？
-      - 是否有自然的阶段边界？
-    IF 建议拆分:
-      向用户输出建议（如 "建议拆为 3 阶段：1.基础认证 2.OAuth 3.RBAC"）
-      用户确认/修改
-      → agent 生成多阶段 target.md + 更新 .index.json stage
+    IF status ∈ {draft, planning}:
+      → [多阶段分析]
+      评估目标复杂度:
+        - 是否超出单次 plan→exec→merge 能力？
+        - 是否有自然的阶段边界？
+      IF 建议拆分:
+        向用户输出建议（如 "建议拆为 3 阶段：1.基础认证 2.OAuth 3.RBAC"）
+        用户确认/修改
+        → agent 生成多阶段 target.md + 更新 .index.json stage
+      ELSE:
+        → agent 生成单阶段 target.md（简化格式）
     ELSE:
-      → agent 生成单阶段 target.md（简化格式）
+      → [单阶段更新模式]
+      更新当前阶段的 target 内容（不触发多阶段分析）
     写入 target.md + 更新 .index.json + commit
 
 2c. thinking-raw（不变）
@@ -152,8 +156,9 @@ planning 状态走正常更新路径，不会重复推进。
 ### 3.1 设计原则
 
 - **格式由 agent 生成**，用户不需要手写 Stage 结构
-- **用户可读** — 打开 .target.md 能一目了然看到阶段划分、当前进度、各阶段目标
+- **用户可读但不可直接编辑** — 前端展示 .target.md 为只读视图，用户通过批注（annotation）方式提交变更要求，由 `target` 子命令处理批注并重新生成文档。这消除了用户手动编辑破坏格式的风险
 - **格式是 agent 内部协议** — SKILL.md 层面定义，用户通过对话式交互
+- **`.index.json` 是唯一权威来源** — target.md 中的 `[COMPLETE]`/`[ACTIVE]`/`[PENDING]` 标记仅为可读性服务。当 target.md 标记与 .index.json 的 stage 字段不一致时，以 .index.json 为准，agent 应修复 target.md 标记
 
 ### 3.2 单阶段（total: 1）
 
@@ -283,8 +288,7 @@ else:
       {
         "stage": 1,
         "name": "基础认证",
-        "completed_at": "2026-02-25T10:00:00Z",
-        "highlight_file": ".memory/.experiences/software/auth-system-stage-1-complete.md"
+        "completed_at": "2026-02-25T10:00:00Z"
       }
     ]
   }
@@ -299,7 +303,8 @@ else:
 | `stage.completed[].stage` | integer | 阶段序号 |
 | `stage.completed[].name` | string | 阶段名称 |
 | `stage.completed[].completed_at` | string | 完成时间戳 |
-| `stage.completed[].highlight_file` | string | 该阶段的 highlight 经验文件路径 |
+
+> 不存储 `highlight_file` — 阶段经验文件始终通过图书馆查询流程（library search）检索，不依赖 .index.json 中的路径缓存。
 
 > v1 不含 `advancement` 字段（v2 ai-auto 时引入）。v1 所有多阶段 notebook 均为 manual 模式。
 
@@ -369,19 +374,24 @@ On successful merge:
 
 1. 读 .index.json 的 stage 字段
 2. IF stage.current < stage.total:
-     a. 更新 .index.json:
-        - status → "stage-done"
-        - stage.completed push { stage: current, name, completed_at, highlight_file: "" }
-        - 保留 branch 和 worktree
+     a. Write .summary.md（阶段完成摘要）
      b. 更新 target.md:
         - 当前 Stage [ACTIVE] → [COMPLETE]
         - 填写 ### Results（从 .summary.md 提取成果摘要）
-     c. Write .summary.md（阶段完成摘要）
+     c. 更新 .index.json:
+        - status → "stage-done"
+        - stage.completed push { stage: current, name, completed_at }
+        - 保留 branch 和 worktree
      d. Git commit: task-ai(<notebook>):merge stage <N> completed
    ELSE (current == total，含 total: 1):
      a. 同现有逻辑：status → "complete"
      b. Git commit: task-ai(<notebook>):merge task completed
 3. Write .auto-signal
+
+原子性说明: status 变更（步骤 c）放在 .summary.md 和 target.md 更新之后。
+如果步骤 a-b 失败，status 仍为 executing，用户可排查后重试 merge。
+如果步骤 c 成功但步骤 d commit 失败，状态已为 stage-done — auto 重新进入
+时从 stage-done 入口恢复（highlight → report），不会重复 merge。
 ```
 
 ### 6.2 .auto-signal
@@ -506,11 +516,7 @@ Output A — Experience Distillation 目标路径:
 - 仍使用 `<notebook>-complete.md`（无 stage 前缀）
 - 额外读取所有 `-stage-*-complete.md` 文件作为输入，综合生成跨阶段累积经验
 
-### 9.4 highlight_file 回写
-
-highlight(complete) 成功后，回写 `.index.json` 中 `stage.completed[current-1].highlight_file`。
-
-### 9.5 最终蒸馏
+### 9.4 最终蒸馏
 
 最后一个阶段 merge → `complete` 时，highlight(complete) 读取所有阶段的 Results + 所有 `-stage-*-complete.md`，综合生成 `<notebook>-complete.md`。
 
@@ -594,22 +600,26 @@ task-ai(auth):merge stage 1 completed
 | 状态机完整性 | ✅ `stage-done` 有退出路径（→ planning, → cancelled），无死锁 |
 | 统一模板 | ✅ total: 1 等价单阶段；缺少 stage 字段时按 total: 1 缺省 |
 | highlight 联动 | ✅ stage-done → highlight(auto-complete) + 幂等检查 + 三种 signal 均对齐 |
-| target.md 解析 | ✅ 格式由 agent 生成，降低解析鲁棒性要求；agent 读取自己写的格式 |
+| target.md 解析 | ✅ 格式由 agent 生成 + 用户不可直接编辑（只读+批注），消除格式损坏风险 |
+| merge 步骤顺序 | ✅ 先写 .summary.md → 再更新 target.md（引用最新 summary）→ 最后改 status，部分失败时 status 仍为 executing 可安全重试 |
+| 多阶段分析触发 | ✅ 限定 status ∈ {draft, planning}，避免 executing 等状态下意外改变 stage.total |
 
 ### 12.2 安全性
 
 | 审查点 | 评估 |
 |--------|------|
 | v1 manual only | ✅ 每个阶段推进都需用户介入，无自主目标生成风险 |
-| iteration 限制 | ✅ 不重置，全局 max_iterations 有效 |
+| iteration 限制 | ✅ v1 中 auto 在 stage-done 必定 (stop)，下次 auto 是新 session，iteration 天然重置。此条 v1 无需实现，留作 v2 备忘 |
 
 ### 12.3 可靠性
 
 | 审查点 | 评估 |
 |--------|------|
+| merge 部分失败 | ✅ 步骤 a-b 失败时 status 仍为 executing（可重试 merge）；步骤 c 成功但 d 失败时 status 为 stage-done（auto 从 stage-done 入口恢复） |
 | 阶段推进失败 | ✅ target 或归档失败时状态留在 stage-done，用户可手动处理后重试 |
 | highlight 失败 | ✅ auto 继续到 report，经验缺失但流程可续 |
 | 中途停止恢复 | ✅ stage-done 是持久状态，auto 重启后从 stage-done 入口恢复 |
+| 权威来源唯一 | ✅ .index.json 为唯一权威来源，target.md 标记仅为可读性。不一致时以 .index.json 为准修复 target.md |
 
 ### 12.4 性能
 
@@ -624,14 +634,16 @@ task-ai(auth):merge stage 1 completed
 |--------|------|
 | 状态机扩展 | ✅ 仅新增 `stage-done`，不膨胀 |
 | 命令改动范围 | ✅ 主要改 merge/auto/target，plan 只需读取阶段信息 |
-| highlight 解耦 | ✅ 单向依赖。highlight 通过 .index.json stage 字段感知阶段信息（文件名前缀），但不承担阶段管理逻辑 |
+| highlight 解耦 | ✅ 单向依赖。highlight 通过 .index.json stage 字段感知阶段信息（文件名前缀），不承担阶段管理逻辑，不回写 .index.json |
+| 经验检索 | ✅ 始终通过图书馆查询流程（library search）检索阶段经验，不依赖 .index.json 中的路径缓存 |
 
 ### 12.6 可维护性
 
 | 审查点 | 评估 |
 |--------|------|
-| target.md 格式 | ✅ agent 生成 + 用户可读，双重满足 |
-| stage 字段 | ✅ 嵌套在 `stage` 对象内，不污染顶层 |
+| target.md 格式 | ✅ agent 生成 + 用户只读（通过批注修改），双重满足 |
+| stage 字段 | ✅ 嵌套在 `stage` 对象内，不污染顶层；completed 条目精简（无 highlight_file） |
+| 权威来源 | ✅ .index.json 为唯一权威，消除双源歧义 |
 
 ---
 
@@ -655,14 +667,14 @@ task-ai(auth):merge stage 1 completed
 | 功能模块 | 测试用例 | 验证点 |
 |---------|---------|--------|
 | target.md 格式 | `test-target-multistage-parse` | 多阶段格式解析正确（Overall Objective / Stage N 各节）；STATUS 标记识别（COMPLETE/ACTIVE/PENDING）；简化格式（无 Stage 头）解析为 total: 1 |
-| .index.json stage | `test-index-stage-schema` | `stage` 字段始终存在（init 时创建）；结构完整（current/total/completed）；`total: 1` 时 completed 为空数组 |
+| .index.json stage | `test-index-stage-schema` | `stage` 字段始终存在（init 时创建）；结构完整（current/total/completed）；`total: 1` 时 completed 为空数组；completed 条目仅含 stage/name/completed_at（无 highlight_file） |
 | stage-done 状态 | `test-state-stage-done` | state.py 接受 `executing → stage-done` 转换；拒绝非法转换（如 `planning → stage-done`）；stage-done 为非终态（可转换到 `planning`） |
-| merge 分支逻辑 | `test-merge-stage-branch` | 有后续 stage 时 → `stage-done`（非 `complete`）；无后续 stage（final stage）→ `complete`；stage-done 时不删除分支/worktree |
+| merge 分支逻辑 | `test-merge-stage-branch` | 有后续 stage 时 → `stage-done`（非 `complete`）；无后续 stage（final stage）→ `complete`；stage-done 时不删除分支/worktree；写入顺序：.summary.md → target.md Results → .index.json status；部分失败（status 变更前）时 status 仍为 executing |
 | auto 阶段路由 | `test-auto-stage-routing` | stage-done → highlight → report → (stop)；entry point 从 stage-done 正确路由 |
 | plan 阶段感知 | `test-plan-stage-aware` | plan 读取当前 ACTIVE stage 的 Requirements/Constraints（非全局）；plan 输出引用 stage 序号 |
-| highlight 联动 | `test-highlight-stage-naming` | stage-done 触发 highlight 时：使用 auto-complete 模式；经验文件名含 `-stage-<N>-` 前缀；final stage 无前缀（保持现有命名）；highlight_file 回写到 stage.completed 对应条目 |
+| highlight 联动 | `test-highlight-stage-naming` | stage-done 触发 highlight 时：使用 auto-complete 模式；经验文件名含 `-stage-<N>-` 前缀；final stage 无前缀（保持现有命名）；经验文件可通过 library search 检索到 |
 | highlight 幂等 | `test-highlight-stage-idempotent` | 连续两次 stage-done → highlight 时，第二次因 mtime 幂等检查写 `(skipped-idempotent)` signal |
-| target 主动分析 | `test-target-proactive-staging` | 复杂目标时 agent 建议多阶段拆分；简单目标时保持单阶段 |
+| target 主动分析 | `test-target-proactive-staging` | 复杂目标时 agent 建议多阶段拆分；简单目标时保持单阶段；status ∉ {draft, planning} 时不触发多阶段分析（走单阶段更新） |
 | target stage-done 推进 | `test-target-stage-advance` | stage-done 上运行 target：Stage [PENDING] → [ACTIVE]、stage.current++、status → planning、plan 归档 |
 
 ### 13.3 回归测试（Green 保护）
@@ -675,7 +687,7 @@ task-ai(auth):merge stage 1 completed
 | total:1 缺省 | `regression-stage-missing` | 已有 notebook 缺少 `stage` 字段时，各命令按 total:1 缺省处理，不报错 |
 | auto 全流程 | `regression-auto-single` | total:1 时 merge → highlight → report 路径不变；无 stage-done 中间状态 |
 | merge 行为 | `regression-merge-single` | total:1 时 merge 直接 → complete（非 stage-done） |
-| target 编辑 | `regression-target-edit` | 简化格式 target.md 编辑、保存、conversational define 不受影响 |
+| target 编辑 | `regression-target-edit` | 简化格式 target.md 通过批注（annotation）+ target 子命令更新不受影响；conversational define 正常工作 |
 | state-matrix | `regression-state-transitions` | 现有全部状态转换路径不变（draft/planning/review/executing/complete/cancelled/blocked） |
 | highlight 无 stage | `regression-highlight-no-stage` | total:1 的 highlight(complete) 不添加 stage 前缀；经验文件命名不变；幂等检查正常工作 |
 | 多阶段集成 | `regression-multistage-flow` | 三阶段完整周期：stage 1 merge → stage-done → highlight → report → (stop) → target(stage 2) → planning → ... → stage 3 merge → complete；验证阶段边界的状态转换和文件归档 |
@@ -703,7 +715,7 @@ task-ai(auth):merge stage 1 completed
 | 4 | B1 | merge 增加 stage-done 分支逻辑 | `skills/merge/SKILL.md` | #1, #3 |
 | 5 | B1 | auto signal whitelist + routing + entry point + Phase 4 分支 | `skills/auto/SKILL.md` | #4 |
 | 6 | B1 | plan 阶段感知（读取当前 ACTIVE stage） | `skills/plan/SKILL.md` | #2 |
-| 7 | B2 | highlight 经验文件命名增加 stage 序号 + highlight_file 回写 | `skills/highlight/SKILL.md` | highlight 已实现 |
+| 7 | B2 | highlight 经验文件命名增加 stage 序号 | `skills/highlight/SKILL.md` | highlight 已实现 |
 | 8 | B3 | state-matrix 增加 stage-done 行 + merge 列修改 | `commands/references/state-matrix.md` | #3 |
 | 9 | B3 | git-details 增加阶段 commit 类型 | `commands/references/git-details.md` | — |
 | 10 | B0 | 各命令 stage 缺省处理（缺少 stage 时按 total:1） | 所有读 .index.json 的 SKILL.md | #1 |
