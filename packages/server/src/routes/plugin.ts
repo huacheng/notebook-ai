@@ -1,0 +1,180 @@
+import { Router, type IRouter } from 'express';
+import { readFile } from 'fs/promises';
+import { execFile as execFileCb } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
+import os from 'os';
+
+const execFile = promisify(execFileCb);
+
+function pluginsDir(): string {
+  return path.join(os.homedir(), '.claude', 'plugins');
+}
+
+async function readJson<T = unknown>(filePath: string): Promise<T | null> {
+  try {
+    const raw = await readFile(filePath, 'utf-8');
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function execClaude(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  const env = { ...process.env };
+  delete env['CLAUDECODE'];
+  return execFile('claude', args, { timeout: 60_000, env });
+}
+
+export function createPluginRouter(): IRouter {
+  const router = Router();
+
+  // GET /status — read three local JSON files, merge and return
+  router.get('/status', async (_req, res) => {
+    const base = pluginsDir();
+
+    // 1. Read known_marketplaces.json → marketplaces[]
+    const knownRaw = await readJson<Record<string, { source: unknown; lastUpdated?: string }>>(
+      path.join(base, 'known_marketplaces.json'),
+    );
+    const known = knownRaw ?? {};
+    const marketplaces = Object.entries(known).map(([name, val]) => ({
+      name,
+      source: val.source,
+      lastUpdated: val.lastUpdated,
+    }));
+
+    // 2. For each marketplace, read marketplace.json → extract plugins[]
+    const plugins: { name: string; marketplace: string; key: string; description?: string; version?: string; category?: string }[] = [];
+    for (const mp of marketplaces) {
+      const mpJson = await readJson<{ plugins?: { name: string; description?: string; version?: string; category?: string }[] }>(
+        path.join(base, 'marketplaces', mp.name, '.claude-plugin', 'marketplace.json'),
+      );
+      if (mpJson?.plugins) {
+        for (const p of mpJson.plugins) {
+          plugins.push({
+            name: p.name,
+            marketplace: mp.name,
+            key: `${p.name}@${mp.name}`,
+            description: p.description,
+            version: p.version,
+            category: p.category,
+          });
+        }
+      }
+    }
+
+    // 3. Read installed_plugins.json → flatten v2 format
+    const installedRaw = await readJson<Record<string, unknown>>(
+      path.join(base, 'installed_plugins.json'),
+    );
+    let installed: Record<string, { version?: string; installedAt?: string }> = {};
+    if (installedRaw) {
+      if ((installedRaw as any).version === 2 && (installedRaw as any).plugins) {
+        const v2plugins = (installedRaw as any).plugins as Record<string, { version?: string; installedAt?: string }[]>;
+        for (const [key, entries] of Object.entries(v2plugins)) {
+          if (Array.isArray(entries) && entries.length > 0) {
+            const e = entries[0];
+            installed[key] = { version: e.version, installedAt: e.installedAt };
+          }
+        }
+      } else {
+        // Legacy format: direct key → { version }
+        const { version: _v, plugins: _p, ...rest } = installedRaw as any;
+        // If it's truly legacy (no version field), use as-is
+        if (_v === undefined) {
+          installed = installedRaw as any;
+        } else {
+          installed = rest;
+        }
+      }
+    }
+
+    res.json({ marketplaces, plugins, installed });
+  });
+
+  // POST /install — install plugin via claude CLI
+  router.post('/install', async (req, res) => {
+    const pluginKey = req.body?.plugin;
+    if (!pluginKey || typeof pluginKey !== 'string') {
+      return res.status(400).json({ error: 'Missing required field: plugin' });
+    }
+    try {
+      await execClaude(['plugin', 'install', pluginKey]);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message ?? 'Install failed' });
+    }
+  });
+
+  // POST /uninstall — uninstall plugin via claude CLI
+  router.post('/uninstall', async (req, res) => {
+    const pluginKey = req.body?.plugin;
+    if (!pluginKey || typeof pluginKey !== 'string') {
+      return res.status(400).json({ error: 'Missing required field: plugin' });
+    }
+    try {
+      await execClaude(['plugin', 'uninstall', pluginKey]);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message ?? 'Uninstall failed' });
+    }
+  });
+
+  // POST /marketplace/add — add marketplace via claude CLI
+  router.post('/marketplace/add', async (req, res) => {
+    const source = req.body?.source;
+    if (!source || typeof source !== 'string') {
+      return res.status(400).json({ error: 'Missing required field: source' });
+    }
+    try {
+      await execClaude(['plugin', 'marketplace', 'add', source]);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message ?? 'Add marketplace failed' });
+    }
+  });
+
+  // POST /marketplace/update — update marketplace(s) via claude CLI
+  router.post('/marketplace/update', async (req, res) => {
+    const name = req.body?.name;
+    try {
+      const args = ['plugin', 'marketplace', 'update'];
+      if (name && typeof name === 'string') args.push(name);
+      await execClaude(args);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message ?? 'Update marketplace failed' });
+    }
+  });
+
+  // POST /marketplace/remove — remove marketplace via claude CLI
+  router.post('/marketplace/remove', async (req, res) => {
+    const name = req.body?.name;
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: 'Missing required field: name' });
+    }
+    try {
+      await execClaude(['plugin', 'marketplace', 'remove', name]);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message ?? 'Remove marketplace failed' });
+    }
+  });
+
+  // POST /update — update a single plugin via claude CLI
+  router.post('/update', async (req, res) => {
+    const pluginKey = req.body?.plugin;
+    if (!pluginKey || typeof pluginKey !== 'string') {
+      return res.status(400).json({ error: 'Missing required field: plugin' });
+    }
+    try {
+      await execClaude(['plugin', 'update', pluginKey]);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message ?? 'Update plugin failed' });
+    }
+  });
+
+  return router;
+}

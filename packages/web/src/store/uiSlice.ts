@@ -1,5 +1,24 @@
 import type { StateCreator } from 'zustand';
 import type { NotebookStore } from './types';
+import {
+  fetchPluginStatus,
+  installPlugin as apiInstallPlugin,
+  uninstallPlugin as apiUninstallPlugin,
+  addMarketplace as apiAddMarketplace,
+  removeMarketplace as apiRemoveMarketplace,
+  updateMarketplace as apiUpdateMarketplace,
+  updatePlugin as apiUpdatePlugin,
+} from '../api/plugin';
+
+function restartAllNotebooks(get: () => NotebookStore) {
+  const { ws, openNotebooks } = get();
+  if (!ws || (ws as WebSocket).readyState !== WebSocket.OPEN) return;
+  for (const [, { sessionId }] of Object.entries(openNotebooks)) {
+    if (sessionId) {
+      (ws as WebSocket).send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
+    }
+  }
+}
 
 export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'activeTab' | 'gitTabOpen' | 'sessionNotice' | 'latency' | 'creatingNotebook'
@@ -17,6 +36,9 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'setSidebarWidth' | 'setRightPanelWidth'
   | 'editMode' | 'pendingDeletes' | 'editSavePhase' | 'editSaveError'
   | 'setEditMode' | 'togglePendingDelete' | 'commitEdits'
+  | 'pluginStatus' | 'pluginLoading' | 'pluginActionKey' | 'pluginDismissed' | 'pluginPanelOpen' | 'pluginOverlay'
+  | 'checkPluginStatus' | 'installPlugin' | 'uninstallPlugin' | 'addMarketplace' | 'removeMarketplace' | 'updateMarketplace' | 'updatePlugin'
+  | 'dismissPluginBanner' | 'openPluginPanel' | 'closePluginPanel'
 >> = (set, get) => ({
   activeTab: 'notebook',
   gitTabOpen: false,
@@ -36,6 +58,12 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   pendingDeletes: new Set<string>(),
   editSavePhase: 'idle',
   editSaveError: '',
+  pluginStatus: null,
+  pluginLoading: false,
+  pluginActionKey: null,
+  pluginDismissed: false,
+  pluginPanelOpen: false,
+  pluginOverlay: null,
 
   setActiveTab(tab) {
     set({ activeTab: tab, gitTabOpen: tab === 'git', editMode: false, pendingDeletes: new Set<string>() });
@@ -175,5 +203,106 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         cell_ids: [...(pendingDeletes as Set<string>)],
       }));
     }
+  },
+
+  async checkPluginStatus() {
+    set({ pluginLoading: true });
+    try {
+      const { authToken } = get();
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginLoading: false });
+    } catch {
+      set({ pluginLoading: false });
+    }
+  },
+
+  async installPlugin(key: string) {
+    set({ pluginActionKey: key, pluginOverlay: `正在安装 ${key.split('@')[0]}…` });
+    try {
+      const { authToken } = get();
+      await apiInstallPlugin(authToken, key);
+      // Restart all open notebooks to pick up plugin changes
+      restartAllNotebooks(get);
+      // Refresh plugin status
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginActionKey: null, pluginOverlay: null });
+    } catch {
+      set({ pluginActionKey: null, pluginOverlay: null });
+    }
+  },
+
+  async uninstallPlugin(key: string) {
+    set({ pluginActionKey: key, pluginOverlay: `正在卸载 ${key.split('@')[0]}…` });
+    try {
+      const { authToken } = get();
+      await apiUninstallPlugin(authToken, key);
+      restartAllNotebooks(get);
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginActionKey: null, pluginOverlay: null });
+    } catch {
+      set({ pluginActionKey: null, pluginOverlay: null });
+    }
+  },
+
+  async addMarketplace(source: string) {
+    set({ pluginOverlay: `正在添加市场 ${source}…` });
+    try {
+      const { authToken } = get();
+      await apiAddMarketplace(authToken, source);
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginOverlay: null });
+    } catch {
+      set({ pluginOverlay: null });
+    }
+  },
+
+  async removeMarketplace(name: string) {
+    set({ pluginOverlay: `正在移除市场 ${name}…` });
+    try {
+      const { authToken } = get();
+      await apiRemoveMarketplace(authToken, name);
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginOverlay: null });
+    } catch {
+      set({ pluginOverlay: null });
+    }
+  },
+
+  async updateMarketplace(name?: string) {
+    set({ pluginOverlay: name ? `正在更新市场 ${name}…` : '正在更新所有市场…' });
+    try {
+      const { authToken } = get();
+      await apiUpdateMarketplace(authToken, name);
+      restartAllNotebooks(get);
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginOverlay: null });
+    } catch {
+      set({ pluginOverlay: null });
+    }
+  },
+
+  async updatePlugin(key: string) {
+    set({ pluginActionKey: key, pluginOverlay: `正在更新 ${key.split('@')[0]}…` });
+    try {
+      const { authToken } = get();
+      await apiUpdatePlugin(authToken, key);
+      restartAllNotebooks(get);
+      const status = await fetchPluginStatus(authToken);
+      set({ pluginStatus: status, pluginActionKey: null, pluginOverlay: null });
+    } catch {
+      set({ pluginActionKey: null, pluginOverlay: null });
+    }
+  },
+
+  dismissPluginBanner() {
+    set({ pluginDismissed: true });
+  },
+
+  openPluginPanel() {
+    set({ pluginPanelOpen: true });
+  },
+
+  closePluginPanel() {
+    set({ pluginPanelOpen: false });
   },
 });

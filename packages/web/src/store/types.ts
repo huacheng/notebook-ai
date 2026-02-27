@@ -8,6 +8,7 @@ import type {
   NotebookListItem,
 } from '@notebook-ai/shared';
 import type { ProjectListItem } from './projectSlice';
+import type { PluginStatusResponse } from '../api/plugin';
 
 /**
  * Full combined store interface.
@@ -52,6 +53,12 @@ export interface NotebookStore {
   pendingDeletes: Set<string>;
   editSavePhase: 'idle' | 'saving' | 'error';
   editSaveError: string;
+  pluginStatus: PluginStatusResponse | null;
+  pluginLoading: boolean;
+  pluginActionKey: string | null;
+  pluginDismissed: boolean;
+  pluginPanelOpen: boolean;
+  pluginOverlay: string | null;
 
   // ── Project state ─────────────────────────────────────────────────────
   projects: ProjectListItem[];
@@ -134,6 +141,16 @@ export interface NotebookStore {
   setEditMode(on: boolean): void;
   togglePendingDelete(cellId: string): void;
   commitEdits(): void;
+  checkPluginStatus(): Promise<void>;
+  installPlugin(key: string): Promise<void>;
+  uninstallPlugin(key: string): Promise<void>;
+  addMarketplace(source: string): Promise<void>;
+  removeMarketplace(name: string): Promise<void>;
+  updateMarketplace(name?: string): Promise<void>;
+  updatePlugin(key: string): Promise<void>;
+  dismissPluginBanner(): void;
+  openPluginPanel(): void;
+  closePluginPanel(): void;
 
   // ── Project actions ───────────────────────────────────────────────────
   fetchProjects(): Promise<void>;

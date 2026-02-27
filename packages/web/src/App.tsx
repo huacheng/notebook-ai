@@ -9,6 +9,7 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { NotebookCreationPanel } from './components/NotebookCreationPanel';
 import { GitHistoryPanel } from './components/GitHistoryPanel';
 import { LoginPage } from './components/LoginPage';
+import { PluginManager } from './components/PluginManager';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
@@ -105,6 +106,13 @@ function AuthenticatedApp() {
   const rightPanelOpen = useStore((s) => s.rightPanelOpen);
   const setRightPanelOpen = useStore((s) => s.setRightPanelOpen);
 
+  const pluginStatus = useStore((s) => s.pluginStatus);
+  const pluginDismissed = useStore((s) => s.pluginDismissed);
+  const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
+  const checkPluginStatus = useStore((s) => s.checkPluginStatus);
+  const openPluginPanel = useStore((s) => s.openPluginPanel);
+  const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
+
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
   const setRightPanelWidth = useStore((s) => s.setRightPanelWidth);
 
@@ -151,6 +159,11 @@ function AuthenticatedApp() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  // Check plugin status on mount
+  useEffect(() => {
+    checkPluginStatus();
+  }, [checkPluginStatus]);
 
   // Save last opened notebook ID to localStorage.
   useEffect(() => {
@@ -218,13 +231,38 @@ function AuthenticatedApp() {
           </button>
         </div>
       )}
+      {pluginStatus && !pluginDismissed && (() => {
+        const TARGET_MARKETPLACES = ['anthropic-agent-skills', 'claude-code-plugins', 'claude-plugins-official', 'moonview'];
+        const existingNames = new Set(pluginStatus.marketplaces.map(m => m.name));
+        const missing = TARGET_MARKETPLACES.filter(n => !existingNames.has(n));
+        if (missing.length === 0) return null;
+        return (
+          <div className="plugin-banner">
+            <span className="plugin-banner-text">
+              部分插件市场未添加，点击管理进行配置。
+            </span>
+            <button className="plugin-banner-install" onClick={openPluginPanel}>
+              管理插件
+            </button>
+            <button
+              className="plugin-banner-close"
+              onClick={dismissPluginBanner}
+              aria-label="关闭"
+            >
+              ×
+            </button>
+          </div>
+        );
+      })()}
       <div className={`app-body${hasActiveFile && fileViewerMaximized ? ' app-body--fv-maximized' : ''}`}>
         <ProjectSidebar />
         <div className="app-divider" onMouseDown={startLeftDrag} />
         <main ref={contentRef} className="app-content">
           <NotebookTabs />
           <div className="notebook-area">
-            {hasActiveFile ? (
+            {pluginPanelOpen ? (
+              <PluginManager />
+            ) : hasActiveFile ? (
               <FileViewer />
             ) : gitTabOpen && activeProjectId ? (
               <GitHistoryPanel projectId={activeProjectId} />

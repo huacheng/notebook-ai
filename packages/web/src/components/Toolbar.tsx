@@ -88,6 +88,23 @@ function LogoutButton() {
   );
 }
 
+// ── Plugin button ────────────────────────────────────────────────────────────
+
+function PluginButton() {
+  const openPluginPanel = useStore((s) => s.openPluginPanel);
+  const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
+
+  return (
+    <button
+      className={`toolbar-btn${pluginPanelOpen ? ' toolbar-btn--active' : ''}`}
+      onClick={openPluginPanel}
+      title="插件管理"
+    >
+      Plugins
+    </button>
+  );
+}
+
 // ── Main Toolbar ────────────────────────────────────────────────────────────
 
 export function Toolbar() {
@@ -99,6 +116,7 @@ export function Toolbar() {
       </div>
 
       <div className="toolbar-right">
+        <PluginButton />
         <ConnectionStatus />
         <LogoutButton />
       </div>
