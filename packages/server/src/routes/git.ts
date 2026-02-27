@@ -2,6 +2,7 @@ import { Router, type IRouter } from 'express';
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import type { NotebookDb } from '../db.js';
+import { unquoteGitPath } from '../git-utils.js';
 
 const execFile = promisify(execFileCb);
 const EXEC_TIMEOUT = 10000;
@@ -106,7 +107,7 @@ export function createGitRouter(db: NotebookDb): IRouter {
             files.push({
               additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
               deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
-              path: match[3],
+              path: unquoteGitPath(match[3]),
             });
           }
         }
@@ -163,7 +164,7 @@ export function createGitRouter(db: NotebookDb): IRouter {
         args.push('--', file);
       }
 
-      const { stdout } = await execFile('git', args, { cwd, timeout: EXEC_TIMEOUT });
+      const { stdout } = await execFile('git', args, { cwd, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
       res.json({ diff: stdout });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
