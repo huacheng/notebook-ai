@@ -223,7 +223,7 @@ Lifecycle skills can discover and delegate to system-installed external plugins 
 
 Sub-commands have different cognitive demands. Each SKILL.md frontmatter declares `model_tier` (heavy/medium/light) and `auto_delegatable` (true/false) to enable the auto loop to dispatch lighter sub-commands to cheaper/faster model tiers via Task subagent.
 
-> **See `commands/references/model-routing.md`** for tier definitions, the full routing table for all 16 skills, and the auto mode delegation protocol.
+> **See `commands/references/model-routing.md`** for tier definitions, the full routing table for all 18 skills, and the auto mode delegation protocol.
 
 ---
 
