@@ -14,6 +14,8 @@ function NotebookStatusBar() {
   const setActiveTab = useStore((s) => s.setActiveTab);
   const saveNotebook = useStore((s) => s.saveNotebook);
   const restartSession = useStore((s) => s.restartSession);
+  const rerunNotebook = useStore((s) => s.rerunNotebook);
+  const interruptCell = useStore((s) => s.interruptCell);
   const restartPhase = useStore((s) => s.restartPhase);
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
@@ -31,6 +33,7 @@ function NotebookStatusBar() {
   const inSlice = activeTab === 'slice';
 
   const [showCommitModal, setShowCommitModal] = useState(false);
+  const [showRerunModal, setShowRerunModal] = useState(false);
 
   function handleExport() {
     if (!sessionId) return;
@@ -83,6 +86,23 @@ function NotebookStatusBar() {
           {isRestarting ? '...' : 'Restart'}
         </button>
         <button
+          className="notebook-statusbar-btn notebook-statusbar-rerun-btn"
+          onClick={() => setShowRerunModal(true)}
+          disabled={!connected || isRunning || isRestarting || editMode}
+          title="Rerun all cells from scratch (clean context)"
+        >
+          Rerun
+        </button>
+        {isRunning && (
+          <button
+            className="notebook-statusbar-btn notebook-statusbar-esc-btn"
+            onClick={interruptCell}
+            title="Interrupt running cell (Esc)"
+          >
+            Esc
+          </button>
+        )}
+        <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}
           disabled={!connected || editMode}
@@ -118,6 +138,16 @@ function NotebookStatusBar() {
           }}
         />
       )}
+
+      {showRerunModal && (
+        <RerunConfirmModal
+          onCancel={() => setShowRerunModal(false)}
+          onConfirm={() => {
+            setShowRerunModal(false);
+            rerunNotebook();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -137,6 +167,27 @@ function EditCommitModal({ count, onCancel, onConfirm }: { count: number; onCanc
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)' }}>
           <button className="annotation-modal-btn" onClick={onCancel}>Cancel</button>
           <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Rerun confirm modal ─────────────────────────────────────────────────────
+
+function RerunConfirmModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="annotation-modal-overlay" onClick={onCancel}>
+      <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: 'var(--font-size-lg)' }}>
+          Rerun all cells?
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-xl) 0' }}>
+          This will clear all cell outputs, reset the agent session (clean context), and re-execute every cell from scratch.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)' }}>
+          <button className="annotation-modal-btn" onClick={onCancel}>Cancel</button>
+          <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>Rerun</button>
         </div>
       </div>
     </div>

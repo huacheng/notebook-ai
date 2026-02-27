@@ -171,4 +171,5 @@ export interface NotebookStore {
   exportHtml(): void;
   restartSession(): void;
   rerunNotebook(): void;
+  interruptCell(): void;
 }

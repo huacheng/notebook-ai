@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 
 export function StreamingText({ cellId }: { cellId: string }) {
@@ -23,6 +23,7 @@ export function StreamingText({ cellId }: { cellId: string }) {
 }
 
 export function StreamingThinking({ cellId }: { cellId: string }) {
+  const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLPreElement>(null);
   const lastRendered = useRef('');
 
@@ -41,11 +42,21 @@ export function StreamingThinking({ cellId }: { cellId: string }) {
   }, [cellId]);
 
   return (
-    <div className="output-thinking streaming">
-      <div className="output-thinking-header-streaming">Thinking…</div>
-      <div className="output-thinking-content">
-        <pre ref={containerRef} className="output-thinking-text" />
-      </div>
+    <div className="output-thinking">
+      <button
+        className="output-collapsible-toggle"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className="collapsible-icon">{open ? '▼' : '▶'}</span>
+        Thinking…
+        <span className="spinner" aria-hidden="true" style={{ marginLeft: 6 }} />
+      </button>
+      {open && (
+        <div className="output-thinking-content">
+          <pre ref={containerRef} className="output-thinking-text" />
+        </div>
+      )}
     </div>
   );
 }

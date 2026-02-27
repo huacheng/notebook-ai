@@ -435,6 +435,17 @@ export function setupWebSocket(
           break;
         }
 
+        case 'interrupt_cell': {
+          const { session_id } = msg;
+          try {
+            await sessionManager.interruptCell(session_id);
+            sendToClient(ws, { type: 'cell_interrupted', session_id });
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+          }
+          break;
+        }
+
         case 'load_cells': {
           const { session_id, offset, limit } = msg;
           const session = sessionManager.getSession(session_id);
