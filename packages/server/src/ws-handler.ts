@@ -77,8 +77,12 @@ export function setupWebSocket(
 
           const owner = sessionOwners.get(session_id);
           if (owner && owner !== ws) {
-            sendToClient(ws, { type: 'session_already_open', session_id });
-            break;
+            if (owner.readyState === owner.OPEN) {
+              sendToClient(ws, { type: 'session_already_open', session_id });
+              break;
+            }
+            // Old owner is closing/closed — allow takeover
+            sessionOwners.delete(session_id);
           }
 
           let session = sessionManager.getSession(session_id);
