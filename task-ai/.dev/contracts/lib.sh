@@ -132,15 +132,11 @@ find_nb_context() {
     cur=$(dirname "$cur")
   done
 
-  # 2. Branch-based discovery: check if current branch matches task/<name> or light/<name>
+  # 2. Branch-based discovery: check if current branch matches task/<name>
   local branch
   branch=$(git branch --show-current 2>/dev/null)
-  if [[ "$branch" =~ ^(task|light)/ ]]; then
-    if [[ "$branch" =~ ^task/ ]]; then
-      export NB_NOTEBOOK="${branch#task/}"
-    else
-      export NB_NOTEBOOK="${branch#light/}"
-    fi
+  if [[ "$branch" =~ ^task/ ]]; then
+    export NB_NOTEBOOK="${branch#task/}"
     # In branch mode, we might not be in the notebook directory.
     # We try to find the directory via its unique name under NB_WORKSPACES_ROOT.
     local root="${NB_WORKSPACES_ROOT:-$(pwd)}"

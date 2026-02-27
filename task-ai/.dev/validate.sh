@@ -46,7 +46,6 @@ L2_SCRIPTS=(
   read-functional.sh
   security-functional.sh
   target-functional.sh
-  light-functional.sh
   vfp-applicability.sh
   annotate-functional.sh
   signal-field-names.py

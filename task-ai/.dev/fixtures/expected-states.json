@@ -1,5 +1,5 @@
 {
-  "_meta": { "version": "1.2", "last_verified": "2026-02-26", "note": "20 transitions (light no longer has state transitions)" },
+  "_meta": { "version": "1.2", "last_verified": "2026-02-27", "note": "20 transitions (highlight has no state transitions)" },
   "states": ["draft","planning","review","executing","re-planning","complete","blocked","cancelled"],
   "terminal": ["complete", "cancelled"],
   "transitions": [
