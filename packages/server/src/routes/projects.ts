@@ -167,9 +167,12 @@ export function createProjectsRouter(
   // Top-level dotdirs that should always be hidden from project file browser
   // .deliverables is shown via the right panel, not the file browser
   const HIDDEN_TOPDIRS = new Set(['.worktrees', '.git', '.deliverables']);
+  // Dirs hidden at ALL levels (shown via dedicated UI, not the file browser)
+  const ALWAYS_HIDDEN_DIRS = new Set(['.deliverables', '.git']);
   function isVisibleEntry(name: string, isTopLevel: boolean): boolean {
     if (!name.startsWith('.')) return true;
     if (name.endsWith('.notebook.json')) return true;
+    if (ALWAYS_HIDDEN_DIRS.has(name)) return false;
     if (isTopLevel && HIDDEN_TOPDIRS.has(name)) return false;
     if (DOTFILE_HIDDEN.has(name)) return false;
     if (name.startsWith('.lock.stale.')) return false;
