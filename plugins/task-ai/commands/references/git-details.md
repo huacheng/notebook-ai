@@ -18,6 +18,7 @@ task-ai(<module>):<type> <description>
 | type | Scenario | Commit Scope |
 |------|----------|-------------|
 | `init` | Task initialization | $NB_WORKSPACES_ROOT/ directory files |
+| `target` | Objective definition; stage advance | $NB_WORKSPACES_ROOT/ directory files |
 | `plan` | Plan generation | $NB_WORKSPACES_ROOT/ directory files |
 | `check` | Check evaluation results | $NB_WORKSPACES_ROOT/ directory files |
 | `research` | Reference collection | $NB_WORKSPACES_LIBRARY/.memory/.references/ files |
@@ -28,10 +29,10 @@ task-ai(<module>):<type> <description>
 | `feat` | New feature code during exec | Project files |
 | `fix` | Bugfix code during exec | Project files |
 | `refactor` | Code cleanup before merge | Project files |
-| `merge` | Merge to main + conflict resolution | — (merge commit) |
+| `merge` | Merge to main + conflict resolution; stage completion | — (merge commit) / $NB_WORKSPACES_ROOT/ directory files |
 | `report` | Report generation | $NB_WORKSPACES_ROOT/ directory files |
 | `cancel` | Task cancellation | $NB_WORKSPACES_ROOT/ directory files |
-| `light` | Lightweight inline operation on current branch | Project files |
+| `highlight` | Experience distillation and ad-hoc capture | $NB_WORKSPACES_LIBRARY/ files |
 | `maintain` | Library maintenance (rebuild index, compact) | $NB_WORKSPACES_LIBRARY/ files |
 
 Commit scope: $NB_WORKSPACES_ROOT/ directory files (state/plan) or project files (feat/fix).
@@ -39,7 +40,7 @@ Commit scope: $NB_WORKSPACES_ROOT/ directory files (state/plan) or project files
 ## Commit Message Examples
 
 ```
-task-ai(auth-refactor):init initialize task module
+task-ai(auth-refactor):init initialize notebook
 task-ai(auth-refactor):plan generate implementation plan
 task-ai(auth-refactor):research collect references
 task-ai(auth-refactor):check post-plan PASS → review
@@ -56,7 +57,10 @@ task-ai(auth-refactor):verify full verification
 task-ai(auth-refactor):annotate annotations processed
 task-ai(auth-refactor):summarize regenerate context summary
 task-ai(auth-refactor):cancel user cancelled
-task-ai(auth-refactor):light fix typo in README
+task-ai(auth-refactor):highlight complete distillation
+task-ai(auth-refactor):highlight adhoc experience captured
+task-ai(auth-refactor):merge stage 1 completed
+task-ai(auth-refactor):target stage 2 defined
 ```
 
 ## Refactoring & Merge

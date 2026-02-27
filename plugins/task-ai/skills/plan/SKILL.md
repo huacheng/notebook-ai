@@ -26,7 +26,11 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 
 ## Execution Steps
 
-1. Read `.target.md` for requirements
+1. Read `.target.md` for requirements. **Stage awareness**: read `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing). If `stage.total > 1` (multi-stage mode):
+   - Only read the current `[ACTIVE]` stage's Objective/Requirements/Constraints from `.target.md` — plan scope is limited to the current stage
+   - Also read prior `[COMPLETE]` stages' `### Results` sections as context (already-implemented capabilities)
+   - Library context loading (steps 9-11) naturally includes prior-stage experience files distilled by highlight
+   - If `stage.total == 1`: read entire `.target.md` as before (backward compatible)
 2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/task-ai:research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
    - **First plan** (status `draft`/`planning`, no existing `.plan.md`):
      - Check if `.target.md` contains `## Research Insights` section (indicates `research --caller target` was already run)
@@ -62,7 +66,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 21. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
 22. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 23. Update `.index.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
-24. **CoT capture** (optional, encouraged): If this planning session involved complex or novel reasoning, write `.memory/.thinking/raw/<notebook>-plan-<YYYY-MM-DD>.md` with quality self-assessment. Use O_APPEND (no lock needed — filename is unique). Append one row to `.memory/.thinking/raw/.index.md` on first creation (O_APPEND). See `skills/library/SKILL.md` `.memory/.thinking/raw/` Entry Format and `library/references/quality-rubric.md` for format and H/M/L rubric
+24. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
 25. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
 26. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
 27. Report plan summary to user
@@ -81,6 +85,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 | `blocked` | `planning` | Unblocking changes |
 | `complete` | REJECT | Completed tasks cannot be re-planned |
 | `cancelled` | REJECT | Cancelled tasks cannot be re-planned |
+| `stage-done` | REJECT | Stage completed — use `target` to advance to next stage first |
 
 ## Git
 

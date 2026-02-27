@@ -28,7 +28,7 @@ Sub-commands have different cognitive demands. The `model_tier` and `auto_delega
 | **research** | heavy | true | Target deepening and methodology collection require strong analysis |
 | **summarize** | light | true | Read + condense; output to `.summary.md` is self-contained |
 | **init** | light | true | Mechanical file creation + branch setup |
-| **light** | light | true | Fast-track shadow task orchestration |
+| **highlight** | medium | true | Experience distillation — structured procedures, library writes |
 | **list** | light | true | Pure read-only query; no file writes |
 | **cancel** | light | true | Simple status update + cleanup |
 | **library** | light | true | Read-only queries (search/list/status) or mechanical maintenance; output is self-contained |

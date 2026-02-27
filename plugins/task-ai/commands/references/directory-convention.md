@@ -45,7 +45,6 @@ $NB_WORKSPACES_ROOT/                   # 环境变量: NB_WORKSPACES_ROOT
 │
 ├── project-a/                         # 项目目录
 │   ├── .index.json                    # 项目元数据（notebook 列表等）
-│   ├── .light-tasks.jsonl             # 轻量级影子任务注册表（transient）
 │   ├── .deliverables/                 # 环境变量: NB_PROJECT_DELIVERABLES — project 级交付物目录
 │   │   └── <notebook>/               # 按 notebook 隔离
 │   │       └── .report.md            # 完成报告（由 report 子命令生成）

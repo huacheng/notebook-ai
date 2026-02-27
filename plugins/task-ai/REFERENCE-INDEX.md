@@ -30,7 +30,7 @@
 | `target` | **Demand Anchor** — defines objectives and requirements in .target.md |
 | `read` | Knowledge Synthesizer — ingests local documents, deduplicates against library |
 | `security` | Runtime Guardian — audits plans and intercepts high-risk shell commands |
-| `light` | **Shadow Task** — lightweight闪击模式, no permanent directory, squash delivery |
+| `highlight` | Experience Distillation Engine — unified protocol for experience/thinking library writes |
 | `research` | Target objective deepening & lifecycle intelligence collection |
 | `plan` | Generate implementation plans from `.target.md` |
 | `verify` | Run domain-adapted tests, produce result files |

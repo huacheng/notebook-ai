@@ -1,8 +1,8 @@
 ---
-description: "Structured task lifecycle management with 18 skills for AI-driven development. Use when tasks need structured planning, domain-aware verification, and tracked execution through $NB_WORKSPACES_ROOT/ directory workflow. Sub-commands: init, target, light, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library."
+description: "Structured task lifecycle management with 18 skills for AI-driven development. Use when tasks need structured planning, domain-aware verification, and tracked execution through $NB_WORKSPACES_ROOT/ directory workflow. Sub-commands: init, target, highlight, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library."
 arguments:
   - name: subcommand
-    description: "Sub-command: init, target, light, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library"
+    description: "Sub-command: init, target, highlight, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library"
     required: true
   - name: args
     description: "Sub-command arguments (varies by sub-command)"
@@ -25,7 +25,7 @@ init → target → research(target) → plan → research(test) → verify → 
             └──────────────── research 可在任意阶段独立调用 ─────────────────────┘
 ```
 
-辅助命令（随时可用）: `light` · `read` · `security` · `auto` · `cancel` · `list` · `annotate` · `summarize` · `library`
+辅助命令（随时可用）: `highlight` · `read` · `security` · `auto` · `cancel` · `list` · `annotate` · `summarize` · `library`
 
 > **research** acts as the **intelligence officer** — the only sub-command callable at every phase independently. See [research standalone invocation examples](#research--intelligence-collection-) below.
 
@@ -93,11 +93,35 @@ Writers should keep `.summary.md` under ~200 lines. It is a context window optim
   "depends_on": [],
   "tags": [],
   "branch": "task/notebook-name",
-  "worktree": ".worktrees/task-notebook-name"
+  "worktree": ".worktrees/task-notebook-name",
+  "stage": {
+    "current": 1,
+    "total": 1,
+    "completed": []
+  }
 }
 ```
 
 Notes: `worktree` is empty string `""` if not using worktree. `depends_on` entries can be simple strings (require `complete`) or objects `{ "module": "...", "min_status": "..." }`.
+
+#### Stage Field (Progressive Target)
+
+The `stage` field tracks multi-stage target progression. Default: `{ "current": 1, "total": 1, "completed": [] }`.
+
+| Sub-field | Type | Description |
+|-----------|------|-------------|
+| `stage.current` | integer | Current stage number (1-based) |
+| `stage.total` | integer | `1` = single stage, `>1` = multi-stage |
+| `stage.completed` | array | Records of completed stages |
+| `stage.completed[].stage` | integer | Stage number |
+| `stage.completed[].name` | string | Stage name |
+| `stage.completed[].completed_at` | string | ISO 8601 completion timestamp |
+
+**Validation Rules**: `stage.current >= 1`, `stage.total >= 1`, `stage.current <= stage.total + 1` (current may temporarily equal total + 1 during stage advance before total is incremented). If any rule is violated, treat as corrupted — log warning and fall back to `{ "current": 1, "total": 1, "completed": [] }`.
+
+**Default handling**: If `.index.json` lacks the `stage` field (pre-v1 notebooks), all commands MUST treat it as `{ "current": 1, "total": 1, "completed": [] }`. No migration needed — single-stage behavior is identical to pre-v1.
+
+**Retry-safe Design**: Stage advance operations (target step 2a) are designed to be retry-safe (non-atomic by intent). Archive/clear steps (4-5) execute before the status change (step 6). If archive/clear fails, status remains `stage-done` and re-running target retries safely. If status change succeeds but git commit fails, status is already `planning` — re-running target detects `planning` and routes to the normal update path. No manual rollback needed.
 
 #### Type Field
 
@@ -124,8 +148,9 @@ Writers: `check` sets `phase: needs-plan` on REPLAN and on NEEDS_REVISION when s
 | `draft` | Task target being defined | `planning`, `cancelled` |
 | `planning` | Plan being researched | `review`, `blocked`, `cancelled` |
 | `review` | Plan passed assessment | `executing`, `re-planning`, `cancelled` |
-| `executing` | Implementation in progress | `complete`, `re-planning`, `blocked`, `cancelled` |
+| `executing` | Implementation in progress | `complete`, `stage-done`, `re-planning`, `blocked`, `cancelled` |
 | `re-planning` | Plan being revised | `review`, `blocked`, `cancelled` |
+| `stage-done` | Current stage complete, awaiting next stage | `planning`, `cancelled` |
 | `complete` | Finished and verified | — (terminal) |
 | `blocked` | Blocked by dependency/issue | `planning`, `cancelled` |
 | `cancelled` | Abandoned (via `cancel`) | — (terminal) |
@@ -223,7 +248,7 @@ Lifecycle skills can discover and delegate to system-installed external plugins 
 
 Sub-commands have different cognitive demands. Each SKILL.md frontmatter declares `model_tier` (heavy/medium/light) and `auto_delegatable` (true/false) to enable the auto loop to dispatch lighter sub-commands to cheaper/faster model tiers via Task subagent.
 
-> **See `commands/references/model-routing.md`** for tier definitions, the full routing table for all 16 skills, and the auto mode delegation protocol.
+> **See `commands/references/model-routing.md`** for tier definitions, the full routing table for all 18 skills, and the auto mode delegation protocol.
 
 ---
 
@@ -255,7 +280,7 @@ Sub-commands have different cognitive demands. Each SKILL.md frontmatter declare
 
 | 命令 | 说明 |
 |------|------|
-| `light` | 当前分支轻量操作（人工干预、单次 commit） |
+| `highlight` | 经验蒸馏引擎（综合蒸馏、对话经验捕获） |
 | `cancel` | 取消任务 |
 | `list` | 查询任务状态与依赖 |
 | `annotate` | 处理 Plan 面板批注 |
@@ -324,4 +349,4 @@ Per-type seed methodology files are centralized in `skills/init/references/seed-
 
 **references/** contains large reference tables and domain-specific details that are only needed in specific situations. The main SKILL.md references these files with `See references/<file>.md` directives — the agent reads them on demand when the context requires it.
 
-18 sub-commands: `init`, `target`, `light`, `plan`, `research`, `read`, `security`, `check`, `verify`, `exec`, `merge`, `report`, `auto`, `cancel`, `list`, `annotate`, `summarize`, `library`. Each skill's SKILL.md frontmatter contains the authoritative description, arguments, model tier, and delegation flag. Read `skills/<name>/SKILL.md` for full details.
+18 sub-commands: `init`, `target`, `highlight`, `plan`, `research`, `read`, `security`, `check`, `verify`, `exec`, `merge`, `report`, `auto`, `cancel`, `list`, `annotate`, `summarize`, `library`. Each skill's SKILL.md frontmatter contains the authoritative description, arguments, model tier, and delegation flag. Read `skills/<name>/SKILL.md` for full details.

@@ -165,8 +165,9 @@ Callable independently for preparatory research before any phase, or to suppleme
     ```
 17. **Flush** any pending plugin registry updates to `$NB_WORKSPACES_LIBRARY/.plugin-registry.md` (accumulated during step 15 doc-parse delegation — see `auto/references/plugin-delegation.md` Re-entrancy rule). This happens while still holding `.memory/.references/.lock`, avoiding a second lock acquisition
 18. **Release** `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock`
-19. **Git commit**: `task-ai(<notebook>):research collect references` (skip if no files written; include `.type-profile.md` and `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` if updated)
-20. **Write** `.auto-signal`: `{ "step": "research", "result": "(collected)" or "(sufficient)", "next": "<caller>", "checkpoint": "post-research", "timestamp": "..." }` — `next` field routes back to the calling phase (default: `plan`; if `--caller verify` → `verify`; if `--caller check` → `check`; if `--caller exec` → `exec`)
+19. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture technology selection and feasibility reasoning from research process. Inline call failure MUST NOT block research's main flow
+20. **Git commit**: `task-ai(<notebook>):research collect references` (skip if no files written; include `.type-profile.md` and `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` if updated)
+21. **Write** `.auto-signal`: `{ "step": "research", "result": "(collected)" or "(sufficient)", "next": "<caller>", "checkpoint": "post-research", "timestamp": "..." }` — `next` field routes back to the calling phase (default: `plan`; if `--caller verify` → `verify`; if `--caller check` → `check`; if `--caller exec` → `exec`)
 
 ## --caller target: Target Deepening Steps
 

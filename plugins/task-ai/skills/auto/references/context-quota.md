@@ -2,9 +2,9 @@
 
 ## Context Window Management
 
-The auto loop runs in a single long-lived the agent session. As the conversation accumulates, context window usage grows. Proactive compaction prevents context overflow:
+The auto loop runs in a single long-lived the agent session. As the conversation accumulates, context window usage grows. Proactive structured compaction prevents context overflow:
 
-1. **Threshold**: Before each iteration (loop step 2b), the agent checks context window usage. At **>= 70%** usage, proactively run prompt "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working." to compress context
+1. **Threshold**: Before each iteration (loop step 3.2), the agent checks context window usage. At **≥ 70%** usage, construct and send the **Structured Compaction Prompt** (see template in main SKILL.md "Context Window Management" section). The template preserves task identity, plan progress, execution state, key decisions, error context, and recovery file pointers in a structured format
 2. **Safety net**: Each sub-command writes `.summary.md` and directory-level `.summary.md` files, providing condensed recovery context after compaction
 3. **Post-compaction recovery**: After compaction, the agent re-reads `.auto-signal` (iteration + step position), `.index.json` (status), and `.summary.md` (task context) to resume the loop. See "Compaction recovery" in Context Advantage section of main SKILL.md
 

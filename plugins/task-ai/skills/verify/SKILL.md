@@ -57,7 +57,8 @@ Run domain-adapted tests and verification procedures for a task module, producin
     - Coverage: X% (if coverage tooling is available, otherwise "N/A")
     - VFP compliance: (K / total_steps)% of steps followed VH→HS discipline
     ```
-12. **Write** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<notebook>-verify.md` with test outcomes, domain verification patterns, and threshold findings — `quality_status: provisional`. For `software` types, include VFP patterns learned: which testing frameworks worked well, VH stub generation techniques, common reasons for VH→HS failures, refactoring patterns applied. Follow six-step Library Write Protocol (see `skills/library/SKILL.md`): acquire `.memory/.experiences/.lock` → O_APPEND with `---` separator (create file if not exists) → append `experience` changelog line → update `.memory/.experiences/<type>/.index.md` row → release lock. Skip if `--checkpoint quick` (insufficient evidence for experience)
+12. If checkpoint != quick: execute highlight protocol scope=verify — see `highlight/SKILL.md` §3.2. Extract verification experience (type-adaptive, not limited to software) from current context, write to library. Inline call failure MUST NOT block verify's main flow. Skip if `--checkpoint quick` (insufficient evidence for experience)
+    - Also execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture verification strategy selection and result analysis reasoning. Inline call failure MUST NOT block verify's main flow
 13. **Update** `.test/.summary.md` — overwrite with condensed summary of ALL criteria & results files in `.test/`
 14. **Git commit**: `task-ai(<notebook>):verify <checkpoint> verification`
 15. **Write** `.auto-signal`: `{ "step": "verify", "result": "(pass|fail|partial)", "next": "check", "checkpoint": "<checkpoint>", "timestamp": "..." }`

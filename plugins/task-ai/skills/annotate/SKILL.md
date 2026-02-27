@@ -55,9 +55,10 @@ Process `.tmp-annotations.json` from the Plan panel. Supports 4 annotation types
     - Update `updated` timestamp
 12. **Write** `.summary.md` with condensed context reflecting annotation changes
 13. **Clean up** the `.tmp-annotations.json` file (delete after processing)
-14. **Git commit**: `task-ai(<notebook>):annotate annotations processed`
-15. **Write** `.auto-signal`: `{ "step": "annotate", "result": "(processed)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
-16. **Generate** execution report (print to screen or append to file per mode)
+14. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value). Capture cross-impact assessment reasoning during annotation processing. Inline call failure MUST NOT block annotate's main flow
+15. **Git commit**: `task-ai(<notebook>):annotate annotations processed`
+16. **Write** `.auto-signal`: `{ "step": "annotate", "result": "(processed)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
+17. **Generate** execution report (print to screen or append to file per mode)
 
 ## State Transitions
 
@@ -71,6 +72,7 @@ Process `.tmp-annotations.json` from the Plan panel. Supports 4 annotation types
 | `blocked` | `planning` | Unblocking changes |
 | `complete` | REJECT | Completed tasks cannot be modified |
 | `cancelled` | REJECT | Cancelled tasks cannot be modified |
+| `stage-done` | REJECT | Stage completed — use `target` to advance to next stage first |
 
 ## Git
 

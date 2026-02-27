@@ -5,8 +5,9 @@
     "(generated)","(done)","(mid-exec)","(step-N)","(blocked)","(hil-pending)",
     "(collected)","(sufficient)","(o1-collected)","(o2-collected)","(o3-collected)","(objective-complete)",
     "(pass)","(fail)","(partial)","(processed)",
-    "success","conflict","rejected"
+    "success","conflict","rejected","stage-done",
+    "(distilled)","(skipped-idempotent)","failed"
   ],
-  "next_whitelist": ["plan","check","exec","merge","report","research","verify","annotate","(stop)"],
+  "next_whitelist": ["plan","check","exec","merge","report","research","verify","annotate","highlight","(stop)"],
   "checkpoint_whitelist": ["","post-plan","post-research","post-o1","post-o2","post-o3","mid-exec","post-exec","quick","full","step-N","regression","dependency-blocked","no-accept"]
 }

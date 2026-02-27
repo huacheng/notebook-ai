@@ -40,7 +40,7 @@ if [[ -d "$TARGET_DIR" ]]; then
     exit 1
 fi
 
-if git branch --list "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+if git branch --list "$BRANCH_NAME" | grep -qF "$BRANCH_NAME"; then
     echo "[ERROR] Git branch already exists: $BRANCH_NAME" >&2
     exit 1
 fi
@@ -60,7 +60,8 @@ fi
 mkdir -p "$WORKING_DIR"
 
 # 5. Metadata Creation (.index.json)
-# Escape TITLE for safe JSON embedding (handle backslashes then double quotes)
+# Sanitize TITLE: strip all control characters and ANSI escape residue, then escape for JSON
+TITLE=$(printf '%s' "$TITLE" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr -d '[:cntrl:]')
 SAFE_TITLE="${TITLE//\\/\\\\}"
 SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
 cat > "$WORKING_DIR/.index.json" <<EOF
@@ -75,7 +76,12 @@ cat > "$WORKING_DIR/.index.json" <<EOF
   "depends_on": [],
   "tags": $TAGS,
   "branch": "$BRANCH_NAME",
-  "worktree": "$( [[ $USE_WORKTREE -eq 1 ]] && echo "$WORKTREE_PATH" || echo "" )"
+  "worktree": "$( [[ $USE_WORKTREE -eq 1 ]] && echo "$WORKTREE_PATH" || echo "" )",
+  "stage": {
+    "current": 1,
+    "total": 1,
+    "completed": []
+  }
 }
 EOF
 

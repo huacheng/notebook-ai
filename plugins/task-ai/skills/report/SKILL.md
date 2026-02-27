@@ -25,7 +25,7 @@ Generate a structured completion report for a task module, documenting what was 
 
 ## Prerequisites
 
-- Task module should have status `complete` (post-exec assessment passed)
+- Task module should have status `complete` or `stage-done` (post-exec assessment passed)
 - Can also be run on `blocked` or `cancelled` tasks for documentation purposes
 - **Minimum content**: If status is `draft` and `.plan.md` does not exist, report outputs a brief notice ("No meaningful content to report — task is still in draft with no plan") instead of generating an empty report structure
 
@@ -91,21 +91,10 @@ The report is written to `[deliverables-dir]/.report.md` (the notebook's deliver
 10. **Collect** git changes related to the task (if identifiable)
 11. **Compose** report in requested format
 12. **Write** to `.report.md`
-13. **Distill experience**: If task status is `complete` and `type` is non-empty, follow the **Library Write Protocol** (`library/SKILL.md`). Validate each pipe-separated segment matches `[a-zA-Z0-9_:-]+`. **Directory-safe transform**: replace `:` with `-` in segment when used as directory name. Extract key learnings for **each** segment (type `data-pipeline|ml` → write to both directories). Steps:
-    - (a) `mkdir -p $NB_WORKSPACES_LIBRARY/.memory/.experiences/<segment>/`
-    - (b) Acquire `$NB_WORKSPACES_LIBRARY/.memory/.experiences/.lock`
-    - (c) Write `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<segment>/<notebook>-complete.md` (overwrite; `.tmp → rename`): what worked, what didn't, key decisions, tools/patterns discovered; frontmatter includes `quality_status: verified`, `completeness: complete`
-    - (d) Acquire `.changelog.lock` → append one line per segment written: `<timestamp> | experience | .memory/.experiences/<segment>/<notebook>-complete.md | quality_status:verified` → release `.changelog.lock`
-    - (e) Update `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<segment>/.index.md` (overwrite matching row or append new row for this notebook)
-    - (f) Overwrite `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<segment>/.summary.md` (distilled patterns + entry index table)
-    - (g) Overwrite top-level `$NB_WORKSPACES_LIBRARY/.memory/.experiences/.summary.md` (all type directories index)
-    - (h) Release `$NB_WORKSPACES_LIBRARY/.memory/.experiences/.lock`
-14. **Distill thinking patterns**: Read `.memory/.thinking/raw/<notebook>-*.md` files (glob); filter to entries with `quality.thinking: H`. For each identified reasoning pattern: acquire `$NB_WORKSPACES_LIBRARY/.memory/.thinking/patterns/.lock` → write/update `.memory/.thinking/patterns/<problem-type>.md` (overwrite; `.tmp → rename`) → append changelog line (`<timestamp> | pattern | .memory/.thinking/patterns/<problem-type>.md | source:<notebook>`) → update `.memory/.thinking/patterns/.index.md` (state: `draft` if new, `active` if already used) → release lock. **Batch update** `failure_count`: scan this task's git history for REPLAN commits (`git log --grep="REPLAN"`); for each REPLAN, if `.plan.md` at that commit referenced a pattern, increment that pattern's `failure_count` in its frontmatter (overwrite with `.tmp → rename`).
-15. **Sync shared type profile**: If `.type-profile.md` exists, merge refined profile back to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` for ALL types. Apply directory-safe transform. Acquire `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/.lock` before writing. If shared profile already exists, update sections with higher-confidence info (check refinement log dates); append task's refinement log entries. Append changelog line: `<timestamp> | type-profile | .memory/.type-profiles/<type>.md | source:<notebook>`. Update `.memory/.type-profiles/.index.md`. Release lock after write.
-16. **Git commit**: `task-ai(<notebook>):report generate completion report`
-17. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
-18. **Lightweight maintain**: Call `library maintain --compact` (compact-threshold check only — no I/O unless `.changelog` exceeds 2000-line threshold). This runs **after** `.auto-signal` is written so the automation loop advances first.
-19. **Print** report to screen
+13. *(Steps 13-15 moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. Report no longer performs library distillation writes. For manual workflows: run `/task-ai:highlight <notebook>` before `/task-ai:report <notebook>` if distillation is needed.)*
+14. **Git commit**: `task-ai(<notebook>):report generate completion report`
+15. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
+16. **Print** report to screen
 
 **Note**: Report is a terminal step — it reads ALL history files (not just latest) to produce a comprehensive record. `.summary.md` is used as an overview, not a replacement for full history in report context.
 
@@ -113,9 +102,15 @@ The report is written to `[deliverables-dir]/.report.md` (the notebook's deliver
 
 | Current Status | After Report | Condition |
 |----------------|--------------|-----------|
-| `complete` | `complete` | Always |
-| `blocked` | `blocked` | Always |
-| `cancelled` | `cancelled` | Always |
+| `draft` | `draft` | Minimal output (see Prerequisites) |
+| `planning` | `planning` | Progress snapshot |
+| `review` | `review` | Progress snapshot |
+| `executing` | `executing` | Progress snapshot |
+| `re-planning` | `re-planning` | Progress snapshot |
+| `complete` | `complete` | Full completion report |
+| `blocked` | `blocked` | Document blocked state |
+| `cancelled` | `cancelled` | Document cancellation |
+| `stage-done` | `stage-done` | Interim report for completed stage |
 
 ## Git
 

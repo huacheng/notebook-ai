@@ -15,7 +15,7 @@ arguments:
 
 # /task-ai:auto — Autonomous Execution Loop
 
-Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction on failures. Runs as a **single the agent session** that internally dispatches sub-commands, preserving context across all steps.
+Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → highlight → report, with self-correction on failures. Runs as a **single the agent session** that internally dispatches sub-commands, preserving context across all steps.
 
 ## Usage
 
@@ -117,9 +117,9 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
-| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `report`, `research`, `verify`, `annotate` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `success`, `conflict`, `rejected` |
-| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `report`, `research`, `verify`, `annotate`, `(stop)` |
+| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate` |
+| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `stage-done`, `conflict`, `rejected` |
+| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `(stop)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
 | `compaction_count` | Integer | ≥ 0 |
@@ -136,7 +136,34 @@ the agent may stall mid-execution. The daemon detects stalls via heartbeat polli
 
 ### Context Window Management & Quota Handling
 
-Proactive context compaction (prompt: "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working.") at >= 70% context usage prevents overflow. `.summary.md` files provide compaction recovery context. Quota exhaustion is NOT a stall — daemon enters quota-wait mode with timeout clock paused.
+Proactive **structured compaction** at ≥ 70% context usage prevents overflow. Instead of a generic "please summarize" prompt, the agent constructs a structured compaction prompt using the template below. `.summary.md` files provide additional compaction recovery context.
+
+#### Structured Compaction Prompt Template
+
+When context ≥ 70%, the agent fills in this template and sends it as a single message:
+
+```
+Summarize and compress our conversation context for continuation. Task identity and loop position will be recovered from files — preserve ONLY the following conversation-exclusive context:
+
+## Plan Progress
+- Completed this iteration: {list of sub-commands completed in current iteration, in order}
+- Remaining: {list of upcoming sub-commands per routing table}
+
+## Execution State
+- Files modified: {key files touched in this iteration}
+- Test status: {last known pass/fail/pending}
+- Blockers: {any active blockers or "none"}
+
+## Key Decisions
+{2-5 bullet points: architectural choices, trade-offs made, rejection rationale — the "why" behind actions taken. This is the highest-value section}
+
+## Error Context
+{Active NEEDS_FIX/NEEDS_REVISION feedback, or "none". Include the specific fix guidance if present}
+
+Discard all other conversation detail. Task identity, iteration count, and file paths are recovered from .auto-signal / .index.json / .summary.md during the recovery protocol.
+```
+
+The agent fills `{...}` placeholders from live conversation context before sending. Fields with no applicable value use `"none"` (not blank).
 
 **Compaction frequency limit**: If 3 or more compactions occur within the same iteration (indicating the task generates more context per sub-command than compaction can reclaim), the auto loop should stop with a warning: "context budget insufficient for this task — consider breaking into smaller sub-tasks or increasing context window". the agent tracks compaction count in memory and persists it to `.auto-signal` via the `compaction_count` field (step 2e). On compaction recovery, the count is restored from the signal file (see Compaction recovery below). The daemon can also monitor `compaction_count` in the signal for observability.
 
@@ -170,8 +197,16 @@ Phase 3: Post-Exec Verification
                     │
                     └──→ exec (re-exec) → [Phase 3]
 
-Phase 4: Merge & Report
-  merge ─── success ──→ report → (stop)
+Phase 4: Merge, Distillation & Report
+  merge ─── success (current==total) ──→ highlight(complete) ──→ report → (stop)
+    │          │
+    │      stage-done (current<total) ──→ highlight(complete) ──→ report → (stop)
+    │          │                          Output: "Stage <N> completed.
+    │          │                          Define next stage target, then run /task-ai:auto"
+    │          │
+    │          ├── (distilled) ──→ report
+    │          ├── (skipped-idempotent) ──→ report
+    │          └── failed ──→ report (non-blocking)
     │
     └── conflict unresolvable (after 3 retries, stays executing) → (stop)
 
@@ -187,7 +222,7 @@ The auto skill runs this loop within a single the agent session:
 2. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status against its required level (simple string → `complete`, extended `{ module, min_status }` entries require at-or-past `min_status`). If any dependency is not met, write `.auto-signal` with `result: "blocked"` and exit. This mirrors the dependency gate in exec/merge
 3. LOOP:
    3.1. Check for .auto-stop file → if exists, break loop
-   3.2. Context check: if context window usage ≥ 70%, run prompt "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working." to compress context
+   3.2. Context check: if context window usage ≥ 70%, construct and send the **Structured Compaction Prompt** (see template in "Context Window Management" section above). Fill all `{...}` placeholders from live context + last `.auto-signal` before sending. Increment `compaction_count`
    3.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - **If `auto_delegatable: true`**: Invoke via Task subagent with `model = tier_to_model(model_tier)` (heavy→opus, medium→sonnet, light→haiku). Subagent receives SKILL.md + `.summary.md` + `.index.json` + input files. On subagent completion, read output files (`.auto-signal`, `.summary.md`, result files) to restore context. On subagent failure/timeout → fallback to inline execution below
       - **If `auto_delegatable: false`**: Execute inline (Read SKILL.md steps, execute in main session)
@@ -214,6 +249,7 @@ The auto skill runs this loop within a single the agent session:
 | `review` | Execute exec |
 | `executing` | Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX, adding one extra iteration. This avoids re-parsing `.plan.md` to count total steps at entry |
 | `re-planning` | Read `phase` field: if `needs-plan` → execute plan (generate); if `needs-check` → execute verify → check (post-plan); if empty → default to plan (generate, safe fallback) |
+| `stage-done` | Execute highlight(complete) → report → stop. Output stage completion message with next-stage instructions. *(FUTURE v2 TODO: auto-advance — auto would read next stage target and continue loop without user intervention; not yet implemented)* |
 | `complete` | Execute report, then stop |
 | `blocked` | Stop loop, report blocking reason |
 | `cancelled` | Stop loop |
@@ -236,9 +272,13 @@ After each step, the agent evaluates the result and determines the next step int
 | exec | (mid-exec) | verify | mid-exec | Significant issue encountered, run verification before checkpoint |
 | exec | (step-N) | verify | mid-exec | Single step completed (manual `--step N` only) |
 | exec | (blocked) | (stop) | — | Cannot continue |
-| merge | success | report | — | Merge complete, generate report |
+| merge | success | highlight | — | Merge complete (final/single stage), distill experience before report |
+| merge | stage-done | highlight | — | Stage complete (intermediate), distill stage experience before report |
 | merge | conflict | (stop) | — | Merge conflict unresolvable |
 | merge | rejected | (stop) | dependency-blocked / no-accept | Prerequisite not met (dependency or missing ACCEPT verdict) |
+| highlight | (distilled) | report | — | Distillation complete, generate report |
+| highlight | (skipped-idempotent) | report | — | No new content, skip to report |
+| highlight | failed | report | — | Distillation failed, continue to report (non-blocking) |
 | research | (collected) | `<caller>` (plan/verify/check/exec) | post-research | References collected, resume calling phase |
 | research | (sufficient) | `<caller>` (plan/verify/check/exec) | post-research | References sufficient, resume calling phase |
 | research | (o1-collected) | (stop) | post-o1 | O1 background research done, wait for user confirmation |
@@ -285,7 +325,7 @@ When `type` contains `software`, the auto loop tracks VH→HS cycle progress dur
 - **Max iterations**: user-configurable (default 20), daemon writes `.auto-stop` when reached
 - **Timeout**: user-configurable (default 30 min), daemon writes `.auto-stop` when elapsed
 - **Stall detection**: heartbeat polling (60s) + pattern matching recovery, with per-iteration (3) and total (10) recovery limits
-- **Context management**: proactive context compaction (prompt: "Please summarize and compress our current conversation context, retaining key states and unfinished tasks, so that we can clear the context window and continue working.") at ≥ 70% context window usage, with `.summary.md` as compaction safety net
+- **Context management**: proactive structured compaction (see template in "Context Window Management" section) at ≥ 70% context window usage, with `.summary.md` as compaction safety net
 - **Quota exhaustion**: detected and handled as wait (not stall), timeout clock paused during quota-wait
 - **Pause on blocked**: Auto stops immediately on `blocked` status (the agent's internal loop exits)
 - **Manual override**: User can `/task-ai:auto --stop` at any time, or daemon writes `.auto-stop` via `DELETE` API
@@ -312,4 +352,4 @@ Auto mode inherits git behavior from each sub-command it invokes. No additional 
 - The daemon logs all signal events and stall detections to server console for debugging
 - **Known trade-off**: First entry on `executing` status always runs `check --checkpoint post-exec`. If execution was incomplete (`completed_steps` < total), check will detect this and route back to exec via NEEDS_FIX, adding one extra iteration. This is acceptable because the auto skill does not re-parse `.plan.md` to count total steps at entry
 - **Context window overflow**: If the agent's context compacts during a long auto run, `.summary.md` (written by each sub-command) provides recovery context. The auto loop continues normally after compaction — each sub-command re-reads relevant files as specified in its SKILL.md
-- **Plugin delegation in auto mode**: External plugin delegation (see `auto/references/plugin-delegation.md`) works naturally in auto mode. Each skill's delegation steps invoke plugins via the Task tool, creating isolated subagents that prevent external plugin output from inflating the auto session context. Trust context compaction prompts to handle context pressure; all delegation slots are always attempted when their trigger conditions are met
+- **Plugin delegation in auto mode**: External plugin delegation (see `auto/references/plugin-delegation.md`) works naturally in auto mode. Each skill's delegation steps invoke plugins via the Task tool, creating isolated subagents that prevent external plugin output from inflating the auto session context. Trust structured compaction to handle context pressure; all delegation slots are always attempted when their trigger conditions are met

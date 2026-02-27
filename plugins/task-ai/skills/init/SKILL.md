@@ -67,7 +67,12 @@ The `.index.json` file uses JSON as the single source of truth for task state:
   "depends_on": [],
   "tags": [],
   "branch": "task/notebook-name",
-  "worktree": ".worktrees/task-notebook-name"
+  "worktree": ".worktrees/task-notebook-name",
+  "stage": {
+    "current": 1,
+    "total": 1,
+    "completed": []
+  }
 }
 ```
 
@@ -80,6 +85,7 @@ The `.index.json` file uses JSON as the single source of truth for task state:
 | `review` | Plan complete, awaiting feasibility evaluation |
 | `executing` | Implementation in progress |
 | `re-planning` | Execution hit issues, plan being revised |
+| `stage-done` | Current stage complete, awaiting next stage definition (multi-stage only) |
 | `complete` | Task finished and verified |
 | `blocked` | Blocked by dependency or unresolved issue |
 | `cancelled` | Task abandoned |
@@ -135,6 +141,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
    - `tags`: parsed from `--tags` argument or `[]`
    - `branch`: `task/<notebook_name>`
    - `worktree`: `.worktrees/task-<notebook_name>` (or empty if no worktree)
+   - `stage`: `{ "current": 1, "total": 1, "completed": [] }` (progressive target default)
 12. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.working/.target.md` with default template (type is auto-discovered by `research` during planning):
     ```markdown
     # Task Target: <title>
