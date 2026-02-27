@@ -7,6 +7,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
+  | 'interruptCell'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -103,7 +104,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         case 'execution_complete':
           store.flushStreamBuffer(parsed.cell_id);
-          store.setCellStatus(parsed.cell_id, 'completed');
+          store.setCellStatus(parsed.cell_id, (parsed as any).status ?? 'completed');
           break;
         case 'git_diff':
           store.setCellGitDiff(parsed.cell_id, parsed.diff);
@@ -213,6 +214,9 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'rerun_failed':
           // Surface rerun error via restartPhase/restartError (shared UI)
           set({ restartPhase: 'error', restartError: (parsed as any).error ?? 'Rerun failed' });
+          break;
+        case 'cell_interrupted':
+          // No-op: the actual cell completion comes via execution_complete
           break;
         case 'error':
           if (parsed.cell_id) {
@@ -333,6 +337,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, sessionId } = get();
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
       ws.send(JSON.stringify({ type: 'rerun_notebook', session_id: sessionId }));
+    }
+  },
+
+  interruptCell() {
+    const { ws, sessionId } = get();
+    if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
+      ws.send(JSON.stringify({ type: 'interrupt_cell', session_id: sessionId }));
     }
   },
 });

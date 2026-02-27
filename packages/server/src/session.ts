@@ -76,6 +76,8 @@ interface NotebookSession {
   claudeSessionId?: string;
   /** Queue of pending cell IDs to execute during a rerun. */
   _rerunQueue?: string[];
+  /** Set by interruptCell() so completeCell() knows to use 'interrupted' status. */
+  _interrupted?: boolean;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -344,6 +346,7 @@ export class SessionManager {
     // Clear rerun queue so no more cells auto-execute after interrupt
     delete session._rerunQueue;
 
+    session._interrupted = true;
     session.agentProcess.interrupt();
     // Claude CLI will emit a 'result' message → completeCell() handles the rest
   }
@@ -425,7 +428,14 @@ export class SessionManager {
     const cell = session.notebook.cells.find((c) => c.id === cellId);
     if (!cell || cell.status !== 'running') return;
 
-    const status = isError ? 'error' as const : 'completed' as const;
+    // Determine final status: interrupted > error > completed
+    let status: 'completed' | 'error' | 'interrupted';
+    if (session._interrupted) {
+      status = 'interrupted';
+      delete session._interrupted;
+    } else {
+      status = isError ? 'error' : 'completed';
+    }
     session.notebook = updateCellStatus(session.notebook, cellId, status);
 
     const startMs = session._execStartTimes.get(cellId);
@@ -437,6 +447,7 @@ export class SessionManager {
       type: 'execution_complete',
       cell_id: cellId,
       duration_ms,
+      status,
     });
 
     console.log(

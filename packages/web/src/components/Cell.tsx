@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import type { Cell as CellData } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
-import { GitDiffView } from './GitDiffView';
 import { MarkdownBody } from './MarkdownBody';
 
 // ── Status indicator ────────────────────────────────────────────────────────
@@ -11,7 +10,10 @@ const StatusIndicator = memo(function StatusIndicator({ status }: { status: Cell
   return (
     <span className={`cell-status cell-status-${status}`} aria-label={status}>
       {status === 'running' && <span className="spinner" aria-hidden="true" />}
-      {status === 'running' ? 'Running…' : status === 'error' ? 'Error' : null}
+      {status === 'running' ? 'Running…'
+        : status === 'error' ? 'Error'
+        : status === 'interrupted' ? 'Interrupted'
+        : null}
     </span>
   );
 });
@@ -70,7 +72,6 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
         </div>
       )}
 
-      {cell.git_diff && <GitDiffView diff={cell.git_diff} />}
     </div>
   );
 }

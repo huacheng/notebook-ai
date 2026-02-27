@@ -1012,6 +1012,16 @@ textarea.cell-input {
   cursor: default;
 }
 
+.notebook-statusbar-esc-btn {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+.notebook-statusbar-esc-btn:hover:not(:disabled) {
+  background: var(--bg-error);
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
 .notebook-statusbar-slice-btn.active {
   background: var(--color-primary-light);
   color: var(--color-primary);
@@ -1212,6 +1222,11 @@ textarea.cell-input {
 .cell-status-error {
   color: var(--color-error);
   background: rgba(220, 38, 38, 0.08);
+}
+
+.cell-status-interrupted {
+  color: var(--text-secondary);
+  background: rgba(168, 162, 158, 0.12);
 }
 
 /* ── Generic cell button (used by attach btn in input bar) ── */
@@ -5234,7 +5249,24 @@ button:focus-visible {
   color: #fff;
 }
 
+/* Expanded commit container (continuation lines + file list) */
+.git-commit-expanded {
+  display: flex;
+  flex-direction: row;
+}
+
+.git-graph-continuation {
+  flex-shrink: 0;
+  display: block;
+  align-self: stretch;
+}
+
 /* Commit file list */
+.git-commit-expanded .git-commit-files {
+  flex: 1;
+  margin-left: 10px;
+}
+
 .git-commit-files {
   padding: 0 10px 6px;
 }

@@ -81,12 +81,13 @@ describe('interrupt (Esc)', () => {
 
   // ── SessionManager.interruptCell() ──────────────────────────────────────
 
-  it('interruptCell() calls agent interrupt()', async () => {
+  it('interruptCell() calls agent interrupt() and sets _interrupted flag', async () => {
     const session = await createSessionWithRunningCell();
 
     await sm.interruptCell(session.id);
 
     expect(interruptSpy).toHaveBeenCalledTimes(1);
+    expect((session as any)._interrupted).toBe(true);
   });
 
   it('interruptCell() clears _rerunQueue', async () => {
@@ -119,10 +120,13 @@ describe('interrupt (Esc)', () => {
     // Simulate: interrupt kills the process → isAlive() returns false
     const isAliveSpy = vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(false);
 
+    // Set _interrupted flag (normally done by interruptCell)
+    (session as any)._interrupted = true;
+
     // Complete the running cell first so we can execute a new one
     onMessage({ type: 'result', result: 'interrupted', is_error: true });
     await new Promise((r) => setTimeout(r, 50));
-    expect(session.notebook.cells[0].status).toBe('error');
+    expect(session.notebook.cells[0].status).toBe('interrupted');
 
     // Now try to execute a new prompt — should auto-restart, not throw
     await sm.executeCell(session.id, 'c3', '继续');
@@ -153,12 +157,78 @@ describe('interrupt (Esc)', () => {
     // executeCell should NOT throw "Another cell is already running"
     await sm.executeCell(session.id, 'c3', '继续');
 
-    // Stale running cell should have been force-completed as error
+    // Stale running cell should have been force-completed
+    // (no _interrupted flag, so it's 'error' — stale death, not user Esc)
     expect(session.notebook.cells[0].status).toBe('error');
     // New cell should be running
     expect(sendPromptSpy).toHaveBeenCalledWith('继续');
 
     isAliveSpy.mockRestore();
+  });
+
+  // ── completeCell interrupted status ─────────────────────────────────────
+
+  it('completeCell sets interrupted status when _interrupted flag is set', async () => {
+    let onMessage: (msg: unknown) => void = () => {};
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMessage = onMsg;
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+
+    const session = await createSessionWithRunningCell();
+
+    // Set the _interrupted flag (simulating interruptCell)
+    (session as any)._interrupted = true;
+
+    // Simulate Claude returning a result after SIGINT
+    onMessage({ type: 'result', result: 'interrupted', is_error: true });
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Cell should be 'interrupted', not 'error'
+    expect(session.notebook.cells[0].status).toBe('interrupted');
+    // Flag should be cleared after use
+    expect((session as any)._interrupted).toBeUndefined();
+  });
+
+  it('execution_complete broadcast includes status field', async () => {
+    let onMessage: (msg: unknown) => void = () => {};
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMessage = onMsg;
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+
+    const session = await createSessionWithRunningCell();
+    const messages: any[] = [];
+    session.listeners.add((msg: any) => messages.push(msg));
+
+    // Case 1: Normal completion — status should be 'completed'
+    onMessage({ type: 'result', result: 'done', is_error: false });
+    await new Promise((r) => setTimeout(r, 50));
+    const completeMsg = messages.find((m) => m.type === 'execution_complete');
+    expect(completeMsg).toBeDefined();
+    expect(completeMsg.status).toBe('completed');
+  });
+
+  it('execution_complete broadcast includes interrupted status', async () => {
+    let onMessage: (msg: unknown) => void = () => {};
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMessage = onMsg;
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+
+    const session = await createSessionWithRunningCell();
+    const messages: any[] = [];
+    session.listeners.add((msg: any) => messages.push(msg));
+
+    // Set interrupted flag
+    (session as any)._interrupted = true;
+
+    // Simulate interrupted completion
+    onMessage({ type: 'result', result: 'interrupted', is_error: true });
+    await new Promise((r) => setTimeout(r, 50));
+    const interruptMsg = messages.find((m) => m.type === 'execution_complete');
+    expect(interruptMsg).toBeDefined();
+    expect(interruptMsg.status).toBe('interrupted');
   });
 
   // ── End-to-end: interrupt during rerun ──────────────────────────────────
@@ -182,8 +252,8 @@ describe('interrupt (Esc)', () => {
     onMessage({ type: 'result', result: 'interrupted', is_error: true });
     await new Promise((r) => setTimeout(r, 50));
 
-    // Cell c1 should be completed with error
-    expect(session.notebook.cells[0].status).toBe('error');
+    // Cell c1 should be completed with 'interrupted' (not 'error')
+    expect(session.notebook.cells[0].status).toBe('interrupted');
     // Cell c2 should NOT have started (rerun queue was cleared)
     expect(session.notebook.cells[1].status).toBe('pending');
     expect(sendPromptSpy).not.toHaveBeenCalledWith('world');

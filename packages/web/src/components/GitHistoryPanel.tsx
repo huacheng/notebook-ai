@@ -5,6 +5,7 @@ import type { CommitInfo, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
+import { GIT_DEFAULT_ALL_BRANCHES } from '../utils/gitDefaults';
 
 // ---------------------------------------------------------------------------
 // localStorage cache for git history
@@ -135,6 +136,36 @@ const GraphCell = memo(function GraphCell({ laneNode, maxLanes }: { laneNode: La
 });
 
 // ---------------------------------------------------------------------------
+// ContinuationLines — draws active lane lines in the expanded file area
+// ---------------------------------------------------------------------------
+
+export const ContinuationLines = memo(function ContinuationLines({
+  laneNode,
+  maxLanes,
+}: {
+  laneNode: LaneNode | undefined;
+  maxLanes: number;
+}) {
+  if (!laneNode || maxLanes <= 0) return null;
+  return (
+    <svg
+      width={maxLanes * LANE_WIDTH}
+      className="git-graph-continuation"
+    >
+      {laneNode.activeLanes.map((al) => (
+        <line
+          key={al.lane}
+          x1={laneX(al.lane)} y1={0}
+          x2={laneX(al.lane)} y2="100%"
+          stroke={colorOf(al.colorIndex)}
+          strokeWidth={2} strokeLinecap="round"
+        />
+      ))}
+    </svg>
+  );
+});
+
+// ---------------------------------------------------------------------------
 // RefBadges
 // ---------------------------------------------------------------------------
 
@@ -256,8 +287,6 @@ const CommitItem = memo(function CommitItem({
     }
   }, [projectId, token, commit.hash]);
 
-  const graphWidth = maxLanes * LANE_WIDTH;
-
   return (
     <div>
       <div
@@ -292,34 +321,37 @@ const CommitItem = memo(function CommitItem({
       </div>
 
       {expanded && (
-        <div className="git-commit-files" style={{ marginLeft: graphWidth + 10 }}>
-          {commit.files.length === 0 ? (
-            <div className="git-commit-files-empty">No files changed</div>
-          ) : (
-            commit.files.map((f) => (
-              <div key={f.path}>
-                <div
-                  onClick={() => handleFileClick(f.path)}
-                  className="git-file-row"
-                >
-                  <span className="git-file-additions">+{f.additions}</span>
-                  <span className="git-file-deletions">-{f.deletions}</span>
-                  <span className={`git-file-path${diffFile === f.path ? ' git-file-path--active' : ''}`}>
-                    {f.path}
-                  </span>
-                </div>
-                {diffFile === f.path && (
-                  <div className="git-file-diff-container">
-                    {loadingDiff ? (
-                      <div className="git-diff-loading">Loading...</div>
-                    ) : (
-                      <DiffView diff={diffContent} />
-                    )}
+        <div className="git-commit-expanded">
+          <ContinuationLines laneNode={laneNode} maxLanes={maxLanes} />
+          <div className="git-commit-files">
+            {commit.files.length === 0 ? (
+              <div className="git-commit-files-empty">No files changed</div>
+            ) : (
+              commit.files.map((f) => (
+                <div key={f.path}>
+                  <div
+                    onClick={() => handleFileClick(f.path)}
+                    className="git-file-row"
+                  >
+                    <span className="git-file-additions">+{f.additions}</span>
+                    <span className="git-file-deletions">-{f.deletions}</span>
+                    <span className={`git-file-path${diffFile === f.path ? ' git-file-path--active' : ''}`}>
+                      {f.path}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))
-          )}
+                  {diffFile === f.path && (
+                    <div className="git-file-diff-container">
+                      {loadingDiff ? (
+                        <div className="git-diff-loading">Loading...</div>
+                      ) : (
+                        <DiffView diff={diffContent} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -343,7 +375,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [allBranches, setAllBranches] = useState(false);
+  const [allBranches, setAllBranches] = useState(GIT_DEFAULT_ALL_BRANCHES);
   const [branches, setBranches] = useState<string[]>(cached?.branches ?? []);
   const [currentBranch, setCurrentBranch] = useState(cached?.currentBranch ?? '');
   const [selectedBranch, setSelectedBranch] = useState('');

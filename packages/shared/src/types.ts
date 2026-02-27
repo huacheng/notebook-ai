@@ -54,6 +54,7 @@ export const CellStatusSchema = z.enum([
   'running',
   'completed',
   'error',
+  'interrupted',
 ]);
 
 const BaseCellSchema = z.object({
@@ -353,6 +354,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   LoadCellsSchema,
   RemoveCellsSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
+  z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
 ]);
 
 // Server → Client: all session-scoped messages carry session_id
@@ -376,6 +378,7 @@ export const ExecutionCompleteSchema = z.object({
   session_id: z.string(),
   cell_id: z.string(),
   duration_ms: z.number().optional(),
+  status: z.enum(['completed', 'error', 'interrupted']).optional(),
 });
 
 export const GitDiffMessageSchema = z.object({
@@ -515,6 +518,12 @@ export const RerunFailedSchema = z.object({
   error: z.string(),
 });
 
+// Server → Client: cell interrupt response
+export const CellInterruptedSchema = z.object({
+  type: z.literal('cell_interrupted'),
+  session_id: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -541,6 +550,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellsRemoveFailedSchema,
   RerunStartedSchema,
   RerunFailedSchema,
+  CellInterruptedSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───

@@ -21,6 +21,7 @@ describe('rerunNotebook (Pipeline mode)', () => {
   let tempDir: string;
   let startSpy: ReturnType<typeof vi.spyOn>;
   let stopSpy: ReturnType<typeof vi.spyOn>;
+  let sendPromptSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     sm = new SessionManager();
@@ -32,11 +33,13 @@ describe('rerunNotebook (Pipeline mode)', () => {
       onMsg({ type: 'system', subtype: 'hook_started' });
     });
     stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    sendPromptSpy = vi.spyOn(AgentProcess.prototype, 'sendPrompt').mockImplementation(() => {});
   });
 
   afterEach(() => {
     startSpy.mockRestore();
     stopSpy.mockRestore();
+    sendPromptSpy.mockRestore();
   });
 
   async function createSessionWithCells() {
@@ -75,21 +78,24 @@ describe('rerunNotebook (Pipeline mode)', () => {
 
   it('clears all cells outputs', async () => {
     const session = await createSessionWithCells();
-    expect(session.notebook.cells.every(c => c.outputs.length > 0)).toBe(true);
+    expect(session.notebook.cells.every(c => c.type === 'prompt' && c.outputs.length > 0)).toBe(true);
 
     await sm.rerunNotebook(session.id);
 
     for (const cell of session.notebook.cells) {
-      expect(cell.outputs).toEqual([]);
+      if (cell.type === 'prompt') expect(cell.outputs).toEqual([]);
     }
   });
 
-  it('resets all cells status to pending', async () => {
+  it('resets cells and starts first cell running', async () => {
     const session = await createSessionWithCells();
 
     await sm.rerunNotebook(session.id);
 
-    for (const cell of session.notebook.cells) {
+    // First cell should be running (rerun auto-executes it)
+    expect(session.notebook.cells[0].status).toBe('running');
+    // Remaining cells should still be pending
+    for (const cell of session.notebook.cells.slice(1)) {
       expect(cell.status).toBe('pending');
     }
   });
@@ -134,5 +140,65 @@ describe('rerunNotebook (Pipeline mode)', () => {
     await expect(sm.rerunNotebook('non-existent')).rejects.toThrow(
       'Session "non-existent" not found',
     );
+  });
+
+  // ── Rerun execution tests ──────────────────────────────────────────────────
+
+  it('executes first prompt cell after rerun', async () => {
+    const session = await createSessionWithCells();
+    await sm.rerunNotebook(session.id);
+
+    // First cell should be running, sendPrompt called with its source
+    expect(session.notebook.cells[0].status).toBe('running');
+    expect(sendPromptSpy).toHaveBeenCalledWith('prompt 1');
+  });
+
+  it('auto-executes next pending cell after first completes', async () => {
+    // Capture the onMessage handler so we can simulate result messages
+    let onMessage: (msg: unknown) => void = () => {};
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMessage = onMsg;
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+
+    const session = await createSessionWithCells();
+    await sm.rerunNotebook(session.id);
+
+    // First cell is running
+    expect(session.notebook.cells[0].status).toBe('running');
+    expect(sendPromptSpy).toHaveBeenCalledWith('prompt 1');
+
+    // Simulate first cell completion
+    onMessage({ type: 'result', result: 'done 1', is_error: false });
+
+    // Allow deferred execution (setTimeout in completeCell + rerun chain)
+    await new Promise((r) => setTimeout(r, 50));
+
+    // First cell should be completed, second cell should now be running
+    expect(session.notebook.cells[0].status).toBe('completed');
+    expect(session.notebook.cells[1].status).toBe('running');
+    expect(sendPromptSpy).toHaveBeenCalledWith('prompt 2');
+  });
+
+  it('cleans up _rerunQueue after all cells finish', async () => {
+    let onMessage: (msg: unknown) => void = () => {};
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMessage = onMsg;
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+
+    const session = await createSessionWithCells();
+    await sm.rerunNotebook(session.id);
+
+    // Execute all 3 cells in sequence
+    for (let i = 0; i < 3; i++) {
+      onMessage({ type: 'result', result: `done ${i}`, is_error: false });
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    // All cells should be completed
+    expect(session.notebook.cells.every((c) => c.status === 'completed')).toBe(true);
+    // _rerunQueue should be cleaned up
+    expect((session as any)._rerunQueue).toBeUndefined();
   });
 });

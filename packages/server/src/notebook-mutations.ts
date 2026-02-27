@@ -5,7 +5,7 @@ import type { Notebook, CellOutput } from '@notebook-ai/shared';
 export function updateCellStatus(
   notebook: Notebook,
   cellId: string,
-  status: 'idle' | 'running' | 'completed' | 'error',
+  status: 'idle' | 'running' | 'completed' | 'error' | 'interrupted',
 ): Notebook {
   return {
     ...notebook,
