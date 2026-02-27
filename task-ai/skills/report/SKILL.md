@@ -25,7 +25,7 @@ Generate a structured completion report for a task module, documenting what was 
 
 ## Prerequisites
 
-- Task module should have status `complete` (post-exec assessment passed)
+- Task module should have status `complete` or `stage-done` (post-exec assessment passed)
 - Can also be run on `blocked` or `cancelled` tasks for documentation purposes
 - **Minimum content**: If status is `draft` and `.plan.md` does not exist, report outputs a brief notice ("No meaningful content to report — task is still in draft with no plan") instead of generating an empty report structure
 
@@ -105,6 +105,7 @@ The report is written to `[deliverables-dir]/.report.md` (the notebook's deliver
 | `complete` | `complete` | Always |
 | `blocked` | `blocked` | Always |
 | `cancelled` | `cancelled` | Always |
+| `stage-done` | `stage-done` | Always (interim report for completed stage) |
 
 ## Git
 

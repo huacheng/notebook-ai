@@ -60,7 +60,8 @@ fi
 mkdir -p "$WORKING_DIR"
 
 # 5. Metadata Creation (.index.json)
-# Escape TITLE for safe JSON embedding (handle backslashes then double quotes)
+# Sanitize TITLE: strip control characters (except newline/tab), then escape for JSON
+TITLE=$(printf '%s' "$TITLE" | tr -d '[:cntrl:]')
 SAFE_TITLE="${TITLE//\\/\\\\}"
 SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
 cat > "$WORKING_DIR/.index.json" <<EOF
@@ -75,7 +76,12 @@ cat > "$WORKING_DIR/.index.json" <<EOF
   "depends_on": [],
   "tags": $TAGS,
   "branch": "$BRANCH_NAME",
-  "worktree": "$( [[ $USE_WORKTREE -eq 1 ]] && echo "$WORKTREE_PATH" || echo "" )"
+  "worktree": "$( [[ $USE_WORKTREE -eq 1 ]] && echo "$WORKTREE_PATH" || echo "" )",
+  "stage": {
+    "current": 1,
+    "total": 1,
+    "completed": []
+  }
 }
 EOF
 

@@ -65,6 +65,7 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 | `executing` | `cancelled` | Always |
 | `re-planning` | `cancelled` | Always |
 | `blocked` | `cancelled` | Always |
+| `stage-done` | `cancelled` | Always |
 | `complete` | REJECT | Terminal state |
 | `cancelled` | REJECT | Terminal state |
 

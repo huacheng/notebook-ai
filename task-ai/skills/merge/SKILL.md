@@ -56,9 +56,22 @@ If merge conflict detected:
 
 On successful merge:
 
-1. **Update** `.index.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values (branch/worktree cleanup is the user's responsibility)
-2. **Write** `.summary.md` with final task summary: completion status, plan overview, key changes, verification outcome, lessons learned (integrate from directory summaries)
-3. **Git commit** state: `task-ai(<notebook>):merge task completed`
+1. **Read** `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing)
+2. **IF `stage.current < stage.total`** (intermediate stage complete):
+   a. **Write** `.summary.md` with stage completion summary: completed steps, key changes, verification outcome, lessons learned
+   b. **Update** `.target.md`: mark current Stage `[ACTIVE]` → `[COMPLETE]`, fill `### Results` section (extract from `.summary.md`)
+   c. **Update** `.index.json`: status → `stage-done`, push to `stage.completed` array `{ "stage": <current>, "name": "<stage name>", "completed_at": "<ISO timestamp>" }` — **retain** `branch` and `worktree` values
+   d. **Git commit** state: `task-ai(<notebook>):merge stage <N> completed`
+3. **ELSE** (`stage.current == stage.total`, including `total: 1`):
+   a. **Update** `.index.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
+   b. **Write** `.summary.md` with final task summary
+   c. **Git commit** state: `task-ai(<notebook>):merge task completed`
+
+4. **IF `stage.current > stage.total`** (data inconsistency):
+   - Log warning: `stage.current (N) > stage.total (M) — treating as final stage`
+   - Proceed as final stage (same as step 3 above, status → `complete`)
+
+**Atomicity**: In the stage-done branch, status change (step 2c) occurs AFTER `.summary.md` and `.target.md` writes (steps 2a-2b). If steps 2a-2b fail, status remains `executing` — user can retry merge. If step 2c succeeds but 2d fails, status is `stage-done` — auto re-enters from stage-done entry point (highlight → report), no repeated merge.
 
 > **Note**: Merge does NOT delete branches or worktrees. The user can clean them up manually or via a separate cleanup command when ready.
 
@@ -76,15 +89,18 @@ On successful merge:
    7.3. Each resolution: fix conflicts → verify (build + test) → if pass commit, if fail abort and retry
    7.4. If all 3 attempts fail → stay `executing`, abort merge, report unresolvable conflicts
    7.5. If conflicts were resolved: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value, only when conflicts occurred). Capture conflict resolution strategy reasoning. Inline call failure MUST NOT block merge's main flow
-8. **Phase 4**: Post-merge finalization (status → `complete` with branch/worktree retained, write `.summary.md`, git commit state)
-9. **Write** `.auto-signal` — MUST be written AFTER Phase 4 status update to `complete`, so the daemon reads correct status when routing to `report`
+8. **Phase 4**: Post-merge finalization — read `stage` field from `.index.json` (default `{ current: 1, total: 1, completed: [] }` if missing):
+   - **If `stage.current < stage.total`**: write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `stage-done` with stage.completed push → git commit `stage <N> completed`
+   - **Else**: status → `complete` with branch/worktree retained → write `.summary.md` → git commit `task completed`
+9. **Write** `.auto-signal` — MUST be written AFTER Phase 4 status update, so the daemon reads correct status when routing
 10. **Report** merge result
 
 ## State Transitions
 
 | Current Status | After Merge | Condition |
 |----------------|-------------|-----------|
-| `executing` | `complete` | Merge successful (with or without conflict resolution) |
+| `executing` | `complete` | Merge successful, `stage.current == stage.total` (final stage or single-stage) |
+| `executing` | `stage-done` | Merge successful, `stage.current < stage.total` (intermediate stage) |
 | `executing` | `executing` | Merge conflict unresolvable after 3 attempts (stays `executing` so merge can be retried after manual conflict resolution) |
 
 ## Git
@@ -94,13 +110,15 @@ On successful merge:
 | Pre-merge cleanup | `task-ai(<notebook>):refactor cleanup before merge` |
 | Merge commit | `task-ai(<notebook>):merge merge completed task` |
 | Conflict resolution | `task-ai(<notebook>):merge resolve merge conflict` |
-| State update | `task-ai(<notebook>):merge task completed` |
+| State update (final) | `task-ai(<notebook>):merge task completed` |
+| State update (stage) | `task-ai(<notebook>):merge stage <N> completed` |
 
 ## .auto-signal
 
 | Result | Signal |
 |--------|--------|
-| Success | `{ "step": "merge", "result": "success", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
+| Success (final/single stage) | `{ "step": "merge", "result": "success", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
+| Success (intermediate stage) | `{ "step": "merge", "result": "stage-done", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
 | Conflict | `{ "step": "merge", "result": "conflict", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
 | Dependency not met | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 | No ACCEPT verdict | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "no-accept", "timestamp": "..." }` |

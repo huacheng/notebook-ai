@@ -355,7 +355,15 @@ auto-complete checks whether distillation is necessary before executing:
 ```
 input_files = [.target.md, .plan.md, .summary.md, *-impl.md, *-verify.md, ...]
 latest_input_mtime = max(mtime(f) for f in input_files if exists(f))
-existing_complete = .memory/.experiences/<type>/<notebook>-complete.md
+
+# Stage-aware output filename
+Read .index.json stage field (default { current: 1, total: 1, completed: [] }):
+  IF stage.total > 1 AND status == "stage-done":
+    filename = "<notebook>-stage-<stage.current>-complete.md"
+  ELSE:
+    filename = "<notebook>-complete.md"
+
+existing_complete = .memory/.experiences/<type>/{filename}
 
 if existing_complete exists AND mtime(existing_complete) >= latest_input_mtime:
     log "No new content since last distillation, skipping"
@@ -383,9 +391,16 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 #### Output A — Experience Distillation
 
+**Stage-aware file naming** — read `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing):
+
+| Scenario | Target filename |
+|----------|----------------|
+| Intermediate stage (`stage.total > 1` AND `status == "stage-done"`) | `<notebook>-stage-<stage.current>-complete.md` |
+| Final stage (`stage.current == stage.total`, including `total: 1`) | `<notebook>-complete.md` |
+
 | Field | Value |
 |-------|-------|
-| Target file | `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type-segment>/<notebook>-complete.md` |
+| Target file | `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type-segment>/{filename}` |
 | Write mode | **Overwrite** (.tmp → rename) — final version replaces all provisional versions |
 | Lock | `.memory/.experiences/.lock` |
 | quality_status | `verified` |
@@ -393,6 +408,10 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 | source | `highlight-complete` |
 
 For multi-type (e.g., `data-pipeline|ml`), write one file per pipe segment. Segments use directory-safe transform (`:` → `-`).
+
+**Final stage distillation** (last stage merge → `complete`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
+
+**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.index.json` > `.target.md` > `.summary.md` > `.plan.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
 
 Frontmatter:
 

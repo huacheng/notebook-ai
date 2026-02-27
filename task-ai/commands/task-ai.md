@@ -93,11 +93,35 @@ Writers should keep `.summary.md` under ~200 lines. It is a context window optim
   "depends_on": [],
   "tags": [],
   "branch": "task/notebook-name",
-  "worktree": ".worktrees/task-notebook-name"
+  "worktree": ".worktrees/task-notebook-name",
+  "stage": {
+    "current": 1,
+    "total": 1,
+    "completed": []
+  }
 }
 ```
 
 Notes: `worktree` is empty string `""` if not using worktree. `depends_on` entries can be simple strings (require `complete`) or objects `{ "module": "...", "min_status": "..." }`.
+
+#### Stage Field (Progressive Target)
+
+The `stage` field tracks multi-stage target progression. Default: `{ "current": 1, "total": 1, "completed": [] }`.
+
+| Sub-field | Type | Description |
+|-----------|------|-------------|
+| `stage.current` | integer | Current stage number (1-based) |
+| `stage.total` | integer | `1` = single stage, `>1` = multi-stage |
+| `stage.completed` | array | Records of completed stages |
+| `stage.completed[].stage` | integer | Stage number |
+| `stage.completed[].name` | string | Stage name |
+| `stage.completed[].completed_at` | string | ISO 8601 completion timestamp |
+
+**Validation Rules**: `stage.current >= 1`, `stage.total >= 1`, `stage.current <= stage.total + 1` (current may temporarily equal total + 1 during stage advance before total is incremented). If any rule is violated, treat as corrupted — log warning and fall back to `{ "current": 1, "total": 1, "completed": [] }`.
+
+**Default handling**: If `.index.json` lacks the `stage` field (pre-v1 notebooks), all commands MUST treat it as `{ "current": 1, "total": 1, "completed": [] }`. No migration needed — single-stage behavior is identical to pre-v1.
+
+**Retry-safe Design**: Stage advance operations (target step 2a) are designed to be retry-safe (non-atomic by intent). Archive/clear steps (4-5) execute before the status change (step 6). If archive/clear fails, status remains `stage-done` and re-running target retries safely. If status change succeeds but git commit fails, status is already `planning` — re-running target detects `planning` and routes to the normal update path. No manual rollback needed.
 
 #### Type Field
 
@@ -124,8 +148,9 @@ Writers: `check` sets `phase: needs-plan` on REPLAN and on NEEDS_REVISION when s
 | `draft` | Task target being defined | `planning`, `cancelled` |
 | `planning` | Plan being researched | `review`, `blocked`, `cancelled` |
 | `review` | Plan passed assessment | `executing`, `re-planning`, `cancelled` |
-| `executing` | Implementation in progress | `complete`, `re-planning`, `blocked`, `cancelled` |
+| `executing` | Implementation in progress | `complete`, `stage-done`, `re-planning`, `blocked`, `cancelled` |
 | `re-planning` | Plan being revised | `review`, `blocked`, `cancelled` |
+| `stage-done` | Current stage complete, awaiting next stage | `planning`, `cancelled` |
 | `complete` | Finished and verified | — (terminal) |
 | `blocked` | Blocked by dependency/issue | `planning`, `cancelled` |
 | `cancelled` | Abandoned (via `cancel`) | — (terminal) |

@@ -26,7 +26,11 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 
 ## Execution Steps
 
-1. Read `.target.md` for requirements
+1. Read `.target.md` for requirements. **Stage awareness**: read `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing). If `stage.total > 1` (multi-stage mode):
+   - Only read the current `[ACTIVE]` stage's Objective/Requirements/Constraints from `.target.md` — plan scope is limited to the current stage
+   - Also read prior `[COMPLETE]` stages' `### Results` sections as context (already-implemented capabilities)
+   - Library context loading (steps 9-11) naturally includes prior-stage experience files distilled by highlight
+   - If `stage.total == 1`: read entire `.target.md` as before (backward compatible)
 2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/task-ai:research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
    - **First plan** (status `draft`/`planning`, no existing `.plan.md`):
      - Check if `.target.md` contains `## Research Insights` section (indicates `research --caller target` was already run)
@@ -81,6 +85,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 | `blocked` | `planning` | Unblocking changes |
 | `complete` | REJECT | Completed tasks cannot be re-planned |
 | `cancelled` | REJECT | Cancelled tasks cannot be re-planned |
+| `stage-done` | REJECT | Stage completed — use `target` to advance to next stage first |
 
 ## Git
 

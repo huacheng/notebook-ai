@@ -118,7 +118,7 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
 | `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `conflict`, `rejected` |
+| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `stage-done`, `conflict`, `rejected` |
 | `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `(stop)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
@@ -198,11 +198,15 @@ Phase 3: Post-Exec Verification
                     └──→ exec (re-exec) → [Phase 3]
 
 Phase 4: Merge, Distillation & Report
-  merge ─── success ──→ highlight(complete) ──→ report → (stop)
-    │                        │
-    │                        ├── (distilled) ──→ report
-    │                        ├── (skipped-idempotent) ──→ report
-    │                        └── failed ──→ report (non-blocking)
+  merge ─── success (current==total) ──→ highlight(complete) ──→ report → (stop)
+    │          │
+    │      stage-done (current<total) ──→ highlight(complete) ──→ report → (stop)
+    │          │                          Output: "Stage <N> completed.
+    │          │                          Define next stage target, then run /task-ai:auto"
+    │          │
+    │          ├── (distilled) ──→ report
+    │          ├── (skipped-idempotent) ──→ report
+    │          └── failed ──→ report (non-blocking)
     │
     └── conflict unresolvable (after 3 retries, stays executing) → (stop)
 
@@ -245,6 +249,7 @@ The auto skill runs this loop within a single the agent session:
 | `review` | Execute exec |
 | `executing` | Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX, adding one extra iteration. This avoids re-parsing `.plan.md` to count total steps at entry |
 | `re-planning` | Read `phase` field: if `needs-plan` → execute plan (generate); if `needs-check` → execute verify → check (post-plan); if empty → default to plan (generate, safe fallback) |
+| `stage-done` | Execute highlight(complete) → report → stop. Output stage completion message with next-stage instructions. *(v2: auto-advance — auto reads next stage target and continues loop without user intervention)* |
 | `complete` | Execute report, then stop |
 | `blocked` | Stop loop, report blocking reason |
 | `cancelled` | Stop loop |
@@ -267,7 +272,8 @@ After each step, the agent evaluates the result and determines the next step int
 | exec | (mid-exec) | verify | mid-exec | Significant issue encountered, run verification before checkpoint |
 | exec | (step-N) | verify | mid-exec | Single step completed (manual `--step N` only) |
 | exec | (blocked) | (stop) | — | Cannot continue |
-| merge | success | highlight | — | Merge complete, distill experience before report |
+| merge | success | highlight | — | Merge complete (final/single stage), distill experience before report |
+| merge | stage-done | highlight | — | Stage complete (intermediate), distill stage experience before report |
 | merge | conflict | (stop) | — | Merge conflict unresolvable |
 | merge | rejected | (stop) | dependency-blocked / no-accept | Prerequisite not met (dependency or missing ACCEPT verdict) |
 | highlight | (distilled) | report | — | Distillation complete, generate report |

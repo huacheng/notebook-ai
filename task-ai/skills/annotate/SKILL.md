@@ -72,6 +72,7 @@ Process `.tmp-annotations.json` from the Plan panel. Supports 4 annotation types
 | `blocked` | `planning` | Unblocking changes |
 | `complete` | REJECT | Completed tasks cannot be modified |
 | `cancelled` | REJECT | Cancelled tasks cannot be modified |
+| `stage-done` | REJECT | Stage completed — use `target` to advance to next stage first |
 
 ## Git
 
