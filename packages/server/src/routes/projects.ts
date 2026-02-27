@@ -523,12 +523,30 @@ export function createProjectsRouter(
       const absPath = path.join(project.path, relPath);
       let nbRow = db.getNotebookByPath(absPath);
 
-      // Frontend sends directory name (e.g. "my-task"), but DB stores full
-      // .notebook.json path (e.g. "my-task/my-task.notebook.json").
+      // Frontend sends directory path (e.g. ".worktrees/task-my-nb"), but DB stores
+      // full .notebook.json path. Try multiple patterns to find the DB record.
       if (!nbRow) {
         const basename = path.basename(absPath);
+        // Pattern 1: {dir}/{basename}.notebook.json (old-style dirs)
         const nbFilePath = path.join(absPath, `${basename}.notebook.json`);
         nbRow = db.getNotebookByPath(nbFilePath);
+        // Pattern 2: worktree dir "task-{slug}" → file "{slug}.notebook.json"
+        if (!nbRow && basename.startsWith('task-')) {
+          const slug = basename.slice(5);
+          nbRow = db.getNotebookByPath(path.join(absPath, `${slug}.notebook.json`));
+        }
+        // Pattern 3: scan directory for any .notebook.json file
+        if (!nbRow && existsSync(absPath)) {
+          try {
+            const entries = await readdir(absPath);
+            for (const entry of entries) {
+              if (entry.endsWith('.notebook.json')) {
+                nbRow = db.getNotebookByPath(path.join(absPath, entry));
+                if (nbRow) break;
+              }
+            }
+          } catch { /* ignore read errors */ }
+        }
       }
 
       if (nbRow) {
@@ -544,13 +562,19 @@ export function createProjectsRouter(
       // absPath may be the dir itself or a .notebook.json file inside it.
       const nbDir = absPath.endsWith('.notebook.json') ? path.dirname(absPath) : absPath;
 
-      const { existsSync } = await import('fs');
       if (!nbRow && !existsSync(nbDir)) {
         return res.status(404).json({ error: 'notebook not found' });
       }
 
-      // Remove notebook directory from disk
+      // Remove notebook directory from disk (and git worktree if applicable)
       if (nbDir !== project.path) {
+        // If it's a worktree, remove via git first (cleans up .git/worktrees/ ref)
+        if (nbDir.includes('/.worktrees/')) {
+          try {
+            const git = new GitManager(project.path);
+            await git.removeWorktree(nbDir);
+          } catch { /* fallback to rm below */ }
+        }
         await rm(nbDir, { recursive: true, force: true }).catch(() => {});
       }
 

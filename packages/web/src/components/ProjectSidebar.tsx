@@ -430,7 +430,8 @@ function FileBrowser() {
     const isNbDir = file.type === 'directory' && (file as any).isNotebook;
     const isNbFile = file.name.endsWith('.notebook.json');
     if (!isNbDir && !isNbFile) return null;
-    const relPath = subPath === '.' ? file.name : `${subPath}/${file.name}`;
+    const relPath = (file as any).worktreePath
+      || (subPath === '.' ? file.name : `${subPath}/${file.name}`);
     return (
       <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
         <button
