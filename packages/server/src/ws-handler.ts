@@ -446,6 +446,17 @@ export function setupWebSocket(
           break;
         }
 
+        case 'change_model': {
+          const { session_id, model } = msg;
+          try {
+            await sessionManager.changeModel(session_id, model);
+            sendToClient(ws, { type: 'model_changed', session_id, model });
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+          }
+          break;
+        }
+
         case 'load_cells': {
           const { session_id, offset, limit } = msg;
           const session = sessionManager.getSession(session_id);

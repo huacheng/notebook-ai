@@ -16,6 +16,7 @@ export class AgentProcess {
     public readonly engine: AgentEngine,
     private readonly cwd: string,
     private readonly systemPrompt?: string,
+    public readonly model?: string,
   ) {}
 
   getClaudeSessionId(): string | null {
@@ -44,6 +45,9 @@ export class AgentProcess {
         '--dangerously-skip-permissions',
         '--tools', 'default',
       );
+      if (this.model) {
+        args.push('--model', this.model);
+      }
       if (resumeSessionId) {
         args.push('--resume', resumeSessionId);
       }

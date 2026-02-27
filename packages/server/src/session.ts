@@ -130,18 +130,20 @@ export class SessionManager {
       assets: { intermediate_files: [] },
     });
 
-    // Determine agent engine from notebook file metadata
+    // Determine agent engine and model from notebook file metadata
     let engine: AgentEngine = 'claude';
+    let model: string | undefined;
     try {
       const raw = await readFile(notebookPath, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed?.metadata?.agent === 'gemini') engine = 'gemini';
+      if (parsed?.metadata?.model) model = parsed.metadata.model;
     } catch { /* file doesn't exist yet — default claude */ }
 
     const session: NotebookSession = {
       id: sessionName,
       cwd,
-      agentProcess: new AgentProcess(engine, cwd, MEMORY_SYSTEM_PROMPT),
+      agentProcess: new AgentProcess(engine, cwd, MEMORY_SYSTEM_PROMPT, model),
       notebook,
       gitManager,
       notebookPath,
@@ -243,9 +245,10 @@ export class SessionManager {
     // Stop old process
     session.agentProcess.stop();
 
-    // Create new AgentProcess with same config
+    // Create new AgentProcess with same config (preserve model)
     const engine = session.agentProcess.engine;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT);
+    const model = session.agentProcess.model;
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model);
 
     // Start new process with same handlers — pass resumeSessionId for context recovery
     await session.agentProcess.start(
@@ -289,7 +292,8 @@ export class SessionManager {
 
     // 3. Create new AgentProcess WITHOUT resumeSessionId (clean context)
     const engine = session.agentProcess.engine;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT);
+    const model = session.agentProcess.model;
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model);
 
     // 4. Start new process — no resume
     await session.agentProcess.start(
@@ -337,6 +341,41 @@ export class SessionManager {
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
     session._execStartTimes.set(cellId, Date.now());
     session.agentProcess.sendPrompt(cell.source);
+  }
+
+  /**
+   * Changes the model for a session: updates notebook metadata,
+   * stops the old agent, and spawns a new one with the new model.
+   */
+  async changeModel(sessionId: string, model: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+
+    // Update notebook metadata
+    session.notebook = {
+      ...session.notebook,
+      metadata: { ...session.notebook.metadata, model },
+    };
+
+    // Stop old process
+    session.agentProcess.stop();
+
+    // Create new AgentProcess with updated model
+    const engine = session.agentProcess.engine;
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model);
+
+    // Start new process (clean — no resume)
+    await session.agentProcess.start(
+      (raw: unknown) => this.handleJsonlMessage(session, raw),
+      (code) => {
+        const cellId = findRunningCellId(session.notebook);
+        if (cellId) {
+          this.completeCell(session, cellId, true);
+        }
+      },
+    );
+
+    console.log(`[session] Model changed to "${model}" for session "${sessionId}"`);
   }
 
   async interruptCell(sessionId: string): Promise<void> {

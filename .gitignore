@@ -13,5 +13,8 @@ AiTasks/.experiences/.lock
 AiTasks/.references/.lock
 AiTasks/.type-profiles/.lock
 
+# Playwright MCP artifacts
+.playwright-mcp/
+
 # Library Knowledge Base (Independent Repo)
 .library/

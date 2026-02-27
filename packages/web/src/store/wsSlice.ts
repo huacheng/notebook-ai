@@ -218,6 +218,32 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'cell_interrupted':
           // No-op: the actual cell completion comes via execution_complete
           break;
+        case 'model_changed': {
+          const newModel = (parsed as any).model as string;
+          const changedSessionId = (parsed as any).session_id as string;
+          set((state) => {
+            // Update state.notebook if it matches
+            const updatedNotebook = state.notebook
+              ? { ...state.notebook, metadata: { ...state.notebook.metadata, model: newModel } }
+              : null;
+            // Update the matching entry in openNotebooks
+            const updatedOpen = { ...state.openNotebooks };
+            for (const [nbId, entry] of Object.entries(updatedOpen)) {
+              if (entry.sessionId === changedSessionId) {
+                updatedOpen[nbId] = {
+                  ...entry,
+                  notebook: { ...entry.notebook, metadata: { ...entry.notebook.metadata, model: newModel } },
+                };
+              }
+            }
+            return {
+              notebook: updatedNotebook,
+              openNotebooks: updatedOpen,
+              modelPanelOpen: false,
+            };
+          });
+          break;
+        }
         case 'error':
           if (parsed.cell_id) {
             store.setCellStatus(parsed.cell_id, 'error');

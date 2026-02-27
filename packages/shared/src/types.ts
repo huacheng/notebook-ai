@@ -185,6 +185,7 @@ export const NotebookMetadataSchema = z.object({
   worktree_path: z.string().optional(),
   branch: z.string().optional(),
   agent: z.enum(['claude', 'gemini']).default('claude'),
+  model: z.string().optional(),
 });
 
 // ─── Notebook (顶层文档) ───
@@ -336,6 +337,12 @@ export const RemoveCellsSchema = z.object({
   cell_ids: z.array(z.string()),
 });
 
+export const ChangeModelSchema = z.object({
+  type: z.literal('change_model'),
+  session_id: z.string(),
+  model: z.string(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -353,6 +360,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   RestartSessionSchema,
   LoadCellsSchema,
   RemoveCellsSchema,
+  ChangeModelSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
 ]);
@@ -524,6 +532,12 @@ export const CellInterruptedSchema = z.object({
   session_id: z.string(),
 });
 
+export const ModelChangedSchema = z.object({
+  type: z.literal('model_changed'),
+  session_id: z.string(),
+  model: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -551,6 +565,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   RerunStartedSchema,
   RerunFailedSchema,
   CellInterruptedSchema,
+  ModelChangedSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───

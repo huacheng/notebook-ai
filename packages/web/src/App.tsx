@@ -10,6 +10,7 @@ import { NotebookCreationPanel } from './components/NotebookCreationPanel';
 import { GitHistoryPanel } from './components/GitHistoryPanel';
 import { LoginPage } from './components/LoginPage';
 import { PluginManager } from './components/PluginManager';
+import { ModelManager } from './components/ModelManager';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
@@ -109,6 +110,7 @@ function AuthenticatedApp() {
   const pluginStatus = useStore((s) => s.pluginStatus);
   const pluginDismissed = useStore((s) => s.pluginDismissed);
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
+  const modelPanelOpen = useStore((s) => s.modelPanelOpen);
   const checkPluginStatus = useStore((s) => s.checkPluginStatus);
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
@@ -262,6 +264,8 @@ function AuthenticatedApp() {
           <div className="notebook-area">
             {pluginPanelOpen ? (
               <PluginManager />
+            ) : modelPanelOpen ? (
+              <ModelManager />
             ) : hasActiveFile ? (
               <FileViewer />
             ) : gitTabOpen && activeProjectId ? (

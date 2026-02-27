@@ -1,4 +1,5 @@
 import { useStore } from '../store';
+import { findModelById } from './ModelManager';
 
 // ── Connection status badge ─────────────────────────────────────────────────
 
@@ -105,6 +106,32 @@ function PluginButton() {
   );
 }
 
+// ── Model button ──────────────────────────────────────────────────────────────
+
+function ModelButton() {
+  const openModelPanel = useStore((s) => s.openModelPanel);
+  const modelPanelOpen = useStore((s) => s.modelPanelOpen);
+  const openNotebooks = useStore((s) => s.openNotebooks);
+  const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
+
+  const hasNotebook = Object.keys(openNotebooks).length > 0;
+  const activeNb = activeNotebookTabId ? openNotebooks[activeNotebookTabId] : null;
+  const currentModelId = activeNb?.notebook?.metadata?.model ?? 'sonnet';
+  const modelDef = findModelById(currentModelId);
+  const label = modelDef?.label ?? 'Model';
+
+  return (
+    <button
+      className={`toolbar-btn${modelPanelOpen ? ' toolbar-btn--active' : ''}${!hasNotebook ? ' toolbar-btn--disabled' : ''}`}
+      onClick={hasNotebook ? openModelPanel : undefined}
+      disabled={!hasNotebook}
+      title={hasNotebook ? '模型管理' : '请先打开一个 notebook，然后选择模型'}
+    >
+      {label}
+    </button>
+  );
+}
+
 // ── Main Toolbar ────────────────────────────────────────────────────────────
 
 export function Toolbar() {
@@ -116,6 +143,7 @@ export function Toolbar() {
       </div>
 
       <div className="toolbar-right">
+        <ModelButton />
         <PluginButton />
         <ConnectionStatus />
         <LogoutButton />

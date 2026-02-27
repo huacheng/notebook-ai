@@ -59,6 +59,7 @@ export interface NotebookStore {
   pluginDismissed: boolean;
   pluginPanelOpen: boolean;
   pluginOverlay: string | null;
+  modelPanelOpen: boolean;
 
   // ── Project state ─────────────────────────────────────────────────────
   projects: ProjectListItem[];
@@ -151,6 +152,9 @@ export interface NotebookStore {
   dismissPluginBanner(): void;
   openPluginPanel(): void;
   closePluginPanel(): void;
+  openModelPanel(): void;
+  closeModelPanel(): void;
+  changeModel(model: string): void;
 
   // ── Project actions ───────────────────────────────────────────────────
   fetchProjects(): Promise<void>;
