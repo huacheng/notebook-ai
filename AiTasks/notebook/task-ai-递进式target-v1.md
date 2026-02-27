@@ -113,15 +113,20 @@ step 2: Write Mode（objective 已提供）
 1. 读取 target.md，定位下一个 [PENDING] Stage
 2. 写入用户提供的目标到该 Stage 的 Objective/Requirements/Constraints
 3. 标记切换：当前 Stage [PENDING] → [ACTIVE]
-4. 更新 .index.json:
+4. 归档: .plan.md → .plan-stage-<N>.md
+        .plan-superseded.md → .plan-superseded-stage-<N>.md（如存在）
+5. 清理: .bugfix/ 目录内容清空
+6. 更新 .index.json:
    - stage.current++
    - status → "planning"
    - completed_steps → 0
-5. 归档: .plan.md → .plan-stage-<N>.md
-        .plan-superseded.md → .plan-superseded-stage-<N>.md（如存在）
-6. 清理: .bugfix/ 目录内容清空
 7. Git commit: task-ai(<notebook>):target stage <N+1> defined
 8. thinking-raw
+
+原子性说明: status 变更（步骤 6）放在归档/清理之后。如果步骤 4-5 失败，
+status 仍为 stage-done，用户可排查后重试。如果步骤 6 成功但步骤 7 commit
+失败，状态已为 planning 但未 commit — 用户重新运行 target 时会检测到已是
+planning 状态走正常更新路径，不会重复推进。
 ```
 
 ### 2.5 State Transitions 更新
@@ -481,11 +486,31 @@ auto-complete 模式（highlight §3.5）：
 | 阶段性 impl | `<notebook>-impl.md`（O_APPEND，所有阶段累积） |
 | 阶段性 verify | `<notebook>-verify.md`（O_APPEND，所有阶段累积） |
 
-### 9.3 highlight_file 回写
+### 9.3 highlight/SKILL.md §3.5 的具体改动
+
+当前 highlight §3.5 auto-complete 的目标文件路径硬编码为 `<notebook>-complete.md`。v1 需要增加 stage 感知：
+
+```
+Output A — Experience Distillation 目标路径:
+
+读取 .index.json 的 stage 字段:
+  IF stage.total > 1 AND status == "stage-done":
+    filename = "<notebook>-stage-<stage.current>-complete.md"
+  ELSE:
+    filename = "<notebook>-complete.md"（现有行为不变）
+
+写入: $NB_WORKSPACES_LIBRARY/.memory/.experiences/<type-segment>/{filename}
+```
+
+最终蒸馏（最后一个阶段 merge → complete）时：
+- 仍使用 `<notebook>-complete.md`（无 stage 前缀）
+- 额外读取所有 `-stage-*-complete.md` 文件作为输入，综合生成跨阶段累积经验
+
+### 9.4 highlight_file 回写
 
 highlight(complete) 成功后，回写 `.index.json` 中 `stage.completed[current-1].highlight_file`。
 
-### 9.4 最终蒸馏
+### 9.5 最终蒸馏
 
 最后一个阶段 merge → `complete` 时，highlight(complete) 读取所有阶段的 Results + 所有 `-stage-*-complete.md`，综合生成 `<notebook>-complete.md`。
 
@@ -599,7 +624,7 @@ task-ai(auth):merge stage 1 completed
 |--------|------|
 | 状态机扩展 | ✅ 仅新增 `stage-done`，不膨胀 |
 | 命令改动范围 | ✅ 主要改 merge/auto/target，plan 只需读取阶段信息 |
-| highlight 解耦 | ✅ 单向依赖，highlight 不知道 stage 概念 |
+| highlight 解耦 | ✅ 单向依赖。highlight 通过 .index.json stage 字段感知阶段信息（文件名前缀），但不承担阶段管理逻辑 |
 
 ### 12.6 可维护性
 
@@ -653,6 +678,7 @@ task-ai(auth):merge stage 1 completed
 | target 编辑 | `regression-target-edit` | 简化格式 target.md 编辑、保存、conversational define 不受影响 |
 | state-matrix | `regression-state-transitions` | 现有全部状态转换路径不变（draft/planning/review/executing/complete/cancelled/blocked） |
 | highlight 无 stage | `regression-highlight-no-stage` | total:1 的 highlight(complete) 不添加 stage 前缀；经验文件命名不变；幂等检查正常工作 |
+| 多阶段集成 | `regression-multistage-flow` | 三阶段完整周期：stage 1 merge → stage-done → highlight → report → (stop) → target(stage 2) → planning → ... → stage 3 merge → complete；验证阶段边界的状态转换和文件归档 |
 
 ### 13.4 实施顺序与 TDD 批次
 
@@ -669,18 +695,18 @@ task-ai(auth):merge stage 1 completed
 
 ## 14. 实施清单
 
-| # | 任务 | 涉及文件 | 依赖 |
-|---|------|---------|------|
-| 1 | init 初始化 stage 字段（默认 total:1） | `skills/init/SKILL.md` | — |
-| 2 | target 主动多阶段分析 + 多阶段格式生成 + stage-done 上的推进行为 | `skills/target/SKILL.md` | #1 |
-| 3 | state.py 增加 stage-done 状态 + 合法转换 | `core/state.py` | — |
-| 4 | merge 增加 stage-done 分支逻辑 | `skills/merge/SKILL.md` | #1, #3 |
-| 5 | auto signal whitelist + routing + entry point + Phase 4 分支 | `skills/auto/SKILL.md` | #4 |
-| 6 | plan 阶段感知（读取当前 ACTIVE stage） | `skills/plan/SKILL.md` | #2 |
-| 7 | highlight 经验文件命名增加 stage 序号 + highlight_file 回写 | `skills/highlight/SKILL.md` | highlight 已实现 |
-| 8 | state-matrix 增加 stage-done 行 + merge 列修改 | `commands/references/state-matrix.md` | #3 |
-| 9 | git-details 增加阶段 commit 类型 | `commands/references/git-details.md` | — |
-| 10 | 各命令 stage 缺省处理（缺少 stage 时按 total:1） | 所有读 .index.json 的 SKILL.md | #1 |
+| # | 批次 | 任务 | 涉及文件 | 依赖 |
+|---|------|------|---------|------|
+| 1 | B0 | init 初始化 stage 字段（默认 total:1） | `skills/init/SKILL.md` | — |
+| 2 | B2 | target 主动多阶段分析 + 多阶段格式生成 + stage-done 上的推进行为 | `skills/target/SKILL.md` | #1 |
+| 3 | B0 | state.py 增加 stage-done 状态 + 合法转换 | `core/state.py` | — |
+| 4 | B1 | merge 增加 stage-done 分支逻辑 | `skills/merge/SKILL.md` | #1, #3 |
+| 5 | B1 | auto signal whitelist + routing + entry point + Phase 4 分支 | `skills/auto/SKILL.md` | #4 |
+| 6 | B1 | plan 阶段感知（读取当前 ACTIVE stage） | `skills/plan/SKILL.md` | #2 |
+| 7 | B2 | highlight 经验文件命名增加 stage 序号 + highlight_file 回写 | `skills/highlight/SKILL.md` | highlight 已实现 |
+| 8 | B3 | state-matrix 增加 stage-done 行 + merge 列修改 | `commands/references/state-matrix.md` | #3 |
+| 9 | B3 | git-details 增加阶段 commit 类型 | `commands/references/git-details.md` | — |
+| 10 | B0 | 各命令 stage 缺省处理（缺少 stage 时按 total:1） | 所有读 .index.json 的 SKILL.md | #1 |
 
 ---
 
