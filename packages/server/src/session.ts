@@ -74,6 +74,8 @@ interface NotebookSession {
   _execStartTimes: Map<string, number>;
   /** Claude CLI session ID captured from system.init — used for --resume on restart. */
   claudeSessionId?: string;
+  /** Queue of pending cell IDs to execute during a rerun. */
+  _rerunQueue?: string[];
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -202,6 +204,12 @@ export class SessionManager {
       };
     }
 
+    // Auto-restart agent process if it died (e.g. SIGINT killed it during interrupt)
+    if (!session.agentProcess.isAlive()) {
+      console.log(`[session ${sessionId}] Agent process dead — auto-restarting before execute.`);
+      await this.restartSession(sessionId);
+    }
+
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
     session._execStartTimes.set(cellId, Date.now());
 
@@ -291,6 +299,46 @@ export class SessionManager {
     );
 
     console.log(`[session] Rerun initiated for session "${sessionId}" (clean context)`);
+
+    // 5. Build rerun queue from all prompt cells and kick off execution
+    session._rerunQueue = session.notebook.cells
+      .filter((c) => c.type === 'prompt')
+      .map((c) => c.id);
+    this.executeNextRerunCell(session);
+  }
+
+  /**
+   * Executes the next cell in the rerun queue.
+   * Shifts the first cellId, sets it to running, and sends the prompt.
+   * Cleans up _rerunQueue when empty.
+   */
+  private executeNextRerunCell(session: NotebookSession): void {
+    if (!session._rerunQueue || session._rerunQueue.length === 0) {
+      delete session._rerunQueue;
+      return;
+    }
+
+    const cellId = session._rerunQueue.shift()!;
+    const cell = session.notebook.cells.find((c) => c.id === cellId);
+    if (!cell) {
+      delete session._rerunQueue;
+      return;
+    }
+
+    session.notebook = updateCellStatus(session.notebook, cellId, 'running');
+    session._execStartTimes.set(cellId, Date.now());
+    session.agentProcess.sendPrompt(cell.source);
+  }
+
+  async interruptCell(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+
+    // Clear rerun queue so no more cells auto-execute after interrupt
+    delete session._rerunQueue;
+
+    session.agentProcess.interrupt();
+    // Claude CLI will emit a 'result' message → completeCell() handles the rest
   }
 
   async closeSession(sessionId: string): Promise<void> {
@@ -401,6 +449,13 @@ export class SessionManager {
           });
         });
     }, 0);
+
+    // Chain rerun execution: if there are more cells in the queue, execute next.
+    if (session._rerunQueue && session._rerunQueue.length > 0) {
+      setTimeout(() => this.executeNextRerunCell(session), 0);
+    } else if (session._rerunQueue) {
+      delete session._rerunQueue;
+    }
   }
 
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */

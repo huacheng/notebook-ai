@@ -185,6 +185,32 @@ interface CellOutputProps {
 export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
   const isRunning = cellStatus === 'running';
 
+  const hasStaticOutput = outputs.length > 0;
+  const hasStreaming = isRunning && cellId;
+
+  if (!hasStaticOutput && !hasStreaming) return null;
+
+  // ── Streaming branch: flat rendering (unchanged) ──
+  if (hasStreaming) {
+    const allToolItems = outputs.filter(
+      (o): o is ToolItem => o.type === 'tool_use',
+    );
+    const interactiveItems = allToolItems.filter(isAskUserQuestion);
+    const toolItems = allToolItems.filter((i) => !isAskUserQuestion(i));
+
+    return (
+      <div className="cell-output-area">
+        <StreamingThinking cellId={cellId} />
+        {toolItems.length > 0 && <ToolsPanel items={toolItems} />}
+        {interactiveItems.map((item, i) => (
+          <InteractiveOptionsWrapper key={item.tool_use_id ?? i} item={item} />
+        ))}
+        <StreamingText cellId={cellId} />
+      </div>
+    );
+  }
+
+  // ── Completed branch: aggregated display ──
   const thinkingItems = outputs.filter(
     (o): o is ThinkingItem => o.type === 'thinking',
   );
@@ -197,33 +223,17 @@ export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
     (o) => o.type === 'text' || o.type === 'error' || o.type === 'chart',
   );
 
-  const hasStaticOutput = outputs.length > 0;
-  const hasStreaming = isRunning && cellId;
-
-  if (!hasStaticOutput && !hasStreaming) return null;
-
   return (
     <div className="cell-output-area">
+      {thinkingItems.length > 0 && <ThinkingPanel items={thinkingItems} />}
 
-      {/* ── Streaming thinking (live, replaces static thinking while running) ── */}
-      {hasStreaming && <StreamingThinking cellId={cellId} />}
-
-      {/* ── Thinking (collapsible, default collapsed — hidden during streaming) ── */}
-      {!hasStreaming && thinkingItems.length > 0 && <ThinkingPanel items={thinkingItems} />}
-
-      {/* ── Tools (each row individually collapsible) ── */}
       {toolItems.length > 0 && <ToolsPanel items={toolItems} />}
 
-      {/* ── Interactive options (AskUserQuestion) ── */}
       {interactiveItems.map((item, i) => (
         <InteractiveOptionsWrapper key={item.tool_use_id ?? i} item={item} />
       ))}
 
-      {/* ── Streaming text (live, replaces static text while running) ── */}
-      {hasStreaming && <StreamingText cellId={cellId} />}
-
-      {/* ── Response output (hidden during streaming to avoid duplicates) ── */}
-      {!hasStreaming && responseItems.length > 0 && (
+      {responseItems.length > 0 && (
         <div className="cell-response">
           {responseItems.map((item, i) => {
             if (item.type === 'text')  return <TextOutputView  key={i} content={item.content} />;
@@ -233,7 +243,6 @@ export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
           })}
         </div>
       )}
-
     </div>
   );
 }
