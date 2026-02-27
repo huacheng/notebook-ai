@@ -1728,6 +1728,99 @@ textarea.cell-input {
   color: var(--color-error);
 }
 
+/* Interactive Options (AskUserQuestion) */
+.interactive-options {
+  border: 1px solid var(--color-primary-ring);
+  border-radius: var(--radius-md);
+  background: var(--bg-cell);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.interactive-options--answered {
+  opacity: 0.7;
+}
+.interactive-options-header {
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.interactive-options-question {
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+.interactive-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.interactive-option-card {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.interactive-option-card:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+.interactive-option-card--selected {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  border-left: 3px solid var(--color-primary);
+}
+.interactive-option-card:disabled {
+  cursor: default;
+}
+.interactive-option-check {
+  flex-shrink: 0;
+  font-size: 1.1em;
+}
+.interactive-option-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.interactive-option-desc {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+.interactive-options-confirm {
+  align-self: flex-end;
+  padding: 6px 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.interactive-options-confirm:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+.interactive-options-confirm:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.interactive-options-status {
+  font-size: var(--font-size-sm);
+  color: var(--color-completed);
+  font-weight: 500;
+}
+
 /* Thinking */
 .output-thinking {
   border: 1px solid #fde68a;
@@ -5045,13 +5138,13 @@ button:focus-visible {
 }
 
 .git-commit-row {
-  padding: 2px 10px;
+  padding: 0 10px;
   cursor: pointer;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 4px;
-  height: 34px;
+  height: 32px;
 }
 
 .git-commit-row:hover {

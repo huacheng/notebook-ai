@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import type { CellOutput as CellOutputItem } from '@notebook-ai/shared';
 import { StreamingText, StreamingThinking } from './StreamingCellOutput';
+import { InteractiveOptions } from './InteractiveOptions';
+import { isAskUserQuestion } from '../utils/interactiveOptions';
+import type { AskQuestion } from '../utils/interactiveOptions';
+import { useStore } from '../store';
 
 // ── SVG sanitizer ────────────────────────────────────────────────────────────
 
@@ -155,6 +159,20 @@ function ToolsPanel({ items }: { items: ToolItem[] }) {
   );
 }
 
+// ── Interactive options wrapper ──────────────────────────────────────────────
+
+function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
+  const submitPrompt = useStore((s) => s.submitPrompt);
+  const questions = (item.input as { questions: AskQuestion[] }).questions;
+
+  return (
+    <InteractiveOptions
+      questions={questions}
+      onSelect={(answer) => submitPrompt(answer)}
+    />
+  );
+}
+
 // ── Public component ─────────────────────────────────────────────────────────
 
 interface CellOutputProps {
@@ -170,9 +188,11 @@ export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
   const thinkingItems = outputs.filter(
     (o): o is ThinkingItem => o.type === 'thinking',
   );
-  const toolItems = outputs.filter(
+  const allToolItems = outputs.filter(
     (o): o is ToolItem => o.type === 'tool_use',
   );
+  const interactiveItems = allToolItems.filter(isAskUserQuestion);
+  const toolItems = allToolItems.filter((i) => !isAskUserQuestion(i));
   const responseItems = outputs.filter(
     (o) => o.type === 'text' || o.type === 'error' || o.type === 'chart',
   );
@@ -193,6 +213,11 @@ export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
 
       {/* ── Tools (each row individually collapsible) ── */}
       {toolItems.length > 0 && <ToolsPanel items={toolItems} />}
+
+      {/* ── Interactive options (AskUserQuestion) ── */}
+      {interactiveItems.map((item, i) => (
+        <InteractiveOptionsWrapper key={item.tool_use_id ?? i} item={item} />
+      ))}
 
       {/* ── Streaming text (live, replaces static text while running) ── */}
       {hasStreaming && <StreamingText cellId={cellId} />}
