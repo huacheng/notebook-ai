@@ -102,10 +102,15 @@ The report is written to `[deliverables-dir]/.report.md` (the notebook's deliver
 
 | Current Status | After Report | Condition |
 |----------------|--------------|-----------|
-| `complete` | `complete` | Always |
-| `blocked` | `blocked` | Always |
-| `cancelled` | `cancelled` | Always |
-| `stage-done` | `stage-done` | Always (interim report for completed stage) |
+| `draft` | `draft` | Minimal output (see Prerequisites) |
+| `planning` | `planning` | Progress snapshot |
+| `review` | `review` | Progress snapshot |
+| `executing` | `executing` | Progress snapshot |
+| `re-planning` | `re-planning` | Progress snapshot |
+| `complete` | `complete` | Full completion report |
+| `blocked` | `blocked` | Document blocked state |
+| `cancelled` | `cancelled` | Document cancellation |
+| `stage-done` | `stage-done` | Interim report for completed stage |
 
 ## Git
 

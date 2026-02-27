@@ -24,6 +24,7 @@ Define or review the core mission for a notebook. This command acts as the cogni
    - Locate the current notebook via path-based discovery (`.working/` directory) or branch-based discovery (`task/<name>`).
    - If context cannot be identified, abort with error: "No active task context detected. Enter a notebook directory or switch to a task branch."
    - **Read** `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing) and `status`.
+   - **If status is `complete` or `cancelled`**: REJECT with error "Completed/cancelled tasks cannot be re-targeted." Abort execution.
 
 2. **If `objective` is provided (Write Mode)** — three-branch routing:
 

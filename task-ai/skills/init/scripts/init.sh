@@ -40,7 +40,7 @@ if [[ -d "$TARGET_DIR" ]]; then
     exit 1
 fi
 
-if git branch --list "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+if git branch --list "$BRANCH_NAME" | grep -qF "$BRANCH_NAME"; then
     echo "[ERROR] Git branch already exists: $BRANCH_NAME" >&2
     exit 1
 fi
@@ -60,8 +60,8 @@ fi
 mkdir -p "$WORKING_DIR"
 
 # 5. Metadata Creation (.index.json)
-# Sanitize TITLE: strip control characters (except newline/tab), then escape for JSON
-TITLE=$(printf '%s' "$TITLE" | tr -d '[:cntrl:]')
+# Sanitize TITLE: strip all control characters and ANSI escape residue, then escape for JSON
+TITLE=$(printf '%s' "$TITLE" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr -d '[:cntrl:]')
 SAFE_TITLE="${TITLE//\\/\\\\}"
 SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
 cat > "$WORKING_DIR/.index.json" <<EOF

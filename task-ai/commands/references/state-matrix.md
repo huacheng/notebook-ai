@@ -8,7 +8,8 @@ Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays s
 | `draft` | →`planning` | →`planning` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
 | `planning` | =`planning` | =`planning` | =`planning` | PASS→`review` / NEEDS_REVISION=`planning` / BLOCKED→`blocked` | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
 | `review` | →`re-planning` | →`re-planning` | →`re-planning` | ⊘ | ⊘ | ⊘ | →`executing` | ⊘ | — | →`cancelled` | — |
-| `executing` | =`executing` | →`re-planning` | →`re-planning` | ⊘ | CONT=`executing` / NEEDS_FIX=`executing` / REPLAN→`re-planning` / BLOCKED→`blocked` | ACCEPT=`executing` (signal→merge) / NEEDS_FIX=`executing` / REPLAN→`re-planning` | =`executing` (NEEDS_FIX fix) / →`blocked` (dependency) | →`complete` / =`executing` (conflict) | — | →`cancelled` | — |
+| `executing` | =`executing` | →`re-planning` | →`re-planning` | ⊘ | CONT=`executing` / NEEDS_FIX=`executing` / REPLAN→`re-planning` / BLOCKED→`blocked` | ACCEPT=`executing` (signal→merge) / NEEDS_FIX=`executing` / REPLAN→`re-planning` | =`executing` (NEEDS_FIX fix) / →`blocked` (dependency) | →`complete` / →`stage-done` / =`executing` (conflict) | — | →`cancelled` | — |
+| `stage-done` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | →`cancelled` | — |
 | `re-planning` | =`re-planning` | =`re-planning` | =`re-planning` | PASS→`review` / NEEDS_REVISION=`re-planning` / BLOCKED→`blocked` | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
 | `complete` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | ⊘ | — |
 | `blocked` | →`planning` | →`planning` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | →`cancelled` | — |
@@ -18,7 +19,7 @@ Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays s
 
 **Verification properties:**
 - Every non-terminal state has ≥1 exit path (no deadlock)
-- Terminal states: only `complete` and `cancelled`
+- Terminal states: only `complete` and `cancelled` (`stage-done` is non-terminal — exits via `target` → `planning` or `cancel` → `cancelled`)
 - `cancel` is available on all non-terminal states (rejected on `complete` and `cancelled`)
 - `exec` requires `review` gate (cannot skip `check`)
 - `merge` requires ACCEPT verdict gate (cannot skip `check post-exec`)

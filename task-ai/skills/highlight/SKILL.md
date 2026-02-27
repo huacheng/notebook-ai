@@ -494,7 +494,7 @@ Steps:
 #### Complete Execution Steps
 
 1. **Read** `.index.json` — get type, status, notebook metadata
-2. **Read** all input files (see table above)
+2. **Read** all input files (see table above), respecting the context budget guard: read in priority order, stop or truncate when approaching the ~50k token budget
 3. **Absorb** existing provisional experience (`-impl.md`, `-verify.md`), integrate into final distillation
 4. **Output A** — Experience distillation, per type segment:
    - 4a. `mkdir -p .memory/.experiences/<segment>/`

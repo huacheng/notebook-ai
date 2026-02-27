@@ -249,7 +249,7 @@ The auto skill runs this loop within a single the agent session:
 | `review` | Execute exec |
 | `executing` | Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX, adding one extra iteration. This avoids re-parsing `.plan.md` to count total steps at entry |
 | `re-planning` | Read `phase` field: if `needs-plan` → execute plan (generate); if `needs-check` → execute verify → check (post-plan); if empty → default to plan (generate, safe fallback) |
-| `stage-done` | Execute highlight(complete) → report → stop. Output stage completion message with next-stage instructions. *(v2: auto-advance — auto reads next stage target and continues loop without user intervention)* |
+| `stage-done` | Execute highlight(complete) → report → stop. Output stage completion message with next-stage instructions. *(FUTURE v2 TODO: auto-advance — auto would read next stage target and continue loop without user intervention; not yet implemented)* |
 | `complete` | Execute report, then stop |
 | `blocked` | Stop loop, report blocking reason |
 | `cancelled` | Stop loop |

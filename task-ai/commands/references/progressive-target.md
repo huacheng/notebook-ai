@@ -16,6 +16,8 @@ Stage 2: planning → check → exec → merge → stage-done
 Stage N: planning → check → exec → merge → complete
 ```
 
+*(Simplified — verify→check loops omitted. See `auto/SKILL.md` for the full loop with verify checkpoints.)*
+
 Key transitions:
 - `executing → stage-done` via merge (when `stage.current < stage.total`)
 - `stage-done → planning` via target (next stage defined)
