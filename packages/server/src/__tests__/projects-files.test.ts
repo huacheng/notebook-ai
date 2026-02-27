@@ -96,6 +96,41 @@ describe('GET /:projectId/files — notebook directory marking', () => {
   });
 });
 
+describe('GET /:projectId/files — worktree notebook injection', () => {
+  it('injects worktree notebooks as isNotebook entries in top-level listing', async () => {
+    // Create worktree-style notebook: .worktrees/task-my-nb/my-nb.notebook.json
+    const wtDir = path.join(projectDir, '.worktrees', 'task-my-nb');
+    await mkdir(wtDir, { recursive: true });
+    await writeFile(path.join(wtDir, 'my-nb.notebook.json'), '{}');
+
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files`)
+      .expect(200);
+
+    const names = res.body.files.map((f: any) => f.name);
+    // .worktrees itself should still be hidden
+    expect(names).not.toContain('.worktrees');
+    // But the notebook should appear as a virtual entry
+    const nb = res.body.files.find((f: any) => f.isNotebook && f.name === 'task-my-nb');
+    expect(nb).toBeDefined();
+    expect(nb.type).toBe('directory');
+    expect(nb.worktreePath).toBe('.worktrees/task-my-nb');
+  });
+
+  it('does not inject worktree dirs that have no .notebook.json', async () => {
+    const wtDir = path.join(projectDir, '.worktrees', 'task-orphan');
+    await mkdir(wtDir, { recursive: true });
+    await writeFile(path.join(wtDir, 'random.txt'), 'not a notebook');
+
+    const res = await request(app)
+      .get(`/api/projects/${PROJECT_ID}/files`)
+      .expect(200);
+
+    const entry = res.body.files.find((f: any) => f.name === 'task-orphan');
+    expect(entry).toBeUndefined();
+  });
+});
+
 // ── 1. Dotfile filter ────────────────────────────────────────────────────
 
 describe('GET /:projectId/files — dotfile filter', () => {

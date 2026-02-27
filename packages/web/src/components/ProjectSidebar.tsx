@@ -3,8 +3,7 @@ import { useStore } from '../store';
 import { FileSection } from './FileSection';
 import { runDeleteFlow } from './deleteFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
-
-const MAX_TITLE_LENGTH = 80;
+import { validateTitle, MAX_TITLE_LENGTH } from '../utils/validateTitle';
 
 function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   phase: 'creating' | 'done' | 'error';
@@ -47,14 +46,7 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   );
 }
 
-function validateTitle(title: string): string {
-  const t = title.trim();
-  if (!t) return '';
-  if (t.length > MAX_TITLE_LENGTH) return `Name too long (max ${MAX_TITLE_LENGTH} chars)`;
-  if (!/[a-zA-Z0-9]/.test(t)) return 'Name must contain at least one letter or number';
-  if (/^[.\-_]/.test(t)) return 'Name cannot start with . - or _';
-  return '';
-}
+
 
 function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete }: {
   projectId: string; projectSlug: string; authToken: string | null;

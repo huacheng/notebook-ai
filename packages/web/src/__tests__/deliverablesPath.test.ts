@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getDeliverablesPath } from '../utils/deliverablesPath';
+import { validateTitle } from '../utils/validateTitle';
 import { createProjectSlice } from '../store/projectSlice';
 
 describe('getDeliverablesPath', () => {
@@ -31,6 +32,34 @@ describe('getDeliverablesPath', () => {
       '/ws/proj/.worktrees/task-x',
       '/ws/proj',
     )).toBe('.worktrees/task-x/.deliverables');
+  });
+});
+
+// ── validateTitle Unicode support ─────────────────────────────────────
+
+describe('validateTitle', () => {
+  it('accepts Chinese characters', () => {
+    expect(validateTitle('测试')).toBe('');
+  });
+
+  it('accepts Japanese characters', () => {
+    expect(validateTitle('テスト')).toBe('');
+  });
+
+  it('accepts Korean characters', () => {
+    expect(validateTitle('테스트')).toBe('');
+  });
+
+  it('accepts mixed Unicode and ASCII', () => {
+    expect(validateTitle('项目 Alpha')).toBe('');
+  });
+
+  it('rejects pure punctuation/symbols', () => {
+    expect(validateTitle('---')).not.toBe('');
+  });
+
+  it('rejects names starting with dot', () => {
+    expect(validateTitle('.hidden')).not.toBe('');
   });
 });
 

@@ -203,6 +203,39 @@ export function createProjectsRouter(
         }
       }
 
+      // Inject worktree notebooks into top-level listing
+      if (isTopLevel) {
+        const wtRoot = path.join(project.path, '.worktrees');
+        if (existsSync(wtRoot)) {
+          try {
+            const wtEntries = await readdir(wtRoot, { withFileTypes: true });
+            for (const wt of wtEntries) {
+              if (!wt.isDirectory()) continue;
+              // Find any .notebook.json inside the worktree dir
+              const wtPath = path.join(wtRoot, wt.name);
+              const wtFiles = await readdir(wtPath).catch(() => [] as string[]);
+              const hasNb = wtFiles.some(f => f.endsWith('.notebook.json'));
+              if (hasNb) {
+                const s = await stat(wtPath).catch(() => null);
+                result.files.push({
+                  name: wt.name,
+                  type: 'directory',
+                  size: 0,
+                  modifiedAt: s?.mtime.toISOString() ?? new Date().toISOString(),
+                  isNotebook: true,
+                  worktreePath: `.worktrees/${wt.name}`,
+                } as any);
+              }
+            }
+            // Re-sort: dirs first, then alphabetical
+            result.files.sort((a, b) => {
+              if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+              return a.name.localeCompare(b.name);
+            });
+          } catch { /* ignore .worktrees scan errors */ }
+        }
+      }
+
       res.json(result);
     } catch (err: any) {
       if (err.message === 'Path outside workspace') {

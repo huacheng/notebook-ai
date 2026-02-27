@@ -517,7 +517,7 @@ export function FileSection({
           {!loading && files.map((f) => {
             const isNbDir = f.type === 'directory' && (f as any).isNotebook;
             return f.type === 'directory' ? (
-            <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => navigateInto(f.name)}>
+            <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => navigateInto((f as any).worktreePath || f.name)}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
               <span className="fp-name" title={f.name}>{f.name}</span>
               {isNbDir && <TypeBadge name={`${f.name}.notebook.json`} />}
