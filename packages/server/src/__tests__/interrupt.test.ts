@@ -129,6 +129,9 @@ describe('interrupt (Esc)', () => {
 
     // start() should have been called again (restart)
     expect(startSpy).toHaveBeenCalledTimes(2); // 1st: createSession, 2nd: auto-restart
+    // Auto-restart should NOT pass resumeSessionId (3rd arg should be undefined)
+    const restartCall = startSpy.mock.calls[1];
+    expect(restartCall[2]).toBeUndefined(); // no --resume for crashed session
     // sendPrompt should succeed on the restarted process
     expect(sendPromptSpy).toHaveBeenCalledWith('继续');
 

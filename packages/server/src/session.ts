@@ -204,10 +204,11 @@ export class SessionManager {
       };
     }
 
-    // Auto-restart agent process if it died (e.g. SIGINT killed it during interrupt)
+    // Auto-restart agent process if it died (e.g. SIGINT killed it during interrupt).
+    // Skip --resume: the crashed session is unrecoverable and causes exit code 1.
     if (!session.agentProcess.isAlive()) {
-      console.log(`[session ${sessionId}] Agent process dead — auto-restarting before execute.`);
-      await this.restartSession(sessionId);
+      console.log(`[session ${sessionId}] Agent process dead — auto-restarting (clean) before execute.`);
+      await this.restartSession(sessionId, { skipResume: true });
     }
 
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
@@ -224,12 +225,13 @@ export class SessionManager {
    * Restarts the agent process for an existing session.
    * Preserves the session ID, notebook state, and listeners.
    */
-  async restartSession(sessionId: string): Promise<void> {
+  async restartSession(sessionId: string, opts?: { skipResume?: boolean }): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
-    // Capture Claude session ID for --resume before stopping
-    const resumeSessionId = session.claudeSessionId;
+    // Capture Claude session ID for --resume before stopping.
+    // Skip resume when the process crashed (SIGINT death) — the session is unrecoverable.
+    const resumeSessionId = opts?.skipResume ? undefined : session.claudeSessionId;
 
     // Stop old process
     session.agentProcess.stop();
