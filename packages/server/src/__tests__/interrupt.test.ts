@@ -138,6 +138,29 @@ describe('interrupt (Esc)', () => {
     isAliveSpy.mockRestore();
   });
 
+  it('executeCell force-completes stale running cell when process is dead', async () => {
+    startSpy.mockImplementation(async (onMsg: (msg: unknown) => void) => {
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+
+    const session = await createSessionWithRunningCell();
+
+    // Simulate: process died but cell is still "running" (race condition)
+    const isAliveSpy = vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(false);
+    // Note: we do NOT send a result message — cell c1 stays "running"
+    expect(session.notebook.cells[0].status).toBe('running');
+
+    // executeCell should NOT throw "Another cell is already running"
+    await sm.executeCell(session.id, 'c3', '继续');
+
+    // Stale running cell should have been force-completed as error
+    expect(session.notebook.cells[0].status).toBe('error');
+    // New cell should be running
+    expect(sendPromptSpy).toHaveBeenCalledWith('继续');
+
+    isAliveSpy.mockRestore();
+  });
+
   // ── End-to-end: interrupt during rerun ──────────────────────────────────
 
   it('interrupt during rerun stops auto-execution of subsequent cells', async () => {

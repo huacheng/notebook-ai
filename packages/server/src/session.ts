@@ -179,6 +179,18 @@ export class SessionManager {
       throw new Error(`Session "${sessionId}" not found.`);
     }
 
+    // If the agent process died (e.g. SIGINT during interrupt), force-complete any
+    // stale running cell and restart the process before the concurrency check.
+    if (!session.agentProcess.isAlive()) {
+      const staleRunningId = findRunningCellId(session.notebook);
+      if (staleRunningId) {
+        console.log(`[session ${sessionId}] Force-completing stale cell "${staleRunningId}" (process dead).`);
+        this.completeCell(session, staleRunningId, true);
+      }
+      console.log(`[session ${sessionId}] Agent process dead — auto-restarting (clean) before execute.`);
+      await this.restartSession(sessionId, { skipResume: true });
+    }
+
     // Reject concurrent execution: only one cell may run at a time per session.
     const alreadyRunning = session.notebook.cells.some((c) => c.status === 'running');
     if (alreadyRunning) {
@@ -202,13 +214,6 @@ export class SessionManager {
           },
         ],
       };
-    }
-
-    // Auto-restart agent process if it died (e.g. SIGINT killed it during interrupt).
-    // Skip --resume: the crashed session is unrecoverable and causes exit code 1.
-    if (!session.agentProcess.isAlive()) {
-      console.log(`[session ${sessionId}] Agent process dead — auto-restarting (clean) before execute.`);
-      await this.restartSession(sessionId, { skipResume: true });
     }
 
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
