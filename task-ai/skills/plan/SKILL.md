@@ -62,7 +62,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 21. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
 22. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 23. Update `.index.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
-24. **CoT capture** (optional, encouraged): If this planning session involved complex or novel reasoning, write `.memory/.thinking/raw/<notebook>-plan-<YYYY-MM-DD>.md` with quality self-assessment. Use O_APPEND (no lock needed — filename is unique). Append one row to `.memory/.thinking/raw/.index.md` on first creation (O_APPEND). See `skills/library/SKILL.md` `.memory/.thinking/raw/` Entry Format and `library/references/quality-rubric.md` for format and H/M/L rubric
+24. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
 25. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
 26. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
 27. Report plan summary to user

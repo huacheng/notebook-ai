@@ -75,6 +75,7 @@ On successful merge:
    7.2. Attempt resolution (up to 3 tries)
    7.3. Each resolution: fix conflicts → verify (build + test) → if pass commit, if fail abort and retry
    7.4. If all 3 attempts fail → stay `executing`, abort merge, report unresolvable conflicts
+   7.5. If conflicts were resolved: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value, only when conflicts occurred). Capture conflict resolution strategy reasoning. Inline call failure MUST NOT block merge's main flow
 8. **Phase 4**: Post-merge finalization (status → `complete` with branch/worktree retained, write `.summary.md`, git commit state)
 9. **Write** `.auto-signal` — MUST be written AFTER Phase 4 status update to `complete`, so the daemon reads correct status when routing to `report`
 10. **Report** merge result
@@ -99,7 +100,7 @@ On successful merge:
 
 | Result | Signal |
 |--------|--------|
-| Success | `{ "step": "merge", "result": "success", "next": "report", "checkpoint": "", "timestamp": "..." }` |
+| Success | `{ "step": "merge", "result": "success", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
 | Conflict | `{ "step": "merge", "result": "conflict", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
 | Dependency not met | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 | No ACCEPT verdict | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "no-accept", "timestamp": "..." }` |

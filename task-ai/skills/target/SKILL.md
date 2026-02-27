@@ -27,6 +27,7 @@ Define or review the core mission for a notebook. This command acts as the cogni
    - **Format**: Transform the input text into a structured Markdown format (Objective, Requirements, Constraints). If the input is a single sentence, use it as the `## Objective`.
    - **Update**: Atomic write to `.working/.target.md`.
    - **Git Commit**: `git commit -m "task-ai($NB):target update objective"` to provide a Demand Traceability record.
+   - Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture goal decomposition and constraint reasoning during objective analysis. Inline call failure MUST NOT block target's main flow.
 3. **If `objective` is omitted (Read Mode)**:
    - **Read**: Read the content of `.working/.target.md`.
    - **Display**: Output the structured objective to the conversation window.

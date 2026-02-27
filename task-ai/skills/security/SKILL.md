@@ -38,6 +38,7 @@ Acts as the mandatory Pre-hook for existing sub-commands (`check` and `exec`), e
 5. Read `.plan.md` and `.target.md`.
 6. **Semantic Deviation**: Evaluate if the proposed steps logically align with the target. Flag out-of-scope networking or obfuscated execution.
 7. **Verdict**: Return `[SECURITY] PASS` or `[SECURITY] BLOCKED`.
+8. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value). Capture threat model and risk assessment reasoning during security audit. Inline call failure MUST NOT block security's main flow.
 
 ## Incident Response
 If a command is `REJECT`ed during `exec`:

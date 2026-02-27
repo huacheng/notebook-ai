@@ -1,8 +1,8 @@
 ---
-description: "Structured task lifecycle management with 18 skills for AI-driven development. Use when tasks need structured planning, domain-aware verification, and tracked execution through $NB_WORKSPACES_ROOT/ directory workflow. Sub-commands: init, target, light, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library."
+description: "Structured task lifecycle management with 18 skills for AI-driven development. Use when tasks need structured planning, domain-aware verification, and tracked execution through $NB_WORKSPACES_ROOT/ directory workflow. Sub-commands: init, target, highlight, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library."
 arguments:
   - name: subcommand
-    description: "Sub-command: init, target, light, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library"
+    description: "Sub-command: init, target, highlight, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library"
     required: true
   - name: args
     description: "Sub-command arguments (varies by sub-command)"
@@ -25,7 +25,7 @@ init → target → research(target) → plan → research(test) → verify → 
             └──────────────── research 可在任意阶段独立调用 ─────────────────────┘
 ```
 
-辅助命令（随时可用）: `light` · `read` · `security` · `auto` · `cancel` · `list` · `annotate` · `summarize` · `library`
+辅助命令（随时可用）: `highlight` · `read` · `security` · `auto` · `cancel` · `list` · `annotate` · `summarize` · `library`
 
 > **research** acts as the **intelligence officer** — the only sub-command callable at every phase independently. See [research standalone invocation examples](#research--intelligence-collection-) below.
 
@@ -255,7 +255,7 @@ Sub-commands have different cognitive demands. Each SKILL.md frontmatter declare
 
 | 命令 | 说明 |
 |------|------|
-| `light` | 当前分支轻量操作（人工干预、单次 commit） |
+| `highlight` | 经验蒸馏引擎（综合蒸馏、对话经验捕获） |
 | `cancel` | 取消任务 |
 | `list` | 查询任务状态与依赖 |
 | `annotate` | 处理 Plan 面板批注 |
@@ -324,4 +324,4 @@ Per-type seed methodology files are centralized in `skills/init/references/seed-
 
 **references/** contains large reference tables and domain-specific details that are only needed in specific situations. The main SKILL.md references these files with `See references/<file>.md` directives — the agent reads them on demand when the context requires it.
 
-18 sub-commands: `init`, `target`, `light`, `plan`, `research`, `read`, `security`, `check`, `verify`, `exec`, `merge`, `report`, `auto`, `cancel`, `list`, `annotate`, `summarize`, `library`. Each skill's SKILL.md frontmatter contains the authoritative description, arguments, model tier, and delegation flag. Read `skills/<name>/SKILL.md` for full details.
+18 sub-commands: `init`, `target`, `highlight`, `plan`, `research`, `read`, `security`, `check`, `verify`, `exec`, `merge`, `report`, `auto`, `cancel`, `list`, `annotate`, `summarize`, `library`. Each skill's SKILL.md frontmatter contains the authoritative description, arguments, model tier, and delegation flag. Read `skills/<name>/SKILL.md` for full details.

@@ -15,7 +15,7 @@ arguments:
 
 # /task-ai:auto — Autonomous Execution Loop
 
-Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction on failures. Runs as a **single the agent session** that internally dispatches sub-commands, preserving context across all steps.
+Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → highlight → report, with self-correction on failures. Runs as a **single the agent session** that internally dispatches sub-commands, preserving context across all steps.
 
 ## Usage
 
@@ -117,9 +117,9 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
-| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `report`, `research`, `verify`, `annotate` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `success`, `conflict`, `rejected` |
-| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `report`, `research`, `verify`, `annotate`, `(stop)` |
+| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate` |
+| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `conflict`, `rejected` |
+| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `(stop)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
 | `compaction_count` | Integer | ≥ 0 |
@@ -170,8 +170,12 @@ Phase 3: Post-Exec Verification
                     │
                     └──→ exec (re-exec) → [Phase 3]
 
-Phase 4: Merge & Report
-  merge ─── success ──→ report → (stop)
+Phase 4: Merge, Distillation & Report
+  merge ─── success ──→ highlight(complete) ──→ report → (stop)
+    │                        │
+    │                        ├── (distilled) ──→ report
+    │                        ├── (skipped-idempotent) ──→ report
+    │                        └── failed ──→ report (non-blocking)
     │
     └── conflict unresolvable (after 3 retries, stays executing) → (stop)
 
@@ -236,9 +240,12 @@ After each step, the agent evaluates the result and determines the next step int
 | exec | (mid-exec) | verify | mid-exec | Significant issue encountered, run verification before checkpoint |
 | exec | (step-N) | verify | mid-exec | Single step completed (manual `--step N` only) |
 | exec | (blocked) | (stop) | — | Cannot continue |
-| merge | success | report | — | Merge complete, generate report |
+| merge | success | highlight | — | Merge complete, distill experience before report |
 | merge | conflict | (stop) | — | Merge conflict unresolvable |
 | merge | rejected | (stop) | dependency-blocked / no-accept | Prerequisite not met (dependency or missing ACCEPT verdict) |
+| highlight | (distilled) | report | — | Distillation complete, generate report |
+| highlight | (skipped-idempotent) | report | — | No new content, skip to report |
+| highlight | failed | report | — | Distillation failed, continue to report (non-blocking) |
 | research | (collected) | `<caller>` (plan/verify/check/exec) | post-research | References collected, resume calling phase |
 | research | (sufficient) | `<caller>` (plan/verify/check/exec) | post-research | References sufficient, resume calling phase |
 | research | (o1-collected) | (stop) | post-o1 | O1 background research done, wait for user confirmation |

@@ -31,7 +31,7 @@ task-ai(<module>):<type> <description>
 | `merge` | Merge to main + conflict resolution | — (merge commit) |
 | `report` | Report generation | $NB_WORKSPACES_ROOT/ directory files |
 | `cancel` | Task cancellation | $NB_WORKSPACES_ROOT/ directory files |
-| `light` | Lightweight inline operation on current branch | Project files |
+| `highlight` | Experience distillation and ad-hoc capture | $NB_WORKSPACES_LIBRARY/ files |
 | `maintain` | Library maintenance (rebuild index, compact) | $NB_WORKSPACES_LIBRARY/ files |
 
 Commit scope: $NB_WORKSPACES_ROOT/ directory files (state/plan) or project files (feat/fix).
@@ -56,7 +56,8 @@ task-ai(auth-refactor):verify full verification
 task-ai(auth-refactor):annotate annotations processed
 task-ai(auth-refactor):summarize regenerate context summary
 task-ai(auth-refactor):cancel user cancelled
-task-ai(auth-refactor):light fix typo in README
+task-ai(auth-refactor):highlight complete distillation
+task-ai(auth-refactor):highlight adhoc experience captured
 ```
 
 ## Refactoring & Merge

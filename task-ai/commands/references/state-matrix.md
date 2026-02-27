@@ -2,7 +2,7 @@
 
 Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays same. `⊘` = rejected (prerequisite fail). `—` = no status change.
 
-| State ↓ \ Command → | target | plan | annotate | check post-plan | check mid-exec | check post-exec | exec | merge | report | cancel | light |
+| State ↓ \ Command → | target | plan | annotate | check post-plan | check mid-exec | check post-exec | exec | merge | report | cancel | highlight |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `(none)` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — | ⊘ | — |
 | `draft` | →`planning` | →`planning` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
@@ -23,5 +23,5 @@ Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays s
 - `exec` requires `review` gate (cannot skip `check`)
 - `merge` requires ACCEPT verdict gate (cannot skip `check post-exec`)
 - `re-planning` must pass through `check` to reach `review`
-- `light` has no state transitions — it operates inline on the current branch
+- `highlight` has no state transitions — it operates as a distillation protocol without affecting notebook status
 - NEEDS_FIX/NEEDS_REVISION self-loops are broken by auto signal routing (`next` field)
