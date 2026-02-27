@@ -64,7 +64,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   | 'prependCells' | 'setCellsOffset'
   | 'generateSlice' | 'updateSliceSections'
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
-  | 'openNotebookTab' | 'closeNotebookTab' | 'setActiveNotebookTab'
+  | 'openNotebookTab' | 'closeNotebookTab' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab'
   | 'appendStreamDelta' | 'flushStreamBuffer'
 >> = (set, get) => ({
   notebook: null,
@@ -391,6 +391,28 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       const newActiveId = state.activeNotebookTabId === notebookId
         ? (remainingIds[0] ?? null)
         : state.activeNotebookTabId;
+      return {
+        openNotebooks: rest,
+        activeNotebookTabId: newActiveId,
+        notebook: newActiveId ? rest[newActiveId]?.notebook ?? null : null,
+        sessionId: newActiveId ? rest[newActiveId]?.sessionId ?? null : null,
+        editMode: false,
+        pendingDeletes: new Set<string>(),
+      };
+    });
+  },
+
+  closeProjectNotebookTabs: (projectId) => {
+    set(state => {
+      const rest: typeof state.openNotebooks = {};
+      for (const [id, entry] of Object.entries(state.openNotebooks)) {
+        if (entry.notebook.metadata.project_id !== projectId) {
+          rest[id] = entry;
+        }
+      }
+      const remainingIds = Object.keys(rest);
+      const activeRemoved = !state.activeNotebookTabId || !(state.activeNotebookTabId in rest);
+      const newActiveId = activeRemoved ? (remainingIds[0] ?? null) : state.activeNotebookTabId;
       return {
         openNotebooks: rest,
         activeNotebookTabId: newActiveId,

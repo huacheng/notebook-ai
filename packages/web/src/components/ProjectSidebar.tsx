@@ -172,8 +172,9 @@ function ProjectList() {
           onConfirm={() => deleteProject(deleteTarget.id)}
           onDone={() => {
             setDeleteTarget(null);
-            const { activeProjectId, goBackToProjectList, fetchProjects, closeProjectFileTabs } = useStore.getState();
+            const { activeProjectId, goBackToProjectList, fetchProjects, closeProjectFileTabs, closeProjectNotebookTabs } = useStore.getState();
             closeProjectFileTabs(deleteTarget.id);
+            closeProjectNotebookTabs(deleteTarget.id);
             if (activeProjectId === deleteTarget.id) goBackToProjectList();
             fetchProjects();
           }}

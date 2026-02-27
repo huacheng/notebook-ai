@@ -141,6 +141,89 @@ describe('cellsOffset initial state', () => {
   });
 });
 
+// ── closeProjectNotebookTabs tests ──────────────────────────────────────
+
+function makeNotebookWithProject(projectId?: string) {
+  return {
+    version: 1,
+    metadata: {
+      title: `nb-${projectId ?? 'none'}`,
+      created: '2025-01-01',
+      agent: 'claude' as const,
+      git_repo: false,
+      ...(projectId !== undefined ? { project_id: projectId } : {}),
+    },
+    cells: [],
+    slice: { generated: false, sections: [] },
+    annotations: [],
+    assets: { intermediate_files: [] },
+  };
+}
+
+describe('closeProjectNotebookTabs', () => {
+  it('closes tabs belonging to the project and keeps others', () => {
+    const { state, getAction } = createTestSlice();
+    state.openNotebooks = {
+      'nb-a1': { notebook: makeNotebookWithProject('proj-a'), sessionId: 's1', scrollY: 0 },
+      'nb-a2': { notebook: makeNotebookWithProject('proj-a'), sessionId: 's2', scrollY: 0 },
+      'nb-b1': { notebook: makeNotebookWithProject('proj-b'), sessionId: 's3', scrollY: 0 },
+    };
+    state.activeNotebookTabId = 'nb-b1';
+    state.notebook = state.openNotebooks['nb-b1'].notebook;
+
+    getAction('closeProjectNotebookTabs')('proj-a');
+
+    expect(Object.keys(state.openNotebooks)).toEqual(['nb-b1']);
+    expect(state.activeNotebookTabId).toBe('nb-b1');
+  });
+
+  it('switches active tab to remaining tab when active is closed', () => {
+    const { state, getAction } = createTestSlice();
+    state.openNotebooks = {
+      'nb-a1': { notebook: makeNotebookWithProject('proj-a'), sessionId: 's1', scrollY: 0 },
+      'nb-b1': { notebook: makeNotebookWithProject('proj-b'), sessionId: 's2', scrollY: 0 },
+    };
+    state.activeNotebookTabId = 'nb-a1';
+    state.notebook = state.openNotebooks['nb-a1'].notebook;
+
+    getAction('closeProjectNotebookTabs')('proj-a');
+
+    expect(state.activeNotebookTabId).toBe('nb-b1');
+    expect(state.notebook).toBe(state.openNotebooks['nb-b1'].notebook);
+  });
+
+  it('sets activeNotebookTabId and notebook to null when all tabs are closed', () => {
+    const { state, getAction } = createTestSlice();
+    state.openNotebooks = {
+      'nb-a1': { notebook: makeNotebookWithProject('proj-a'), sessionId: 's1', scrollY: 0 },
+      'nb-a2': { notebook: makeNotebookWithProject('proj-a'), sessionId: 's2', scrollY: 0 },
+    };
+    state.activeNotebookTabId = 'nb-a1';
+    state.notebook = state.openNotebooks['nb-a1'].notebook;
+
+    getAction('closeProjectNotebookTabs')('proj-a');
+
+    expect(Object.keys(state.openNotebooks)).toEqual([]);
+    expect(state.activeNotebookTabId).toBeNull();
+    expect(state.notebook).toBeNull();
+  });
+
+  it('does not close notebooks without project_id', () => {
+    const { state, getAction } = createTestSlice();
+    state.openNotebooks = {
+      'nb-a1': { notebook: makeNotebookWithProject('proj-a'), sessionId: 's1', scrollY: 0 },
+      'nb-no': { notebook: makeNotebookWithProject(undefined), sessionId: 's2', scrollY: 0 },
+    };
+    state.activeNotebookTabId = 'nb-no';
+    state.notebook = state.openNotebooks['nb-no'].notebook;
+
+    getAction('closeProjectNotebookTabs')('proj-a');
+
+    expect(Object.keys(state.openNotebooks)).toEqual(['nb-no']);
+    expect(state.activeNotebookTabId).toBe('nb-no');
+  });
+});
+
 describe('cells_loaded WS message — wsSlice handler dispatch', () => {
   /**
    * This test exercises the ACTUAL wsSlice onmessage handler by:

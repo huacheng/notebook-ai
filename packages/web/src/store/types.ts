@@ -150,6 +150,7 @@ export interface NotebookStore {
   // ── Multi-notebook actions ────────────────────────────────────────────
   openNotebookTab(notebookId: string, notebook: Notebook, sessionId: string): void;
   closeNotebookTab(notebookId: string): void;
+  closeProjectNotebookTabs(projectId: string): void;
   setActiveNotebookTab(notebookId: string): void;
   appendStreamDelta(cellId: string, delta: string, blockType: 'text' | 'thinking'): void;
   flushStreamBuffer(cellId: string): string;
