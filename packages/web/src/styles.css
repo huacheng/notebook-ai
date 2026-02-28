@@ -1328,6 +1328,34 @@ textarea.cell-input {
   margin-right: calc(-1 * var(--space-xl));
 }
 
+/* Scroll-to-bottom floating button */
+.scroll-to-bottom {
+  position: fixed;
+  top: 50vh;
+  /* right is set dynamically via JS */
+  z-index: 25;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s, color 0.2s;
+  opacity: 0.7;
+  padding: 0;
+}
+.scroll-to-bottom:hover {
+  opacity: 1;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
 .notebook-input-row {
   display: flex;
   flex-direction: column;

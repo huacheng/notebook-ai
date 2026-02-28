@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, type RefObject } from 'react';
 import { useStore } from '../store';
 import { Cell } from './Cell';
 import { SliceView } from './SliceView';
 import { loadDraft, saveDraft, clearDraft } from '../utils/promptDraft';
+import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -482,6 +483,55 @@ function EditSaveOverlay() {
   );
 }
 
+// ── Scroll-to-bottom floating button ─────────────────────────────────────────
+
+function ScrollToBottomButton({ bottomRef }: { bottomRef: RefObject<HTMLDivElement | null> }) {
+  const [visible, setVisible] = useState(false);
+  const [rightPx, setRightPx] = useState(0);
+
+  useEffect(() => {
+    const scroller = bottomRef.current?.closest('.app-content') as HTMLElement | null;
+    if (!scroller) return;
+
+    const updateVisibility = () => {
+      setVisible(shouldShowScrollBtn(
+        scroller.scrollTop, scroller.scrollHeight, scroller.clientHeight,
+      ));
+    };
+
+    const updatePosition = () => {
+      const rect = scroller.getBoundingClientRect();
+      // 12px inset from right edge of .app-content (scrollbar is 5px, leaves 7px gap)
+      setRightPx(window.innerWidth - rect.right + 12);
+    };
+
+    scroller.addEventListener('scroll', updateVisibility, { passive: true });
+    const ro = new ResizeObserver(updatePosition);
+    ro.observe(scroller);
+
+    updateVisibility();
+    updatePosition();
+
+    return () => {
+      scroller.removeEventListener('scroll', updateVisibility);
+      ro.disconnect();
+    };
+  }, [bottomRef]);
+
+  if (!visible) return null;
+
+  return (
+    <button
+      className="scroll-to-bottom"
+      style={{ right: rightPx }}
+      onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+      aria-label="Scroll to bottom"
+    >
+      ↓
+    </button>
+  );
+}
+
 // ── Main Notebook component ─────────────────────────────────────────────────
 
 export function Notebook() {
@@ -566,6 +616,7 @@ export function Notebook() {
           </div>
 
           <NotebookInputBar />
+          <ScrollToBottomButton bottomRef={bottomRef} />
         </>
       )}
 
