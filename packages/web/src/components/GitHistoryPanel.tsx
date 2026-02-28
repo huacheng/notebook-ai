@@ -396,7 +396,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
   commitsRef.current = commits;
   const persistCache = useCallback((newCommits: CommitInfo[], newHasMore: boolean) => {
     saveGitCache(projectId, {
-      commits: newCommits.slice(0, 30), // only cache first page
+      commits: newCommits.slice(0, 5), // only cache first page
       hasMore: newHasMore,
       branches,
       currentBranch,

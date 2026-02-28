@@ -42,7 +42,7 @@ export function createGitRouter(db: NotebookDb): IRouter {
     const cwd = project.path;
 
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 30));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 5));
     const file = req.query.file as string | undefined;
     if (file && (file.includes('..') || file.startsWith('/'))) {
       res.status(400).json({ error: 'Invalid file path' });
