@@ -40,6 +40,25 @@ export function isTaskSystemFile(absolutePath: string): boolean {
   return filename.startsWith('.');
 }
 
+export function resolveAbsolutePath(
+  source: 'workspace' | 'library' | 'deliverables',
+  filePath: string,
+  workspaceDir: string | null,
+  activeProjectPath: string | null,
+): string {
+  if (source === 'workspace') {
+    return workspaceDir ? `${workspaceDir}/${filePath}` : '';
+  }
+  if (source === 'deliverables') {
+    return workspaceDir ? `${workspaceDir}/.deliverables/${filePath}` : '';
+  }
+  // library
+  const root = activeProjectPath
+    ? activeProjectPath.substring(0, activeProjectPath.lastIndexOf('/'))
+    : null;
+  return root ? `${root}/.library/${filePath}` : '';
+}
+
 export function buildAnnotationText(annotations: FileAnnotations): string {
   const { items } = annotations;
   if (items.length === 0) return '';

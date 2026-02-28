@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isTaskSystemFile } from '../types/fileAnnotations';
+import { isTaskSystemFile, resolveAbsolutePath } from '../types/fileAnnotations';
 
 describe('isTaskSystemFile', () => {
   it('detects dotfile inside .working/ (.target.md)', () => {
@@ -33,5 +33,38 @@ describe('isTaskSystemFile', () => {
 
   it('returns false for empty string', () => {
     expect(isTaskSystemFile('')).toBe(false);
+  });
+});
+
+describe('resolveAbsolutePath', () => {
+  it('workspace: workspaceDir + "/" + path', () => {
+    expect(resolveAbsolutePath('workspace', 'src/main.ts', '/home/u/ws', null))
+      .toBe('/home/u/ws/src/main.ts');
+  });
+
+  it('workspace: system file inside .working/', () => {
+    expect(resolveAbsolutePath('workspace', '.working/.target.md', '/home/u/ws', null))
+      .toBe('/home/u/ws/.working/.target.md');
+  });
+
+  it('library: uses activeProjectPath parent as root', () => {
+    expect(resolveAbsolutePath('library', 'refs/api.md', null, '/home/u/ws/.library/proj/notebook.json'))
+      .toBe('/home/u/ws/.library/proj/.library/refs/api.md');
+  });
+
+  it('library: works with both workspaceDir and activeProjectPath', () => {
+    expect(resolveAbsolutePath('library', 'refs/api.md', '/home/u/ws', '/home/u/ws/.library/proj/notebook.json'))
+      .toBe('/home/u/ws/.library/proj/.library/refs/api.md');
+  });
+
+  it('deliverables: workspaceDir + "/.deliverables/" + path', () => {
+    expect(resolveAbsolutePath('deliverables', 'report.pdf', '/home/u/ws', null))
+      .toBe('/home/u/ws/.deliverables/report.pdf');
+  });
+
+  it('returns empty string when no dir info', () => {
+    expect(resolveAbsolutePath('workspace', 'file.ts', null, null)).toBe('');
+    expect(resolveAbsolutePath('library', 'file.ts', null, null)).toBe('');
+    expect(resolveAbsolutePath('deliverables', 'file.ts', null, null)).toBe('');
   });
 });
