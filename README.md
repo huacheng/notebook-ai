@@ -1,208 +1,205 @@
-# Moonview
+# Notebook AI
 
 [中文文档](README_CN.md)
 
-A plugin marketplace for structured task lifecycle management.
+An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude or Gemini as the execution engine.
 
-> *"Standing on the moon, looking at Earth"* — [老王来了@dlw2023](https://www.youtube.com/@dlw2023)
+![UI Preview](ui-redesign-preview.png)
 
-## Installation
+## Features
 
-Add the Moonview marketplace to your preferred agent:
+- **AI Notebook** — Multi-turn conversational cells with real-time streaming of thinking, text, and tool use
+- **Multi-agent Support** — Claude (Sonnet / Haiku / Opus) and Gemini, switchable per session
+- **Project & Workspace** — Each notebook runs in an isolated git worktree with its own branch
+- **Auto Git Commit** — Every cell execution auto-commits changes with diff tracking
+- **File Management** — Upload, browse, edit, and annotate files (text, PDF, DOCX, XLSX, PPTX, images)
+- **Git History** — Visual branch graph, commit diff viewer, and branch filtering
+- **Shared Library** — Cross-notebook knowledge base with system-managed references and user imports
+- **Slice View** — AI-generated structured summary of notebook sessions
+- **Plugin Marketplace** — Install and manage plugins from GitHub-hosted marketplaces
+- **Token Auth** — Optional bearer-token authentication with brute-force protection
+- **Export** — Notebooks as HTML or zip bundles
+
+## Architecture
+
+```
+notebook-ai/
+├── packages/
+│   ├── web/        # React 19 + Vite frontend
+│   ├── server/     # Express 5 + SQLite backend
+│   └── shared/     # Zod schemas & TypeScript types
+├── task-ai/        # task-ai plugin (development)
+└── plugins/        # Published plugin artifacts
+```
+
+### packages/web
+
+React 19 SPA with a three-column layout: project sidebar, notebook content area, and deliverables panel.
+
+| Technology | Role |
+|---|---|
+| React 19 | UI framework |
+| Vite 6 | Dev server & bundler |
+| Zustand 5 | State management (6 composable slices) |
+| react-markdown | Markdown rendering with GFM + syntax highlighting |
+| react-pdf / docx-preview / xlsx | File viewer for PDF, DOCX, XLSX |
+| Tiptap | Rich-text file editor |
+| WebSocket | Real-time streaming & session multiplexing |
+
+**UI Layout:**
+
+```
+┌──────────────── Toolbar (model selector, connection status) ─────────────────┐
+├─ Sidebar (272px) ─┬─ Main Content ──────────────────────────┬─ Right Panel ──┤
+│ L1: Project List  │  Notebook Tabs                          │ Deliverables   │
+│ L2: File Browser  │  ┌─ StatusBar (sticky) ──────────────┐  │ File Section   │
+│ ── divider ──     │  │  Cell list (prompt + AI response)  │  │                │
+│ Library Section   │  │  ...streaming output...            │  │                │
+│                   │  └─ InputBar (sticky) ────────────────┘  │                │
+└───────────────────┴──────────────────────────────────────────┴────────────────┘
+```
+
+Panels are draggable-resizable. Main content area renders one of: Notebook, FileViewer, GitHistoryPanel, PluginManager, or WelcomeScreen.
+
+### packages/server
+
+Express 5 HTTP + WebSocket backend. No external database — uses embedded SQLite (better-sqlite3, WAL mode).
+
+| Technology | Role |
+|---|---|
+| Express 5 | REST API |
+| ws | WebSocket server |
+| better-sqlite3 | Embedded database |
+| simple-git | Git operations |
+| multer | File uploads |
+
+**Core modules:**
+
+| Module | Responsibility |
+|---|---|
+| `AgentProcess` | Spawns persistent `claude` / `gemini` CLI subprocess per session; manages stdin/stdout JSON stream protocol |
+| `SessionManager` | Session lifecycle — create, execute, restart, rerun, interrupt, model-change, auto-save, git commit |
+| `NotebookStore` | Load/save/validate `.notebook.json` files on disk |
+| `NotebookDb` | SQLite CRUD for notebooks, sessions, projects, file annotations |
+| `GitManager` | Repo init, auto-commit, worktree management, deliverable merges |
+| `ws-handler` | WebSocket message routing — 18 client message types, 25 server event types |
+| `auth` | Token auth with timing-safe compare, exponential-backoff brute-force lockout |
+
+**Key design decisions:**
+
+- **Persistent subprocess model** — Each notebook session owns a long-lived `claude -p` process (not request-per-response). The server multiplexes WebSocket clients to subprocess stdio streams.
+- **Deterministic session IDs** — `nb-<SHA1(notebookPath)[:8]>`, making session creation idempotent.
+- **Auto-commit per cell** — On completion: write notebook → `git add -A` → commit → capture diff → save notebook with diff.
+- **Resume-after buffering** — 500-event ring buffer per session for WebSocket reconnection replay.
+- **Git worktree per notebook** — Parallel tasks without branch-switching conflicts.
+
+**REST API overview:**
+
+| Route Group | Endpoints | Description |
+|---|---|---|
+| `/api/auth` | 3 | Login, status check, token verify |
+| `/api/notebooks` | 12 | CRUD, restore, import/export, slice generation |
+| `/api/notebooks/:id/files` | 7 | Workspace file management |
+| `/api/projects` | 13 | Project CRUD, file management, notebook lifecycle |
+| `/api/projects/:id/git-*` | 3 | Git log, diff, branches |
+| `/api/library` | 7 | Shared library file management |
+| `/api/plugin` | 7 | Plugin install/uninstall, marketplace management |
+
+### packages/shared
+
+Single-file Zod schema package (`src/types.ts`, 686 lines) defining the complete data contract:
+
+- **Notebook** — `version`, `metadata`, `cells[]`, `slice`, `annotations[]`, `assets`
+- **Cell types** — `prompt` (with outputs), `markdown`, `visualization`
+- **Cell outputs** — `text`, `thinking`, `tool_use`, `error`, `chart`
+- **WebSocket contract** — 18 client → server message types, 25 server → client event types
+- **Project** — `id`, `title`, `path`, `status`
+- **Annotations** — `insert`, `delete`, `replace`, `comment` (with optional audio)
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 20
+- pnpm
+- Git
+- Claude Code CLI (`claude`) or Gemini CLI (`gemini`) installed
+
+### Install & Run
 
 ```bash
-# Gemini CLI
-gemini plugin add huacheng/moonview
+git clone <repo-url> notebook-ai
+cd notebook-ai
+pnpm install
 
-# Claude Code
-claude plugin add huacheng/moonview
-
-# Codex CLI
-codex plugin add huacheng/moonview
+# Start dev server (frontend :3000 + backend :3002)
+./restart.sh
 ```
 
-## Plugins
+The app will be available at `https://localhost:3000`.
 
-### task-ai (v0.8.3)
+### Authentication
 
-## I. Overview
+Set the `NB_AUTH_TOKEN` environment variable to enable token auth:
 
-task-ai is a **pure Markdown instruction-driven** task lifecycle management framework. It runs as a model-agnostic plugin, managing the full lifecycle from task initialization to completion reports. The framework supports domain-adaptive verification (VFP protocol), cross-task knowledge reuse, and highly automated autonomous execution.
-
-**Core philosophy**: "Task as Notebook". Every task is bound to an independent Notebook structure, ensuring clear responsibility boundaries and complete audit trails.
-
-**Entry command**: `/task-ai:<subcommand> [args]`
-
----
-
-## II. 18 Sub-commands
-
-### Core Lifecycle (in typical order)
-
-| Sub-command | Tier | Role | Notes |
-|-------------|------|------|-------|
-| `init` | light | Initialize working directory and git branch | Requires `<project> <notebook>` |
-| `target` | light | **Define/review task objectives** | Bidirectional sync with `.target.md` |
-| `research` | medium | Intelligence collection, type discovery | Independently callable at any phase |
-| `plan` | heavy | Generate implementation plan `.plan.md` | Auto-generates VH verification stubs |
-| `verify` | medium | Run domain-adapted tests (VH/CGG) | Produces test result files |
-| `check` | heavy | Plan/execution review and gating | Three checkpoints control state transitions |
-| `exec` | heavy | Step-by-step plan execution | Follows VFP protocol (Red → Green → Refactor) |
-| `merge` | medium | Merge task branch, clean up metadata | Auto-deletes task branch |
-| `report` | medium | Generate completion report, distill experience | Syncs knowledge to `.library` |
-
-### Auxiliary & System Commands
-
-| Sub-command | Tier | Role |
-|-------------|------|------|
-| `light` | light | **Inline fix**: directly modify and commit on current branch, no state changes. |
-| `read` | medium | **System Immunity**: safely ingest knowledge from external docs/URLs into library. |
-| `security` | heavy | **Security Gateway**: pre-audit plans and verify high-risk commands. |
-| `auto` | heavy | Autonomous execution loop: single-session orchestration via `.auto-signal`. |
-| `cancel` | light | Cancel task, clean up state. |
-| `list` | light | Query task inventory, dependency graph, and task status. |
-| `annotate` | medium | Process interactive annotations from the Plan panel. |
-| `summarize` | light | Regenerate `.summary.md` for compressed context. |
-| `library` | light | Knowledge library management (search, rebuild index, archive maintenance). |
-
-### Simplified Arguments
-
-Apart from `init` and `light` which require explicit project/task names at launch, all other commands auto-detect context via **path sniffing** and **git branch matching** — no manual arguments needed.
-
-### Typical Sub-command Flow
-
-#### 1. Standard Heavy Task
-```mermaid
-graph TD
-    init[init] --> target[target]
-    target --> res_obj[research:objective]
-    res_obj --> plan[plan]
-    plan --> sec_plan{security:audit-plan}
-    sec_plan -- PASS --> verify[verify]
-    sec_plan -- REJECT --> plan
-    verify --> check[check]
-    check -- PASS --> exec[exec]
-    check -- REPLAN --> plan
-    exec --> sec_cmd{security:verify-cmd}
-    sec_cmd -- PASS --> hs[Verification: HS]
-    hs --> check_post[check:post-exec]
-    check_post -- ACCEPT --> merge[merge]
-    check_post -- NEEDS_FIX --> exec
-    merge --> report[report]
+```bash
+# In .env file
+NB_AUTH_TOKEN=your-secret-token
 ```
 
-#### 2. Lightweight Inline Operation (Light Path)
-```mermaid
-graph LR
-    light["light &lt;description&gt;"] --> edit[Modify files directly]
-    edit --> commit["light --commit"]
-```
-
-#### 3. Auxiliary & Global Commands
-- **`auto`**: Wraps the standard flow, auto-driven via `.auto-signal`.
-- **`read`**: Globally callable, feeds knowledge into `.library`.
-- **`list` / `summarize` / `library`**: Status and management tools, available anytime.
-
----
-
-## III. State Machine (8 states, 20 transitions)
-
-```
-draft → planning → review → executing → complete
-                 ↗            ↘
-          re-planning    ←    blocked
-```
-
-### Key Design Constraints
-1. **`light` is stateless**: `light` mode operates directly on the current branch and does not participate in state machine transitions.
-2. **Security first**: All `exec` operations must pass `security` validation before execution.
-
----
-
-## IV. VFP Protocol & Quality Assurance
-
-### Verification-First Protocol (VFP)
-The framework enforces a **Verification-First Protocol**:
-- **VH (Verification Hypothesis)**: Define failure baselines during the planning phase.
-- **HS (Hypothesis Satisfied)**: Verify success after implementation.
-- **CGG (Cumulative Green Gate)**: Every modification must pass full regression.
-
-### Automated Audit (Six-Perspective Audit)
-The built-in `.dev/validate.sh` performs deep checks across six dimensions on all 18 skills:
-1. **Structural consistency**: Step numbering, cross-references.
-2. **Routing compliance**: `.auto-signal` state machine transitions.
-3. **Technical integrity**: Locking mechanisms, data flow closure.
-4. **Functional robustness**: Full TDD contract test coverage.
-5. **Security defense**: 10 categories of injection sanitization, path traversal prevention.
-6. **Protocol compliance**: Authoritative protocol section (`§`) references.
-
----
-
-## V. Environment & Compatibility
-
-### Model Agnostic
-- Completely removed hard-coded references to specific LLM names.
-- Uses the generic term `the agent` instead of any specific model name.
-- Documentation fully standardized in English; prompts support multiple CLI environments (Gemini/Claude Code, etc.).
-
-### Infrastructure
-- **No inline Python**: All Bash scripts operate through standalone utility modules (`state.py`, `json_get.py`); embedding Python in shell is strictly prohibited.
-- **Concurrency protection**: Atomic locking mechanism based on `flock`, ensuring state safety during multi-task parallel execution.
+If unset, authentication is disabled (suitable for local development).
 
 ### Environment Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `NB_WORKSPACES_ROOT` | `/home/user/nb-workspaces` | Root directory for all projects and notebooks |
-| `NB_WORKSPACES_LIBRARY` | `$NB_WORKSPACES_ROOT/.library` | Shared knowledge library directory |
+|---|---|---|
+| `NB_AUTH_TOKEN` | *(none)* | Bearer token for auth; unset = auth disabled |
+| `PORT` | `3002` | Backend API port |
+| `NB_WORKSPACES_ROOT` | `/home/user/nb-workspaces` | Root directory for projects and notebooks |
+| `NB_WORKSPACES_LIBRARY` | `$NB_WORKSPACES_ROOT/.library` | Shared knowledge library |
 
----
-
-## VI. Current Statistics
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Total sub-commands | 18 | Full coverage from research to delivery |
-| Contract tests passed | **713 PASS** | 0 FAIL, 0 ERROR |
-| State machine states | 8 | `light` has no state transitions |
-| Documentation coverage | 100% | Every skill has a complete SKILL.md |
-
----
-
-## Quick Start
+## Development
 
 ```bash
-# 1. Initialize a notebook under a project
-/task-ai:init my-project auth-refactor --title "Refactor auth to JWT"
+# Run all packages in dev mode
+pnpm dev
 
-# 2. Write requirements in .target.md, then let research deepen them
-/task-ai:research my-project/auth-refactor --caller target
+# Run tests
+pnpm test
 
-# 3. Generate plan
-/task-ai:plan auth-refactor --generate
+# Type check
+pnpm typecheck
 
-# 4. Verify → check plan quality
-/task-ai:verify auth-refactor
-/task-ai:check auth-refactor --checkpoint post-plan
-
-# 5. Execute the plan
-/task-ai:exec auth-refactor
-
-# 6. Merge to main + generate report
-/task-ai:merge auth-refactor
-/task-ai:report auth-refactor
-
-# Or run the full lifecycle automatically:
-/task-ai:auto auth-refactor --start
+# Restart (kills ports 3000/3002, relaunches)
+./restart.sh
 ```
 
----
-*Summary auto-generated and verified by task-ai (v0.8.3).*
+Logs are written to `/tmp/notebook-dev.log`.
 
-## Related
+## Moonview Plugin Marketplace
 
-- [ai-cli-online](https://github.com/huacheng/ai-cli-online) — Web interface with Plan annotation panel and Chat editor
+This repository also hosts the [Moonview](https://github.com/huacheng/moonview) plugin ecosystem, including the **task-ai** plugin — a structured task lifecycle management framework with 18 subcommands covering the full workflow from research to delivery.
+
+```bash
+# Install Moonview marketplace
+claude plugin add huacheng/moonview
+gemini plugin add huacheng/moonview
+```
+
+See the [Moonview README](https://github.com/huacheng/moonview) for plugin documentation.
+
+## Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | React 19, Vite 6, Zustand 5, TypeScript, WebSocket |
+| Backend | Express 5, better-sqlite3, ws, simple-git, Node.js ESM |
+| Shared | Zod schemas, TypeScript types |
+| AI Agents | Claude Code CLI, Gemini CLI (persistent subprocess) |
+| Testing | Vitest, supertest, jsdom |
+| Styling | Custom CSS with CSS variables ("Atelier warm studio" theme) |
+| Fonts | Bricolage Grotesque, Outfit, JetBrains Mono, LXGW WenKai Mono |
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 huacheng
