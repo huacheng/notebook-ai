@@ -3,15 +3,13 @@ import type { Cell as CellData } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
 import { MarkdownBody } from './MarkdownBody';
 
-// ── Status indicator ────────────────────────────────────────────────────────
+// ── Status indicator (non-running states only) ──────────────────────────────
 
 const StatusIndicator = memo(function StatusIndicator({ status }: { status: CellData['status'] }) {
-  if (status === 'idle' || status === 'completed') return null;
+  if (status === 'idle' || status === 'completed' || status === 'running') return null;
   return (
     <span className={`cell-status cell-status-${status}`} aria-label={status}>
-      {status === 'running' && <span className="spinner" aria-hidden="true" />}
-      {status === 'running' ? 'Running…'
-        : status === 'error' ? 'Error'
+      {status === 'error' ? 'Error'
         : status === 'interrupted' ? 'Interrupted'
         : null}
     </span>

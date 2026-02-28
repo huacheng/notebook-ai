@@ -1556,76 +1556,6 @@ textarea.cell-input {
   gap: var(--space-md);
 }
 
-/* ── Tab panel container ─────────────────────────────────── */
-.cell-panels {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.cell-panel-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-cell-hover);
-  gap: 2px;
-  padding: 4px 6px 0;
-}
-
-.cell-panel-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px 5px;
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-}
-
-.cell-panel-tab:hover {
-  color: var(--text-primary);
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.cell-panel-tab.active {
-  color: var(--text-primary);
-  background: var(--bg-cell);
-  border-color: var(--border-default);
-  border-bottom-color: var(--bg-cell);
-  margin-bottom: -1px;
-}
-
-.cell-panel-tab-count {
-  font-size: 0.65rem;
-  background: var(--border-default);
-  color: var(--text-secondary);
-  border-radius: 8px;
-  padding: 0 5px;
-  line-height: 1.6;
-  font-weight: 600;
-}
-
-.cell-panel-tab.active .cell-panel-tab-count {
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
-}
-
-.cell-panel-content {
-  padding: var(--space-sm);
-}
-
-/* ── Thinking panel ──────────────────────────────────────── */
-.cell-panel-thinking {
-  max-height: 260px;
-  overflow-y: auto;
-  border-radius: var(--radius-sm);
-}
-
 .output-thinking-text {
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -1634,13 +1564,6 @@ textarea.cell-input {
   word-break: break-word;
   line-height: 1.65;
   margin: 0;
-}
-
-/* ── Tools panel ─────────────────────────────────────────── */
-.cell-panel-tools {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 /* ── Response section (section 4) ────────────────────────── */
@@ -1930,6 +1853,30 @@ textarea.cell-input {
   word-break: break-word;
   line-height: 1.55;
   border: 1px solid var(--border-default);
+}
+
+/* Tool result preview (shown without expanding) */
+.tool-use-result-preview {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 2px var(--space-md) var(--space-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  max-height: 3.2em;
+  overflow: hidden;
+}
+.tool-use-result-preview-error {
+  color: var(--color-error);
+}
+
+/* Tool executing spinner (inline, smaller) */
+.tool-use-spinner {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  margin-left: 4px;
 }
 
 /* Chart */
@@ -5319,6 +5266,24 @@ button:focus-visible {
 @keyframes pulse-border {
   0%, 100% { border-left-color: var(--color-running); }
   50% { border-left-color: transparent; }
+}
+
+/* ── Timeline window (streaming) ──────────────────────────── */
+.cell-timeline-window {
+  max-height: calc(1.6em * 10 + 8px);   /* ~10 lines max */
+  min-height: calc(1.6em * 1 + 8px);    /* 1 line min */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 4px 0;
+  scroll-behavior: smooth;
+}
+
+/* ── Running status metrics ───────────────────────────────── */
+.cell-status-metrics {
+  opacity: 0.75;
+  font-weight: 400;
 }
 
 /* ============================================================

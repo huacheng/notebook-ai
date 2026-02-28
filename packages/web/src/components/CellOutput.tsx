@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CellOutput as CellOutputItem } from '@notebook-ai/shared';
 import { StreamingText, StreamingThinking } from './StreamingCellOutput';
 import { InteractiveOptions } from './InteractiveOptions';
 import { isAskUserQuestion } from '../utils/interactiveOptions';
 import type { AskQuestion } from '../utils/interactiveOptions';
 import { useStore } from '../store';
+import { formatTime, formatTokens } from '../utils/runningStatus';
 
 // ── SVG sanitizer ────────────────────────────────────────────────────────────
 
@@ -50,13 +51,12 @@ function ChartOutputView({ chart_type, svg }: { chart_type: string; svg?: string
   );
 }
 
-// ── Panel: Thinking ──────────────────────────────────────────────────────────
+// ── Inline thinking (single block, collapsible) ─────────────────────────────
 
 type ThinkingItem = Extract<CellOutputItem, { type: 'thinking' }>;
 
-function ThinkingPanel({ items }: { items: ThinkingItem[] }) {
+function InlineThinking({ item }: { item: ThinkingItem }) {
   const [open, setOpen] = useState(false);
-  const combined = items.map((i) => i.content).join('\n\n---\n\n');
   return (
     <div className="output-thinking">
       <button
@@ -66,20 +66,26 @@ function ThinkingPanel({ items }: { items: ThinkingItem[] }) {
       >
         <span className="collapsible-icon">{open ? '▼' : '▶'}</span>
         Thinking
-        <span className="cell-panel-tab-count">{items.length}</span>
       </button>
       {open && (
         <div className="output-thinking-content">
-          <pre className="output-thinking-text">{combined}</pre>
+          <pre className="output-thinking-text">{item.content}</pre>
         </div>
       )}
     </div>
   );
 }
 
-// ── Panel: Tools ─────────────────────────────────────────────────────────────
+// ── Tool row (unchanged) ────────────────────────────────────────────────────
 
 type ToolItem = Extract<CellOutputItem, { type: 'tool_use' }>;
+
+/** Truncate to first N lines, append "…" if truncated */
+function previewLines(text: string, maxLines = 2): string {
+  const lines = text.split('\n');
+  if (lines.length <= maxLines) return text;
+  return lines.slice(0, maxLines).join('\n') + '\n…';
+}
 
 function ToolRow({ item }: { item: ToolItem }) {
   const [open, setOpen] = useState(false);
@@ -91,6 +97,7 @@ function ToolRow({ item }: { item: ToolItem }) {
 
   const hasResult = item.result !== undefined;
   const isError = item.is_error ?? false;
+  const pending = !hasResult;
   const statusClass = hasResult ? (isError ? 'tool-result-error' : 'tool-result-ok') : '';
 
   return (
@@ -103,12 +110,20 @@ function ToolRow({ item }: { item: ToolItem }) {
         <span className="collapsible-icon">{open ? '▼' : '▶'}</span>
         <code className="tool-use-name">{item.name}</code>
         {!open && <span className="collapsible-summary">{summary}</span>}
+        {pending && <span className="spinner tool-use-spinner" aria-hidden="true" />}
         {hasResult && !open && (
           <span className={isError ? 'tool-use-fail' : 'tool-use-done'}>
             {isError ? '✗' : '✓'}
           </span>
         )}
       </button>
+
+      {/* Result preview (visible without expanding) */}
+      {hasResult && !open && (
+        <pre className={`tool-use-result-preview${isError ? ' tool-use-result-preview-error' : ''}`}>
+          {previewLines(item.result!, 2)}
+        </pre>
+      )}
 
       {open && (
         <div className="tool-use-details">
@@ -122,37 +137,6 @@ function ToolRow({ item }: { item: ToolItem }) {
               <pre className="tool-use-result">{item.result}</pre>
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToolsPanel({ items }: { items: ToolItem[] }) {
-  const [open, setOpen] = useState(false);
-  const errorCount = items.filter((i) => i.is_error).length;
-  const doneCount  = items.filter((i) => i.result !== undefined && !i.is_error).length;
-
-  return (
-    <div className="output-thinking">
-      <button
-        className="output-collapsible-toggle"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        <span className="collapsible-icon">{open ? '▼' : '▶'}</span>
-        Tools
-        <span className="cell-panel-tab-count">{items.length}</span>
-        {doneCount  > 0 && <span className="tool-use-done"  style={{ marginLeft: 4 }}>✓{doneCount}</span>}
-        {errorCount > 0 && <span className="tool-use-fail"  style={{ marginLeft: 4 }}>✗{errorCount}</span>}
-      </button>
-      {open && (
-        <div className="output-thinking-content">
-          <div className="cell-panel-tools">
-            {items.map((item, i) => (
-              <ToolRow key={i} item={item} />
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -173,6 +157,88 @@ function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
   );
 }
 
+// ── RunningStatus bar ───────────────────────────────────────────────────────
+
+function RunningStatus({ cellId, outputs }: { cellId: string; outputs: CellOutputItem[] }) {
+  const startRef = useRef(Date.now());
+  const thinkStartRef = useRef<number | null>(null);
+  const thinkAccum = useRef(0);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    startRef.current = Date.now();
+    thinkStartRef.current = null;
+    thinkAccum.current = 0;
+  }, [cellId]);
+
+  useEffect(() => {
+    const iv = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Read store non-reactively each render (driven by tick)
+  const buf = useStore.getState().streamBuffer[cellId];
+  const hasThinkingStream = buf && buf.thinking.length > 0;
+
+  // Track thinking time
+  if (hasThinkingStream && thinkStartRef.current === null) {
+    thinkStartRef.current = Date.now();
+  } else if (!hasThinkingStream && thinkStartRef.current !== null) {
+    thinkAccum.current += (Date.now() - thinkStartRef.current) / 1000;
+    thinkStartRef.current = null;
+  }
+
+  const elapsed = Math.floor((Date.now() - startRef.current) / 1000);
+  const totalChars = (buf?.text.length ?? 0) + (buf?.thinking.length ?? 0)
+    + outputs.reduce((s, o) => s + ('content' in o ? (o as { content: string }).content.length : 0), 0);
+  const tokens = Math.floor(totalChars / 4);
+  const toolCount = outputs.filter((o) => o.type === 'tool_use' && !isAskUserQuestion(o as ToolItem)).length;
+  const thinkSec = Math.floor(
+    thinkAccum.current + (thinkStartRef.current ? (Date.now() - thinkStartRef.current) / 1000 : 0),
+  );
+
+  const isThinking = hasThinkingStream;
+
+  // Build metrics string
+  const parts: string[] = [];
+  if (tokens > 0) parts.push(`↑ ${formatTokens(tokens)}`);
+  if (toolCount > 0) parts.push(`${toolCount} tool use${toolCount > 1 ? 's' : ''}`);
+  if (thinkSec > 0 && !isThinking) parts.push(`thought for ${formatTime(thinkSec)}`);
+
+  const label = isThinking ? 'Thinking…' : 'Running…';
+  const metrics = parts.length > 0 ? ` (${formatTime(elapsed)} · ${parts.join(' · ')})` : ` (${formatTime(elapsed)})`;
+
+  return (
+    <span className="cell-status cell-status-running" aria-label="running">
+      <span className="spinner" aria-hidden="true" />
+      {label}
+      <span className="cell-status-metrics">{metrics}</span>
+    </span>
+  );
+}
+
+// ── Timeline: render outputs in chronological order ─────────────────────────
+
+function TimelineOutputs({ outputs }: { outputs: CellOutputItem[] }) {
+  return (
+    <>
+      {outputs.map((output, i) => {
+        if (output.type === 'thinking') return <InlineThinking key={i} item={output} />;
+        if (output.type === 'tool_use') {
+          if (isAskUserQuestion(output)) {
+            return <InteractiveOptionsWrapper key={output.tool_use_id ?? i} item={output} />;
+          }
+          return <ToolRow key={output.tool_use_id ?? i} item={output} />;
+        }
+        if (output.type === 'text') return <TextOutputView key={i} content={output.content} />;
+        if (output.type === 'error') return <ErrorOutputView key={i} message={output.message} />;
+        if (output.type === 'chart') return <ChartOutputView key={i} chart_type={output.chart_type} svg={output.svg} />;
+        return null;
+      })}
+    </>
+  );
+}
+
 // ── Public component ─────────────────────────────────────────────────────────
 
 interface CellOutputProps {
@@ -184,65 +250,45 @@ interface CellOutputProps {
 
 export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
   const isRunning = cellStatus === 'running';
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const hasStaticOutput = outputs.length > 0;
   const hasStreaming = isRunning && cellId;
 
+  // Auto-scroll timeline window to bottom during streaming
+  useEffect(() => {
+    if (!hasStreaming) return;
+    const iv = setInterval(() => {
+      const el = timelineRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 200);
+    return () => clearInterval(iv);
+  }, [hasStreaming]);
+
   if (!hasStaticOutput && !hasStreaming) return null;
 
-  // ── Streaming branch: flat rendering (unchanged) ──
+  // ── Streaming branch: timeline window + status bar ──
   if (hasStreaming) {
-    const allToolItems = outputs.filter(
-      (o): o is ToolItem => o.type === 'tool_use',
-    );
-    const interactiveItems = allToolItems.filter(isAskUserQuestion);
-    const toolItems = allToolItems.filter((i) => !isAskUserQuestion(i));
+    // Check if streamBuffer has content not yet in outputs (for de-duplication)
+    const lastThinking = outputs.filter((o) => o.type === 'thinking').at(-1);
+    const lastText = outputs.filter((o) => o.type === 'text').at(-1);
 
     return (
       <div className="cell-output-area">
-        <StreamingThinking cellId={cellId} />
-        {toolItems.length > 0 && <ToolsPanel items={toolItems} />}
-        {interactiveItems.map((item, i) => (
-          <InteractiveOptionsWrapper key={item.tool_use_id ?? i} item={item} />
-        ))}
-        <StreamingText cellId={cellId} />
+        <div className="cell-timeline-window" ref={timelineRef}>
+          <TimelineOutputs outputs={outputs} />
+          <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
+          <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
+        </div>
+        <RunningStatus cellId={cellId} outputs={outputs} />
       </div>
     );
   }
 
-  // ── Completed branch: aggregated display ──
-  const thinkingItems = outputs.filter(
-    (o): o is ThinkingItem => o.type === 'thinking',
-  );
-  const allToolItems = outputs.filter(
-    (o): o is ToolItem => o.type === 'tool_use',
-  );
-  const interactiveItems = allToolItems.filter(isAskUserQuestion);
-  const toolItems = allToolItems.filter((i) => !isAskUserQuestion(i));
-  const responseItems = outputs.filter(
-    (o) => o.type === 'text' || o.type === 'error' || o.type === 'chart',
-  );
-
+  // ── Completed branch: same timeline layout ──
   return (
     <div className="cell-output-area">
-      {thinkingItems.length > 0 && <ThinkingPanel items={thinkingItems} />}
-
-      {toolItems.length > 0 && <ToolsPanel items={toolItems} />}
-
-      {interactiveItems.map((item, i) => (
-        <InteractiveOptionsWrapper key={item.tool_use_id ?? i} item={item} />
-      ))}
-
-      {responseItems.length > 0 && (
-        <div className="cell-response">
-          {responseItems.map((item, i) => {
-            if (item.type === 'text')  return <TextOutputView  key={i} content={item.content} />;
-            if (item.type === 'error') return <ErrorOutputView key={i} message={item.message} />;
-            if (item.type === 'chart') return <ChartOutputView key={i} chart_type={item.chart_type} svg={item.svg} />;
-            return null;
-          })}
-        </div>
-      )}
+      <TimelineOutputs outputs={outputs} />
     </div>
   );
 }
