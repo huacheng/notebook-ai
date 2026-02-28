@@ -4,8 +4,10 @@ export interface FileAnnotation {
   id: string;                   // uid()
   type: 'insert' | 'delete' | 'replace' | 'comment';
   file_path: string;            // relative path within workspace/library
+  absolute_path: string;        // absolute path for prompt
   selected_text: string;        // anchor snapshot (max 80 chars)
   content?: string;             // insert/replace/comment text
+  textOffset: number;           // selection start in rendered text
   author: string;
   timestamp: string;            // ISO
   updatedAt: number;            // ms epoch
@@ -57,6 +59,39 @@ export function resolveAbsolutePath(
     ? activeProjectPath.substring(0, activeProjectPath.lastIndexOf('/'))
     : null;
   return root ? `${root}/.library/${filePath}` : '';
+}
+
+const CONTEXT_CAP = 40;
+
+export function buildSingleAnnotationPrompt(ann: FileAnnotation, fullText: string): string {
+  const { type, absolute_path, selected_text, content, textOffset } = ann;
+  const before = fullText.substring(Math.max(0, textOffset - CONTEXT_CAP), textOffset);
+  const afterStart = textOffset + selected_text.length;
+  const after = fullText.substring(afterStart, afterStart + CONTEXT_CAP);
+
+  const obj: Record<string, string> = {
+    type,
+    file: absolute_path,
+    selected_text,
+    before,
+    after,
+  };
+
+  if (type === 'insert' && content != null) {
+    obj.content = content;
+  } else if (type === 'replace' && content != null) {
+    obj.replacement = content;
+  } else if (type === 'comment' && content != null) {
+    obj.comment = content;
+  }
+  // delete: no extra field
+
+  return JSON.stringify(obj);
+}
+
+export function buildAnnotationPrompt(annotations: FileAnnotation[], fullText: string): string {
+  if (annotations.length === 0) return '';
+  return annotations.map((a) => buildSingleAnnotationPrompt(a, fullText)).join('\n');
 }
 
 export function buildAnnotationText(annotations: FileAnnotations): string {
