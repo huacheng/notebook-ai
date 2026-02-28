@@ -299,7 +299,7 @@ function AuthenticatedApp() {
         <ProjectSidebar />
         <div className="app-divider" onMouseDown={startLeftDrag} />
         <main ref={contentRef} className={`app-content${inSplitView ? ' app-content--split' : ''}`}>
-          <NotebookTabs />
+          <NotebookTabs inSplitView={inSplitView} splitRatio={splitRatio} />
           <div
             className={`notebook-area${inSplitView ? ' notebook-area--split' : ''}`}
             style={inSplitView ? { '--split-ratio': splitRatio } as React.CSSProperties : undefined}

@@ -5274,6 +5274,25 @@ button:focus-visible {
   to { transform: rotate(360deg); }
 }
 
+/* Split mode: two tab groups aligned with FileViewer (left) and Notebook (right) */
+.notebook-tabs--split {
+  display: flex;
+}
+
+.notebook-tabs--split .notebook-tabs-left {
+  flex: none;
+  width: calc(var(--split-ratio, 0.5) * 100%);
+  display: flex;
+  overflow-x: auto;
+  border-right: 1px solid var(--border-default);
+}
+
+.notebook-tabs--split .notebook-tabs-right {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+}
+
 /* ============================================================
    Right Panel
    ============================================================ */
