@@ -2,16 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { buildTimelineItems } from '../utils/timelineItems';
 
 describe('CellOutput layout logic', () => {
-  it('streaming: thinking and tool_use go into timeline, text stays in content', () => {
+  it('streaming: thinking and tool_use separated, text stays in content', () => {
     const outputs = [
       { type: 'thinking' as const, content: 'pondering...' },
       { type: 'tool_use' as const, name: 'bash', input: { cmd: 'ls' }, tool_use_id: 't1' },
       { type: 'text' as const, content: 'result text' },
     ];
-    const { timeline, content } = buildTimelineItems(outputs);
-    expect(timeline).toHaveLength(2);
-    expect(timeline[0].type).toBe('thinking');
-    expect(timeline[1].type).toBe('tool_use');
+    const { thinking, tools, content } = buildTimelineItems(outputs);
+    expect(thinking).toHaveLength(1);
+    expect(thinking[0].type).toBe('thinking');
+    expect(tools).toHaveLength(1);
+    expect(tools[0].type).toBe('tool_use');
     expect(content).toHaveLength(1);
     expect(content[0].type).toBe('text');
   });
@@ -22,8 +23,9 @@ describe('CellOutput layout logic', () => {
       { type: 'tool_use' as const, name: 'read', input: {}, tool_use_id: 't1', result: 'file content' },
       { type: 'text' as const, content: 'answer' },
     ];
-    const { timeline, content } = buildTimelineItems(outputs);
-    expect(timeline).toHaveLength(2);
+    const { thinking, tools, content } = buildTimelineItems(outputs);
+    expect(thinking).toHaveLength(1);
+    expect(tools).toHaveLength(1);
     expect(content).toHaveLength(1);
   });
 

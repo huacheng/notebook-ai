@@ -164,7 +164,7 @@ describe('CellOutput completed layout', () => {
     expect(html).toContain('markdown-rendered');
   });
 
-  it('thinking+tools are inside timeline-window, text is outside', async () => {
+  it('thinking+tools groups are inside timeline-window, text is outside', async () => {
     const html = await renderCellOutput({
       outputs: [thinkingOutput, toolOutput, textOutput],
       cellId: 'done-cell',
@@ -172,13 +172,13 @@ describe('CellOutput completed layout', () => {
     });
 
     const timelineStart = html.indexOf('tl-frame');
-    const toolIdx = html.indexOf('tl-block--tool');
-    const thinkIdx = html.indexOf('tl-block--thinking');
+    const thinkGroupIdx = html.indexOf('tl-group--thinking');
+    const toolGroupIdx = html.indexOf('tl-group--tools');
     const mdIdx = html.indexOf('markdown-rendered');
 
-    expect(thinkIdx).toBeGreaterThan(timelineStart);
-    expect(toolIdx).toBeGreaterThan(timelineStart);
-    expect(mdIdx).toBeGreaterThan(toolIdx);
+    expect(thinkGroupIdx).toBeGreaterThan(timelineStart);
+    expect(toolGroupIdx).toBeGreaterThan(timelineStart);
+    expect(mdIdx).toBeGreaterThan(toolGroupIdx);
   });
 
   it('renders only text when no thinking/tools', async () => {

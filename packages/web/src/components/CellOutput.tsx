@@ -8,6 +8,7 @@ import { useStore } from '../store';
 import { formatTime, formatTokens, estimateTokens, getStatusLabel } from '../utils/runningStatus';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { buildTimelineItems } from '../utils/timelineItems';
+import { thinkingGroupProps, toolsGroupProps } from '../utils/groupProps';
 
 // ── SVG sanitizer ────────────────────────────────────────────────────────────
 
@@ -142,6 +143,57 @@ function ToolRow({ item }: { item: ToolItem }) {
               <pre className="tool-use-result">{item.result}</pre>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Collapsible groups (completed branch) ───────────────────────────────────
+
+function ThinkingGroup({ items }: { items: ThinkingItem[] }) {
+  const [open, setOpen] = useState(false);
+  const { label } = thinkingGroupProps(items);
+  return (
+    <div className="tl-group tl-group--thinking">
+      <button
+        className="tl-group-toggle"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className="collapsible-icon">{open ? '▼' : '▶'}</span>
+        {label}
+      </button>
+      {open && (
+        <div className="tl-group-body tl-group-body--scroll">
+          <pre className="output-thinking-text">
+            {items.map((item) => item.content).join('\n\n')}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolsGroup({ items }: { items: ToolItem[] }) {
+  const [open, setOpen] = useState(false);
+  const { label } = toolsGroupProps(items);
+  return (
+    <div className="tl-group tl-group--tools">
+      <button
+        className="tl-group-toggle"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className="collapsible-icon">{open ? '▼' : '▶'}</span>
+        {label}
+      </button>
+      {open && (
+        <div className="tl-group-body tl-group-body--scroll">
+          {items.map((item, i) => {
+            if (isAskUserQuestion(item)) return null;
+            return <ToolRow key={item.tool_use_id ?? i} item={item} />;
+          })}
         </div>
       )}
     </div>
@@ -301,7 +353,8 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
     const lastThinking = outputs.filter((o) => o.type === 'thinking').at(-1);
     const lastText = outputs.filter((o) => o.type === 'text').at(-1);
 
-    const { timeline: timelineItems } = buildTimelineItems(outputs);
+    const { thinking, tools } = buildTimelineItems(outputs);
+    const timelineItems = [...thinking, ...tools] as CellOutputItem[];
 
     return (
       <div className="cell-output-area">
@@ -317,18 +370,23 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
     );
   }
 
-  // ── Completed branch: two-zone layout ──
-  // Zone A: thinking + tools (10-line scrollable)
-  // Zone B: text/error/chart outputs (full-height markdown)
-  const { timeline, content } = buildTimelineItems(outputs);
+  // ── Completed branch: collapsed groups + content ──
+  const { thinking, tools, content } = buildTimelineItems(outputs);
+
+  // InteractiveOptions rendered outside ToolsGroup
+  const interactiveItems = tools.filter((t) => isAskUserQuestion(t as ToolItem)) as ToolItem[];
 
   return (
     <div className="cell-output-area">
-      {timeline.length > 0 && (
+      {(thinking.length > 0 || tools.length > 0) && (
         <div className="tl-frame">
-          <TimelineOutputs outputs={timeline} />
+          {thinking.length > 0 && <ThinkingGroup items={thinking as ThinkingItem[]} />}
+          {tools.length > 0 && <ToolsGroup items={tools as ToolItem[]} />}
         </div>
       )}
+      {interactiveItems.map((item) => (
+        <InteractiveOptionsWrapper key={item.tool_use_id} item={item} />
+      ))}
       {content.length > 0 && (
         <div className="output-cell">
           <TimelineOutputs outputs={content} />
