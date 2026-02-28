@@ -32,6 +32,14 @@ export function storageKey(notebookId: string, filePath: string): string {
   return `file-annotations-${notebookId}-${filePath}`;
 }
 
+export function isTaskSystemFile(absolutePath: string): boolean {
+  const segments = absolutePath.split('/');
+  const workingIdx = segments.indexOf('.working');
+  if (workingIdx < 0) return false;
+  const filename = segments[segments.length - 1];
+  return filename.startsWith('.');
+}
+
 export function buildAnnotationText(annotations: FileAnnotations): string {
   const { items } = annotations;
   if (items.length === 0) return '';
