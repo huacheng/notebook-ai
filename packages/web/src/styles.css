@@ -19,6 +19,7 @@
   --toolbar-text: #fafaf9;
   --toolbar-border: #292524;
   --toolbar-height: 34px;
+  --tabs-height: 33px;
   --statusbar-height: 36px;
 
   /* Content — paper-warm backgrounds */
@@ -938,7 +939,7 @@ textarea.cell-input {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
   position: sticky;
-  top: 0;
+  top: var(--tabs-height);
   z-index: 10;
   margin-left: calc(-1 * var(--space-xl));
   margin-right: calc(-1 * var(--space-xl));
@@ -5110,6 +5111,8 @@ button:focus-visible {
   border-bottom: 1px solid var(--border-default);
   overflow-x: auto;
   flex-shrink: 0;
+  height: var(--tabs-height);
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   z-index: 15;

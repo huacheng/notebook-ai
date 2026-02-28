@@ -498,6 +498,19 @@ export function setupWebSocket(
               });
             }
             sendToClient(ws, { type: 'cells_removed', session_id });
+
+            // Best-effort git commit — fire after cells_removed is already sent
+            try {
+              const commitResult = await session.gitManager.commitCellExecution(
+                'edit',
+                `Remove ${cell_ids.length} cell(s)`,
+              );
+              if (commitResult) {
+                console.log(`[ws] Committed cell removal – ${commitResult.filesChanged.length} file(s) changed`);
+              }
+            } catch (err) {
+              console.warn('[ws] Git commit for cell removal failed:', String(err));
+            }
           } catch (err) {
             sendToClient(ws, { type: 'cells_remove_failed', session_id, error: String(err) });
           }
