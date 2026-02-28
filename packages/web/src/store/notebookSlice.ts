@@ -348,6 +348,12 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   },
 
   closeNotebookTab: (notebookId) => {
+    // Unsubscribe from session before removing tab state
+    const closingEntry = get().openNotebooks[notebookId];
+    if (closingEntry?.sessionId && typeof get().unsubscribeFromSession === 'function') {
+      get().unsubscribeFromSession(closingEntry.sessionId);
+    }
+
     set(state => {
       const { [notebookId]: _, ...rest } = state.openNotebooks;
       const remainingIds = Object.keys(rest);
