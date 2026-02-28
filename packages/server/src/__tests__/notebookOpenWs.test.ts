@@ -35,9 +35,32 @@ describe('NotebookOpen WS schemas', () => {
       },
       session_id: 'sess-1',
       workspace_dir: '/home/test',
+      total_cells: 0,
     };
     const result = NotebookOpenedSchema.safeParse(msg);
     expect(result.success).toBe(true);
+  });
+
+  it('NotebookOpenedSchema requires total_cells field', async () => {
+    const { NotebookOpenedSchema } = await import('@notebook-ai/shared');
+    const msg = {
+      type: 'notebook_opened',
+      request_id: 'abc-123',
+      notebook_id: 'nb-1',
+      notebook: {
+        version: 1,
+        metadata: { title: 'Test', created: '2024-01-01T00:00:00Z' },
+        cells: [],
+        slice: { generated: false, sections: [] },
+        annotations: [],
+        assets: { intermediate_files: [] },
+      },
+      session_id: 'sess-1',
+      workspace_dir: '/home/test',
+      // missing total_cells
+    };
+    const result = NotebookOpenedSchema.safeParse(msg);
+    expect(result.success).toBe(false);
   });
 
   it('NotebookOpenErrorSchema accepts an error response', async () => {

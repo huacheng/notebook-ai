@@ -421,6 +421,9 @@ function FileBrowser() {
             ws.send(JSON.stringify({ type: 'notebook_open', request_id: requestId, path: notebookPath }));
           });
           openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
+          const totalCells = opened.total_cells ?? opened.notebook.cells.length;
+          const cellsOffset = totalCells - opened.notebook.cells.length;
+          useStore.setState({ cellsOffset, loadingOlderCells: false });
           sub(opened.session_id);
         } else {
           // REST fallback

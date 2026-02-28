@@ -1,6 +1,8 @@
 import { type WebSocketServer, type WebSocket } from 'ws';
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import { execFile as execFileCb } from 'child_process';
+import { promisify } from 'util';
 import {
   WSClientMessageSchema,
   type Notebook,
@@ -13,7 +15,72 @@ import { authEnabled } from './auth.js';
 import { validateWorkspacePath } from './workspace-files.js';
 import { exportToHtml } from './export.js';
 import { getLibraryDir } from './workspace.js';
+import { unquoteGitPath } from './git-utils.js';
 import type { GitWatcher, FileWatcher } from './watcher.js';
+
+const execFileAsync = promisify(execFileCb);
+const EXEC_TIMEOUT = 10000;
+const DEFAULT_GIT_LOG_LIMIT = 5;
+
+/**
+ * Compute git log for a repo path. Shared by git_log_request handler and git_changed push.
+ */
+export async function computeGitLog(
+  cwd: string,
+  opts: { page?: number; limit?: number; all?: boolean; stats?: boolean } = {},
+): Promise<{ commits: unknown[]; total: number; page: number; limit: number }> {
+  const page = opts.page ?? 1;
+  const limit = opts.limit ?? DEFAULT_GIT_LOG_LIMIT;
+  const skip = (page - 1) * limit;
+
+  const SEP = '---GIT-LOG-SEP---';
+  const format = `${SEP}%n%H%n%h%n%P%n%D%n%s%n%an%n%aI`;
+  const args = ['log', '--topo-order', `--pretty=format:${format}`, `--skip=${skip}`, `-${limit + 1}`];
+  if (opts.stats) args.splice(3, 0, '--numstat');
+  if (opts.all) args.splice(1, 0, '--all');
+
+  const { stdout } = await execFileAsync('git', args, { cwd, timeout: EXEC_TIMEOUT });
+  const commits: unknown[] = [];
+  const blocks = stdout.split(SEP).filter((b: string) => b.trim());
+
+  for (const block of blocks) {
+    const rawLines = block.split('\n');
+    if (rawLines[0] === '') rawLines.shift();
+    if (rawLines.length < 7) continue;
+
+    const [hash, shortHash, parentLine, refLine, message, author, date, ...fileLines] = rawLines;
+    const parents = parentLine.trim() ? parentLine.trim().split(' ') : [];
+    const refs: { type: string; name: string }[] = [];
+    if (refLine.trim()) {
+      for (const raw of refLine.split(',')) {
+        const part = raw.trim();
+        if (!part) continue;
+        if (part.startsWith('HEAD -> ')) refs.push({ type: 'head', name: part.slice(8) });
+        else if (part === 'HEAD') refs.push({ type: 'head', name: 'HEAD' });
+        else if (part.startsWith('tag: ')) refs.push({ type: 'tag', name: part.slice(5) });
+        else if (part.includes('/')) refs.push({ type: 'remote', name: part });
+        else refs.push({ type: 'branch', name: part });
+      }
+    }
+    const files: { path: string; additions: number; deletions: number }[] = [];
+    for (const fl of fileLines) {
+      const match = fl.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+      if (match) {
+        files.push({
+          additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+          deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+          path: unquoteGitPath(match[3]),
+        });
+      }
+    }
+    commits.push({ hash, shortHash, parents, refs, message, author, date, files });
+  }
+
+  const hasMore = commits.length > limit;
+  if (hasMore) commits.pop();
+
+  return { commits, total: commits.length, page, limit };
+}
 
 function sendToClient(ws: WebSocket, msg: object): void {
   if (ws.readyState === ws.OPEN) {
@@ -534,8 +601,15 @@ export function setupWebSocket(
               sendToClient(ws, { type: 'error', message: `Project "${project_id}" not found for git watch.` });
               break;
             }
-            const unsub = gitWatcher.subscribe(project.path, project_id, (pid, hash) => {
-              sendToClient(ws, { type: 'git_changed', watch_id, project_id: pid, latest_hash: hash });
+            const repoPath = project.path;
+            const unsub = gitWatcher.subscribe(repoPath, project_id, (pid, hash) => {
+              // Push git log data along with change notification
+              computeGitLog(repoPath).then((logData) => {
+                sendToClient(ws, { type: 'git_changed', watch_id, project_id: pid, latest_hash: hash, ...logData });
+              }).catch(() => {
+                // Fallback: send without commits (frontend will request)
+                sendToClient(ws, { type: 'git_changed', watch_id, project_id: pid, latest_hash: hash });
+              });
             });
             watchSubscriptions.set(watch_id, unsub);
           } else if (kind === 'files' && fileWatcher) {
@@ -574,13 +648,19 @@ export function setupWebSocket(
           const { request_id, path: nbPath } = msg;
           try {
             const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);
+            const CELL_PAGE_SIZE = 5;
+            const totalCells = result.notebook.cells.length;
+            const paginatedNotebook = totalCells > CELL_PAGE_SIZE
+              ? { ...result.notebook, cells: result.notebook.cells.slice(-CELL_PAGE_SIZE) }
+              : result.notebook;
             sendToClient(ws, {
               type: 'notebook_opened',
               request_id,
               notebook_id: result.notebookId,
-              notebook: result.notebook,
+              notebook: paginatedNotebook,
               session_id: result.sessionId,
               workspace_dir: result.workspaceDir,
+              total_cells: totalCells,
             });
           } catch (err) {
             sendToClient(ws, {
@@ -600,68 +680,8 @@ export function setupWebSocket(
               sendToClient(ws, { type: 'git_log_error', request_id, error: `Project "${project_id}" not found` });
               break;
             }
-            const { execFile: execFileCb } = await import('child_process');
-            const { promisify } = await import('util');
-            const execFileAsync = promisify(execFileCb);
-            const { unquoteGitPath } = await import('./git-utils.js');
-            const cwd = project.path;
-            const EXEC_TIMEOUT = 10000;
-            const skip = (page - 1) * limit;
-
-            const SEP = '---GIT-LOG-SEP---';
-            const format = `${SEP}%n%H%n%h%n%P%n%D%n%s%n%an%n%aI`;
-            const args = ['log', '--topo-order', `--pretty=format:${format}`, `--skip=${skip}`, `-${limit + 1}`];
-            if (stats) args.splice(3, 0, '--numstat');
-            if (all) args.splice(1, 0, '--all');
-
-            const { stdout } = await execFileAsync('git', args, { cwd, timeout: EXEC_TIMEOUT });
-            const commits: unknown[] = [];
-            const blocks = stdout.split(SEP).filter((b: string) => b.trim());
-
-            for (const block of blocks) {
-              const rawLines = block.split('\n');
-              if (rawLines[0] === '') rawLines.shift();
-              if (rawLines.length < 7) continue;
-
-              const [hash, shortHash, parentLine, refLine, message, author, date, ...fileLines] = rawLines;
-              const parents = parentLine.trim() ? parentLine.trim().split(' ') : [];
-              const refs: { type: string; name: string }[] = [];
-              if (refLine.trim()) {
-                for (const raw of refLine.split(',')) {
-                  const part = raw.trim();
-                  if (!part) continue;
-                  if (part.startsWith('HEAD -> ')) refs.push({ type: 'head', name: part.slice(8) });
-                  else if (part === 'HEAD') refs.push({ type: 'head', name: 'HEAD' });
-                  else if (part.startsWith('tag: ')) refs.push({ type: 'tag', name: part.slice(5) });
-                  else if (part.includes('/')) refs.push({ type: 'remote', name: part });
-                  else refs.push({ type: 'branch', name: part });
-                }
-              }
-              const files: { path: string; additions: number; deletions: number }[] = [];
-              for (const fl of fileLines) {
-                const match = fl.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
-                if (match) {
-                  files.push({
-                    additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
-                    deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
-                    path: unquoteGitPath(match[3]),
-                  });
-                }
-              }
-              commits.push({ hash, shortHash, parents, refs, message, author, date, files });
-            }
-
-            const hasMore = commits.length > limit;
-            if (hasMore) commits.pop();
-
-            sendToClient(ws, {
-              type: 'git_log_response',
-              request_id,
-              commits,
-              total: commits.length,
-              page,
-              limit,
-            });
+            const logData = await computeGitLog(project.path, { page, limit, all, stats });
+            sendToClient(ws, { type: 'git_log_response', request_id, ...logData });
           } catch (err) {
             sendToClient(ws, { type: 'git_log_error', request_id, error: String(err) });
           }

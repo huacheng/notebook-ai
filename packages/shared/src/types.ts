@@ -591,6 +591,7 @@ export const NotebookOpenedSchema = z.object({
   notebook: NotebookSchema,
   session_id: z.string(),
   workspace_dir: z.string(),
+  total_cells: z.number().int().nonnegative(),
 });
 
 export const NotebookOpenErrorSchema = z.object({
@@ -621,6 +622,10 @@ export const GitChangedSchema = z.object({
   watch_id: z.string(),
   project_id: z.string(),
   latest_hash: z.string(),
+  commits: z.array(z.unknown()).optional(),
+  total: z.number().optional(),
+  page: z.number().optional(),
+  limit: z.number().optional(),
 });
 
 export const FilesChangedSchema = z.object({

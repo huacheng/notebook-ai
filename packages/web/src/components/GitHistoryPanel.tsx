@@ -515,13 +515,23 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?.project_id === projectId) {
-        loadPage(1, search, false, allBranches, selectedBranch);
+      if (detail?.project_id !== projectId) return;
+
+      // If server pushed commits and no filters are active, use directly
+      if (detail.commits && !search && !allBranches && !selectedBranch) {
+        const pushed = detail.commits as CommitInfo[];
+        setCommits(pushed);
+        setHasMore(pushed.length >= (detail.limit ?? 5));
+        setPage(1);
+        persistCache(pushed, pushed.length >= (detail.limit ?? 5));
+        return;
       }
+      // Filters active or no commits in push — request fresh data
+      loadPage(1, search, false, allBranches, selectedBranch);
     };
     window.addEventListener('nb:git-changed', handler);
     return () => window.removeEventListener('nb:git-changed', handler);
-  }, [projectId, search, allBranches, selectedBranch, loadPage]);
+  }, [projectId, search, allBranches, selectedBranch, loadPage, persistCache]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -634,11 +644,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
         )}
 
         {!loading && hasMore && (
-          <div className="git-load-more">
-            <button className="git-load-more-btn" onClick={handleLoadMore}>
-              Load more
-            </button>
-          </div>
+          <div className="git-load-more">Loading...</div>
         )}
       </div>
     </div>

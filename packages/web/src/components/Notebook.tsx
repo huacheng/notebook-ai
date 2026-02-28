@@ -572,15 +572,37 @@ export function Notebook() {
   }, [cells.length, cellsOffset]);
 
   const handleLoadMore = useCallback(() => {
-    const { ws, sessionId } = useStore.getState();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    const BATCH = 10;
+    const { ws, sessionId, loadingOlderCells: isLoading } = useStore.getState();
+    if (isLoading || !ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    const BATCH = 5;
     const newOffset = Math.max(0, cellsOffset - BATCH);
     const limit = cellsOffset - newOffset;
     if (limit <= 0) return;
     ws.send(JSON.stringify({ type: 'load_cells', session_id: sessionId, offset: newOffset, limit }));
     useStore.setState({ loadingOlderCells: true });
   }, [cellsOffset]);
+
+  // Scroll-to-top auto-load older cells
+  const rafCellsRef = useRef(0);
+  useEffect(() => {
+    const el = cellsContainerRef.current?.parentElement;
+    if (!el) return;
+    const onScroll = () => {
+      if (rafCellsRef.current) return;
+      rafCellsRef.current = requestAnimationFrame(() => {
+        rafCellsRef.current = 0;
+        if (cellsOffset <= 0) return;
+        if (el.scrollTop <= 80) {
+          handleLoadMore();
+        }
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (rafCellsRef.current) cancelAnimationFrame(rafCellsRef.current);
+    };
+  }, [cellsOffset, handleLoadMore]);
 
   return (
     <div className="notebook-container">
@@ -592,13 +614,9 @@ export function Notebook() {
         <>
           <div className="notebook-cells" ref={cellsContainerRef}>
             {cellsOffset > 0 && (
-              <button
-                className="notebook-load-more"
-                onClick={handleLoadMore}
-                disabled={loadingOlderCells}
-              >
-                {loadingOlderCells ? '加载中…' : `↑ ${cellsOffset} 条更早的对话`}
-              </button>
+              <div className="notebook-load-more">
+                {loadingOlderCells ? '加载中…' : `↑ ${cellsOffset} older cells`}
+              </div>
             )}
             {cells.length === 0 && cellsOffset === 0 && (
               <div className="notebook-empty">

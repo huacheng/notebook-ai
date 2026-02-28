@@ -87,6 +87,22 @@ describe('watch_subscribe message parsing', () => {
     expect(result.success).toBe(true);
   });
 
+  it('GitChangedSchema accepts commits payload for push-based git log', async () => {
+    const { GitChangedSchema } = await import('@notebook-ai/shared');
+    const result = GitChangedSchema.safeParse({
+      type: 'git_changed',
+      watch_id: 'w1',
+      project_id: 'proj-123',
+      latest_hash: 'abc123',
+      commits: [{ hash: 'abc', shortHash: 'abc', message: 'test' }],
+      total: 1,
+      page: 1,
+      limit: 5,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.commits).toHaveLength(1);
+  });
+
   it('FilesChangedSchema validates server message', async () => {
     const { FilesChangedSchema } = await import('@notebook-ai/shared');
     const result = FilesChangedSchema.safeParse({
