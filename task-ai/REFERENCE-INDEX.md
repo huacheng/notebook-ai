@@ -77,7 +77,7 @@
 
 | File | Description |
 |------|-------------|
-| `references/six-perspective-audit.md` | Six-perspective audit framework with domain adaptation |
+| `references/six-dimension-audit.md` | Six-dimension audit framework (D1-D6) with domain adaptation |
 
 ### annotate
 

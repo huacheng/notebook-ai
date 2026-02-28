@@ -67,9 +67,21 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 22. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 23. Update `.index.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
 24. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
-25. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
-26. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
-27. Report plan summary to user
+25. **L1 六维自审** — scan `.plan.md` against `.target.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
+    - Read `.plan.md`, `.target.md`, `.type-profile.md` (if exists)
+    - D1 Correctness: requirements coverage, acceptance criteria mapping, input/output consistency
+    - D2 Security: security-sensitive step identification, input validation coverage
+    - D3 Reliability: dependency explicitness, failure fallback, inter-step coupling
+    - D4 Performance: redundant steps, step granularity
+    - D5 Architecture: module boundaries, incremental delivery, separation of concerns
+    - D6 Maintainability: step executability, terminology consistency, test traceability
+    - **Weight adjustment**: read `.type-profile.md` to shift emphasis (e.g., `software` → Security↑ Reliability↑, `infrastructure` → Security↑↑ Reliability↑↑). Full weight table in `references/self-audit-checklist.md` section 2
+    - If issues found → edit `.plan.md` directly (no `.analysis/` files — that is check's responsibility)
+    - If no issues → skip, proceed to step 26
+    - **Non-fatal**: if self-audit fails (exception/timeout), skip and proceed to step 26. Log "Self-audit: skipped (error)" for step 28 report
+26. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
+27. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
+28. Report plan summary to user. Include self-audit summary: "Self-audit: N issues found and corrected" or "Self-audit: clean" or "Self-audit: skipped (error)"
 
 **Context management (plan)**: When `.summary.md` exists, read it as the primary context source for plan generation instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest file from each directory for the most recent assessment/issue/note. See also `exec/SKILL.md` for the equivalent exec-phase context rule.
 

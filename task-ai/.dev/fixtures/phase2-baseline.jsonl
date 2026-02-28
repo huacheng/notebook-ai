@@ -39,7 +39,7 @@
 {"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'skills/library/SKILL.md' exists"}
 {"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'skills/merge/SKILL.md' exists"}
 {"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'init/references/seed-types/<type>.md' exists"}
-{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'references/six-perspective-audit.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'references/six-dimension-audit.md' exists"}
 {"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'plan/references/type-profiling.md' exists"}
 {"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'init/references/seed-types/<type>.md' exists"}
 {"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'skills/library/SKILL.md' exists"}
@@ -178,7 +178,7 @@
 {"test":"L1-naming-conventions:skills/auto/references/stall-detection.md","status":"PASS","detail":"skills/auto/references/stall-detection.md: valid filename"}
 {"test":"L1-naming-conventions:skills/cancel/SKILL.md","status":"PASS","detail":"skills/cancel/SKILL.md: valid filename"}
 {"test":"L1-naming-conventions:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: valid filename"}
-{"test":"L1-naming-conventions:skills/check/references/six-perspective-audit.md","status":"PASS","detail":"skills/check/references/six-perspective-audit.md: valid filename"}
+{"test":"L1-naming-conventions:skills/check/references/six-dimension-audit.md","status":"PASS","detail":"skills/check/references/six-dimension-audit.md: valid filename"}
 {"test":"L1-naming-conventions:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: valid filename"}
 {"test":"L1-naming-conventions:skills/init/SKILL.md","status":"PASS","detail":"skills/init/SKILL.md: valid filename"}
 {"test":"L1-naming-conventions:skills/init/references/seed-types/.summary.md","status":"PASS","detail":"skills/init/references/seed-types/.summary.md: valid filename"}
@@ -389,7 +389,7 @@
 {"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/context-quota.md"}
 {"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/plugin-delegation.md"}
 {"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/stall-detection.md"}
-{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/check/references/six-perspective-audit.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/check/references/six-dimension-audit.md"}
 {"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/ai-skill.md"}
 {"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/chip-design.md"}
 {"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/data-pipeline.md"}

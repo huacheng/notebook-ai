@@ -123,7 +123,7 @@ Callable independently for preparatory research before any phase, or to suppleme
      - Compare against type registry — detect single match, hybrid indicators, or novel domain
      - For hybrid tasks: write type as `A|B` pipe-separated format (e.g., `data-pipeline|ml`)
      - For novel domains: **register** new type in `$NB_WORKSPACES_LIBRARY/.type-registry.md` (append row with date + source task)
-   10.4. **Write** or update `.type-profile.md` with all sections including **Phase Intelligence** and **Audit Adaptation** (per-perspective domain checkpoints — use seed tables from `check/references/six-perspective-audit.md` Domain Adaptation as starting point, supplement with web research for novel types)
+   10.4. **Write** or update `.type-profile.md` with all sections including **Phase Intelligence** and **Audit Adaptation** (per-dimension domain checkpoints — use seed tables from `check/references/six-dimension-audit.md` Domain Adaptation as starting point, supplement with web research for novel types)
    10.5. **Update** `type` in `.index.json` (use `A|B` format for hybrids)
    10.6. **Sync to shared**: copy `.type-profile.md` to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (acquire `.memory/.type-profiles/.lock` first; apply directory-safe transform: replace `:` with `-` in type segment when used as filename, e.g., `science:astro` → `science-astro`). For ALL types — seed types also benefit from cross-task profile accumulation. Release lock after write
    10.7. **If `--caller verify|check|exec`** and `.type-profile.md` exists:

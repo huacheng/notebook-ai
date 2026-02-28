@@ -24,7 +24,7 @@ Fix 11 issues (out of 25 identified) from the six-dimension audit of the task-ai
 ### 3. Six-perspective terminology alignment (C4)
 
 **Files**: check/SKILL.md, MEMORY.md
-**Fix**: Align check SKILL.md prose to use exact terms from six-perspective-audit.md: Security, Architecture, Performance, Extensibility, Consistency, Correctness/Completeness. Update MEMORY.md to match.
+**Fix**: Align check SKILL.md prose to use exact terms from six-dimension-audit.md: D1 Correctness, D2 Security, D3 Reliability, D4 Performance, D5 Architecture, D6 Maintainability. Update MEMORY.md to match.
 **Test**: `terminology.sh` (L2) — extract canonical terms from audit reference, verify check SKILL uses them.
 
 ### 4. $TASK_AI_ROOT script path resolution (C5)

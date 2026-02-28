@@ -31,16 +31,16 @@ Evaluates whether the implementation plan is ready for execution.
 
 **Reads:** `.target.md` + `.plan.md` + `.summary.md` (if exists) + `.test/` (latest criteria file) + `.bugfix/` (latest file if exists, to verify revised plan addresses execution issues)
 
-**Evaluation Criteria:**
+**Evaluation Criteria (unified six-dimension framework, L2 depth):**
 
-| Criterion | Weight | Description |
+| Dimension | Weight | Focus at L2 |
 |-----------|--------|-------------|
-| **Completeness** | High | Does the plan cover all requirements in `.target.md`? |
-| **Feasibility** | High | Can the plan be implemented with current codebase/tools? |
-| **Verifiability** | High | Does `.test/` contain criteria files with testable acceptance criteria and per-step verification? Are test/verification methods appropriate for the task type (see Task-Type-Aware Verification below)? |
-| **Clarity** | Medium | Are implementation steps clear and unambiguous? |
-| **Risk** | Medium | Are risks identified and mitigated? |
-| **Dependencies** | High | Are all `depends_on` modules meeting their required status? (simple → `complete`, extended → at-or-past `min_status`) If not → BLOCKED |
+| **D1 Correctness** | High | Requirements coverage — does the plan address all `.target.md` requirements? Functional feasibility — can the approach work with current codebase/tools? |
+| **D2 Security** | Medium | Security risk identification — are risks flagged and mitigated? |
+| **D3 Reliability** | High | Dependency validation — are all `depends_on` modules meeting required status? (simple → `complete`, extended → at-or-past `min_status`) If not → BLOCKED. Feasibility of dependencies — are external dependencies available? |
+| **D4 Performance** | Low | Plan efficiency — no redundant or overly granular steps? |
+| **D5 Architecture** | Medium | Structure — does the plan support incremental delivery and separation of concerns? |
+| **D6 Maintainability** | High | Clarity — are steps clear and unambiguous? Verifiability — does `.test/` contain criteria files with testable acceptance criteria and per-step verification? Are test/verification methods appropriate for the task type (see Task-Type-Aware Verification below)? |
 
 **Outcomes:**
 
@@ -222,6 +222,6 @@ Verification methods MUST match the task domain. Read `type` from `.index.json` 
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `2024-01-15-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.index.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
 - **Concurrency**: Check acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
-- **Six-perspective audit**: For thorough evaluation, apply Security / Architecture / Performance / Extensibility / Consistency / Correctness/Completeness checks systematically, adapted to the task's domain type. See `references/six-perspective-audit.md` for the full checklist and domain adaptation table
+- **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. See `references/six-dimension-audit.md` for the full checklist and domain adaptation table
 - **VFP applicability**: VFP applies when `type` contains `software` OR `.type-profile.md` contains `## Verification Cycle` section. See `commands/references/verification-first-protocol.md` for full applicability rules
 - **verify integration**: The `verify` sub-command can pre-run tests independently. When recent `verify` results exist (same day, matching checkpoint), check incorporates them instead of re-running. This is optional — check works standalone
