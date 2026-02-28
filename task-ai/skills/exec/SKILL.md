@@ -56,7 +56,7 @@ Read the `type` field from `.index.json` to determine the task domain. Execution
 For each implementation step:
 
 1. **Read** relevant files (source code, configs, scripts, documentation)
-2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[Red: ...]` annotations in `.plan.md`) before implementing:
+2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[VH: ...]` annotations in `.plan.md`) before implementing:
    - **Expected: all Red (failing)** → proceed to implementation
    - **Unexpected: any Green (passing)** → log warning in `.notes/`: "Step N: test X was Green before implementation — test may be trivially satisfied or implementation leaked from a prior step". Continue implementation but flag for review
 3. **Implement** the change using **domain-appropriate methods** as described in the plan (see `init/references/seed-types/<type>.md` for per-type seed methodology, or `.type-profile.md` for task-specific guidance)

@@ -494,7 +494,25 @@ Comment 永远不删除或修改已有内容——只追加。
     | 仅 Comment（任何文件） | any | `(none)` | 评论不触发后续流程 |
 15. **生成执行报告**（输出到屏幕）
 
-### 3.6 一般文件批注（非 task-ai 流）
+### 3.6 并发：auto 执行期间的锁竞争
+
+annotate 需要获取 `.working/.lock`（见 `commands/references/concurrency.md`）。当 auto 正在运行（例如 exec 阶段持有锁），用户同时提交批注时：
+
+| 场景 | 行为 |
+|------|------|
+| auto 持有锁，annotate 尝试获取 | **REJECT** — 报错提示"锁被 auto 会话持有" |
+| auto 步骤间隙（锁已释放，尚未获取下一步） | annotate 正常获取锁执行 |
+| annotate 持有锁，auto 尝试继续 | auto 检测到锁被占用，等待 annotate 完成 |
+
+**当前策略：快速失败 + 用户重试**
+
+- annotate 不排队、不等待 — 遵循锁协议的"REJECT, no retry"原则
+- 用户收到拒绝后可选择：(a) 等待 auto 当前步骤完成后重试，(b) `/task-ai:cancel` 终止 auto 后批注
+- auto 在每轮迭代间（检查 `.auto-stop` 处）自然释放锁，形成可用窗口
+
+**设计理由**：排队机制（写 `.pending-annotations.json`、auto 轮间消费）增加复杂度且引入新并发问题（队列文件本身的读写竞争、批注时效性）。快速失败成本低——auto 单步通常分钟级，用户稍后重试即可。如后续实践表明竞争频繁，再升级为排队方案。
+
+### 3.7 一般文件批注（非 task-ai 流）
 
 一般文件的批注不经过 annotate 子命令，由 Claude 直接在对话中响应：
 
