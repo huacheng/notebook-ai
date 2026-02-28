@@ -169,11 +169,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   setSidebarWidth(px) {
-    set({ sidebarWidth: Math.min(500, Math.max(180, px)) });
+    set({ sidebarWidth: Math.min(500, Math.max(120, px)) });
   },
 
   setRightPanelWidth(px) {
-    set({ rightPanelWidth: Math.min(500, Math.max(180, px)) });
+    set({ rightPanelWidth: Math.min(500, Math.max(120, px)) });
   },
 
   setEditMode(on) {

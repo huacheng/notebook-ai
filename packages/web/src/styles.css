@@ -3569,6 +3569,27 @@ button:focus-visible {
 .fp-entry-dir .fp-name { color: var(--text-secondary); font-weight: 500; }
 .fp-entry-up .fp-name { color: var(--text-secondary); opacity: 0.45; }
 
+/* ── Custom tooltip for file names (faster than native title) ── */
+.fp-name[data-tooltip] { position: relative; }
+.fp-name[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  background: var(--toolbar-bg);
+  color: var(--toolbar-text);
+  font-size: 11px;
+  font-family: var(--font-sans);
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 50;
+  transition: opacity 0.12s 0.15s;
+}
+.fp-name[data-tooltip]:hover::after { opacity: 1; }
+
 /* ── Type badges — warm muted palette matching the Atelier theme ── */
 .fp-badge {
   font-size: 9px;
@@ -3981,6 +4002,60 @@ button:focus-visible {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Split view (FileViewer + Notebook side-by-side) ───────────────── */
+
+/* app-content in split mode: no scroll (each pane scrolls independently) */
+.app-content--split {
+  overflow-y: hidden;
+}
+
+/* notebook-area becomes flex-row in split mode */
+.notebook-area--split {
+  flex-direction: row;
+}
+
+/* FileViewer takes left portion via CSS custom property */
+.notebook-area--split .file-viewer {
+  flex: none;
+  width: calc(var(--split-ratio, 0.5) * 100%);
+  min-width: 200px;
+  border-right: 1px solid var(--border-default);
+}
+
+/* Vertical split divider */
+.split-divider {
+  width: 3px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--border-default);
+  transition: background 0.15s;
+}
+.split-divider:hover { background: var(--color-primary); }
+
+/* Notebook pane — own scroll container for sticky positioning */
+.notebook-split-pane {
+  flex: 1;
+  min-width: 250px;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Neutralize negative margins and re-anchor sticky top in split mode */
+.notebook-split-pane .notebook-statusbar {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: var(--space-lg);
+  padding-right: var(--space-lg);
+  top: 0;
+}
+.notebook-split-pane .notebook-input-bar {
+  margin-left: 0;
+  margin-right: 0;
+  padding: var(--space-md) var(--space-lg);
 }
 
 /* ── FileViewer maximized — hide sidebars ──────────────────────────── */
@@ -4634,6 +4709,10 @@ button:focus-visible {
 }
 .fv-ann-card__btn:hover { background: var(--bg-cell-hover); color: var(--text-primary); }
 .fv-ann-card__btn--danger:hover { color: var(--color-error); }
+.fv-ann-card--sent { opacity: 0.7; }
+.fv-ann-card__btn--sent { color: var(--color-completed); cursor: default; }
+.fv-ann-card__btn:disabled,
+.fv-ann-dropdown__btn:disabled { cursor: default; opacity: 0.6; }
 
 /* ── FileAnnotationDropdown ──────────────────────────────────────────── */
 .fv-ann-dropdown {
@@ -4680,6 +4759,11 @@ button:focus-visible {
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: var(--font-size-xs);
+}
+.fv-ann-dropdown__send-all:disabled {
+  background: var(--bg-cell-hover);
+  color: var(--text-secondary);
+  cursor: default;
 }
 .fv-ann-dropdown__list {
   max-height: 300px;

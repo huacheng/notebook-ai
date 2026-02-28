@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { Notebook } from './components/Notebook';
 import { ProjectSidebar } from './components/ProjectSidebar';
@@ -14,6 +14,7 @@ import { ModelManager } from './components/ModelManager';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
+import { computeSplitEntryWidth } from './utils/splitView';
 import './styles.css';
 
 // ── Scroll position persistence ─────────────────────────────────────────────
@@ -104,9 +105,6 @@ function AuthenticatedApp() {
   const activeProjectId = useStore((s) => s.activeProjectId);
   const activeFileTabId = useStore((s) => s.activeFileTabId);
   const fileViewerMaximized = useStore((s) => s.fileViewerMaximized);
-  const rightPanelOpen = useStore((s) => s.rightPanelOpen);
-  const setRightPanelOpen = useStore((s) => s.setRightPanelOpen);
-
   const pluginStatus = useStore((s) => s.pluginStatus);
   const pluginDismissed = useStore((s) => s.pluginDismissed);
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
@@ -116,12 +114,20 @@ function AuthenticatedApp() {
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
 
+  const sidebarWidth = useStore((s) => s.sidebarWidth);
+  const rightPanelWidth = useStore((s) => s.rightPanelWidth);
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
   const setRightPanelWidth = useStore((s) => s.setRightPanelWidth);
 
   const contentRef = useRef<HTMLElement | null>(null);
   const savedScrollRef = useRef<number>(0);
-  const draggingRef = useRef<'left' | 'right' | null>(null);
+  const draggingRef = useRef<'left' | 'right' | 'split' | null>(null);
+  const notebookSplitRef = useRef<HTMLDivElement | null>(null);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+
+  // Saved panel widths for split-view restore
+  const savedSidebarRef = useRef<number | null>(null);
+  const savedRightRef = useRef<number | null>(null);
 
   // ── Column divider drag ──────────────────────────────────────────────
   const startLeftDrag = useCallback((e: React.MouseEvent) => {
@@ -134,13 +140,22 @@ function AuthenticatedApp() {
     draggingRef.current = 'right';
   }, []);
 
+  const startSplitDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = 'split';
+  }, []);
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!draggingRef.current) return;
       if (draggingRef.current === 'left') {
         setSidebarWidth(e.clientX);
-      } else {
+      } else if (draggingRef.current === 'right') {
         setRightPanelWidth(window.innerWidth - e.clientX);
+      } else if (draggingRef.current === 'split' && contentRef.current) {
+        const rect = contentRef.current.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        setSplitRatio(Math.min(0.8, Math.max(0.2, ratio)));
       }
     };
     const onUp = () => { draggingRef.current = null; };
@@ -155,9 +170,37 @@ function AuthenticatedApp() {
   // Initiate WebSocket connection only when we have a sessionId.
   useWebSocket(sessionId);
 
+  const hasActiveFile = activeFileTabId !== null;
+  const hasNotebook = notebook !== null;
+  const inSplitView = hasActiveFile && hasNotebook
+    && !pluginPanelOpen && !modelPanelOpen && !fileViewerMaximized;
+
+  // ── Auto-shrink panels on split-view transition ────────────────────
+  const prevSplitRef = useRef(false);
+  useEffect(() => {
+    if (inSplitView && !prevSplitRef.current) {
+      // Entering split view — save widths and shrink
+      savedSidebarRef.current = sidebarWidth;
+      savedRightRef.current = rightPanelWidth;
+      setSidebarWidth(computeSplitEntryWidth(sidebarWidth));
+      setRightPanelWidth(computeSplitEntryWidth(rightPanelWidth));
+    } else if (!inSplitView && prevSplitRef.current) {
+      // Exiting split view — restore saved widths
+      if (savedSidebarRef.current !== null) {
+        setSidebarWidth(savedSidebarRef.current);
+        savedSidebarRef.current = null;
+      }
+      if (savedRightRef.current !== null) {
+        setRightPanelWidth(savedRightRef.current);
+        savedRightRef.current = null;
+      }
+    }
+    prevSplitRef.current = inSplitView;
+  }); // intentionally no deps — runs every render but only acts on transitions
+
   // Persist and restore scroll position across notebook switches and browser tab switches.
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
-  useScrollRestoration(activeNotebookTabId ?? activeNotebookId, contentRef);
+  useScrollRestoration(activeNotebookTabId ?? activeNotebookId, inSplitView ? notebookSplitRef : contentRef);
 
   // Fetch projects on mount
   useEffect(() => {
@@ -187,39 +230,25 @@ function AuthenticatedApp() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save/restore scroll position when FileViewer opens/closes (R1).
-  const hasActiveFile = activeFileTabId !== null;
+  // Only needed when notebook is NOT mounted (no split view — notebook disappears entirely).
   const prevHasFileRef = useRef(hasActiveFile);
   useEffect(() => {
     const wasOpen = prevHasFileRef.current;
     const isOpen = hasActiveFile;
     prevHasFileRef.current = hasActiveFile;
 
-    if (!wasOpen && isOpen && contentRef.current) {
-      // FileViewer opening — save current scroll position.
-      savedScrollRef.current = contentRef.current.scrollTop;
-    } else if (wasOpen && !isOpen && contentRef.current) {
-      // FileViewer closing — restore saved scroll position.
-      requestAnimationFrame(() => {
-        if (contentRef.current) {
-          contentRef.current.scrollTop = savedScrollRef.current;
-        }
-      });
+    if (!hasNotebook) {
+      if (!wasOpen && isOpen && contentRef.current) {
+        savedScrollRef.current = contentRef.current.scrollTop;
+      } else if (wasOpen && !isOpen && contentRef.current) {
+        requestAnimationFrame(() => {
+          if (contentRef.current) {
+            contentRef.current.scrollTop = savedScrollRef.current;
+          }
+        });
+      }
     }
-  }, [hasActiveFile]);
-
-  // Auto-collapse RightPanel when FileViewer opens; restore when it closes.
-  const savedRightPanelRef = useRef<boolean | null>(null);
-  useEffect(() => {
-    if (hasActiveFile && rightPanelOpen) {
-      savedRightPanelRef.current = true;
-      setRightPanelOpen(false);
-    } else if (!hasActiveFile && savedRightPanelRef.current) {
-      setRightPanelOpen(true);
-      savedRightPanelRef.current = null;
-    }
-  }, [hasActiveFile]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const hasNotebook = notebook !== null;
+  }, [hasActiveFile, hasNotebook]);
 
   return (
     <div className="app">
@@ -269,15 +298,28 @@ function AuthenticatedApp() {
       <div className={`app-body${hasActiveFile && fileViewerMaximized ? ' app-body--fv-maximized' : ''}`}>
         <ProjectSidebar />
         <div className="app-divider" onMouseDown={startLeftDrag} />
-        <main ref={contentRef} className="app-content">
+        <main ref={contentRef} className={`app-content${inSplitView ? ' app-content--split' : ''}`}>
           <NotebookTabs />
-          <div className="notebook-area">
+          <div
+            className={`notebook-area${inSplitView ? ' notebook-area--split' : ''}`}
+            style={inSplitView ? { '--split-ratio': splitRatio } as React.CSSProperties : undefined}
+          >
             {pluginPanelOpen ? (
               <PluginManager />
             ) : modelPanelOpen ? (
               <ModelManager />
             ) : hasActiveFile ? (
-              <FileViewer />
+              <>
+                <FileViewer />
+                {inSplitView && (
+                  <>
+                    <div className="split-divider" onMouseDown={startSplitDrag} />
+                    <div className="notebook-split-pane" ref={notebookSplitRef}>
+                      <Notebook />
+                    </div>
+                  </>
+                )}
+              </>
             ) : gitTabOpen && activeProjectId ? (
               null  /* GitHistoryPanel rendered below as keep-alive */
             ) : notebookLoading ? (

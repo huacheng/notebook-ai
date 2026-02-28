@@ -6,6 +6,7 @@ interface FileAnnotationCardProps {
   onEdit: (id: string, content: string) => void;
   onRemove: (id: string) => void;
   onSend: (id: string) => void;
+  isSent: boolean;
 }
 
 const TYPE_META = {
@@ -15,7 +16,7 @@ const TYPE_META = {
   comment: { label: 'Comment', color: '#d97706' },
 } as const;
 
-export function FileAnnotationCard({ annotation, onEdit, onRemove, onSend }: FileAnnotationCardProps) {
+export function FileAnnotationCard({ annotation, onEdit, onRemove, onSend, isSent: sent }: FileAnnotationCardProps) {
   const meta = TYPE_META[annotation.type];
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -43,7 +44,7 @@ export function FileAnnotationCard({ annotation, onEdit, onRemove, onSend }: Fil
   }, [editing]);
 
   return (
-    <div className={`fv-ann-card fv-ann-card--${annotation.type}`}>
+    <div className={`fv-ann-card fv-ann-card--${annotation.type}${sent ? ' fv-ann-card--sent' : ''}`}>
       <span className="fv-ann-card__type" style={{ color: meta.color }}>{meta.label}</span>
       <span className="fv-ann-card__anchor">&ldquo;{annotation.selected_text.slice(0, 50)}&rdquo;</span>
       {annotation.content && !editing && (
@@ -66,7 +67,13 @@ export function FileAnnotationCard({ annotation, onEdit, onRemove, onSend }: Fil
         />
       )}
       <div className="fv-ann-card__actions">
-        <button className="fv-ann-card__btn" onClick={() => onSend(annotation.id)}>Send</button>
+        <button
+          className={`fv-ann-card__btn${sent ? ' fv-ann-card__btn--sent' : ''}`}
+          onClick={() => onSend(annotation.id)}
+          disabled={sent}
+        >
+          {sent ? '✓ Sent' : 'Send'}
+        </button>
         <button className="fv-ann-card__btn" onClick={startEdit}>✎</button>
         <button className="fv-ann-card__btn fv-ann-card__btn--danger" onClick={() => onRemove(annotation.id)}>×</button>
       </div>

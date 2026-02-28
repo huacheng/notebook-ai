@@ -13,7 +13,7 @@ import { renderAsync } from 'docx-preview';
 import * as XLSX from 'xlsx';
 import type { FileFormat } from '../hooks/useFileStream';
 import type { FileAnnotations, FileAnnotation } from '../types/fileAnnotations';
-import { uid, buildSendPayload } from '../types/fileAnnotations';
+import { uid, buildSendPayload, collectAnnotationIds, filterSendable, applyEdit, computeSourceCursor } from '../types/fileAnnotations';
 import { FileSelectionFloat } from './FileSelectionFloat';
 import { FileAnnotationCard } from './FileAnnotationCard';
 import { FileAnnotationDropdown } from './FileAnnotationDropdown';
@@ -22,6 +22,7 @@ import {
   captureSelectionRects,
   addHighlight,
   removeHighlight,
+  rekeyHighlight,
   formatTagLabel,
   computeScrollTarget,
   computeMarginAnchor,
@@ -195,7 +196,7 @@ export function FileViewerRender({
   format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath,
   pdfScale = 1.0, onPdfPagesLoaded, onPdfVisiblePage,
 }: FileViewerRenderProps) {
-  const [float, setFloat] = useState<{ x: number; y: number; selectionBottom: number; text: string; rects: { x: number; y: number; width: number; height: number }[]; textOffset: number } | null>(null);
+  const [float, setFloat] = useState<{ x: number; y: number; selectionBottom: number; text: string; rects: { x: number; y: number; width: number; height: number }[]; renderedOffset: number; renderedTextLen: number } | null>(null);
   const [editFloat, setEditFloat] = useState<{ x: number; y: number; annotationId: string; isNew: boolean } | null>(null);
   const [highlights, setHighlights] = useState<HighlightsMap>({});
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
@@ -203,6 +204,10 @@ export function FileViewerRender({
   const [pdfError, setPdfError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const visiblePagesRef = useRef(new Set<number>());
+
+  // ── Baseline set: tracks which annotation IDs have been sent ──
+  const baselineIdsRef = useRef<Set<string>>(collectAnnotationIds(annotations.items));
+  const [baselineVer, setBaselineVer] = useState(0);
 
   // Container padding — fixed offset that doesn't participate in PDF scaling
   const PADDING_X = 24;
@@ -290,14 +295,15 @@ export function FileViewerRender({
 
   const addAnnotation = useCallback((type: FileAnnotation['type'], selectedText: string, defaultContent?: string) => {
     const id = uid();
+    const truncated = selectedText.slice(0, 80);
     const ann: FileAnnotation = {
       id,
       type,
       file_path: filePath,
       absolute_path: absolutePath,
-      selected_text: selectedText.slice(0, 80),
+      selected_text: truncated,
       content: defaultContent,
-      textOffset: float?.textOffset ?? 0,
+      cursor: float ? computeSourceCursor(truncated, float.renderedOffset, float.renderedTextLen, content) : 0,
       author: 'user',
       timestamp: new Date().toISOString(),
       updatedAt: Date.now(),
@@ -314,7 +320,7 @@ export function FileViewerRender({
       setEditFloat({ x: float!.x, y: float!.selectionBottom, annotationId: id, isNew: true });
     }
     setFloat(null);
-  }, [annotations, filePath, absolutePath, onAnnotationsChange, float, pdfScale]);
+  }, [annotations, filePath, absolutePath, onAnnotationsChange, float, pdfScale, content]);
 
   const removeAnnotation = useCallback((id: string) => {
     onAnnotationsChange({ items: annotations.items.filter((a) => a.id !== id), updatedAt: Date.now() });
@@ -323,11 +329,11 @@ export function FileViewerRender({
   }, [annotations, onAnnotationsChange, activeHighlightId]);
 
   const editAnnotation = useCallback((id: string, newContent: string) => {
-    onAnnotationsChange({
-      items: annotations.items.map((a) => a.id === id ? { ...a, content: newContent, updatedAt: Date.now() } : a),
-      updatedAt: Date.now(),
-    });
-  }, [annotations, onAnnotationsChange]);
+    const newId = uid();
+    onAnnotationsChange({ items: applyEdit(annotations.items, id, newContent, newId), updatedAt: Date.now() });
+    setHighlights((prev) => rekeyHighlight(prev, id, newId));
+    if (activeHighlightId === id) setActiveHighlightId(newId);
+  }, [annotations, onAnnotationsChange, activeHighlightId]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     const sel = window.getSelection();
@@ -338,11 +344,12 @@ export function FileViewerRender({
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
     const range = sel.getRangeAt(0);
-    // Compute textOffset: character offset of selection start in rendered text
+    // Compute renderedOffset: character offset of selection start in rendered text
     const preRange = document.createRange();
     preRange.setStart(container, 0);
     preRange.setEnd(range.startContainer, range.startOffset);
-    const textOffset = preRange.toString().length;
+    const renderedOffset = preRange.toString().length;
+    const renderedTextLen = container.innerText.length;
     const rangeRect = range.getBoundingClientRect();
     const scrollTop = container.scrollTop;
     const scrollLeft = container.scrollLeft;
@@ -358,22 +365,34 @@ export function FileViewerRender({
       selectionBottom: rangeRect.bottom - containerRect.top + scrollTop + 8,
       text,
       rects,
-      textOffset,
+      renderedOffset,
+      renderedTextLen,
     });
   }, []);
 
-  const getRenderedText = useCallback(() => containerRef.current?.innerText ?? '', []);
+  const isSent = useCallback((id: string) => baselineIdsRef.current.has(id), []);
+
+  const sendableCount = useMemo(() => {
+    void baselineVer; // trigger recompute on baseline changes
+    return filterSendable(annotations.items, baselineIdsRef.current).length;
+  }, [annotations, baselineVer]);
 
   const handleSendSingle = useCallback((id: string) => {
+    if (baselineIdsRef.current.has(id)) return;
     const ann = annotations.items.find((a) => a.id === id);
-    if (ann) {
-      onSendToPrompt(buildSendPayload([ann], getRenderedText()));
-    }
-  }, [annotations, onSendToPrompt, getRenderedText]);
+    if (!ann) return;
+    onSendToPrompt(buildSendPayload([ann]));
+    baselineIdsRef.current.add(id);
+    setBaselineVer((v) => v + 1);
+  }, [annotations, onSendToPrompt]);
 
   const handleSendAll = useCallback(() => {
-    onSendToPrompt(buildSendPayload(annotations.items, getRenderedText()));
-  }, [annotations, onSendToPrompt, getRenderedText]);
+    const sendable = filterSendable(annotations.items, baselineIdsRef.current);
+    if (sendable.length === 0) return;
+    onSendToPrompt(buildSendPayload(sendable));
+    baselineIdsRef.current = collectAnnotationIds(annotations.items);
+    setBaselineVer((v) => v + 1);
+  }, [annotations, onSendToPrompt]);
 
   const handleCancelAll = useCallback(() => {
     onAnnotationsChange({ items: [], updatedAt: Date.now() });
@@ -421,6 +440,8 @@ export function FileViewerRender({
           onRemove={removeAnnotation}
           onCancelAll={handleCancelAll}
           onScrollTo={handleScrollTo}
+          isSent={isSent}
+          sendableCount={sendableCount}
         />
       </div>
 
@@ -574,6 +595,7 @@ export function FileViewerRender({
               onEdit={editAnnotation}
               onRemove={removeAnnotation}
               onSend={handleSendSingle}
+              isSent={isSent(a.id)}
             />
           ))}
         </div>

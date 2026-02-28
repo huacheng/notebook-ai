@@ -35,9 +35,8 @@ Each annotation is a single JSON line with these fields:
 // All types share these fields
 { file: string;      // absolute path to the annotated file
   type: 'insert' | 'delete' | 'replace' | 'comment';
-  selected: string;  // user-selected text (anchor, from rendered text)
-  before: string;    // rendered text context before selection (≤40 chars)
-  after: string;     // rendered text context after selection (≤40 chars)
+  selected: string;  // user-selected text (anchor, max 80 chars)
+  cursor: number;    // character offset in source file text
 }
 // Type-specific fields:
 // insert:  { content: string }     — text to insert after selection
@@ -46,7 +45,7 @@ Each annotation is a single JSON line with these fields:
 // delete:  (no extra field)        — delete the selected text
 ```
 
-**Context fields are in rendered text space** (from `container.innerText`), not markdown source. `before` + `selected` + `after` form a unique positional anchor. Claude reads the source file and maps rendered-text context → source location using markdown syntax knowledge.
+**Positioning**: `cursor` is the character offset in the **source file** (not rendered text). The model uses `cursor` + `selected` as dual anchors to locate the exact position in the source file. When multiple annotations target the same file, group them by `file` and read each file only once.
 
 > **See `references/annotation-processing.md`** for processing logic (triage rules, cross-impact assessment, conflict detection), and execution report format.
 
@@ -68,7 +67,7 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 
 ## Execution Steps
 
-1. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `before`, `after`, and type-specific content fields
+1. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once
 2. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. Reject if any path escapes (prevents path traversal)
 3. **Determine file layer** for each annotation (Requirement / Planning / Evaluation / Methodology / Information)
 4. **Read `.index.json`** — validate status is not terminal (`complete` / `cancelled` / `stage-done`). If terminal, REJECT
@@ -213,7 +212,7 @@ task-ai(<notebook>):annotate annotations processed
 ## Notes
 
 - Annotations arrive via prompt JSONL — no intermediate files (`.tmp-annotations.json` is deprecated)
-- `before`/`selected`/`after` are in **rendered text space** (from `container.innerText`), not markdown source — Claude maps to source using markdown syntax knowledge
+- `cursor` is a **source file character offset** — use `cursor` + `selected` to locate position precisely in the source file
 - Cross-impact assessment should check ALL files in the task module, not just the current file
 - **Content sanitization**: strip HTML comments, ANSI escapes, and control chars before writing
 - **Frontend routing**: `isTaskSystemFile()` → prompt gets `/task-ai:annotate\n` prefix (skill call); non-system files → no prefix (Claude conversational response). Claude does not need to route — frontend does deterministic dispatch

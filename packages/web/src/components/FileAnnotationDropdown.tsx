@@ -8,13 +8,15 @@ interface FileAnnotationDropdownProps {
   onRemove: (id: string) => void;
   onCancelAll?: () => void;
   onScrollTo?: (id: string) => void;
+  isSent: (id: string) => boolean;
+  sendableCount: number;
 }
 
 const TYPE_SYMBOL: Record<string, string> = {
   insert: '+', delete: '−', replace: '⇄', comment: '?',
 };
 
-export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, onRemove, onCancelAll, onScrollTo }: FileAnnotationDropdownProps) {
+export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, onRemove, onCancelAll, onScrollTo, isSent, sendableCount }: FileAnnotationDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const count = annotations.items.length;
@@ -38,7 +40,9 @@ export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, o
       {open && (
         <div className="fv-ann-dropdown__panel">
           <div className="fv-ann-dropdown__header">
-            <button className="fv-ann-dropdown__send-all" onClick={onSendAll}>Send All</button>
+            <button className="fv-ann-dropdown__send-all" onClick={onSendAll} disabled={sendableCount === 0}>
+              {sendableCount === 0 ? 'All Sent' : `Send All (${sendableCount})`}
+            </button>
             {onCancelAll && (
               <button className="fv-ann-dropdown__cancel-all" onClick={onCancelAll}>Cancel All</button>
             )}
@@ -55,7 +59,9 @@ export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, o
                 >
                   {(a.content ?? a.selected_text).slice(0, 60)}
                 </span>
-                <button className="fv-ann-dropdown__btn" onClick={() => onSendSingle(a.id)}>Send</button>
+                <button className="fv-ann-dropdown__btn" onClick={() => onSendSingle(a.id)} disabled={isSent(a.id)}>
+                  {isSent(a.id) ? '✓' : 'Send'}
+                </button>
                 <button className="fv-ann-dropdown__btn fv-ann-dropdown__btn--danger" onClick={() => onRemove(a.id)}>×</button>
               </div>
             ))}

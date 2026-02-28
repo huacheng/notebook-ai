@@ -7,7 +7,7 @@ export interface FileAnnotation {
   absolute_path: string;        // absolute path for prompt
   selected_text: string;        // anchor snapshot (max 80 chars)
   content?: string;             // insert/replace/comment text
-  textOffset: number;           // selection start in rendered text
+  cursor: number;               // character offset in source text
   author: string;
   timestamp: string;            // ISO
   updatedAt: number;            // ms epoch
@@ -61,20 +61,42 @@ export function resolveAbsolutePath(
   return root ? `${root}/.library/${filePath}` : '';
 }
 
-const CONTEXT_CAP = 40;
+export function computeSourceCursor(
+  selectedText: string,
+  renderedOffset: number,
+  renderedTextLen: number,
+  sourceText: string,
+): number {
+  if (renderedTextLen === 0) return 0;
+  if (!selectedText) {
+    return Math.round((renderedOffset / renderedTextLen) * sourceText.length);
+  }
+  // Find all positions of selectedText in source
+  const positions: number[] = [];
+  let idx = 0;
+  while ((idx = sourceText.indexOf(selectedText, idx)) !== -1) {
+    positions.push(idx);
+    idx += 1;
+  }
+  if (positions.length === 0) {
+    return Math.round((renderedOffset / renderedTextLen) * sourceText.length);
+  }
+  if (positions.length === 1) return positions[0];
+  // Multiple matches: pick closest by proportion
+  const est = (renderedOffset / renderedTextLen) * sourceText.length;
+  return positions.reduce((best, p) =>
+    Math.abs(p - est) < Math.abs(best - est) ? p : best
+  );
+}
 
-export function buildSingleAnnotationPrompt(ann: FileAnnotation, fullText: string): string {
-  const { type, absolute_path, selected_text, content, textOffset } = ann;
-  const before = fullText.substring(Math.max(0, textOffset - CONTEXT_CAP), textOffset);
-  const afterStart = textOffset + selected_text.length;
-  const after = fullText.substring(afterStart, afterStart + CONTEXT_CAP);
+export function buildSingleAnnotationPrompt(ann: FileAnnotation): string {
+  const { type, absolute_path, selected_text, content, cursor } = ann;
 
-  const obj: Record<string, string> = {
+  const obj: Record<string, string | number> = {
     file: absolute_path,
     type,
     selected: selected_text,
-    before,
-    after,
+    cursor,
   };
 
   if (type === 'insert' && content != null) {
@@ -89,20 +111,35 @@ export function buildSingleAnnotationPrompt(ann: FileAnnotation, fullText: strin
   return JSON.stringify(obj);
 }
 
-export function buildAnnotationPrompt(annotations: FileAnnotation[], fullText: string): string {
+export function buildAnnotationPrompt(annotations: FileAnnotation[]): string {
   if (annotations.length === 0) return '';
-  return annotations.map((a) => buildSingleAnnotationPrompt(a, fullText)).join('\n');
+  return annotations.map((a) => buildSingleAnnotationPrompt(a)).join('\n');
 }
 
-export function buildSendPayload(annotations: FileAnnotation[], fullText: string): string {
+export function buildSendPayload(annotations: FileAnnotation[]): string {
   if (annotations.length === 0) return '';
-  const jsonl = buildAnnotationPrompt(annotations, fullText);
+  const jsonl = buildAnnotationPrompt(annotations);
   // Route: system file (dotfile inside .working/) gets /task-ai:annotate prefix
   const firstPath = annotations[0].absolute_path;
   if (isTaskSystemFile(firstPath)) {
     return `/task-ai:annotate\n${jsonl}`;
   }
   return jsonl;
+}
+
+export function collectAnnotationIds(items: FileAnnotation[]): Set<string> {
+  return new Set(items.map((i) => i.id));
+}
+
+export function filterSendable(items: FileAnnotation[], baseline: Set<string>): FileAnnotation[] {
+  return items.filter((i) => !baseline.has(i.id));
+}
+
+export function applyEdit(items: FileAnnotation[], id: string, newContent: string, newId?: string): FileAnnotation[] {
+  const nid = newId ?? uid();
+  return items.map((a) =>
+    a.id === id ? { ...a, id: nid, content: newContent, updatedAt: Date.now() } : a,
+  );
 }
 
 export function canEditFile(format: string | null, absolutePath: string): boolean {

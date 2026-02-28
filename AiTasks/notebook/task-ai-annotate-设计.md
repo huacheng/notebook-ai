@@ -2,6 +2,8 @@
 
 > 批注交互系统：统一的文件批注 → prompt 流
 > 日期：2026-02-28
+>
+> **⚠️ 历史文档** — `textOffset` + `before`/`after` 定位机制已被 `cursor`（源文件字符偏移）+ `selected` 双锚点取代。当前实现见 `task-ai/commands/references/annotation-format.md`。
 
 ---
 

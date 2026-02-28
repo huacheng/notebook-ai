@@ -274,10 +274,10 @@ describe('sidebarWidth', () => {
     expect(state.sidebarWidth).toBe(350);
   });
 
-  it('clamps below 180 to 180', () => {
+  it('clamps below 120 to 120', () => {
     const { state, getAction } = createTestSlice();
     getAction('setSidebarWidth')(100);
-    expect(state.sidebarWidth).toBe(180);
+    expect(state.sidebarWidth).toBe(120);
   });
 
   it('clamps above 500 to 500', () => {
@@ -288,8 +288,8 @@ describe('sidebarWidth', () => {
 
   it('accepts boundary values exactly', () => {
     const { state, getAction } = createTestSlice();
-    getAction('setSidebarWidth')(180);
-    expect(state.sidebarWidth).toBe(180);
+    getAction('setSidebarWidth')(120);
+    expect(state.sidebarWidth).toBe(120);
     getAction('setSidebarWidth')(500);
     expect(state.sidebarWidth).toBe(500);
   });
@@ -307,10 +307,10 @@ describe('rightPanelWidth', () => {
     expect(state.rightPanelWidth).toBe(400);
   });
 
-  it('clamps below 180 to 180', () => {
+  it('clamps below 120 to 120', () => {
     const { state, getAction } = createTestSlice();
     getAction('setRightPanelWidth')(50);
-    expect(state.rightPanelWidth).toBe(180);
+    expect(state.rightPanelWidth).toBe(120);
   });
 
   it('clamps above 500 to 500', () => {

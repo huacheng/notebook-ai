@@ -490,7 +490,10 @@ function ScrollToBottomButton({ bottomRef }: { bottomRef: RefObject<HTMLDivEleme
   const [rightPx, setRightPx] = useState(0);
 
   useEffect(() => {
-    const scroller = bottomRef.current?.closest('.app-content') as HTMLElement | null;
+    const scroller = (
+      bottomRef.current?.closest('.notebook-split-pane')
+      ?? bottomRef.current?.closest('.app-content')
+    ) as HTMLElement | null;
     if (!scroller) return;
 
     const updateVisibility = () => {

@@ -5,7 +5,7 @@ Process annotations from the file viewer's JSONL prompt input.
 ## Table of Contents
 
 - [Input Format — JSONL Prompt](#input-format--jsonl-prompt)
-- [Rendered Text Positioning](#rendered-text-positioning)
+- [Source Cursor Positioning](#source-cursor-positioning)
 - [Content Sanitization](#content-sanitization)
 - [Processing Logic](#processing-logic)
   - [A. Delete Annotations](#a-delete-annotations)
@@ -21,14 +21,14 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 **Single annotation**:
 
 ```jsonl
-{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","before":"Performance\n","after":"\nMax memory usage: 512MB","replacement":"Max response time: 200ms"}
+{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
 ```
 
 **Batch (multiple annotations, same file)**:
 
 ```jsonl
-{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","before":"Performance\n","after":"\nMax memory usage: 512MB","replacement":"Max response time: 200ms"}
-{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"comment","selected":"Support offline mode","before":"Features\nSupport real-time sync\n","after":"\nMulti-device sync","comment":"离线模式的数据同步策略需要明确"}
+{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
+{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"comment","selected":"Support offline mode","cursor":128,"comment":"离线模式的数据同步策略需要明确"}
 ```
 
 ### Field Reference
@@ -39,9 +39,8 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 |-------|------|-------------|
 | `file` | string | Absolute path to the annotated file |
 | `type` | string | `'insert'` \| `'delete'` \| `'replace'` \| `'comment'` |
-| `selected` | string | User-selected text (anchor snapshot from rendered text) |
-| `before` | string | Rendered text context before selection (≤40 chars) |
-| `after` | string | Rendered text context after selection (≤40 chars) |
+| `selected` | string | User-selected text (max 80 chars) |
+| `cursor` | number | Character offset of selection start in source file text |
 
 **Type-specific fields**:
 
@@ -61,24 +60,21 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 | Multi-line + `<` | `"selected":"Req\n\n1. ...\n3. < 200ms"` | ✅ `\n` escaped, `<` is normal |
 | Quotes and arrows | `"selected":"Use \"strict\" for → val"` | ✅ `\"` standard JSON escape |
 
-## Rendered Text Positioning
+## Source Cursor Positioning
 
-`before`, `selected`, and `after` are extracted from **rendered visible text** (`container.innerText`), NOT from markdown source. This solves the fundamental mismatch between rendered text and source:
+`cursor` is the character offset in the **source file** (not rendered text). The frontend computes it by mapping the rendered-text selection offset to the source via `computeSourceCursor()`:
+
+1. **Unique match**: `selected` appears once in source → return that position directly
+2. **Multiple matches**: use rendered-offset proportion to pick the closest occurrence
+3. **Zero matches** (e.g. markdown syntax stripped): fall back to proportional estimate
 
 ```
 Source:   See **important** note about *performance*
-Rendered: See important note about performance
-Selected:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-              ↑ selected = "important note about performance"
-before = "See "   ← rendered text before selection
-after  = ""       ← selection at end
+                                       cursor = 31 ↑
+Selected: "performance"
 ```
 
-Using `indexOf("important note about performance")` on the source would return -1 (not found) because the source contains `**` and `*` markers. In rendered text space, positioning is always precise.
-
-**Claude-side processing**: Claude reads the source file and maps rendered-text context → source location using markdown syntax knowledge. For `.target.md` / `.plan.md` and similar formats (headings, lists, tables), the mapping is unambiguous.
-
-`before` + `selected` + `after` together form a **unique positional anchor** — resolving ambiguity when the same text appears multiple times in a file.
+**Claude-side processing**: read the source file, seek to `cursor`, and use `selected` as confirmation anchor. `cursor` + `selected` together form a **dual positional anchor** — `cursor` provides the position, `selected` confirms the content. When multiple annotations target the same file, group by `file` and read each source file only once.
 
 ## Content Sanitization
 

@@ -65,6 +65,12 @@ export function removeHighlight(map: HighlightsMap, id: string): HighlightsMap {
   return rest;
 }
 
+export function rekeyHighlight(map: HighlightsMap, oldId: string, newId: string): HighlightsMap {
+  if (!(oldId in map)) return map;
+  const { [oldId]: entry, ...rest } = map;
+  return { ...rest, [newId]: entry };
+}
+
 const TYPE_SYMBOLS: Record<string, string> = {
   insert: '+',
   delete: 'Delete',
