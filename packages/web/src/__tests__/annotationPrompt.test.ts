@@ -8,6 +8,7 @@ import {
   resolveAbsolutePath,
   buildSingleAnnotationPrompt,
   buildAnnotationPrompt,
+  buildSendPayload,
   type FileAnnotation,
 } from '../types/fileAnnotations';
 
@@ -186,5 +187,59 @@ describe('buildAnnotationPrompt', () => {
 
   it('empty array returns empty string', () => {
     expect(buildAnnotationPrompt([], fullText)).toBe('');
+  });
+});
+
+describe('buildSendPayload', () => {
+  const fullText = '0123456789selected0123456789012345678901234567890123456789';
+
+  it('system file single annotation gets /task-ai:annotate prefix', () => {
+    const ann = makeAnn({
+      type: 'comment', content: 'fix this',
+      absolute_path: '/home/u/ws/.working/.target.md', textOffset: 10,
+    });
+    const result = buildSendPayload([ann], fullText);
+    expect(result.startsWith('/task-ai:annotate\n')).toBe(true);
+    const jsonl = result.substring('/task-ai:annotate\n'.length);
+    expect(() => JSON.parse(jsonl)).not.toThrow();
+  });
+
+  it('general file single annotation has no prefix', () => {
+    const ann = makeAnn({
+      type: 'comment', content: 'fix',
+      absolute_path: '/home/u/ws/readme.md', textOffset: 10,
+    });
+    const result = buildSendPayload([ann], fullText);
+    expect(result.startsWith('/task-ai:annotate')).toBe(false);
+    expect(() => JSON.parse(result)).not.toThrow();
+  });
+
+  it('system file batch gets prefix + multi-line JSONL', () => {
+    const anns = [
+      makeAnn({ type: 'comment', content: 'a', absolute_path: '/home/u/ws/.working/.plan.md', textOffset: 10 }),
+      makeAnn({ type: 'delete', absolute_path: '/home/u/ws/.working/.plan.md', textOffset: 10 }),
+    ];
+    const result = buildSendPayload(anns, fullText);
+    expect(result.startsWith('/task-ai:annotate\n')).toBe(true);
+    const jsonl = result.substring('/task-ai:annotate\n'.length);
+    const lines = jsonl.split('\n');
+    expect(lines).toHaveLength(2);
+    lines.forEach((l) => expect(() => JSON.parse(l)).not.toThrow());
+  });
+
+  it('general file batch has no prefix + multi-line JSONL', () => {
+    const anns = [
+      makeAnn({ type: 'comment', content: 'a', absolute_path: '/home/u/ws/file.ts', textOffset: 10 }),
+      makeAnn({ type: 'insert', content: 'b', absolute_path: '/home/u/ws/file.ts', textOffset: 10 }),
+    ];
+    const result = buildSendPayload(anns, fullText);
+    expect(result.startsWith('/task-ai:annotate')).toBe(false);
+    const lines = result.split('\n');
+    expect(lines).toHaveLength(2);
+    lines.forEach((l) => expect(() => JSON.parse(l)).not.toThrow());
+  });
+
+  it('empty array returns empty string', () => {
+    expect(buildSendPayload([], fullText)).toBe('');
   });
 });

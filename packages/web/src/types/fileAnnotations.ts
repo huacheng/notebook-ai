@@ -94,6 +94,17 @@ export function buildAnnotationPrompt(annotations: FileAnnotation[], fullText: s
   return annotations.map((a) => buildSingleAnnotationPrompt(a, fullText)).join('\n');
 }
 
+export function buildSendPayload(annotations: FileAnnotation[], fullText: string): string {
+  if (annotations.length === 0) return '';
+  const jsonl = buildAnnotationPrompt(annotations, fullText);
+  // Route: system file (dotfile inside .working/) gets /task-ai:annotate prefix
+  const firstPath = annotations[0].absolute_path;
+  if (isTaskSystemFile(firstPath)) {
+    return `/task-ai:annotate\n${jsonl}`;
+  }
+  return jsonl;
+}
+
 export function buildAnnotationText(annotations: FileAnnotations): string {
   const { items } = annotations;
   if (items.length === 0) return '';
