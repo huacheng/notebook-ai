@@ -138,8 +138,10 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-left">
-        <span className="toolbar-logo" aria-label="Notebook AI">NoteBook AI</span>
-        <span className="toolbar-version">v{__APP_VERSION__}</span>
+        <span className="toolbar-brand">
+          <span className="toolbar-logo" aria-label="Notebook AI">NoteBook AI</span>
+          <span className="toolbar-version">v{__APP_VERSION__}</span>
+        </span>
       </div>
 
       <div className="toolbar-right">

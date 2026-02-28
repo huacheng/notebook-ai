@@ -208,13 +208,19 @@ textarea.cell-input {
   z-index: 0;
 }
 
+.toolbar-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .toolbar-logo {
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--color-primary);
-  flex-shrink: 0;
   text-shadow: 0 0 16px rgba(14, 165, 233, 0.25);
   white-space: nowrap;
 }
@@ -223,7 +229,6 @@ textarea.cell-input {
   font-family: var(--font-mono);
   font-size: 0.65rem;
   color: rgba(255, 255, 255, 0.5);
-  margin-left: 2px;
   letter-spacing: 0;
 }
 
