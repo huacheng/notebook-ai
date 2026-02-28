@@ -84,6 +84,7 @@ export interface NotebookStore {
   sessionId: string | null;
   restartPhase: 'idle' | 'restarting' | 'done' | 'error';
   restartError: string;
+  lastEventIndex: Record<string, number>;
 
   // ── Auth actions ───────────────────────────────────────────────────────
   checkAuthStatus(): Promise<void>;
@@ -186,6 +187,7 @@ export interface NotebookStore {
   disconnectWebSocket(): void;
   subscribeToSession(sessionId: string): void;
   unsubscribeFromSession(sessionId: string): void;
+  updateLastEventIndex(sessionId: string, index: number): void;
   executeCell(cellId: string): void;
   saveNotebook(path?: string): void;
   loadNotebook(path: string): void;

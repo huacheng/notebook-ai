@@ -228,6 +228,7 @@ export const ProjectListItemSchema = z.object({
 export const SubscribeSchema = z.object({
   type: z.literal('subscribe'),
   session_id: z.string(),
+  resume_after: z.number().int().optional(),
 });
 
 export const UnsubscribeSchema = z.object({
@@ -538,6 +539,14 @@ export const ModelChangedSchema = z.object({
   model: z.string(),
 });
 
+// Server → Client: forwarded system message (e.g. context compaction)
+export const SystemMessageSchema = z.object({
+  type: z.literal('system_message'),
+  subtype: z.string(),
+  message: z.string(),
+  cell_id: z.string().optional(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -566,6 +575,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   RerunFailedSchema,
   CellInterruptedSchema,
   ModelChangedSchema,
+  SystemMessageSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───

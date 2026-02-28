@@ -5,7 +5,8 @@ import { InteractiveOptions } from './InteractiveOptions';
 import { isAskUserQuestion } from '../utils/interactiveOptions';
 import type { AskQuestion } from '../utils/interactiveOptions';
 import { useStore } from '../store';
-import { formatTime, formatTokens } from '../utils/runningStatus';
+import { formatTime, formatTokens, estimateTokens, getStatusLabel } from '../utils/runningStatus';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 // ── SVG sanitizer ────────────────────────────────────────────────────────────
 
@@ -22,8 +23,8 @@ function sanitizeSvg(svg: string): string {
 
 // ── Response renderers ───────────────────────────────────────────────────────
 
-function TextOutputView({ content }: { content: string }) {
-  return <pre className="output-text">{content}</pre>;
+export function TextOutputView({ content }: { content: string }) {
+  return <MarkdownRenderer content={content} className="output-text-md" />;
 }
 
 function ErrorOutputView({ message }: { message: string }) {
@@ -159,7 +160,7 @@ function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
 
 // ── RunningStatus bar ───────────────────────────────────────────────────────
 
-function RunningStatus({ cellId, outputs }: { cellId: string; outputs: CellOutputItem[] }) {
+function RunningStatus({ cellId, outputs, source }: { cellId: string; outputs: CellOutputItem[]; source: string }) {
   const startRef = useRef(Date.now());
   const thinkStartRef = useRef<number | null>(null);
   const thinkAccum = useRef(0);
@@ -189,23 +190,26 @@ function RunningStatus({ cellId, outputs }: { cellId: string; outputs: CellOutpu
   }
 
   const elapsed = Math.floor((Date.now() - startRef.current) / 1000);
-  const totalChars = (buf?.text.length ?? 0) + (buf?.thinking.length ?? 0)
-    + outputs.reduce((s, o) => s + ('content' in o ? (o as { content: string }).content.length : 0), 0);
-  const tokens = Math.floor(totalChars / 4);
+
+  // Split token estimation: input (↑) vs output (↓)
+  const { input: inputTokens, output: outputTokens } = estimateTokens(source, outputs, buf ?? undefined);
+
   const toolCount = outputs.filter((o) => o.type === 'tool_use' && !isAskUserQuestion(o as ToolItem)).length;
   const thinkSec = Math.floor(
     thinkAccum.current + (thinkStartRef.current ? (Date.now() - thinkStartRef.current) / 1000 : 0),
   );
 
   const isThinking = hasThinkingStream;
+  const hasAnyOutput = (buf && (buf.text.length > 0 || buf.thinking.length > 0)) || outputs.length > 0;
 
   // Build metrics string
   const parts: string[] = [];
-  if (tokens > 0) parts.push(`↑ ${formatTokens(tokens)}`);
+  if (inputTokens > 0) parts.push(`↑ ${formatTokens(inputTokens)}`);
+  if (outputTokens > 0) parts.push(`↓ ${formatTokens(outputTokens)}`);
   if (toolCount > 0) parts.push(`${toolCount} tool use${toolCount > 1 ? 's' : ''}`);
   if (thinkSec > 0 && !isThinking) parts.push(`thought for ${formatTime(thinkSec)}`);
 
-  const label = isThinking ? 'Thinking…' : 'Running…';
+  const label = getStatusLabel(isThinking, hasAnyOutput, elapsed);
   const metrics = parts.length > 0 ? ` (${formatTime(elapsed)} · ${parts.join(' · ')})` : ` (${formatTime(elapsed)})`;
 
   return (
@@ -246,9 +250,10 @@ interface CellOutputProps {
   isActiveCell?: boolean;
   cellId?: string;
   cellStatus?: string;
+  source?: string;
 }
 
-export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
+export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOutputProps) {
   const isRunning = cellStatus === 'running';
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -280,7 +285,7 @@ export function CellOutput({ outputs, cellId, cellStatus }: CellOutputProps) {
           <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
           <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
         </div>
-        <RunningStatus cellId={cellId} outputs={outputs} />
+        <RunningStatus cellId={cellId} outputs={outputs} source={source} />
       </div>
     );
   }

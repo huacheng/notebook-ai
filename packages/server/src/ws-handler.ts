@@ -138,6 +138,17 @@ export function setupWebSocket(
             subscriptions.set(session_id, remove);
             sessionOwners.set(session_id, ws);
             console.log(`[ws] Client ${clientId} subscribed to session ${session_id}`);
+
+            // Resume-after: replay buffered events the client missed
+            if (msg.resume_after !== undefined) {
+              const missed = sessionManager.getEventsAfter(session_id, msg.resume_after);
+              for (const { event } of missed) {
+                sendToClient(ws, event as any);
+              }
+              if (missed.length > 0) {
+                console.log(`[ws] Replayed ${missed.length} events for session ${session_id} (resume_after=${msg.resume_after})`);
+              }
+            }
           }
           break;
         }

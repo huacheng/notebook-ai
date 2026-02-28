@@ -155,7 +155,8 @@ function AuthenticatedApp() {
   useWebSocket(sessionId);
 
   // Persist and restore scroll position across notebook switches and browser tab switches.
-  useScrollRestoration(activeNotebookId, contentRef);
+  const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
+  useScrollRestoration(activeNotebookTabId ?? activeNotebookId, contentRef);
 
   // Fetch projects on mount
   useEffect(() => {

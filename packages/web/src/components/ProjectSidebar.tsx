@@ -398,6 +398,15 @@ function FileBrowser() {
     }
   }, [activeProjectPath, openFileTab]);
 
+  const handleDirClick = useCallback((subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => {
+    if (meta.isNotebook) {
+      // Open the notebook directly instead of navigating into .worktrees/ layer
+      const nbFile = `${name}.notebook.json`;
+      handleFileClick(subPath, nbFile);
+      return true;
+    }
+  }, [handleFileClick]);
+
   const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);
   const canCreateNb = nbTitle.trim().length > 0 && !nbTitleError;
 
@@ -465,6 +474,7 @@ function FileBrowser() {
         baseUrl={`/api/projects/${activeProjectId}`}
         authToken={authToken}
         onFileClick={handleFileClick}
+        onDirClick={handleDirClick}
         noDragFilter={(name) => name.endsWith('.notebook.json')}
         renderItemActions={renderItemActions}
         onSubPathChange={setCurrentSubPath}

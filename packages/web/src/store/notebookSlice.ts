@@ -8,6 +8,12 @@ import type {
   SliceSection,
 } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
+import {
+  appendOutputToNotebook,
+  setCellStatusInNotebook,
+  updateToolResultInNotebook,
+  setCellGitDiffInNotebook,
+} from './notebookMutations';
 
 // Adaptive sync timer for cell source updates
 let _sourceSyncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -223,72 +229,28 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   setCellStatus(cellId, status) {
     set((state) => {
       if (!state.notebook) return {};
-      return {
-        notebook: {
-          ...state.notebook,
-          cells: state.notebook.cells.map((c) =>
-            c.id === cellId ? { ...c, status } : c
-          ),
-        },
-      };
+      return { notebook: setCellStatusInNotebook(state.notebook, cellId, status) };
     });
   },
 
   appendCellOutput(cellId, output: CellOutput) {
     set((state) => {
       if (!state.notebook) return {};
-      return {
-        notebook: {
-          ...state.notebook,
-          cells: state.notebook.cells.map((c) => {
-            if (c.id !== cellId || c.type !== 'prompt') return c;
-            return { ...c, outputs: [...c.outputs, output] };
-          }),
-        },
-      };
+      return { notebook: appendOutputToNotebook(state.notebook, cellId, output) };
     });
   },
 
   updateToolResult(cellId, toolUseId, content, isError) {
     set((state) => {
       if (!state.notebook) return {};
-      let matched = false;
-      return {
-        notebook: {
-          ...state.notebook,
-          cells: state.notebook.cells.map((c) => {
-            if (c.id !== cellId || c.type !== 'prompt') return c;
-            return {
-              ...c,
-              outputs: c.outputs.map((out) => {
-                if (matched || out.type !== 'tool_use') return out;
-                const byId = out.tool_use_id === toolUseId;
-                const unresolved = !byId && out.result === undefined;
-                if (byId || unresolved) {
-                  matched = true;
-                  return { ...out, result: content, is_error: isError };
-                }
-                return out;
-              }),
-            };
-          }),
-        },
-      };
+      return { notebook: updateToolResultInNotebook(state.notebook, cellId, toolUseId, content, isError ?? false) };
     });
   },
 
   setCellGitDiff(cellId, diff) {
     set((state) => {
       if (!state.notebook) return {};
-      return {
-        notebook: {
-          ...state.notebook,
-          cells: state.notebook.cells.map((c) => {
-            if (c.id !== cellId || c.type !== 'prompt') return c;
-            return { ...c, git_diff: diff };
-          }),
-        },
-      };
+      return { notebook: setCellGitDiffInNotebook(state.notebook, cellId, diff) };
     });
   },
 
@@ -429,18 +391,12 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
 
   setActiveNotebookTab: (notebookId) => {
     set(state => {
-      // Save scroll position for current tab
-      const current = state.activeNotebookTabId;
-      const updated = { ...state.openNotebooks };
-      if (current && updated[current]) {
-        updated[current] = { ...updated[current], scrollY: typeof window !== 'undefined' ? window.scrollY : 0 };
-      }
       return {
-        openNotebooks: updated,
+        openNotebooks: state.openNotebooks,
         activeNotebookTabId: notebookId,
-        notebook: updated[notebookId]?.notebook ?? null,
-        sessionId: updated[notebookId]?.sessionId ?? null,
-        workspaceDir: updated[notebookId]?.workspaceDir ?? null,
+        notebook: state.openNotebooks[notebookId]?.notebook ?? null,
+        sessionId: state.openNotebooks[notebookId]?.sessionId ?? null,
+        workspaceDir: state.openNotebooks[notebookId]?.workspaceDir ?? null,
         openFile: null, // C3: clear FileViewer when switching tabs
         editMode: false,
         pendingDeletes: new Set<string>(),

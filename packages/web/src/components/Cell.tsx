@@ -66,6 +66,7 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
             isActiveCell={cell.status === 'running'}
             cellId={cell.id}
             cellStatus={cell.status}
+            source={cell.source}
           />
         </div>
       )}

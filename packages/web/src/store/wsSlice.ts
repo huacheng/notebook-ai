@@ -1,9 +1,17 @@
 import type { StateCreator } from 'zustand';
 import type { WSServerMessage } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
+import { applyToSession } from './wsRouting';
+import {
+  appendOutputToNotebook,
+  setCellStatusInNotebook,
+  updateToolResultInNotebook,
+  setCellGitDiffInNotebook,
+} from './notebookMutations';
 
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
+  | 'lastEventIndex' | 'updateLastEventIndex'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
@@ -14,6 +22,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   sessionId: null,
   restartPhase: 'idle',
   restartError: '',
+  lastEventIndex: {},
 
   connectWebSocket() {
     const existing = get().ws;
@@ -61,9 +70,19 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     ws.onopen = () => {
       if (get().ws === ws) {
         set({ wsStatus: 'connected' });
-        const { sessionId } = get();
-        if (sessionId) {
-          ws.send(JSON.stringify({ type: 'subscribe', session_id: sessionId }));
+        // Re-subscribe to all open notebook sessions on reconnect
+        const { openNotebooks, sessionId, lastEventIndex } = get();
+        const subscribedIds = new Set(
+          Object.values(openNotebooks).map((e) => e.sessionId).filter(Boolean),
+        );
+        // Also include the active sessionId for backward compat
+        if (sessionId) subscribedIds.add(sessionId);
+        for (const sid of subscribedIds) {
+          const msg: Record<string, unknown> = { type: 'subscribe', session_id: sid };
+          if (lastEventIndex[sid] !== undefined) {
+            msg.resume_after = lastEventIndex[sid];
+          }
+          ws.send(JSON.stringify(msg));
         }
         sendPing();
         pingTimer = setInterval(sendPing, PING_INTERVAL);
@@ -91,23 +110,52 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       } catch {
         return;
       }
+      // Track event_index for resume-after
+      const eventIndex = (parsed as any).event_index;
+      const eventSessionId = (parsed as any).session_id;
+      if (typeof eventIndex === 'number' && typeof eventSessionId === 'string') {
+        set((state) => ({
+          lastEventIndex: { ...state.lastEventIndex, [eventSessionId]: eventIndex },
+        }));
+      }
       const store = get();
+      const msgSessionId = (parsed as any).session_id as string | undefined;
       switch (parsed.type) {
         case 'cell_output':
-          store.appendCellOutput(parsed.cell_id, parsed.output);
+          if (msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) =>
+              appendOutputToNotebook(nb, parsed.cell_id, parsed.output)));
+          } else {
+            store.appendCellOutput(parsed.cell_id, parsed.output);
+          }
           break;
         case 'cell_stream':
           store.appendStreamDelta(parsed.cell_id, parsed.delta, parsed.block_type);
           break;
         case 'tool_result':
-          store.updateToolResult(parsed.cell_id, parsed.tool_use_id, parsed.content, parsed.is_error);
+          if (msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) =>
+              updateToolResultInNotebook(nb, parsed.cell_id, parsed.tool_use_id, parsed.content, parsed.is_error ?? false)));
+          } else {
+            store.updateToolResult(parsed.cell_id, parsed.tool_use_id, parsed.content, parsed.is_error);
+          }
           break;
         case 'execution_complete':
           store.flushStreamBuffer(parsed.cell_id);
-          store.setCellStatus(parsed.cell_id, (parsed as any).status ?? 'completed');
+          if (msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) =>
+              setCellStatusInNotebook(nb, parsed.cell_id, (parsed as any).status ?? 'completed')));
+          } else {
+            store.setCellStatus(parsed.cell_id, (parsed as any).status ?? 'completed');
+          }
           break;
         case 'git_diff':
-          store.setCellGitDiff(parsed.cell_id, parsed.diff);
+          if (msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) =>
+              setCellGitDiffInNotebook(nb, parsed.cell_id, parsed.diff)));
+          } else {
+            store.setCellGitDiff(parsed.cell_id, parsed.diff);
+          }
           break;
         case 'export_complete': {
           const title = store.notebook?.metadata.title ?? 'notebook';
@@ -244,14 +292,22 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           });
           break;
         }
+        case 'system_message':
+          // Log system messages (e.g. context compaction) for future UI display
+          console.log(`[ws] system: ${(parsed as any).subtype} — ${(parsed as any).message}`);
+          break;
         case 'error':
           if (parsed.cell_id) {
-            store.setCellStatus(parsed.cell_id, 'error');
-            store.appendCellOutput(parsed.cell_id, {
-              type: 'error',
-              message: parsed.message,
-              timestamp: new Date().toISOString(),
-            });
+            const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };
+            if (msgSessionId) {
+              set((state) => applyToSession(state, msgSessionId, (nb) => {
+                const nb2 = setCellStatusInNotebook(nb, parsed.cell_id!, 'error');
+                return appendOutputToNotebook(nb2, parsed.cell_id!, errorOutput);
+              }));
+            } else {
+              store.setCellStatus(parsed.cell_id, 'error');
+              store.appendCellOutput(parsed.cell_id, errorOutput);
+            }
           }
           break;
       }
@@ -268,10 +324,20 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     set({ ws: null, wsStatus: 'disconnected' });
   },
 
+  updateLastEventIndex(sessionId, index) {
+    set((state) => ({
+      lastEventIndex: { ...state.lastEventIndex, [sessionId]: index },
+    }));
+  },
+
   subscribeToSession(sessionId) {
-    const { ws } = get();
+    const { ws, lastEventIndex } = get();
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'subscribe', session_id: sessionId }));
+      const msg: Record<string, unknown> = { type: 'subscribe', session_id: sessionId };
+      if (lastEventIndex[sessionId] !== undefined) {
+        msg.resume_after = lastEventIndex[sessionId];
+      }
+      ws.send(JSON.stringify(msg));
     }
   },
 

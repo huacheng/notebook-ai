@@ -4,9 +4,25 @@ import { useStore } from '../store';
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
+/** Pure helper: compute which sessions need subscribe/unsubscribe. */
+export function computeSubscriptionDiff(
+  subscribed: Set<string>,
+  current: Set<string>,
+): { toSubscribe: string[]; toUnsubscribe: string[] } {
+  const toSubscribe: string[] = [];
+  const toUnsubscribe: string[] = [];
+  for (const sid of current) {
+    if (sid && !subscribed.has(sid)) toSubscribe.push(sid);
+  }
+  for (const sid of subscribed) {
+    if (!current.has(sid)) toUnsubscribe.push(sid);
+  }
+  return { toSubscribe, toUnsubscribe };
+}
+
 /**
  * Manages WebSocket lifecycle: single persistent connection per tab,
- * with subscribe/unsubscribe when the active sessionId changes.
+ * subscribes to ALL open notebook sessions (not just the active one).
  */
 export function useWebSocket(sessionId: string | null) {
   const connectWebSocket = useStore((s) => s.connectWebSocket);
@@ -16,7 +32,12 @@ export function useWebSocket(sessionId: string | null) {
   const setWsReconnectExhausted = useStore((s) => s.setWsReconnectExhausted);
 
   const reconnectAttempts = useRef(0);
-  const prevSessionIdRef = useRef<string | null>(null);
+  const subscribedRef = useRef<Set<string>>(new Set());
+
+  // Derive a stable string key from all open session IDs.
+  const openSessionIds = useStore(
+    (s) => Object.values(s.openNotebooks).map((e) => e.sessionId).filter(Boolean).sort().join(','),
+  );
 
   // Connect once on mount; auto-reconnect on disconnect.
   useEffect(() => {
@@ -46,18 +67,19 @@ export function useWebSocket(sessionId: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Subscribe/unsubscribe when the active session changes.
+  // Subscribe/unsubscribe when the set of open sessions changes.
   useEffect(() => {
-    const prev = prevSessionIdRef.current;
+    const current = new Set(openSessionIds ? openSessionIds.split(',') : []);
+    const { toSubscribe, toUnsubscribe } = computeSubscriptionDiff(subscribedRef.current, current);
 
-    if (prev && prev !== sessionId) {
-      unsubscribeFromSession(prev);
+    for (const sid of toSubscribe) {
+      subscribeToSession(sid);
+      subscribedRef.current.add(sid);
     }
-    if (sessionId && sessionId !== prev) {
-      subscribeToSession(sessionId);
+    for (const sid of toUnsubscribe) {
+      unsubscribeFromSession(sid);
+      subscribedRef.current.delete(sid);
     }
-
-    prevSessionIdRef.current = sessionId;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [openSessionIds]);
 }

@@ -4119,7 +4119,8 @@ button:focus-visible {
   color: var(--text-primary);
 }
 .fv-render__markdown,
-.fv-render__html {
+.fv-render__html,
+.output-text-md {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
   line-height: 1.7;
@@ -4130,52 +4131,52 @@ button:focus-visible {
 }
 
 /* ── Markdown typography ─────────────────────────────────────── */
-.fv-render__markdown h1,
-.fv-render__markdown h2,
-.fv-render__markdown h3,
-.fv-render__markdown h4,
-.fv-render__markdown h5,
-.fv-render__markdown h6 {
+:is(.fv-render__markdown, .output-text-md) h1,
+:is(.fv-render__markdown, .output-text-md) h2,
+:is(.fv-render__markdown, .output-text-md) h3,
+:is(.fv-render__markdown, .output-text-md) h4,
+:is(.fv-render__markdown, .output-text-md) h5,
+:is(.fv-render__markdown, .output-text-md) h6 {
   font-family: var(--font-display);
   margin: 1.2em 0 0.4em;
   line-height: 1.3;
 }
 /* H1: sky-700 — 主色深蓝，底部分隔线 */
-.fv-render__markdown h1 {
+:is(.fv-render__markdown, .output-text-md) h1 {
   font-size: 1.6em;
   color: #0369a1;
   border-bottom: 2px solid rgba(14, 165, 233, 0.25);
   padding-bottom: 0.3em;
 }
 /* H2: purple-700 — 紫色区分层级 */
-.fv-render__markdown h2 {
+:is(.fv-render__markdown, .output-text-md) h2 {
   font-size: 1.35em;
   color: #7c3aed;
   border-bottom: 1px solid rgba(124, 58, 237, 0.15);
   padding-bottom: 0.2em;
 }
 /* H3: teal-700 — 青绿色 */
-.fv-render__markdown h3 {
+:is(.fv-render__markdown, .output-text-md) h3 {
   font-size: 1.15em;
   color: #0f766e;
 }
 /* H4: amber-700 — 琥珀色 */
-.fv-render__markdown h4 {
+:is(.fv-render__markdown, .output-text-md) h4 {
   font-size: 1.05em;
   color: #b45309;
 }
 /* H5/H6: 次级灰色，小字 */
-.fv-render__markdown h5 { font-size: 0.95em; color: var(--text-secondary); font-weight: 600; }
-.fv-render__markdown h6 { font-size: 0.875em; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+:is(.fv-render__markdown, .output-text-md) h5 { font-size: 0.95em; color: var(--text-secondary); font-weight: 600; }
+:is(.fv-render__markdown, .output-text-md) h6 { font-size: 0.875em; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
 
 /* ── Paragraphs & lists ──────────────────────────────────────── */
-.fv-render__markdown p { margin: 0 0 0.8em; }
-.fv-render__markdown ul, .fv-render__markdown ol { padding-left: 1.8em; margin: 0 0 0.8em; }
-.fv-render__markdown li { margin-bottom: 0.2em; }
-.fv-render__markdown li::marker { color: var(--text-secondary); }
+:is(.fv-render__markdown, .output-text-md) p { margin: 0 0 0.8em; }
+:is(.fv-render__markdown, .output-text-md) ul, :is(.fv-render__markdown, .output-text-md) ol { padding-left: 1.8em; margin: 0 0 0.8em; }
+:is(.fv-render__markdown, .output-text-md) li { margin-bottom: 0.2em; }
+:is(.fv-render__markdown, .output-text-md) li::marker { color: var(--text-secondary); }
 
 /* ── Blockquote — 左边框 + 浅底色 ────────────────────────────── */
-.fv-render__markdown blockquote {
+:is(.fv-render__markdown, .output-text-md) blockquote {
   border-left: 3px solid var(--color-primary);
   padding: 0.4em 1em;
   color: var(--text-secondary);
@@ -4183,13 +4184,13 @@ button:focus-visible {
   background: var(--color-primary-light);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
-.fv-render__markdown blockquote blockquote {
+:is(.fv-render__markdown, .output-text-md) blockquote blockquote {
   border-left-color: rgba(14, 165, 233, 0.4);
   background: rgba(14, 165, 233, 0.04);
 }
 
 /* ── Inline code ─────────────────────────────────────────────── */
-.fv-render__markdown code {
+:is(.fv-render__markdown, .output-text-md) code {
   background: #f1f0ee;
   color: #c7254e;
   padding: 1px 5px;
@@ -4200,7 +4201,7 @@ button:focus-visible {
 }
 
 /* ── Code blocks ─────────────────────────────────────────────── */
-.fv-render__markdown pre {
+:is(.fv-render__markdown, .output-text-md) pre {
   background: #1e1e2e;
   border-radius: var(--radius-md);
   padding: var(--space-sm) var(--space-md);
@@ -4208,7 +4209,7 @@ button:focus-visible {
   margin: 0.5em 0;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
-.fv-render__markdown pre code {
+:is(.fv-render__markdown, .output-text-md) pre code {
   background: transparent;
   border: none;
   color: #cdd6f4;
@@ -4218,35 +4219,35 @@ button:focus-visible {
 }
 
 /* ── Tables (GFM) ────────────────────────────────────────────── */
-.fv-render__markdown table { border-collapse: collapse; width: 100%; margin: 0.5em 0; font-size: 0.9em; }
-.fv-render__markdown th,
-.fv-render__markdown td { border: 1px solid var(--border-default); padding: 6px 12px; text-align: left; }
-.fv-render__markdown th { background: var(--bg-cell-hover); font-weight: 600; color: #0369a1; }
-.fv-render__markdown tr:nth-child(even) td { background: rgba(0, 0, 0, 0.015); }
+:is(.fv-render__markdown, .output-text-md) table { border-collapse: collapse; width: 100%; margin: 0.5em 0; font-size: 0.9em; }
+:is(.fv-render__markdown, .output-text-md) th,
+:is(.fv-render__markdown, .output-text-md) td { border: 1px solid var(--border-default); padding: 6px 12px; text-align: left; }
+:is(.fv-render__markdown, .output-text-md) th { background: var(--bg-cell-hover); font-weight: 600; color: #0369a1; }
+:is(.fv-render__markdown, .output-text-md) tr:nth-child(even) td { background: rgba(0, 0, 0, 0.015); }
 
 /* ── Links ───────────────────────────────────────────────────── */
-.fv-render__markdown a { color: var(--color-primary); text-decoration: none; }
-.fv-render__markdown a:hover { text-decoration: underline; }
+:is(.fv-render__markdown, .output-text-md) a { color: var(--color-primary); text-decoration: none; }
+:is(.fv-render__markdown, .output-text-md) a:hover { text-decoration: underline; }
 
 /* ── Horizontal rule ─────────────────────────────────────────── */
-.fv-render__markdown hr {
+:is(.fv-render__markdown, .output-text-md) hr {
   border: none;
   border-top: 1px solid var(--border-default);
   margin: 1.2em 0;
 }
 
 /* ── Images ──────────────────────────────────────────────────── */
-.fv-render__markdown img { max-width: 100%; border-radius: var(--radius-md); }
+:is(.fv-render__markdown, .output-text-md) img { max-width: 100%; border-radius: var(--radius-md); }
 
 /* ── Checkboxes (task lists) ─────────────────────────────────── */
-.fv-render__markdown input[type="checkbox"] { margin-right: 0.4em; accent-color: var(--color-primary); }
+:is(.fv-render__markdown, .output-text-md) input[type="checkbox"] { margin-right: 0.4em; accent-color: var(--color-primary); }
 
 /* ── Strikethrough ───────────────────────────────────────────── */
-.fv-render__markdown del { color: var(--text-secondary); text-decoration: line-through; }
+:is(.fv-render__markdown, .output-text-md) del { color: var(--text-secondary); text-decoration: line-through; }
 
 /* ── Bold & italic ───────────────────────────────────────────── */
-.fv-render__markdown strong { color: var(--text-primary); font-weight: 650; }
-.fv-render__markdown em { color: #57534e; font-style: italic; }
+:is(.fv-render__markdown, .output-text-md) strong { color: var(--text-primary); font-weight: 650; }
+:is(.fv-render__markdown, .output-text-md) em { color: #57534e; font-style: italic; }
 
 /* ── Mermaid ─────────────────────────────────────────────────── */
 .fv-mermaid-diagram { text-align: center; margin: 1em 0; overflow-x: auto; }
@@ -5116,6 +5117,9 @@ button:focus-visible {
   border-bottom: 1px solid var(--border-default);
   overflow-x: auto;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 15;
 }
 
 .notebook-tab {

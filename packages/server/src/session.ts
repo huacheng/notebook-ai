@@ -8,6 +8,7 @@ import {
   type WSServerMessage,
   type CellOutput,
 } from '@notebook-ai/shared';
+import { EventBuffer } from './event-buffer.js';
 import {
   updateCellStatus,
   updateCellDuration,
@@ -78,6 +79,8 @@ interface NotebookSession {
   _rerunQueue?: string[];
   /** Set by interruptCell() so completeCell() knows to use 'interrupted' status. */
   _interrupted?: boolean;
+  /** Event buffer for WS resume-after reconnection. */
+  eventBuffer: EventBuffer;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -149,6 +152,7 @@ export class SessionManager {
       notebookPath,
       listeners: new Set(),
       _execStartTimes: new Map(),
+      eventBuffer: new EventBuffer(),
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -399,6 +403,7 @@ export class SessionManager {
 
     session.agentProcess.stop();
     session.listeners.clear();
+    session.eventBuffer.clear();
     this.sessions.delete(sessionId);
     console.log(`[session] Closed session "${sessionId}"`);
   }
@@ -451,13 +456,23 @@ export class SessionManager {
   // Accept any object — session_id is injected here so call sites stay clean.
   private broadcast(session: NotebookSession, msg: Record<string, unknown>): void {
     const msgWithSession = { ...msg, session_id: session.id } as WSServerMessage;
+    // Buffer the event with a monotonically increasing index for resume-after.
+    const buffered = session.eventBuffer.push(msgWithSession as Record<string, unknown>);
+    const indexed = { ...msgWithSession, event_index: buffered.event_index } as unknown as WSServerMessage;
     for (const listener of session.listeners) {
       try {
-        listener(msgWithSession);
+        listener(indexed);
       } catch (err) {
         console.error('[session] Listener error:', err);
       }
     }
+  }
+
+  /** Get buffered events after a given index for resume-after support. */
+  getEventsAfter(sessionId: string, afterIndex: number): Array<{ event_index: number; event: Record<string, unknown> }> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return [];
+    return session.eventBuffer.getEventsAfter(afterIndex);
   }
 
   /**
@@ -732,10 +747,19 @@ export class SessionManager {
 
       case 'system': {
         // Capture Claude session_id from system.init for --resume support.
-        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string };
+        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string; message?: string };
         if (sysMsg.subtype === 'init' && sysMsg.session_id) {
           session.claudeSessionId = sysMsg.session_id;
           console.log(`[session ${session.id}] Captured Claude session_id: ${sysMsg.session_id}`);
+        }
+        // Forward non-init/hook system messages to frontend (e.g. context compaction)
+        if (sysMsg.subtype && sysMsg.subtype !== 'init' && sysMsg.subtype !== 'hook_started' && sysMsg.subtype !== 'hook_completed') {
+          this.broadcast(session, {
+            type: 'system_message',
+            subtype: sysMsg.subtype,
+            message: sysMsg.message ?? '',
+            cell_id: findRunningCellId(session.notebook),
+          } as any);
         }
         break;
       }

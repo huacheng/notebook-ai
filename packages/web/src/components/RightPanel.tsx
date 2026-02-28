@@ -18,7 +18,7 @@ export function RightPanel() {
   if (!rightPanelOpen) {
     return (
       <div className="right-panel right-panel--collapsed">
-        <button className="right-panel-expand-btn" onClick={toggleRightPanel}>&lsaquo;</button>
+        <button className="right-panel-expand-btn" onClick={toggleRightPanel}>&#9776;</button>
       </div>
     );
   }
@@ -27,7 +27,7 @@ export function RightPanel() {
     <div className="right-panel" style={{ width: rightPanelWidth }}>
       <div className="right-panel-toolbar">
         <span className="right-panel-title">Deliverables</span>
-        <button className="right-panel-collapse-btn" onClick={toggleRightPanel}>&rsaquo;</button>
+        <button className="right-panel-collapse-btn" onClick={toggleRightPanel}>&#9776;</button>
       </div>
       {activeProjectId ? (
         <FileSection

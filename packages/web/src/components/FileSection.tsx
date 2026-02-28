@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react';
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
+import { makeFetchGuard } from '../utils/fetchGuard';
 
 // Compute a POSIX-style relative path from `fromDir` to `toFile`.
 // Both arguments must be absolute Unix paths.
@@ -215,6 +216,8 @@ export interface FileSectionProps {
   readOnlyPath?: (subPath: string) => boolean;
   /** Called when the user navigates to a different sub-path. */
   onSubPathChange?: (subPath: string) => void;
+  /** Optional callback for directory clicks. Return true to prevent default navigateInto. */
+  onDirClick?: (subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => boolean | void;
 }
 
 export function FileSection({
@@ -231,6 +234,7 @@ export function FileSection({
   readOnlyPath,
   onSubPathChange,
   refreshKey,
+  onDirClick,
 }: FileSectionProps) {
   const [subPath, setSubPath] = useState(initialPath);
 
@@ -250,12 +254,14 @@ export function FileSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newNameRef = useRef<HTMLInputElement>(null);
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fetchGuard = useRef(makeFetchGuard()).current;
 
   useEffect(() => {
     if (creating) { setNewName(''); setTimeout(() => newNameRef.current?.focus(), 0); }
   }, [creating]);
 
   const fetchFiles = useCallback(async (path: string, silent = false) => {
+    const id = fetchGuard.next();
     const cacheKey = `nb-filelist-${baseUrl}-${path}`;
 
     // On non-silent loads, try cache first to avoid loading flash
@@ -277,14 +283,19 @@ export function FileSection({
         `${baseUrl}/files?path=${encodeURIComponent(path)}`,
         { headers: h },
       );
+      if (!fetchGuard.isCurrent(id)) return; // stale — discard
       if (!res.ok) { if (!silent) setError(((await res.json()) as { error: string }).error); return; }
       const result = (await res.json()) as ListResult;
+      if (!fetchGuard.isCurrent(id)) return; // stale — discard
       setFiles(result.files);
       setCurrentDirPath(result.dirPath);
       cacheSet(cacheKey, result);
-    } catch (err) { if (!silent) setError(String(err)); }
-    finally { if (!silent) setLoading(false); }
-  }, [baseUrl, authToken]);
+    } catch (err) {
+      if (!fetchGuard.isCurrent(id)) return;
+      if (!silent) setError(String(err));
+    }
+    finally { if (!silent && fetchGuard.isCurrent(id)) setLoading(false); }
+  }, [baseUrl, authToken, fetchGuard]);
 
   useEffect(() => { setSubPath(initialPath); fetchFiles(initialPath); }, [baseUrl]); // eslint-disable-line
 
@@ -517,7 +528,11 @@ export function FileSection({
           {!loading && files.map((f) => {
             const isNbDir = f.type === 'directory' && (f as any).isNotebook;
             return f.type === 'directory' ? (
-            <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => navigateInto((f as any).worktreePath || f.name)}>
+            <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => {
+              const meta = { isNotebook: isNbDir || undefined, worktreePath: (f as any).worktreePath as string | undefined };
+              if (onDirClick?.(subPath, f.name, meta) === true) return;
+              navigateInto((f as any).worktreePath || f.name);
+            }}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
               <span className="fp-name" title={f.name}>{f.name}</span>
               {isNbDir && <TypeBadge name={`${f.name}.notebook.json`} />}

@@ -28,3 +28,21 @@ useStore.subscribe((state, prevState) => {
     _persistNotebook(state.activeNotebookId, state.notebook);
   }
 });
+
+// Sync state.notebook → openNotebooks[activeTabId] when user mutates notebook directly
+useStore.subscribe((state, prev) => {
+  if (state.notebook && state.notebook !== prev.notebook && state.activeNotebookTabId) {
+    const tab = state.openNotebooks[state.activeNotebookTabId];
+    if (tab && tab.notebook !== state.notebook) {
+      useStore.setState((s) => ({
+        openNotebooks: {
+          ...s.openNotebooks,
+          [s.activeNotebookTabId!]: {
+            ...s.openNotebooks[s.activeNotebookTabId!],
+            notebook: state.notebook!,
+          },
+        },
+      }));
+    }
+  }
+});
