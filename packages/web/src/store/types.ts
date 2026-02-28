@@ -60,6 +60,7 @@ export interface NotebookStore {
   pluginPanelOpen: boolean;
   pluginOverlay: string | null;
   modelPanelOpen: boolean;
+  modelSwitching: boolean;
 
   // ── Project state ─────────────────────────────────────────────────────
   projects: ProjectListItem[];

@@ -412,7 +412,7 @@ function FileBrowser() {
 
   const handleDirClick = useCallback(async (_subPath: string, _name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => {
     if (meta.isNotebook && meta.worktreePath) {
-      // Open the notebook directly — find the .notebook.json inside the worktree dir
+      // Open the notebook AND let navigateInto proceed (return false)
       try {
         const h: Record<string, string> = {};
         if (authToken) h['Authorization'] = `Bearer ${authToken}`;
@@ -425,16 +425,15 @@ function FileBrowser() {
           const nbEntry = (data.files as { name: string }[]).find(f => f.name.endsWith('.notebook.json'));
           if (nbEntry) {
             handleFileClick(meta.worktreePath, nbEntry.name);
-            return true;
+            // Don't return true — let FileSection navigate into the worktree dir
           }
         }
       } catch { /* fall through to navigate */ }
-    }
-    // isNotebook without worktreePath means it's a regular dir containing a {name}.notebook.json
-    if (meta.isNotebook) {
+    } else if (meta.isNotebook) {
+      // isNotebook without worktreePath — open notebook, let navigateInto proceed
       handleFileClick(_subPath, `${_name}.notebook.json`);
-      return true;
     }
+    // Return undefined → FileSection calls navigateInto() to show directory contents
   }, [handleFileClick, authToken, activeProjectId]);
 
   const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);

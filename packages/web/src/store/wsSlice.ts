@@ -288,6 +288,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               notebook: updatedNotebook,
               openNotebooks: updatedOpen,
               modelPanelOpen: false,
+              modelSwitching: false,
             };
           });
           break;
@@ -309,6 +310,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               store.appendCellOutput(parsed.cell_id, errorOutput);
             }
           }
+          // Clear model switching overlay on any error (e.g. change_model failure)
+          if (get().modelSwitching) set({ modelSwitching: false });
           break;
       }
     };

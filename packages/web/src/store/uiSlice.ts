@@ -39,7 +39,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'pluginStatus' | 'pluginLoading' | 'pluginActionKey' | 'pluginDismissed' | 'pluginPanelOpen' | 'pluginOverlay'
   | 'checkPluginStatus' | 'installPlugin' | 'uninstallPlugin' | 'addMarketplace' | 'removeMarketplace' | 'updateMarketplace' | 'updatePlugin'
   | 'dismissPluginBanner' | 'openPluginPanel' | 'closePluginPanel'
-  | 'modelPanelOpen' | 'openModelPanel' | 'closeModelPanel' | 'changeModel'
+  | 'modelPanelOpen' | 'modelSwitching' | 'openModelPanel' | 'closeModelPanel' | 'changeModel'
 >> = (set, get) => ({
   activeTab: 'notebook',
   gitTabOpen: false,
@@ -66,6 +66,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   pluginPanelOpen: false,
   pluginOverlay: null,
   modelPanelOpen: false,
+  modelSwitching: false,
 
   setActiveTab(tab) {
     set({ activeTab: tab, gitTabOpen: tab === 'git', editMode: false, pendingDeletes: new Set<string>() });
@@ -320,9 +321,9 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, openNotebooks, activeNotebookTabId } = get();
     if (!ws || (ws as WebSocket).readyState !== WebSocket.OPEN) return;
     if (!activeNotebookTabId) return;
-    // Send change_model only to the current active notebook session
     const active = openNotebooks[activeNotebookTabId];
     if (active?.sessionId) {
+      set({ modelSwitching: true, modelPanelOpen: false });
       (ws as WebSocket).send(JSON.stringify({ type: 'change_model', session_id: active.sessionId, model }));
     }
   },

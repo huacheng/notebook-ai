@@ -44,12 +44,11 @@ describe('notebook reopen guard', () => {
     expect(matched).toBeNull();
   });
 
-  it('handleDirClick for worktree notebook returns true to prevent navigateInto', () => {
-    // The fix: handleDirClick should return true for worktree notebooks
-    // so that FileSection's onClick does not also call navigateInto
-    // We test the contract: when meta.isNotebook && meta.worktreePath, return true
+  it('handleDirClick for notebook dir returns undefined so navigateInto still runs', () => {
+    // The contract: handleDirClick opens the notebook but does NOT return true,
+    // so FileSection's navigateInto() proceeds to show the directory contents.
 
-    // This is a behavioral contract test — verifying the return value pattern
+    let fileClickCalled = false;
     async function simulateHandleDirClick(
       meta: { isNotebook?: boolean; worktreePath?: string },
       findNotebookFile: () => string | null,
@@ -57,27 +56,30 @@ describe('notebook reopen guard', () => {
       if (meta.isNotebook && meta.worktreePath) {
         const nbEntry = findNotebookFile();
         if (nbEntry) {
-          // handleFileClick would be called here
-          return true; // must return true to prevent navigateInto
+          fileClickCalled = true; // handleFileClick called
+          // Don't return true — let navigateInto proceed
         }
+      } else if (meta.isNotebook) {
+        fileClickCalled = true;
       }
-      if (meta.isNotebook) {
-        return true;
-      }
+      // Return undefined → navigateInto runs
     }
 
-    // Test: worktree notebook found
+    // Test: worktree notebook found — opens notebook AND navigateInto runs
     const result1 = simulateHandleDirClick(
       { isNotebook: true, worktreePath: '.worktrees/task-foo' },
       () => 'foo.notebook.json',
     );
-    expect(result1).resolves.toBe(true);
+    expect(result1).resolves.toBeUndefined();
+    expect(fileClickCalled).toBe(true);
 
-    // Test: non-notebook directory
+    // Test: non-notebook directory — no file click, navigateInto runs
+    fileClickCalled = false;
     const result2 = simulateHandleDirClick(
       { isNotebook: false },
       () => null,
     );
     expect(result2).resolves.toBeUndefined();
+    expect(fileClickCalled).toBe(false);
   });
 });

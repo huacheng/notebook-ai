@@ -62,9 +62,6 @@ export function ModelManager() {
   function handleSelect(provider: ProviderDef, modelId: string) {
     if (provider.engine !== 'claude') return; // Gemini not yet supported
     if (modelId === currentModel) return;
-    const def = findModelById(modelId);
-    const label = def?.label ?? modelId;
-    if (!window.confirm(`切换到 ${label}？当前 notebook session 将重启。`)) return;
     changeModel(modelId);
   }
 

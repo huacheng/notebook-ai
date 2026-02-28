@@ -5835,3 +5835,22 @@ button:focus-visible {
 .mm-model-row--disabled:hover {
   background: var(--bg-cell);
 }
+
+/* ── Model-switch full-screen overlay ────────────────────── */
+.model-switch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(250, 249, 247, 0.85);
+  backdrop-filter: blur(2px);
+}
+.model-switch-overlay-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--text-secondary);
+}

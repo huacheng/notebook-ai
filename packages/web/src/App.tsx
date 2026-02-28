@@ -111,6 +111,7 @@ function AuthenticatedApp() {
   const pluginDismissed = useStore((s) => s.pluginDismissed);
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
   const modelPanelOpen = useStore((s) => s.modelPanelOpen);
+  const modelSwitching = useStore((s) => s.modelSwitching);
   const checkPluginStatus = useStore((s) => s.checkPluginStatus);
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
@@ -222,6 +223,14 @@ function AuthenticatedApp() {
 
   return (
     <div className="app">
+      {modelSwitching && (
+        <div className="model-switch-overlay">
+          <div className="model-switch-overlay-content">
+            <span className="spinner" aria-hidden="true" />
+            <span>Switching model…</span>
+          </div>
+        </div>
+      )}
       <Toolbar />
       {wsReconnectExhausted && wsStatus === 'disconnected' && (
         <div className="ws-exhausted-banner">
