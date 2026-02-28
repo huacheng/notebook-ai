@@ -42,6 +42,8 @@ Evaluates whether the implementation plan is ready for execution.
 | **D5 Architecture** | Medium | Structure — does the plan support incremental delivery and separation of concerns? |
 | **D6 Maintainability** | High | Clarity — are steps clear and unambiguous? Verifiability — does `.test/` contain criteria files with testable acceptance criteria and per-step verification? Are test/verification methods appropriate for the task type (see Task-Type-Aware Verification below)? |
 
+**Domain weight adjustment**: Weights above are defaults. Read `.type-profile.md` "Audit Adaptation" section to shift emphasis per task domain (e.g., `software` → Security↑ Reliability↑, `infrastructure` → Security↑↑ Reliability↑↑, `data-pipeline` → Performance↑ Reliability↑). When profile lacks adaptation guidance, use seed tables in `references/six-dimension-audit.md` Domain Adaptation section. Adjustments increase attention on specific dimensions without skipping any.
+
 **Outcomes:**
 
 | Result | Action | Status Transition |
