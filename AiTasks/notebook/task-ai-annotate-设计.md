@@ -549,7 +549,7 @@ annotate 需要获取 `.working/.lock`（见 `commands/references/concurrency.md
 |------|--------|------|
 | R1 | 删除 `.tmp-annotations.json` JSON schema | 不再有中间文件 |
 | R2 | 写入 JSONL prompt 格式规范 | 字段定义（见 §2.2）、单条/批量示例、边界情况说明 |
-| R3 | 新增文件层级分类表 | 从 SKILL.md 引用 |
+| ~~R3~~ | ~~新增文件层级分类表~~ | ❌ 不做：格式文档职责是 wire format，文件层级分类是处理语义，属于 SKILL.md 职责。冗余复制增加维护负担 |
 | R4 | 新增前端硬路由说明 | 系统文件 → prompt 加 `/task-ai:annotate` 前缀（skill 调用）；一般文件 → 无前缀（对话式响应）|
 
 ## 6. references/annotation-processing.md 修订清单
@@ -557,7 +557,7 @@ annotate 需要获取 `.working/.lock`（见 `commands/references/concurrency.md
 | 编号 | 修改项 | 说明 |
 |------|--------|------|
 | P1 | 删除 "Annotation File Format" 节 | 替换为 prompt 解析说明 |
-| P2 | 增加文件层级维度 | 各类批注的 triage 增加文件类别判断 |
+| ~~P2~~ | ~~增加文件层级维度~~ | ❌ 不做：SKILL.md 已有完整五层分类 + 二维状态转换表，processing.md 再写一份是冗余复制，同一信息两处维护易产生不一致 |
 | P3 | Comment 节强调"不改状态" | 统一语义 |
 
 ## 7. 关联文件修订清单
