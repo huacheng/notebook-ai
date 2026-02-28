@@ -234,7 +234,7 @@ function NotebookInputBar() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveDraft(draftKey, text), 300);
+    saveTimer.current = setTimeout(() => saveDraft(draftKey, text), 50);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [text, draftKey]);
 
