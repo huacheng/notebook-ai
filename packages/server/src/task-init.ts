@@ -63,7 +63,6 @@ export async function initTaskWorkingDir(opts: {
 
 const GITIGNORE_ENTRIES = [
   '.worktrees/',
-  '**/.working/.tmp-annotations.json',
   '**/.working/.auto-signal',
   '**/.working/.auto-signal.tmp',
   '**/.working/.auto-stop',

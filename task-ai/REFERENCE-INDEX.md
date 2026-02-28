@@ -8,7 +8,7 @@
 
 | File | Description |
 |------|-------------|
-| `annotation-format.md` | `.tmp-annotations.json` schema (Insert/Delete/Replace/Comment) |
+| `annotation-format.md` | Annotation JSONL format (Insert/Delete/Replace/Comment) |
 | `changelog-consumption-protocol.md` | 4-step library context loading protocol |
 | `concurrency.md` | Lock protocol, shared dir protection, lock ordering |
 | `depends-on-format.md` | Dependency format spec and enforcement rules |

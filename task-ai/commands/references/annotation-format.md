@@ -1,21 +1,36 @@
 # Annotation Format (for `annotate` sub-command)
 
-`.tmp-annotations.json` contains four `string[][]` arrays:
+Annotations arrive as **JSONL** (one JSON object per line) in the prompt context. The frontend prepends `/task-ai:annotate\n` for system files (`.working/` dotfiles).
 
-```json
-{
-  "Insert Annotations": [["Line{N}:...before20", "content", "after20..."]],
-  "Delete Annotations": [["Line{N}:...before20", "selected", "after20..."]],
-  "Replace Annotations": [["Line{N}:...before20", "selected", "replacement", "after20..."]],
-  "Comment Annotations": [["Line{N}:...before20", "selected", "comment", "after20..."]]
-}
+## Field Reference
+
+**Common fields (all types)**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file` | string | Absolute path to the annotated file |
+| `type` | string | `'insert'` \| `'delete'` \| `'replace'` \| `'comment'` |
+| `selected` | string | User-selected text (from rendered text, not source) |
+| `before` | string | Rendered text context before selection (≤40 chars) |
+| `after` | string | Rendered text context after selection (≤40 chars) |
+
+**Type-specific fields**:
+
+| Type | Extra field | Description |
+|------|------------|-------------|
+| `insert` | `content` | Text to insert after the selected position |
+| `delete` | (none) | `selected` is the text to delete |
+| `replace` | `replacement` | Text to replace `selected` with |
+| `comment` | `comment` | Comment on the selected text |
+
+## Example
+
+```jsonl
+{"file":"/home/user/nb-workspaces/proj/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","before":"Performance\n","after":"\nMax memory usage: 512MB","replacement":"Max response time: 200ms"}
 ```
 
-| Type | Elements | Structure |
-|------|----------|-----------|
-| Insert | 3 | [context_before, content, context_after] |
-| Delete | 3 | [context_before, selected_text, context_after] |
-| Replace | 4 | [context_before, selected_text, replacement, context_after] |
-| Comment | 4 | [context_before, selected_text, comment, context_after] |
+## Positioning
 
-Context: `context_before` = `"Line{N}:...{≤20 chars}"`, newlines as `↵`. `context_after` = `"{≤20 chars}..."`.
+`before` + `selected` + `after` are extracted from **rendered visible text** (`container.innerText`), not markdown source. They form a unique positional anchor. Claude reads the source file and maps rendered-text context → source location using markdown syntax knowledge.
+
+> See `skills/annotate/references/annotation-processing.md` for full processing logic.
