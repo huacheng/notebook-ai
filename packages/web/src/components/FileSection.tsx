@@ -415,7 +415,12 @@ export function FileSection({
   function navigateUp() {
     if (subPath === initialPath || subPath === '.') return;
     const parts = subPath.split('/'); parts.pop();
-    setSubPath(parts.length === 0 ? initialPath : parts.join('/'));
+    let target = parts.length === 0 ? initialPath : parts.join('/');
+    // Skip .worktrees/ intermediate directory — go straight to root
+    if (target === '.worktrees' || target.endsWith('/.worktrees')) {
+      target = initialPath;
+    }
+    setSubPath(target);
   }
 
   // Strip initialPath prefix from breadcrumbs so internal dirs like .working are hidden
