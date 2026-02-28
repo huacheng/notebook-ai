@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useStore } from '../store';
 import { Cell } from './Cell';
 import { SliceView } from './SliceView';
+import { loadDraft, saveDraft, clearDraft } from '../utils/promptDraft';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -207,8 +208,12 @@ function NotebookInputBar() {
   const notebook = useStore((s) => s.notebook);
   const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
   const editMode = useStore((s) => s.editMode);
+  const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
 
-  const [text, setText] = useState('');
+  // Draft key: per-notebook (falls back to sessionId for compat)
+  const draftKey = activeNotebookTabId || sessionId || '';
+
+  const [text, setText] = useState(() => loadDraft(draftKey));
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -224,6 +229,23 @@ function NotebookInputBar() {
   }, []);
 
   useEffect(() => { resize(); }, [text, resize]);
+
+  // Persist draft to localStorage (debounced)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveDraft(draftKey, text), 300);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [text, draftKey]);
+
+  // Restore draft when switching notebooks
+  const prevDraftKey = useRef(draftKey);
+  useEffect(() => {
+    if (prevDraftKey.current !== draftKey) {
+      prevDraftKey.current = draftKey;
+      setText(loadDraft(draftKey));
+    }
+  }, [draftKey]);
 
   // Listen for annotation-forwarded prompt text
   useEffect(() => {
@@ -249,6 +271,7 @@ function NotebookInputBar() {
     if (!source || isRunning) return;
     submitPrompt(source);
     setText('');
+    clearDraft(draftKey);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
