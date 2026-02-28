@@ -3,6 +3,18 @@ name: cancel
 description: "Cancel a task module — set status to cancelled, stop auto if running, optionally clean up worktree. Use when a task becomes infeasible, is deprioritized, or needs to be abandoned."
 model_tier: light
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [取消, 放弃, 废弃, 不做了, 中止, 作废]
+    en: [cancel, abort, abandon, drop, stop task, kill task]
+  phrases:
+    zh: [取消这个任务, 不做了, 放弃这个, 任务作废, 停掉这个任务]
+    en: [cancel this task, abandon the task, drop this task, I don't want to do this anymore]
+  disambiguate: >
+    Core intent: permanently cancel a task module and mark it as cancelled.
+    User explicitly abandons a task → cancel.
+    User wants to PAUSE → not cancel (no pause skill; user just stops invoking commands).
+    User wants to stop auto mode only → auto --action stop, not cancel.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

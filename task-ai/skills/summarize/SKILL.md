@@ -3,6 +3,17 @@ name: summarize
 description: Regenerate .summary.md files for context recovery or refresh
 model_tier: light
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [摘要, 刷新摘要, 恢复上下文, 重建摘要, 上下文丢了]
+    en: [summarize, refresh summary, recover context, rebuild summary, context lost]
+  phrases:
+    zh: [重新生成摘要, 刷新一下摘要, 上下文丢了恢复一下, 重建summary]
+    en: [regenerate summaries, refresh the summary, recover lost context, rebuild summary files]
+  disambiguate: >
+    Core intent: regenerate .summary.md files when context is lost or stale.
+    User says "context is lost" or "refresh summaries" → summarize.
+    User wants a formal task REPORT → report. User wants to capture EXPERIENCE → highlight.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

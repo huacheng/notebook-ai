@@ -3,6 +3,17 @@ name: annotate
 description: "Process Plan panel annotations — triage, cross-impact assessment, and execution. Triggered automatically when annotations (Insert/Delete/Replace/Comment) are submitted from the Plan panel UI."
 model_tier: medium
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [批注, 标注, 注释, 修改计划, 计划批注]
+    en: [annotate, annotation, mark up, plan comment, plan edit]
+  phrases:
+    zh: [处理批注, 计划有批注, 批注提交了, 修改计划步骤]
+    en: [process annotations, there are annotations, annotations submitted, modify plan steps]
+  disambiguate: >
+    Core intent: process structured annotations (Insert/Delete/Replace/Comment) on .plan.md from the UI.
+    Annotations come from the Plan panel UI → annotate.
+    User wants to REGENERATE the whole plan → plan. User wants to change the GOAL → target.
 arguments:
   - name: task_file
     description: "Absolute path to the task file being annotated"

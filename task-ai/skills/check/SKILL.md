@@ -3,6 +3,17 @@ name: check
 description: Check plan feasibility at key checkpoints — post-plan, mid-execution, post-execution
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [检查, 评审, 审查, 评估, 可行性, 审核, 把关]
+    en: [check, review, evaluate, assess, feasibility, audit, gate]
+  phrases:
+    zh: [检查一下计划, 方案可行吗, 评审一下, 看看行不行, 审查通过了吗, 能不能执行]
+    en: [check the plan, is it feasible, review the implementation, evaluate progress, ready to execute]
+  disambiguate: >
+    Core intent: evaluate and render a verdict (PASS/NEEDS_REVISION/ACCEPT/REPLAN) at a lifecycle checkpoint.
+    User asks "is this plan OK?" or "can we proceed?" → check.
+    User asks to RUN tests → verify. User asks to SEE task status → list.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

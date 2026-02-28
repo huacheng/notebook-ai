@@ -3,6 +3,17 @@ name: library
 description: "Cross-task knowledge library management — search, list, audit, and maintain the shared .library/ knowledge base. Defines the write protocol and changelog consumption protocol for all other sub-commands. Does not participate in the automation loop."
 model_tier: light
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [知识库, 图书馆, 搜索参考, 查经验, 知识管理, 参考文献]
+    en: [library, knowledge base, search references, find experience, knowledge management]
+  phrases:
+    zh: [搜索知识库, 查查经验, 有没有参考, 知识库里有什么, 维护知识库, 知识库状态]
+    en: [search the library, find related references, what's in the knowledge base, library status, maintain library]
+  disambiguate: >
+    Core intent: query or maintain the shared cross-task knowledge library (.library/).
+    User wants to SEARCH existing knowledge → library search.
+    User wants to COLLECT NEW knowledge via web research → research. User wants to INGEST a local file → read.
 arguments:
   - name: operation
     description: "Operation: search, list, status, or maintain"

@@ -3,6 +3,17 @@ name: init
 description: "Initialize a new notebook working directory under NB_WORKSPACES_ROOT with system files, git branch, and optional worktree. Use when starting a new feature, bug fix, or refactoring task that needs structured lifecycle tracking."
 model_tier: light
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [新任务, 新项目, 初始化, 创建任务, 开新, 建任务]
+    en: [new task, new project, initialize, create task, start fresh, set up task]
+  phrases:
+    zh: [开一个新任务, 建个项目, 初始化一下, 新开一个, 从头开始]
+    en: [start a new task, set up a new project, initialize a notebook, create a fresh workspace]
+  disambiguate: >
+    Core intent: create a brand new task workspace from scratch.
+    User wants to START something new (no existing task context) → init.
+    User already has a task and wants to define goals → target, not init.
 arguments:
   - name: project_name
     description: "Name of the project directory under NB_WORKSPACES_ROOT (e.g., project-a, my-project)"

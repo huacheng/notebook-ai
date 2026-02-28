@@ -3,6 +3,17 @@ name: merge
 description: "Merge completed task branch to main — with conflict resolution and verification retry. Does not delete branches or worktrees. Triggered after check post-exec ACCEPT verdict confirms all tests pass."
 model_tier: medium
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [合并, 合入, merge, 入主分支, 提交合并]
+    en: [merge, integrate, merge to main, land, ship it]
+  phrases:
+    zh: [合并到主分支, 合入master, 可以合了吗, 提交合并, 合并代码]
+    en: [merge to main, merge the branch, ready to merge, land the changes, integrate into master]
+  disambiguate: >
+    Core intent: merge a completed task branch into main with conflict resolution.
+    User says "merge" or "land it" → merge.
+    User says "is it done?" → check post-exec. User says "commit" → git commit (not this skill).
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

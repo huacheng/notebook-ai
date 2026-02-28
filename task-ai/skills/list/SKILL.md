@@ -3,6 +3,17 @@ name: list
 description: "Query task status and relationships — read-only, no file writes. Use to inspect task inventory, check progress, view dependency graphs, or audit status transition history."
 model_tier: light
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [任务列表, 进度, 状态, 有哪些任务, 看看, 依赖]
+    en: [list tasks, status, progress, show tasks, what tasks, dependencies]
+  phrases:
+    zh: [看看任务列表, 目前进度怎样, 任务状态, 有哪些任务在跑, 依赖关系图, 看看历史]
+    en: [show me the tasks, what's the progress, task status overview, dependency graph, timeline]
+  disambiguate: >
+    Core intent: read-only query of task inventory and status — no side effects.
+    User asks "what tasks exist?" or "what's the status?" → list.
+    User asks "is this plan OK?" → check (renders verdict). User asks "show target" → target read mode.
 arguments:
   - name: notebook
     description: "Notebook name (optional — omit to list all notebooks)"

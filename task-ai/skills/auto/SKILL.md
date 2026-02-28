@@ -3,6 +3,17 @@ name: auto
 description: Autonomous execution loop — single the agent session orchestrates plan/check/exec cycle internally
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [自动, 全自动, 自动跑, 自动执行, 一键, 跑全流程]
+    en: [auto, autopilot, run automatically, hands-off, full cycle, end to end]
+  phrases:
+    zh: [自动跑一遍, 全自动执行, 一键跑完, 从头到尾自动, 启动自动模式, 停止自动]
+    en: [run it automatically, start autopilot, run the full cycle, hands-off execution, stop auto]
+  disambiguate: >
+    Core intent: orchestrate the entire plan→check→exec→merge lifecycle autonomously.
+    User wants FULL automated cycle → auto.
+    User wants to execute ONE step manually → exec. User wants just the plan → plan.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

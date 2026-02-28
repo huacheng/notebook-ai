@@ -3,6 +3,17 @@ name: exec
 description: "Execute the implementation plan for a reviewed task module. Triggered after check PASS (from review status) or on NEEDS_FIX continuation (from executing status with fix guidance)."
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [执行, 实现, 开干, 动手, 开始做, 写代码, 跑起来]
+    en: [execute, implement, start working, do it, write code, run the plan, build it]
+  phrases:
+    zh: [开始执行, 按计划做, 动手实现, 开始写代码, 继续做, 执行计划, 修这个bug]
+    en: [execute the plan, start implementing, carry out the plan, continue execution, fix this issue]
+  disambiguate: >
+    Core intent: carry out the implementation plan by writing code / making changes.
+    User says "do it" or "start implementing" → exec.
+    User says "plan how to do it" → plan. User says "run it automatically" → auto.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

@@ -3,6 +3,17 @@ name: verify
 description: "Run domain-adapted tests and verification procedures, producing result files. Triggered after plan generation (post-plan), during execution (per-step), or after execution completes (post-exec) to provide evidence for check's verdict."
 model_tier: medium
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [测试, 验证, 跑测试, 测一下, 验收, 通过了吗]
+    en: [test, verify, run tests, validate, check tests, passing]
+  phrases:
+    zh: [跑一下测试, 验证一下, 测试通过了吗, 看看测试结果, 全量测试, 快速验证]
+    en: [run the tests, verify it works, are tests passing, run verification, quick check, full test suite]
+  disambiguate: >
+    Core intent: run tests and produce result files — does NOT render verdicts.
+    User says "run tests" or "does it pass?" → verify.
+    User says "is the plan OK?" or "can we merge?" → check (renders verdict).
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

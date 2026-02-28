@@ -3,6 +3,17 @@ name: read
 description: "Knowledge Synthesizer — ingests local documents, deduplicates against library, and synthesizes into validated .references/ files."
 model_tier: medium
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [读文件, 导入, 导入文档, 吃掉, 读取, 消化]
+    en: [read file, ingest, import document, absorb, consume, load document]
+  phrases:
+    zh: [读一下这个文件, 导入这个文档, 把这个文件吃掉, 读取并入库, 消化这份资料]
+    en: [read this file, ingest this document, import into library, absorb this file, load this into references]
+  disambiguate: >
+    Core intent: ingest a LOCAL file into the knowledge library with dedup and sanitization.
+    User points to a specific local file to import → read.
+    User wants to search the WEB for knowledge → research. User wants to SEARCH existing library → library.
 arguments:
   - name: file_path
     description: "Absolute or relative path to the local document"

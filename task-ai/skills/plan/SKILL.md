@@ -3,6 +3,17 @@ name: plan
 description: "Generate implementation plans for a task module. Triggered after init when .target.md requirements are defined, or on re-plan when check/exec identify issues requiring plan revision."
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [计划, 方案, 规划, 实现步骤, 怎么做, 出方案, 拆步骤]
+    en: [plan, approach, implementation steps, how to implement, design plan, break down]
+  phrases:
+    zh: [出个计划, 制定方案, 怎么实现, 拆成步骤, 做个规划, 重新规划, 换个方案]
+    en: [generate a plan, make an implementation plan, how should we implement this, break it into steps, replan]
+  disambiguate: >
+    Core intent: generate or regenerate an actionable implementation plan (.plan.md).
+    User asks HOW to implement something → plan.
+    User asks WHAT to implement → target. User asks to INVESTIGATE options → research.
 arguments:
   - name: notebook
     description: "Notebook name (optional — detected from context if omitted)"
