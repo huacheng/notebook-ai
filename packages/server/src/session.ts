@@ -44,17 +44,9 @@ interface ClaudeResultMessage {
   is_error: boolean;
 }
 
-interface ClaudeToolResultMessage {
-  type: 'tool_result';
-  tool_use_id: string;
-  content: string | Array<{ type: string; text?: string }>;
-  is_error?: boolean;
-}
-
 type ClaudeJsonlMessage =
   | ClaudeTextMessage
   | ClaudeResultMessage
-  | ClaudeToolResultMessage
   | { type: string };
 
 // ── NotebookSession ──────────────────────────────────────────────────────────
@@ -584,7 +576,7 @@ export class SessionManager {
    * Claude emits:
    *   - type "assistant"    → content blocks (text, thinking, tool_use)
    *   - type "result"       → final result text + is_error + definitive completion
-   *   - type "tool_result"  → output of a tool invocation
+   *   - type "user"         → tool results wrapped as { message: { content: [{ type: 'tool_result', ... }] } }
    *   - type "stream_event" → streaming deltas (forwarded as cell_stream for real-time rendering)
    *   - type "content_block_delta" → direct streaming deltas (forwarded as cell_stream)
    *   - type "system"       → system messages (ignored)
@@ -683,41 +675,39 @@ export class SessionManager {
         break;
       }
 
-      case 'tool_result': {
-        const toolResult = msg as ClaudeToolResultMessage;
-        // Prefer exact match by tool_use_id (handles race: result before tool_result,
-        // and stale results for previous cells). Fall back to running cell.
-        const cellId = findCellByToolUseId(session.notebook, toolResult.tool_use_id)
-          ?? findRunningCellId(session.notebook);
-        if (!cellId) break;
+      case 'user': {
+        // Claude CLI stream-json sends tool results as:
+        // { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id, content }] } }
+        const userMsg = msg as any;
+        const blocks = userMsg.message?.content;
+        if (!Array.isArray(blocks)) break;
 
-        // Normalise content to a plain string.
-        const content =
-          typeof toolResult.content === 'string'
-            ? toolResult.content
-            : toolResult.content
-                .map((b) => (b.type === 'text' ? (b.text ?? '') : ''))
-                .join('');
+        for (const block of blocks) {
+          if (block.type !== 'tool_result' || !block.tool_use_id) continue;
 
-        const isError = toolResult.is_error ?? false;
+          const cellId = findCellByToolUseId(session.notebook, block.tool_use_id)
+            ?? findRunningCellId(session.notebook);
+          if (!cellId) continue;
 
-        // Update the matching tool_use output block in the notebook.
-        session.notebook = attachToolResult(
-          session.notebook,
-          cellId,
-          toolResult.tool_use_id,
-          content,
-          isError,
-        );
+          const content =
+            typeof block.content === 'string'
+              ? block.content
+              : Array.isArray(block.content)
+                ? block.content.map((b: any) => (b.type === 'text' ? (b.text ?? '') : '')).join('')
+                : '';
 
-        // Broadcast to frontend so tool results show up in real time.
-        this.broadcast(session, {
-          type: 'tool_result',
-          cell_id: cellId,
-          tool_use_id: toolResult.tool_use_id,
-          content,
-          is_error: isError,
-        });
+          const isError = block.is_error ?? false;
+
+          session.notebook = attachToolResult(session.notebook, cellId, block.tool_use_id, content, isError);
+
+          this.broadcast(session, {
+            type: 'tool_result',
+            cell_id: cellId,
+            tool_use_id: block.tool_use_id,
+            content,
+            is_error: isError,
+          });
+        }
         break;
       }
 

@@ -89,10 +89,14 @@ describe('tool_result after result (race condition)', () => {
 
     // Step 2: `tool_result` arrives AFTER completion
     onMessage({
-      type: 'tool_result',
-      tool_use_id: 'tu-1',
-      content: 'my-hostname',
-      is_error: false,
+      type: 'user',
+      message: {
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'tu-1',
+          content: 'my-hostname',
+        }],
+      },
     });
 
     // The tool_use output should now have a result — NOT undefined
@@ -114,10 +118,14 @@ describe('tool_result after result (race condition)', () => {
 
     // tool_result arrives while cell is still running (normal case)
     onMessage({
-      type: 'tool_result',
-      tool_use_id: 'tu-1',
-      content: 'normal-result',
-      is_error: false,
+      type: 'user',
+      message: {
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'tu-1',
+          content: 'normal-result',
+        }],
+      },
     });
 
     const cell = session.notebook.cells[0] as any;
@@ -159,10 +167,14 @@ describe('tool_result after result (race condition)', () => {
     // A stale tool_result for tu-1 should NOT corrupt c2
     // (it should go to c1, not c2)
     onMessage({
-      type: 'tool_result',
-      tool_use_id: 'tu-1',
-      content: 'late-result-for-c1',
-      is_error: false,
+      type: 'user',
+      message: {
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'tu-1',
+          content: 'late-result-for-c1',
+        }],
+      },
     });
 
     // tu-1 result goes to c1 (matched by tool_use_id)
