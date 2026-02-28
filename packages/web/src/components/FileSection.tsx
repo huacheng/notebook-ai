@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react';
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { makeFetchGuard } from '../utils/fetchGuard';
+import { computeBreadcrumb, computeNavigateUp } from '../utils/worktreePath';
 
 // Compute a POSIX-style relative path from `fromDir` to `toFile`.
 // Both arguments must be absolute Unix paths.
@@ -413,26 +414,10 @@ export function FileSection({
   }
 
   function navigateUp() {
-    if (subPath === initialPath || subPath === '.') return;
-    const parts = subPath.split('/'); parts.pop();
-    let target = parts.length === 0 ? initialPath : parts.join('/');
-    // Skip .worktrees/ intermediate directory — go straight to root
-    if (target === '.worktrees' || target.endsWith('/.worktrees')) {
-      target = initialPath;
-    }
-    setSubPath(target);
+    setSubPath(computeNavigateUp(subPath, initialPath));
   }
 
-  // Strip initialPath prefix from breadcrumbs so internal dirs like .working are hidden
-  let displayPath = initialPath !== '.' && subPath.startsWith(initialPath)
-    ? subPath.slice(initialPath.length).replace(/^\//, '') || '.'
-    : subPath;
-  // Hide .worktrees/ intermediate layer — show only the final directory name
-  const worktreePrefix = displayPath.startsWith('.worktrees/') ? '.worktrees/' : '';
-  if (worktreePrefix) {
-    displayPath = displayPath.slice(worktreePrefix.length) || '.';
-  }
-  const pathParts = displayPath === '.' ? [] : displayPath.split('/');
+  const { displayPath, pathParts, crumbPaths } = computeBreadcrumb(subPath, initialPath);
 
   return (
     <div className="fp-section-body">
@@ -444,11 +429,7 @@ export function FileSection({
             onClick={() => setSubPath(initialPath)} title="Root"
           >/</button>
           {pathParts.map((part, i) => {
-            const displayCrumb = pathParts.slice(0, i + 1).join('/');
-            const realCrumb = worktreePrefix ? `${worktreePrefix}${displayCrumb}` : displayCrumb;
-            const crumbPath = initialPath !== '.'
-              ? `${initialPath}/${realCrumb}`
-              : realCrumb;
+            const crumbPath = crumbPaths[i];
             return (
             <Fragment key={i}>
               <span className="fp-crumb-sep">›</span>
