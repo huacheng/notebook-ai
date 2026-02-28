@@ -105,6 +105,14 @@ export function buildSendPayload(annotations: FileAnnotation[], fullText: string
   return jsonl;
 }
 
+export function canEditFile(absolutePath: string, format: string | null): boolean {
+  if (format === null) return false;
+  if (format === 'unsupported') return false;
+  if (format.endsWith('-binary')) return false;
+  if (isTaskSystemFile(absolutePath)) return false;
+  return true;
+}
+
 export function buildAnnotationText(annotations: FileAnnotations): string {
   const { items } = annotations;
   if (items.length === 0) return '';

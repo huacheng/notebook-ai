@@ -9,6 +9,7 @@ import {
   buildSingleAnnotationPrompt,
   buildAnnotationPrompt,
   buildSendPayload,
+  canEditFile,
   type FileAnnotation,
 } from '../types/fileAnnotations';
 
@@ -241,5 +242,42 @@ describe('buildSendPayload', () => {
 
   it('empty array returns empty string', () => {
     expect(buildSendPayload([], fullText)).toBe('');
+  });
+});
+
+describe('canEditFile', () => {
+  it('system file + text format returns false', () => {
+    expect(canEditFile('/home/u/ws/.working/.target.md', 'text')).toBe(false);
+  });
+
+  it('system file + html format returns false', () => {
+    expect(canEditFile('/home/u/ws/.working/.plan.md', 'html')).toBe(false);
+  });
+
+  it('general file + text format returns true', () => {
+    expect(canEditFile('/home/u/ws/readme.md', 'text')).toBe(true);
+  });
+
+  it('general file + html format returns true', () => {
+    expect(canEditFile('/home/u/ws/index.html', 'html')).toBe(true);
+  });
+
+  it('binary format always returns false', () => {
+    expect(canEditFile('/home/u/ws/doc.pdf', 'pdf-binary')).toBe(false);
+    expect(canEditFile('/home/u/ws/doc.docx', 'docx-binary')).toBe(false);
+    expect(canEditFile('/home/u/ws/data.xlsx', 'xlsx-binary')).toBe(false);
+    expect(canEditFile('/home/u/ws/slides.pptx', 'pptx-binary')).toBe(false);
+  });
+
+  it('unsupported format returns false', () => {
+    expect(canEditFile('/home/u/ws/file.xyz', 'unsupported')).toBe(false);
+  });
+
+  it('null format returns false', () => {
+    expect(canEditFile('/home/u/ws/file.txt', null)).toBe(false);
+  });
+
+  it('empty absolutePath returns true (non-system)', () => {
+    expect(canEditFile('', 'text')).toBe(true);
   });
 });
