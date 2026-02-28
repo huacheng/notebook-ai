@@ -17,3 +17,11 @@ export function computeSplitEntryWidth(normalWidth: number): number {
 export function clampSplitRatio(ratio: number): number {
   return Math.min(0.8, Math.max(0.2, ratio));
 }
+
+/** Determine what the right split pane should display. */
+export function splitRightPaneContent(opts: {
+  inSplitView: boolean;
+  gitTabOpen: boolean;
+}): 'notebook' | 'overlay' {
+  return opts.inSplitView && opts.gitTabOpen ? 'overlay' : 'notebook';
+}

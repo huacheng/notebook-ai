@@ -653,7 +653,6 @@ export function ProjectSidebar() {
       <div className="sidebar-bottom" style={{ flex: 1 - leftSidebarSplitRatio }}>
         <div className="sidebar-section-header">
           <span>Library</span>
-          <span className="fp-section-sub">drag to prompt</span>
         </div>
         <FileSection
           baseUrl="/api/library"

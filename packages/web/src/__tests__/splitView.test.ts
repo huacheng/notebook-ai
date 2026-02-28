@@ -3,6 +3,7 @@ import {
   computeSplitView,
   computeSplitEntryWidth,
   clampSplitRatio,
+  splitRightPaneContent,
 } from '../utils/splitView';
 
 describe('computeSplitView', () => {
@@ -61,5 +62,17 @@ describe('clampSplitRatio', () => {
   });
   it('passes through valid ratio', () => {
     expect(clampSplitRatio(0.6)).toBe(0.6);
+  });
+});
+
+describe('splitRightPaneContent', () => {
+  it('returns overlay when gitTabOpen in split view', () => {
+    expect(splitRightPaneContent({ inSplitView: true, gitTabOpen: true })).toBe('overlay');
+  });
+  it('returns notebook when gitTab closed in split view', () => {
+    expect(splitRightPaneContent({ inSplitView: true, gitTabOpen: false })).toBe('notebook');
+  });
+  it('returns notebook when not in split view even with git open', () => {
+    expect(splitRightPaneContent({ inSplitView: false, gitTabOpen: true })).toBe('notebook');
   });
 });

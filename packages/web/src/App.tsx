@@ -315,7 +315,16 @@ function AuthenticatedApp() {
                   <>
                     <div className="split-divider" onMouseDown={startSplitDrag} />
                     <div className="notebook-split-pane" ref={notebookSplitRef}>
-                      <Notebook />
+                      {gitTabOpen ? (
+                        <div className="split-notebook-overlay">
+                          <div className="split-notebook-overlay-icon">&#9881;</div>
+                          <p className="split-notebook-overlay-text">
+                            Git History is active. Switch to a notebook tab to continue
+                          </p>
+                        </div>
+                      ) : (
+                        <Notebook />
+                      )}
                     </div>
                   </>
                 )}
