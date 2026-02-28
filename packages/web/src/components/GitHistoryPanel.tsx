@@ -405,7 +405,8 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
   }, [projectId, branches, currentBranch]);
 
   const loadPage = useCallback(async (p: number, file: string, append: boolean, all: boolean, branch: string) => {
-    setLoading(true);
+    // If we already have cached commits, don't show loading indicator (silent refresh)
+    if (commitsRef.current.length === 0) setLoading(true);
     setError(null);
     try {
       const resp = await fetchGitLog(projectId, authToken, {
