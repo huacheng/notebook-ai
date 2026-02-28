@@ -3,6 +3,18 @@ name: research
 description: "Target objective deepening & lifecycle intelligence — default mode guides multi-stage objective refinement through background research, feasibility analysis, and goal synthesis; also callable from any phase for reference collection"
 model_tier: heavy
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [调研, 研究, 调查, 背景, 可行性, 文献, 参考, 最佳实践, 技术选型, 深化]
+    en: [research, investigate, background, feasibility, references, best practices, state of the art, literature, survey, deepen]
+  phrases:
+    zh: [先了解一下, 研究一下, 调研一下, 查查看, 有什么方案, 了解背景, 可行性分析, 技术路线, 深化目标, 参考实现, O1, O2, O3]
+    en: [look into, find out about, what are the options, explore approaches, feasibility analysis, reference implementation, deepen objective]
+  disambiguate: >
+    Core intent: investigate / explore / collect knowledge — output is Insights or .references/ files.
+    User wants to understand before acting ("先调研一下") → research.
+    User says "深化目标" → research --caller target (progressive O1→O2→O3).
+    Ambiguous word "需求": user ANALYZING requirement gaps or proposing missing ones → research --phase requirements.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

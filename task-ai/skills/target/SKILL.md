@@ -3,6 +3,18 @@ name: target
 description: "Define, refine, and review task objectives and requirements in .target.md. Supports both conversational definition and file-based editing."
 model_tier: heavy
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [目标, 需求, 范围, 约束, 交付物, 验收标准, 阶段推进]
+    en: [goal, objective, requirements, scope, constraints, deliverables, acceptance criteria]
+  phrases:
+    zh: [我想做, 我要做, 我需要, 定目标, 写目标, 改目标, 调整目标, 看目标, 当前目标, 需求变了, 加需求, 改需求, 下一阶段]
+    en: [I want to build, change the goal, update requirements, show target, what's the current objective, next stage, adjust scope]
+  disambiguate: >
+    Core intent: define / update / view .target.md content.
+    User states a concrete goal ("我想做 X") or modifies existing one ("改成 Y") → target.
+    User says "深化目标" or "调研可行性" → research --caller target, NOT target.
+    Ambiguous word "需求": user DESCRIBING requirement content → target; user INVESTIGATING what's missing → research.
 arguments:
   - name: objective
     description: "The task goal, requirements, and constraints (optional — omit to read current target)"
