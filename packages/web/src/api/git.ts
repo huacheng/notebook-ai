@@ -44,7 +44,7 @@ function authHeaders(token: string | null): Record<string, string> {
 export async function fetchGitLog(
   projectId: string,
   token: string | null,
-  opts: { page?: number; limit?: number; file?: string; all?: boolean; branch?: string } = {},
+  opts: { page?: number; limit?: number; file?: string; all?: boolean; branch?: string; stats?: boolean } = {},
 ): Promise<GitLogResponse> {
   const params = new URLSearchParams();
   if (opts.page) params.set('page', String(opts.page));
@@ -52,12 +52,25 @@ export async function fetchGitLog(
   if (opts.file) params.set('file', opts.file);
   if (opts.all) params.set('all', 'true');
   if (opts.branch) params.set('branch', opts.branch);
+  if (opts.stats) params.set('stats', 'true');
 
   const qs = params.toString();
   const url = `/api/projects/${projectId}/git-log${qs ? `?${qs}` : ''}`;
   const res = await fetch(url, { headers: authHeaders(token) });
   if (!res.ok) throw new Error(`Git log failed: ${res.status}`);
   return res.json();
+}
+
+export async function fetchGitCommitFiles(
+  projectId: string,
+  token: string | null,
+  commit: string,
+): Promise<CommitFile[]> {
+  const url = `/api/projects/${projectId}/git-commit-files?commit=${encodeURIComponent(commit)}`;
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`Git commit files failed: ${res.status}`);
+  const data: { files: CommitFile[] } = await res.json();
+  return data.files;
 }
 
 export async function fetchGitDiff(

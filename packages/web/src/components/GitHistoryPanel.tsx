@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useStore } from '../store';
-import { fetchGitLog, fetchGitDiff, fetchGitBranches } from '../api/git';
-import type { CommitInfo, RefInfo } from '../api/git';
+import { fetchGitLog, fetchGitDiff, fetchGitBranches, fetchGitCommitFiles } from '../api/git';
+import type { CommitInfo, CommitFile, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { GIT_DEFAULT_ALL_BRANCHES } from '../utils/gitDefaults';
+import { useWatcher } from '../hooks/useWatcher';
 
 // ---------------------------------------------------------------------------
 // localStorage cache for git history
@@ -263,12 +264,31 @@ const CommitItem = memo(function CommitItem({
   maxLanes: number;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [files, setFiles] = useState<CommitFile[]>(commit.files);
+  const [loadingFiles, setLoadingFiles] = useState(false);
   const [diffFile, setDiffFile] = useState<string | null>(null);
   const [diffContent, setDiffContent] = useState<string>('');
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [copied, setCopied] = useState(false);
   const diffFileRef = useRef(diffFile);
   diffFileRef.current = diffFile;
+  const filesLoadedRef = useRef(commit.files.length > 0);
+
+  // On-demand: load file list when first expanded (if not already loaded from stats)
+  const handleToggle = useCallback(() => {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (next && !filesLoadedRef.current) {
+        filesLoadedRef.current = true;
+        setLoadingFiles(true);
+        fetchGitCommitFiles(projectId, token, commit.hash)
+          .then((f) => setFiles(f))
+          .catch(() => setFiles([]))
+          .finally(() => setLoadingFiles(false));
+      }
+      return next;
+    });
+  }, [projectId, token, commit.hash]);
 
   const handleFileClick = useCallback(async (filePath: string) => {
     if (diffFileRef.current === filePath) {
@@ -290,7 +310,7 @@ const CommitItem = memo(function CommitItem({
   return (
     <div>
       <div
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         className="git-commit-row"
       >
         {laneNode && maxLanes > 0 && (
@@ -324,10 +344,12 @@ const CommitItem = memo(function CommitItem({
         <div className="git-commit-expanded">
           <ContinuationLines laneNode={laneNode} maxLanes={maxLanes} />
           <div className="git-commit-files">
-            {commit.files.length === 0 ? (
+            {loadingFiles ? (
+              <div className="git-diff-loading">Loading files...</div>
+            ) : files.length === 0 ? (
               <div className="git-commit-files-empty">No files changed</div>
             ) : (
-              commit.files.map((f) => (
+              files.map((f) => (
                 <div key={f.path}>
                   <div
                     onClick={() => handleFileClick(f.path)}
@@ -435,28 +457,19 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
     loadPage(1, search, false, allBranches, selectedBranch);
   }, [search, allBranches, selectedBranch, loadPage]);
 
-  // Auto-refresh polling
-  const latestHashRef = useRef<string>(cached?.latestHash ?? '');
-  useEffect(() => {
-    if (commits.length > 0) latestHashRef.current = commits[0].hash;
-  }, [commits]);
+  // WebSocket-based change detection (replaces 3s HTTP polling)
+  useWatcher('git', { projectId });
 
   useEffect(() => {
-    const id = window.setInterval(async () => {
-      try {
-        const resp = await fetchGitLog(projectId, authToken, {
-          page: 1, limit: 1,
-          all: allBranches || undefined,
-          branch: selectedBranch || undefined,
-          file: search || undefined,
-        });
-        if (resp.commits.length > 0 && resp.commits[0].hash !== latestHashRef.current) {
-          loadPage(1, search, false, allBranches, selectedBranch);
-        }
-      } catch { /* ignore polling errors */ }
-    }, 3000);
-    return () => clearInterval(id);
-  }, [projectId, authToken, search, allBranches, selectedBranch, loadPage]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.project_id === projectId) {
+        loadPage(1, search, false, allBranches, selectedBranch);
+      }
+    };
+    window.addEventListener('nb:git-changed', handler);
+    return () => window.removeEventListener('nb:git-changed', handler);
+  }, [projectId, search, allBranches, selectedBranch, loadPage]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

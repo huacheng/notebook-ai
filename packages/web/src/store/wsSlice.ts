@@ -297,6 +297,12 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           // Log system messages (e.g. context compaction) for future UI display
           console.log(`[ws] system: ${(parsed as any).subtype} — ${(parsed as any).message}`);
           break;
+        case 'git_changed':
+          window.dispatchEvent(new CustomEvent('nb:git-changed', { detail: parsed }));
+          break;
+        case 'files_changed':
+          window.dispatchEvent(new CustomEvent('nb:files-changed', { detail: parsed }));
+          break;
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };

@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { FileSection } from './FileSection';
 import { getDeliverablesPath } from '../utils/deliverablesPath';
+import { useWatcher } from '../hooks/useWatcher';
 
 export function RightPanel() {
   const rightPanelOpen = useStore(s => s.rightPanelOpen);
@@ -14,6 +16,16 @@ export function RightPanel() {
   const rightPanelWidth = useStore(s => s.rightPanelWidth);
 
   const delivPath = getDeliverablesPath(workspaceDir, activeProjectPath);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // WS-based deliverables change detection
+  useWatcher('files', { projectId: activeProjectId, dirPath: delivPath });
+
+  useEffect(() => {
+    const handler = () => setRefreshKey(k => k + 1);
+    window.addEventListener('nb:files-changed', handler);
+    return () => window.removeEventListener('nb:files-changed', handler);
+  }, []);
 
   if (!rightPanelOpen) {
     return (
@@ -36,6 +48,7 @@ export function RightPanel() {
           authToken={authToken}
           showDownloadAll
           initialPath={delivPath}
+          refreshKey={refreshKey}
           onFileClick={(subPath, name) => {
             const relPath = subPath === '.' ? name : `${subPath}/${name}`;
             openFileTab({ path: relPath, source: 'deliverables', sessionId: sessionId ?? '', projectId: activeProjectId ?? undefined });

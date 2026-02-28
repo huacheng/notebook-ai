@@ -4,6 +4,7 @@ import { FileSection } from './FileSection';
 import { runDeleteFlow } from './deleteFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
 import { validateTitle, MAX_TITLE_LENGTH } from '../utils/validateTitle';
+import { useWatcher } from '../hooks/useWatcher';
 
 function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   phase: 'creating' | 'done' | 'error';
@@ -365,6 +366,18 @@ function FileBrowser() {
   const nbImportRef = useRef<HTMLInputElement>(null);
   const isInsideNotebook = currentSubPath !== '.';
 
+  // WS-based file change detection (replaces 10s HTTP polling)
+  useWatcher('files', { projectId: activeProjectId });
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setFileRefreshKey(k => k + 1);
+    };
+    window.addEventListener('nb:files-changed', handler);
+    return () => window.removeEventListener('nb:files-changed', handler);
+  }, []);
+
   const handleFileClick = useCallback(async (subPath: string, filename: string) => {
     if (filename.endsWith('.notebook.json')) {
       // Check if this notebook is already open — switch tab instead of re-fetching
@@ -568,8 +581,18 @@ export function ProjectSidebar() {
   const openFileTab = useStore(s => s.openFileTab);
   const sidebarWidth = useStore(s => s.sidebarWidth);
 
+  const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const sidebarRef = useRef<HTMLElement>(null);
   const dragging = useRef(false);
+
+  // WS-based library change detection
+  useWatcher('files', { dirPath: '__library__' });
+
+  useEffect(() => {
+    const handler = () => setLibraryRefreshKey(k => k + 1);
+    window.addEventListener('nb:files-changed', handler);
+    return () => window.removeEventListener('nb:files-changed', handler);
+  }, []);
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
@@ -604,6 +627,7 @@ export function ProjectSidebar() {
         <FileSection
           baseUrl="/api/library"
           authToken={authToken}
+          refreshKey={libraryRefreshKey}
           showDownloadAll
           dropLabel="Drop to add to Library"
           workspaceDir={workspaceDir}

@@ -54,13 +54,15 @@ export function createGitRouter(db: NotebookDb): IRouter {
       res.status(400).json({ error: 'Invalid branch name' });
       return;
     }
+    const stats = req.query.stats === 'true';
     const skip = (page - 1) * limit;
 
     try {
       const SEP = '---GIT-LOG-SEP---';
       const format = `${SEP}%n%H%n%h%n%P%n%D%n%s%n%an%n%aI`;
 
-      const args = ['log', '--topo-order', `--pretty=format:${format}`, '--numstat', `--skip=${skip}`, `-${limit + 1}`];
+      const args = ['log', '--topo-order', `--pretty=format:${format}`, `--skip=${skip}`, `-${limit + 1}`];
+      if (stats) args.splice(3, 0, '--numstat');
       if (all) args.splice(1, 0, '--all');
       if (branch && !all) args.push(branch);
       if (file) {
@@ -170,6 +172,48 @@ export function createGitRouter(db: NotebookDb): IRouter {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[api:git-diff]', msg);
       res.status(500).json({ error: 'Failed to get diff' });
+    }
+  });
+
+  // Git commit files (on-demand numstat for a single commit)
+  router.get('/:projectId/git-commit-files', async (req, res) => {
+    const project = db.getProject(req.params.projectId);
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+    const cwd = project.path;
+
+    const commit = req.query.commit as string;
+    if (!commit || !/^[a-f0-9]{7,40}$/.test(commit)) {
+      res.status(400).json({ error: 'Invalid commit hash' });
+      return;
+    }
+
+    try {
+      const { stdout } = await execFile(
+        'git',
+        ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
+        { cwd, timeout: EXEC_TIMEOUT },
+      );
+
+      const files: CommitFile[] = [];
+      for (const line of stdout.split('\n')) {
+        const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+        if (match) {
+          files.push({
+            additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+            deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+            path: unquoteGitPath(match[3]),
+          });
+        }
+      }
+
+      res.json({ files });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[api:git-commit-files]', msg);
+      res.status(500).json({ error: 'Failed to get commit files' });
     }
   });
 

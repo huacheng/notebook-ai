@@ -18,6 +18,7 @@ import { createGitRouter } from './routes/git.js';
 import { createPluginRouter } from './routes/plugin.js';
 import { setupWebSocket } from './ws-handler.js';
 import { authMiddleware } from './auth.js';
+import { GitWatcher, FileWatcher } from './watcher.js';
 
 // ── App setup ────────────────────────────────────────────────────────────────
 
@@ -86,9 +87,14 @@ app.use('/api/projects', createProjectsRouter(db, sessionManager, notebookStore,
 app.use('/api/projects', createGitRouter(db));
 app.use('/api/plugin', createPluginRouter());
 
+// ── Watchers (push-based change detection) ──────────────────────────────────
+
+const gitWatcher = new GitWatcher();
+const fileWatcher = new FileWatcher();
+
 // ── WebSocket ────────────────────────────────────────────────────────────────
 
-setupWebSocket(wss, db, sessionManager, notebookStore);
+setupWebSocket(wss, db, sessionManager, notebookStore, gitWatcher, fileWatcher);
 
 // ── Startup: import notebooks from disk that have no DB record ────────────────
 

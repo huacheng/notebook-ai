@@ -43,7 +43,7 @@ const EXT_TYPE: Record<string, string> = {
   xlsx: 'xls', xls: 'xls',
 };
 
-function fileType(name: string): string {
+export function fileType(name: string): string {
   if (name.endsWith('.notebook.json')) return 'nb';
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   return EXT_TYPE[ext] ?? (ext.slice(0, 4) || '···');
@@ -254,7 +254,6 @@ export function FileSection({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newNameRef = useRef<HTMLInputElement>(null);
-  const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchGuard = useRef(makeFetchGuard()).current;
 
   useEffect(() => {
@@ -310,13 +309,7 @@ export function FileSection({
     if (refreshKey) fetchFiles(subPath, true);
   }, [refreshKey]); // eslint-disable-line
 
-  useEffect(() => {
-    autoRefreshRef.current = setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      fetchFiles(subPath, true);
-    }, 10_000);
-    return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
-  }, [subPath, fetchFiles]);
+  // Auto-refresh removed: consumers use useWatcher + refreshKey instead
 
   const uploadFileList = useCallback((fileList: FileList | File[]) => {
     const formData = new FormData();
@@ -530,7 +523,7 @@ export function FileSection({
               navigateInto((f as any).worktreePath || f.name);
             }}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
-              <span className="fp-name" title={f.name}>{f.name}</span>
+              <span className="fp-name" data-tooltip={f.name}>{f.name}</span>
               {isNbDir && <TypeBadge name={`${f.name}.notebook.json`} />}
               {renderItemActions?.(f, subPath) ?? (
                 !isReadOnly && !noDeleteFilter?.(f.name, subPath) && (
@@ -556,9 +549,8 @@ export function FileSection({
               onClick={() => onFileClick?.(subPath, f.name)}
               style={{ cursor: onFileClick ? 'pointer' : undefined }}
             >
+              <span className="fp-name" data-tooltip={f.name}>{f.name}</span>
               <FileIcon name={f.name} />
-              <span className="fp-name" title={f.name}>{f.name}</span>
-              <TypeBadge name={f.name} />
               {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions">
                 {isReadOnly ? null : confirmDelete === f.name ? (

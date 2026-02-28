@@ -12,6 +12,7 @@ import { authEnabled } from './auth.js';
 import { validateWorkspacePath } from './workspace-files.js';
 import { exportToHtml } from './export.js';
 import { getLibraryDir } from './workspace.js';
+import type { GitWatcher, FileWatcher } from './watcher.js';
 
 function sendToClient(ws: WebSocket, msg: object): void {
   if (ws.readyState === ws.OPEN) {
@@ -24,6 +25,8 @@ export function setupWebSocket(
   db: NotebookDb,
   sessionManager: SessionManager,
   notebookStore: NotebookStore,
+  gitWatcher?: GitWatcher,
+  fileWatcher?: FileWatcher,
 ): void {
   // Purge stale file annotations on startup
   db.cleanupOldFileAnnotations(7);
@@ -49,6 +52,8 @@ export function setupWebSocket(
 
     // Per-connection subscription map: sessionId → removeListener
     const subscriptions = new Map<string, () => void>();
+    // Per-connection watcher subscriptions: watch_id → unsubscribe fn
+    const watchSubscriptions = new Map<string, () => void>();
 
     ws.on('message', async (data) => {
       let parsed: unknown;
@@ -517,6 +522,53 @@ export function setupWebSocket(
           break;
         }
 
+        case 'watch_subscribe': {
+          const { watch_id, kind, project_id, dir_path } = msg;
+          // Prevent duplicate subscriptions
+          if (watchSubscriptions.has(watch_id)) break;
+
+          if (kind === 'git' && gitWatcher && project_id) {
+            const project = db.getProject(project_id);
+            if (!project) {
+              sendToClient(ws, { type: 'error', message: `Project "${project_id}" not found for git watch.` });
+              break;
+            }
+            const unsub = gitWatcher.subscribe(project.path, project_id, (pid, hash) => {
+              sendToClient(ws, { type: 'git_changed', watch_id, project_id: pid, latest_hash: hash });
+            });
+            watchSubscriptions.set(watch_id, unsub);
+          } else if (kind === 'files' && fileWatcher) {
+            let watchPath: string;
+            if (dir_path === '__library__') {
+              watchPath = getLibraryDir();
+            } else if (project_id) {
+              const project = db.getProject(project_id);
+              if (!project) {
+                sendToClient(ws, { type: 'error', message: `Project "${project_id}" not found for file watch.` });
+                break;
+              }
+              watchPath = dir_path ? `${project.path}/${dir_path}` : project.path;
+            } else {
+              break; // No valid path to watch
+            }
+            const unsub = fileWatcher.subscribe(watchPath, (dp) => {
+              sendToClient(ws, { type: 'files_changed', watch_id, dir_path: dp });
+            });
+            watchSubscriptions.set(watch_id, unsub);
+          }
+          break;
+        }
+
+        case 'watch_unsubscribe': {
+          const { watch_id } = msg;
+          const unsub = watchSubscriptions.get(watch_id);
+          if (unsub) {
+            unsub();
+            watchSubscriptions.delete(watch_id);
+          }
+          break;
+        }
+
         default: {
           msg satisfies never;
           sendToClient(ws, { type: 'error', message: 'Unknown message type.' });
@@ -531,6 +583,11 @@ export function setupWebSocket(
         if (sessionOwners.get(session_id) === ws) sessionOwners.delete(session_id);
       }
       subscriptions.clear();
+      // Clean up all watcher subscriptions
+      for (const [, unsub] of watchSubscriptions) {
+        unsub();
+      }
+      watchSubscriptions.clear();
     }
 
     ws.on('close', () => {

@@ -344,6 +344,20 @@ export const ChangeModelSchema = z.object({
   model: z.string(),
 });
 
+// Client → Server: watch subscribe/unsubscribe (file & git change notifications)
+export const WatchSubscribeSchema = z.object({
+  type: z.literal('watch_subscribe'),
+  watch_id: z.string(),
+  kind: z.enum(['git', 'files']),
+  project_id: z.string().optional(),
+  dir_path: z.string().optional(),
+});
+
+export const WatchUnsubscribeSchema = z.object({
+  type: z.literal('watch_unsubscribe'),
+  watch_id: z.string(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -362,6 +376,8 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   LoadCellsSchema,
   RemoveCellsSchema,
   ChangeModelSchema,
+  WatchSubscribeSchema,
+  WatchUnsubscribeSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
 ]);
@@ -547,6 +563,20 @@ export const SystemMessageSchema = z.object({
   cell_id: z.string().optional(),
 });
 
+// Server → Client: watch change notifications
+export const GitChangedSchema = z.object({
+  type: z.literal('git_changed'),
+  watch_id: z.string(),
+  project_id: z.string(),
+  latest_hash: z.string(),
+});
+
+export const FilesChangedSchema = z.object({
+  type: z.literal('files_changed'),
+  watch_id: z.string(),
+  dir_path: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -576,6 +606,8 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellInterruptedSchema,
   ModelChangedSchema,
   SystemMessageSchema,
+  GitChangedSchema,
+  FilesChangedSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -680,6 +712,11 @@ export type CellsLoaded = z.infer<typeof CellsLoadedSchema>;
 export type NotebookListItem = z.infer<typeof NotebookListItemSchema>;
 export type WorkspaceInfo = z.infer<typeof WorkspaceInfoSchema>;
 export type CreateNotebookRequest = z.infer<typeof CreateNotebookRequestSchema>;
+
+export type WatchSubscribe = z.infer<typeof WatchSubscribeSchema>;
+export type WatchUnsubscribe = z.infer<typeof WatchUnsubscribeSchema>;
+export type GitChanged = z.infer<typeof GitChangedSchema>;
+export type FilesChanged = z.infer<typeof FilesChangedSchema>;
 
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectListItem = z.infer<typeof ProjectListItemSchema>;
