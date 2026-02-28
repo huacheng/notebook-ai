@@ -283,9 +283,9 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
         <div className="cell-timeline-window" ref={timelineRef}>
           <TimelineOutputs outputs={outputs} />
           <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
-          <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
         </div>
         <RunningStatus cellId={cellId} outputs={outputs} source={source} />
+        <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
       </div>
     );
   }

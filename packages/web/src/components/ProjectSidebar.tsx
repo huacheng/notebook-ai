@@ -367,7 +367,19 @@ function FileBrowser() {
 
   const handleFileClick = useCallback(async (subPath: string, filename: string) => {
     if (filename.endsWith('.notebook.json')) {
+      // Check if this notebook is already open — switch tab instead of re-fetching
+      const { openNotebooks, setActiveNotebookTab } = useStore.getState();
       const notebookPath = subPath === '.' ? `${activeProjectPath}/${filename}` : `${activeProjectPath}/${subPath}/${filename}`;
+      // Match by workspaceDir (derived from notebookPath's directory)
+      const wsDir = notebookPath.replace(/\/[^/]+$/, '');
+      for (const [nbId, entry] of Object.entries(openNotebooks)) {
+        if (entry.workspaceDir === wsDir) {
+          useStore.getState().deactivateFileTab();
+          setActiveNotebookTab(nbId);
+          return;
+        }
+      }
+
       useStore.getState().deactivateFileTab();
       useStore.setState({ notebookLoading: true, gitTabOpen: false });
       try {
@@ -413,7 +425,7 @@ function FileBrowser() {
           const nbEntry = (data.files as { name: string }[]).find(f => f.name.endsWith('.notebook.json'));
           if (nbEntry) {
             handleFileClick(meta.worktreePath, nbEntry.name);
-            return;
+            return true;
           }
         }
       } catch { /* fall through to navigate */ }

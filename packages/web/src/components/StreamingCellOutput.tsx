@@ -1,30 +1,39 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 export function StreamingText({ cellId, lastTextContent }: { cellId: string; lastTextContent?: string }) {
-  const containerRef = useRef<HTMLPreElement>(null);
-  const lastRendered = useRef('');
+  const [text, setText] = useState(() => {
+    const buf = useStore.getState().streamBuffer[cellId];
+    return buf?.text ?? '';
+  });
 
   useEffect(() => {
+    let lastRendered = '';
     const interval = setInterval(() => {
       const buf = useStore.getState().streamBuffer[cellId];
       if (!buf) return;
       // De-duplicate: if streamBuffer text equals an already-committed output, skip
       if (lastTextContent && buf.text === lastTextContent) {
-        if (containerRef.current) containerRef.current.textContent = '';
+        if (lastRendered !== '') {
+          lastRendered = '';
+          setText('');
+        }
         return;
       }
-      if (buf.text !== lastRendered.current) {
-        lastRendered.current = buf.text;
-        if (containerRef.current) {
-          containerRef.current.textContent = buf.text;
-        }
+      if (buf.text !== lastRendered) {
+        lastRendered = buf.text;
+        setText(buf.text);
       }
-    }, 20);
+    }, 100); // 100ms for markdown rendering performance
     return () => clearInterval(interval);
   }, [cellId, lastTextContent]);
 
-  return <pre ref={containerRef} className="output-text streaming" />;
+  return (
+    <div className="streaming-text-area">
+      <MarkdownRenderer content={text} className="output-text-md streaming" />
+    </div>
+  );
 }
 
 export function StreamingThinking({ cellId, lastThinkingContent }: { cellId: string; lastThinkingContent?: string }) {

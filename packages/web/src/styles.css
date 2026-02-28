@@ -5260,6 +5260,18 @@ button:focus-visible {
   animation: pulse-border 1s ease-in-out infinite;
 }
 
+/* Streaming text area: outside the timeline scroll window, renders markdown */
+.streaming-text-area {
+  border-left: 2px solid var(--color-running);
+  animation: pulse-border 1s ease-in-out infinite;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.streaming-text-area .markdown-rendered {
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
 .output-thinking.streaming {
   border-left: 2px solid var(--color-running);
   animation: pulse-border 1s ease-in-out infinite;
