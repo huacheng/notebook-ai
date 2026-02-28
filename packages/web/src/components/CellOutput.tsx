@@ -311,57 +311,28 @@ interface CellOutputProps {
 
 export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOutputProps) {
   const isRunning = cellStatus === 'running';
-  const timelineRef = useRef<HTMLDivElement>(null);
 
   const hasStaticOutput = outputs.length > 0;
   const hasStreaming = isRunning && cellId;
-  const userScrolledUp = useRef(false);
-
-  // Auto-scroll timeline window to bottom during streaming,
-  // but pause when user manually scrolls up
-  useEffect(() => {
-    if (!hasStreaming) return;
-    const el = timelineRef.current;
-    if (!el) return;
-
-    userScrolledUp.current = false;
-
-    const onScroll = () => {
-      // Consider "at bottom" if within 30px of the bottom edge
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
-      userScrolledUp.current = !atBottom;
-    };
-    el.addEventListener('scroll', onScroll);
-
-    const iv = setInterval(() => {
-      if (!userScrolledUp.current) {
-        el.scrollTop = el.scrollHeight;
-      }
-    }, 200);
-
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      clearInterval(iv);
-    };
-  }, [hasStreaming]);
 
   if (!hasStaticOutput && !hasStreaming) return null;
 
-  // ── Streaming branch: timeline window + status bar ──
+  // ── Streaming branch: collapsed groups + live streams ──
   if (hasStreaming) {
-    // Check if streamBuffer has content not yet in outputs (for de-duplication)
     const lastThinking = outputs.filter((o) => o.type === 'thinking').at(-1);
     const lastText = outputs.filter((o) => o.type === 'text').at(-1);
 
     const { thinking, tools } = buildTimelineItems(outputs);
-    const timelineItems = [...thinking, ...tools] as CellOutputItem[];
 
     return (
       <div className="cell-output-area">
-        <div className="tl-frame" ref={timelineRef}>
-          <TimelineOutputs outputs={timelineItems} />
-          <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
-        </div>
+        {(thinking.length > 0 || tools.length > 0) && (
+          <div className="tl-groups">
+            {thinking.length > 0 && <ThinkingGroup items={thinking as ThinkingItem[]} />}
+            {tools.length > 0 && <ToolsGroup items={tools as ToolItem[]} />}
+          </div>
+        )}
+        <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
         <RunningStatus cellId={cellId} outputs={outputs} source={source} />
         <div className="output-cell">
           <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
@@ -379,7 +350,7 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
   return (
     <div className="cell-output-area">
       {(thinking.length > 0 || tools.length > 0) && (
-        <div className="tl-frame">
+        <div className="tl-groups">
           {thinking.length > 0 && <ThinkingGroup items={thinking as ThinkingItem[]} />}
           {tools.length > 0 && <ToolsGroup items={tools as ToolItem[]} />}
         </div>

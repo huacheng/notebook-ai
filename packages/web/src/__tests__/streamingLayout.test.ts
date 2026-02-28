@@ -99,29 +99,32 @@ describe('CellOutput streaming layout', () => {
     useStore.setState({ streamBuffer: {} });
   });
 
-  it('has three zones: timeline-window → status → streaming-text-area', async () => {
+  it('has zones: groups → streaming-thinking → status → streaming-text', async () => {
     useStore.setState({
-      streamBuffer: { 'cell-run': { text: 'model output', thinking: '' } },
+      streamBuffer: { 'cell-run': { text: 'model output', thinking: 'hmm' } },
     });
     const html = await renderCellOutput({
-      outputs: [],
+      outputs: [
+        { type: 'tool_use', name: 'bash', tool_use_id: 't1', input: {}, result: 'ok' } as any,
+      ],
       cellId: 'cell-run',
       cellStatus: 'running',
       source: 'prompt',
     });
 
-    expect(html).toContain('tl-frame');
+    expect(html).toContain('tl-groups');
+    expect(html).toContain('tl-group--tools');
     expect(html).toContain('cell-status-running');
     expect(html).toContain('streaming-text-area');
 
-    const timelineIdx = html.indexOf('tl-frame');
+    const groupsIdx = html.indexOf('tl-groups');
     const statusIdx = html.indexOf('cell-status-running');
     const textIdx = html.indexOf('streaming-text-area');
-    expect(timelineIdx).toBeLessThan(statusIdx);
+    expect(groupsIdx).toBeLessThan(statusIdx);
     expect(statusIdx).toBeLessThan(textIdx);
   });
 
-  it('StreamingThinking is inside timeline-window (before status)', async () => {
+  it('StreamingThinking is between groups and status', async () => {
     useStore.setState({
       streamBuffer: { c1: { text: '', thinking: 'deep thought' } },
     });
@@ -132,15 +135,36 @@ describe('CellOutput streaming layout', () => {
       source: 'p',
     });
 
-    const timelineStart = html.indexOf('tl-frame');
     const thinkingIdx = html.indexOf('tl-block tl-block--thinking streaming');
     const statusIdx = html.indexOf('cell-status-running');
-    expect(thinkingIdx).toBeGreaterThan(timelineStart);
     expect(thinkingIdx).toBeLessThan(statusIdx);
+  });
+
+  it('streaming uses collapsed groups, not individual timeline items', async () => {
+    useStore.setState({
+      streamBuffer: { c2: { text: '', thinking: '' } },
+    });
+    const html = await renderCellOutput({
+      outputs: [
+        { type: 'thinking', content: 'thought-1' } as any,
+        { type: 'tool_use', name: 'bash', tool_use_id: 't1', input: { cmd: 'ls' }, result: 'ok' } as any,
+        { type: 'thinking', content: 'thought-2' } as any,
+        { type: 'tool_use', name: 'read', tool_use_id: 't2', input: { path: '/' }, result: 'data' } as any,
+      ],
+      cellId: 'c2',
+      cellStatus: 'running',
+      source: 'p',
+    });
+
+    // Should have group headers, not individual blocks
+    expect(html).toContain('tl-group--thinking');
+    expect(html).toContain('tl-group--tools');
+    // Should NOT have tl-frame (old scrollable timeline)
+    expect(html).not.toContain('tl-frame');
   });
 });
 
-// ── CellOutput: completed layout (two-zone split) ──────────
+// ── CellOutput: completed layout ────────────────────────────
 
 describe('CellOutput completed layout', () => {
   const thinkingOutput: CellOutputItem = { type: 'thinking', content: 'I thought about this' };
@@ -153,31 +177,31 @@ describe('CellOutput completed layout', () => {
   };
   const textOutput: CellOutputItem = { type: 'text', content: '## Answer\n\nHere is the result.' };
 
-  it('separates thinking+tools into timeline-window, text as markdown outside', async () => {
+  it('separates thinking+tools groups from text markdown', async () => {
     const html = await renderCellOutput({
       outputs: [thinkingOutput, toolOutput, textOutput],
       cellId: 'done-cell',
       cellStatus: 'completed',
     });
 
-    expect(html).toContain('tl-frame');
+    expect(html).toContain('tl-groups');
     expect(html).toContain('markdown-rendered');
   });
 
-  it('thinking+tools groups are inside timeline-window, text is outside', async () => {
+  it('thinking+tools groups are inside groups container, text is outside', async () => {
     const html = await renderCellOutput({
       outputs: [thinkingOutput, toolOutput, textOutput],
       cellId: 'done-cell',
       cellStatus: 'completed',
     });
 
-    const timelineStart = html.indexOf('tl-frame');
+    const groupsStart = html.indexOf('tl-groups');
     const thinkGroupIdx = html.indexOf('tl-group--thinking');
     const toolGroupIdx = html.indexOf('tl-group--tools');
     const mdIdx = html.indexOf('markdown-rendered');
 
-    expect(thinkGroupIdx).toBeGreaterThan(timelineStart);
-    expect(toolGroupIdx).toBeGreaterThan(timelineStart);
+    expect(thinkGroupIdx).toBeGreaterThan(groupsStart);
+    expect(toolGroupIdx).toBeGreaterThan(groupsStart);
     expect(mdIdx).toBeGreaterThan(toolGroupIdx);
   });
 
@@ -188,18 +212,18 @@ describe('CellOutput completed layout', () => {
       cellStatus: 'completed',
     });
 
-    expect(html).not.toContain('tl-frame');
+    expect(html).not.toContain('tl-groups');
     expect(html).toContain('markdown-rendered');
   });
 
-  it('renders only timeline-window when no text outputs', async () => {
+  it('renders only groups when no text outputs', async () => {
     const html = await renderCellOutput({
       outputs: [thinkingOutput, toolOutput],
       cellId: 'tools-only',
       cellStatus: 'completed',
     });
 
-    expect(html).toContain('tl-frame');
+    expect(html).toContain('tl-groups');
     expect(html).not.toContain('output-text-md');
   });
 });

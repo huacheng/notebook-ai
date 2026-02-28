@@ -26,32 +26,53 @@ describe('ThinkingGroup props', () => {
 });
 
 describe('ToolsGroup props', () => {
-  it('returns label with call count', () => {
+  it('shows success and fail counts in label', () => {
     const items = [
-      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1' },
-      { type: 'tool_use' as const, name: 'read', input: {}, tool_use_id: 't2' },
+      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1', result: 'ok' },
+      { type: 'tool_use' as const, name: 'read', input: {}, tool_use_id: 't2', result: 'data' },
+      { type: 'tool_use' as const, name: 'write', input: {}, tool_use_id: 't3', result: 'err', is_error: true },
     ];
     const props = toolsGroupProps(items as any);
-    expect(props.label).toBe('Tools (2 calls)');
-    expect(props.count).toBe(2);
+    expect(props.label).toBe('Tools (3 calls · 2 ✓ · 1 ✗)');
+    expect(props.ok).toBe(2);
+    expect(props.fail).toBe(1);
+  });
+
+  it('omits fail segment when no errors', () => {
+    const items = [
+      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1', result: 'ok' },
+      { type: 'tool_use' as const, name: 'read', input: {}, tool_use_id: 't2', result: 'data' },
+    ];
+    const props = toolsGroupProps(items as any);
+    expect(props.label).toBe('Tools (2 calls · 2 ✓)');
   });
 
   it('singular call label for 1 item', () => {
     const items = [
-      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1' },
+      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1', result: 'done' },
     ];
     const props = toolsGroupProps(items as any);
-    expect(props.label).toBe('Tools (1 call)');
+    expect(props.label).toBe('Tools (1 call · 1 ✓)');
   });
 
   it('excludes AskUserQuestion from display count', () => {
     const items = [
-      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1' },
+      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1', result: 'ok' },
       { type: 'tool_use' as const, name: 'AskUserQuestion', input: { questions: [{ question: 'Pick one', options: ['a', 'b'] }] }, tool_use_id: 't2' },
     ];
     const props = toolsGroupProps(items as any);
-    // AskUserQuestion is still in items but count only reflects non-interactive tools
     expect(props.displayCount).toBe(1);
-    expect(props.count).toBe(2); // total items
+    expect(props.count).toBe(2);
+  });
+
+  it('handles tools with no result yet (pending)', () => {
+    const items = [
+      { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1', result: 'ok' },
+      { type: 'tool_use' as const, name: 'read', input: {}, tool_use_id: 't2' },
+    ];
+    const props = toolsGroupProps(items as any);
+    expect(props.label).toBe('Tools (2 calls · 1 ✓)');
+    expect(props.ok).toBe(1);
+    expect(props.fail).toBe(0);
   });
 });

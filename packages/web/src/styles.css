@@ -5291,6 +5291,14 @@ button:focus-visible {
   scroll-behavior: smooth;
 }
 
+/* ── Groups container (completed branch, no height limit) ─── */
+.tl-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 4px 0;
+}
+
 /* ── Collapsible group (completed branch) ─────────────────── */
 .tl-group {
   border-radius: var(--radius-md);
