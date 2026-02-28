@@ -309,10 +309,26 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
     );
   }
 
-  // ── Completed branch: same timeline layout ──
+  // ── Completed branch: two-zone layout ──
+  // Zone A: thinking + tools (10-line scrollable)
+  // Zone B: text/error/chart outputs (full-height markdown)
+  const timelineOutputs = outputs.filter(
+    (o) => o.type === 'thinking' || o.type === 'tool_use',
+  );
+  const contentOutputs = outputs.filter(
+    (o) => o.type !== 'thinking' && o.type !== 'tool_use',
+  );
+
   return (
     <div className="cell-output-area">
-      <TimelineOutputs outputs={outputs} />
+      {timelineOutputs.length > 0 && (
+        <div className="cell-timeline-window">
+          <TimelineOutputs outputs={timelineOutputs} />
+        </div>
+      )}
+      {contentOutputs.length > 0 && (
+        <TimelineOutputs outputs={contentOutputs} />
+      )}
     </div>
   );
 }
