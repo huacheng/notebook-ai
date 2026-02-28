@@ -13,7 +13,8 @@ An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude
 - **Project & Workspace** — Each notebook runs in an isolated git worktree with its own branch
 - **Auto Git Commit** — Every cell execution auto-commits changes with diff tracking
 - **File Management** — Upload, browse, edit, and annotate files (text, PDF, DOCX, XLSX, PPTX, images)
-- **Git History** — Visual branch graph, commit diff viewer, and branch filtering
+- **Git History** — Visual branch graph, commit diff viewer, and branch filtering (all via WebSocket)
+- **Split View** — Side-by-side file viewer and notebook editing with synchronized tab bar
 - **Shared Library** — Cross-notebook knowledge base with system-managed references and user imports
 - **Slice View** — AI-generated structured summary of notebook sessions
 - **Plugin Marketplace** — Install and manage plugins from GitHub-hosted marketplaces
@@ -59,7 +60,7 @@ React 19 SPA with a three-column layout: project sidebar, notebook content area,
 └───────────────────┴──────────────────────────────────────────┴────────────────┘
 ```
 
-Panels are draggable-resizable. Main content area renders one of: Notebook, FileViewer, GitHistoryPanel, PluginManager, or WelcomeScreen.
+Panels are draggable-resizable. Main content area renders one of: Notebook, FileViewer, GitHistoryPanel, PluginManager, or WelcomeScreen. In split-view mode (file + notebook), the tab bar splits into two groups aligned with the left (file tabs) and right (notebook + Git tabs) panes.
 
 ### packages/server
 
@@ -82,7 +83,7 @@ Express 5 HTTP + WebSocket backend. No external database — uses embedded SQLit
 | `NotebookStore` | Load/save/validate `.notebook.json` files on disk |
 | `NotebookDb` | SQLite CRUD for notebooks, sessions, projects, file annotations |
 | `GitManager` | Repo init, auto-commit, worktree management, deliverable merges |
-| `ws-handler` | WebSocket message routing — 18 client message types, 25 server event types |
+| `ws-handler` | WebSocket message routing — 25 client message types, 38 server event types |
 | `auth` | Token auth with timing-safe compare, exponential-backoff brute-force lockout |
 
 **Key design decisions:**
@@ -107,12 +108,12 @@ Express 5 HTTP + WebSocket backend. No external database — uses embedded SQLit
 
 ### packages/shared
 
-Single-file Zod schema package (`src/types.ts`, 686 lines) defining the complete data contract:
+Single-file Zod schema package (`src/types.ts`, 849 lines) defining the complete data contract:
 
 - **Notebook** — `version`, `metadata`, `cells[]`, `slice`, `annotations[]`, `assets`
 - **Cell types** — `prompt` (with outputs), `markdown`, `visualization`
 - **Cell outputs** — `text`, `thinking`, `tool_use`, `error`, `chart`
-- **WebSocket contract** — 18 client → server message types, 25 server → client event types
+- **WebSocket contract** — 25 client → server message types, 38 server → client event types
 - **Project** — `id`, `title`, `path`, `status`
 - **Annotations** — `insert`, `delete`, `replace`, `comment` (with optional audio)
 

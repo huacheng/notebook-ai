@@ -13,7 +13,8 @@ AI 驱动的 Notebook 工作空间 — 类似 Jupyter Notebook，但以 Claude �
 - **项目与工作区** — 每个 Notebook 运行在独立的 Git Worktree 中，拥有独立分支
 - **自动 Git 提交** — 每次 Cell 执行后自动提交变更并记录 Diff
 - **文件管理** — 上传、浏览、编辑和批注文件（文本、PDF、DOCX、XLSX、PPTX、图片）
-- **Git 历史** — 可视化分支图、提交 Diff 查看器、分支过滤
+- **Git 历史** — 可视化分支图、提交 Diff 查看器、分支过滤（全部通过 WebSocket）
+- **分屏视图** — 文件查看器与 Notebook 并排编辑，Tab 栏同步拆分
 - **共享知识库** — 跨 Notebook 的知识库，包含系统管理的引用和用户导入内容
 - **Slice 视图** — AI 生成的 Notebook 会话结构化摘要
 - **插件市场** — 从 GitHub 托管的市场安装和管理插件
@@ -59,7 +60,7 @@ React 19 单页应用，三栏布局：项目侧边栏、Notebook 内容区、�
 └──────────────────┴─────────────────────────────┴────────────┘
 ```
 
-面板支持拖拽调整大小。主内容区可渲染：Notebook、文件查看器、Git 历史面板、插件管理器或欢迎页。
+面板支持拖拽调整大小。主内容区可渲染：Notebook、文件查看器、Git 历史面板、插件管理器或欢迎页。分屏模式下（文件 + Notebook），Tab 栏拆分为左侧（文件 Tab）和右侧（Notebook + Git Tab）两组，与下方面板对齐。
 
 ### packages/server
 
@@ -82,7 +83,7 @@ Express 5 HTTP + WebSocket 后端。无需外部数据库 — 使用内嵌 SQLit
 | `NotebookStore` | 磁盘上 `.notebook.json` 文件的加载/保存/校验 |
 | `NotebookDb` | SQLite CRUD — notebooks、sessions、projects、file annotations |
 | `GitManager` | 仓库初始化、自动提交、Worktree 管理、交付物合并 |
-| `ws-handler` | WebSocket 消息路由 — 18 种客户端消息类型，25 种服务端事件类型 |
+| `ws-handler` | WebSocket 消息路由 — 25 种客户端消息类型，38 种服务端事件类型 |
 | `auth` | Token 认证 + timing-safe 比对 + 指数退避暴力破解防护 |
 
 **关键设计决策：**
@@ -107,12 +108,12 @@ Express 5 HTTP + WebSocket 后端。无需外部数据库 — 使用内嵌 SQLit
 
 ### packages/shared
 
-单文件 Zod Schema 包（`src/types.ts`，686 行），定义完整的数据契约：
+单文件 Zod Schema 包（`src/types.ts`，849 行），定义完整的数据契约：
 
 - **Notebook** — `version`、`metadata`、`cells[]`、`slice`、`annotations[]`、`assets`
 - **Cell 类型** — `prompt`（含 outputs）、`markdown`、`visualization`
 - **Cell 输出** — `text`、`thinking`、`tool_use`、`error`、`chart`
-- **WebSocket 契约** — 18 种客户端→服务端消息类型，25 种服务端→客户端事件类型
+- **WebSocket 契约** — 25 种客户端→服务端消息类型，38 种服务端→客户端事件类型
 - **Project** — `id`、`title`、`path`、`status`
 - **Annotations** — `insert`、`delete`、`replace`、`comment`（支持音频附件）
 
