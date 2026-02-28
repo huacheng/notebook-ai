@@ -419,9 +419,14 @@ export function FileSection({
   }
 
   // Strip initialPath prefix from breadcrumbs so internal dirs like .working are hidden
-  const displayPath = initialPath !== '.' && subPath.startsWith(initialPath)
+  let displayPath = initialPath !== '.' && subPath.startsWith(initialPath)
     ? subPath.slice(initialPath.length).replace(/^\//, '') || '.'
     : subPath;
+  // Hide .worktrees/ intermediate layer — show only the final directory name
+  const worktreePrefix = displayPath.startsWith('.worktrees/') ? '.worktrees/' : '';
+  if (worktreePrefix) {
+    displayPath = displayPath.slice(worktreePrefix.length) || '.';
+  }
   const pathParts = displayPath === '.' ? [] : displayPath.split('/');
 
   return (
@@ -434,9 +439,11 @@ export function FileSection({
             onClick={() => setSubPath(initialPath)} title="Root"
           >/</button>
           {pathParts.map((part, i) => {
+            const displayCrumb = pathParts.slice(0, i + 1).join('/');
+            const realCrumb = worktreePrefix ? `${worktreePrefix}${displayCrumb}` : displayCrumb;
             const crumbPath = initialPath !== '.'
-              ? `${initialPath}/${pathParts.slice(0, i + 1).join('/')}`
-              : pathParts.slice(0, i + 1).join('/');
+              ? `${initialPath}/${realCrumb}`
+              : realCrumb;
             return (
             <Fragment key={i}>
               <span className="fp-crumb-sep">›</span>
