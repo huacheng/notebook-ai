@@ -344,6 +344,11 @@ export function createProjectsRouter(
       res.status(400).json({ error: 'Cannot delete project root.' });
       return;
     }
+    // Protect .working/ directory and its contents from deletion
+    if (filePath === '.working' || filePath.startsWith('.working/')) {
+      res.status(403).json({ error: 'Cannot delete .working/ system files.' });
+      return;
+    }
     try {
       const resolved = await validateWorkspacePath(filePath, project.path);
       await rm(resolved, { recursive: true, force: false });

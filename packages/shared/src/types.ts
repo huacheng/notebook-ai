@@ -376,6 +376,23 @@ export const GitLogRequestSchema = z.object({
   stats: z.boolean().optional(),
 });
 
+// Client → Server: git commit files via WebSocket (request-response)
+export const GitCommitFilesRequestSchema = z.object({
+  type: z.literal('git_commit_files_request'),
+  request_id: z.string(),
+  project_id: z.string(),
+  commit: z.string(),
+});
+
+// Client → Server: git diff via WebSocket (request-response)
+export const GitDiffRequestSchema = z.object({
+  type: z.literal('git_diff_request'),
+  request_id: z.string(),
+  project_id: z.string(),
+  commit: z.string(),
+  file: z.string().optional(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -398,6 +415,8 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   WatchUnsubscribeSchema,
   NotebookOpenSchema,
   GitLogRequestSchema,
+  GitCommitFilesRequestSchema,
+  GitDiffRequestSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
 ]);
@@ -616,6 +635,36 @@ export const GitLogErrorSchema = z.object({
   error: z.string(),
 });
 
+// Server → Client: git commit files responses
+export const GitCommitFilesResponseSchema = z.object({
+  type: z.literal('git_commit_files_response'),
+  request_id: z.string(),
+  files: z.array(z.object({
+    path: z.string(),
+    additions: z.number(),
+    deletions: z.number(),
+  })),
+});
+
+export const GitCommitFilesErrorSchema = z.object({
+  type: z.literal('git_commit_files_error'),
+  request_id: z.string(),
+  error: z.string(),
+});
+
+// Server → Client: git diff responses
+export const GitDiffResponseSchema = z.object({
+  type: z.literal('git_diff_response'),
+  request_id: z.string(),
+  diff: z.string(),
+});
+
+export const GitDiffErrorSchema = z.object({
+  type: z.literal('git_diff_error'),
+  request_id: z.string(),
+  error: z.string(),
+});
+
 // Server → Client: watch change notifications
 export const GitChangedSchema = z.object({
   type: z.literal('git_changed'),
@@ -669,6 +718,10 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   NotebookOpenErrorSchema,
   GitLogResponseSchema,
   GitLogErrorSchema,
+  GitCommitFilesResponseSchema,
+  GitCommitFilesErrorSchema,
+  GitDiffResponseSchema,
+  GitDiffErrorSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -788,3 +841,9 @@ export type NotebookOpenError = z.infer<typeof NotebookOpenErrorSchema>;
 export type GitLogRequest = z.infer<typeof GitLogRequestSchema>;
 export type GitLogResponse = z.infer<typeof GitLogResponseSchema>;
 export type GitLogError = z.infer<typeof GitLogErrorSchema>;
+export type GitCommitFilesRequest = z.infer<typeof GitCommitFilesRequestSchema>;
+export type GitCommitFilesResponse = z.infer<typeof GitCommitFilesResponseSchema>;
+export type GitCommitFilesError = z.infer<typeof GitCommitFilesErrorSchema>;
+export type GitDiffRequest = z.infer<typeof GitDiffRequestSchema>;
+export type GitDiffResponse = z.infer<typeof GitDiffResponseSchema>;
+export type GitDiffError = z.infer<typeof GitDiffErrorSchema>;

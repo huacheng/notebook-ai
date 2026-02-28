@@ -315,6 +315,18 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'git_log_error':
           window.dispatchEvent(new CustomEvent('nb:git-log-error', { detail: parsed }));
           break;
+        case 'git_commit_files_response':
+          window.dispatchEvent(new CustomEvent('nb:git-commit-files-response', { detail: parsed }));
+          break;
+        case 'git_commit_files_error':
+          window.dispatchEvent(new CustomEvent('nb:git-commit-files-error', { detail: parsed }));
+          break;
+        case 'git_diff_response':
+          window.dispatchEvent(new CustomEvent('nb:git-diff-response', { detail: parsed }));
+          break;
+        case 'git_diff_error':
+          window.dispatchEvent(new CustomEvent('nb:git-diff-error', { detail: parsed }));
+          break;
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };

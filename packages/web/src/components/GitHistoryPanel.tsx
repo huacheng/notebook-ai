@@ -282,29 +282,73 @@ const CommitItem = memo(function CommitItem({
       if (next && !filesLoadedRef.current) {
         filesLoadedRef.current = true;
         setLoadingFiles(true);
-        fetchGitCommitFiles(projectId, token, commit.hash)
-          .then((f) => setFiles(f))
-          .catch(() => setFiles([]))
-          .finally(() => setLoadingFiles(false));
+        const ws = useStore.getState().ws;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          const requestId = crypto.randomUUID();
+          const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 10_000);
+          function onResponse(e: Event) {
+            const d = (e as CustomEvent).detail;
+            if (d.request_id === requestId) { cleanup(); setFiles(d.files); setLoadingFiles(false); }
+          }
+          function onError(e: Event) {
+            const d = (e as CustomEvent).detail;
+            if (d.request_id === requestId) { cleanup(); setFiles([]); setLoadingFiles(false); }
+          }
+          function cleanup() {
+            clearTimeout(timeout);
+            window.removeEventListener('nb:git-commit-files-response', onResponse);
+            window.removeEventListener('nb:git-commit-files-error', onError);
+          }
+          function fallbackRest() {
+            fetchGitCommitFiles(projectId, token, commit.hash)
+              .then((f) => setFiles(f)).catch(() => setFiles([])).finally(() => setLoadingFiles(false));
+          }
+          window.addEventListener('nb:git-commit-files-response', onResponse);
+          window.addEventListener('nb:git-commit-files-error', onError);
+          ws.send(JSON.stringify({ type: 'git_commit_files_request', request_id: requestId, project_id: projectId, commit: commit.hash }));
+        } else {
+          fetchGitCommitFiles(projectId, token, commit.hash)
+            .then((f) => setFiles(f)).catch(() => setFiles([])).finally(() => setLoadingFiles(false));
+        }
       }
       return next;
     });
   }, [projectId, token, commit.hash]);
 
-  const handleFileClick = useCallback(async (filePath: string) => {
+  const handleFileClick = useCallback((filePath: string) => {
     if (diffFileRef.current === filePath) {
       setDiffFile(null);
       return;
     }
     setDiffFile(filePath);
     setLoadingDiff(true);
-    try {
-      const d = await fetchGitDiff(projectId, token, commit.hash, filePath);
-      setDiffContent(d);
-    } catch {
-      setDiffContent('Failed to load diff');
-    } finally {
-      setLoadingDiff(false);
+    const ws = useStore.getState().ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const requestId = crypto.randomUUID();
+      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 10_000);
+      function onResponse(e: Event) {
+        const d = (e as CustomEvent).detail;
+        if (d.request_id === requestId) { cleanup(); setDiffContent(d.diff); setLoadingDiff(false); }
+      }
+      function onError(e: Event) {
+        const d = (e as CustomEvent).detail;
+        if (d.request_id === requestId) { cleanup(); setDiffContent('Failed to load diff'); setLoadingDiff(false); }
+      }
+      function cleanup() {
+        clearTimeout(timeout);
+        window.removeEventListener('nb:git-diff-response', onResponse);
+        window.removeEventListener('nb:git-diff-error', onError);
+      }
+      function fallbackRest() {
+        fetchGitDiff(projectId, token, commit.hash, filePath)
+          .then((d) => setDiffContent(d)).catch(() => setDiffContent('Failed to load diff')).finally(() => setLoadingDiff(false));
+      }
+      window.addEventListener('nb:git-diff-response', onResponse);
+      window.addEventListener('nb:git-diff-error', onError);
+      ws.send(JSON.stringify({ type: 'git_diff_request', request_id: requestId, project_id: projectId, commit: commit.hash, file: filePath }));
+    } else {
+      fetchGitDiff(projectId, token, commit.hash, filePath)
+        .then((d) => setDiffContent(d)).catch(() => setDiffContent('Failed to load diff')).finally(() => setLoadingDiff(false));
     }
   }, [projectId, token, commit.hash]);
 

@@ -446,8 +446,8 @@ textarea.cell-input {
   padding: var(--space-xs) var(--space-md);
   font-size: var(--font-size-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  text-transform: capitalize;
+  color: var(--text-primary);
   border-bottom: 1px solid var(--border-default);
   display: flex;
   align-items: center;

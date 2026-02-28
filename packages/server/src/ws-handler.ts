@@ -688,6 +688,72 @@ export function setupWebSocket(
           break;
         }
 
+        case 'git_commit_files_request': {
+          const { request_id, project_id, commit } = msg;
+          try {
+            const project = db.getProject(project_id);
+            if (!project) {
+              sendToClient(ws, { type: 'git_commit_files_error', request_id, error: `Project "${project_id}" not found` });
+              break;
+            }
+            if (!/^[a-f0-9]{7,40}$/.test(commit)) {
+              sendToClient(ws, { type: 'git_commit_files_error', request_id, error: 'Invalid commit hash' });
+              break;
+            }
+            const { stdout } = await execFileAsync(
+              'git', ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
+              { cwd: project.path, timeout: EXEC_TIMEOUT },
+            );
+            const files: { path: string; additions: number; deletions: number }[] = [];
+            for (const line of stdout.split('\n')) {
+              const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+              if (match) {
+                files.push({
+                  additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+                  deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+                  path: unquoteGitPath(match[3]),
+                });
+              }
+            }
+            sendToClient(ws, { type: 'git_commit_files_response', request_id, files });
+          } catch (err) {
+            sendToClient(ws, { type: 'git_commit_files_error', request_id, error: String(err) });
+          }
+          break;
+        }
+
+        case 'git_diff_request': {
+          const { request_id, project_id, commit, file } = msg;
+          try {
+            const project = db.getProject(project_id);
+            if (!project) {
+              sendToClient(ws, { type: 'git_diff_error', request_id, error: `Project "${project_id}" not found` });
+              break;
+            }
+            if (!/^[a-f0-9]{7,40}$/.test(commit)) {
+              sendToClient(ws, { type: 'git_diff_error', request_id, error: 'Invalid commit hash' });
+              break;
+            }
+            if (file && (file.includes('..') || file.startsWith('/'))) {
+              sendToClient(ws, { type: 'git_diff_error', request_id, error: 'Invalid file path' });
+              break;
+            }
+            let args: string[];
+            try {
+              await execFileAsync('git', ['rev-parse', `${commit}~1`], { cwd: project.path, timeout: EXEC_TIMEOUT });
+              args = ['diff', `${commit}~1`, commit];
+            } catch {
+              args = ['diff-tree', '-p', '--root', commit];
+            }
+            if (file) args.push('--', file);
+            const { stdout } = await execFileAsync('git', args, { cwd: project.path, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
+            sendToClient(ws, { type: 'git_diff_response', request_id, diff: stdout });
+          } catch (err) {
+            sendToClient(ws, { type: 'git_diff_error', request_id, error: String(err) });
+          }
+          break;
+        }
+
         default: {
           sendToClient(ws, { type: 'error', message: 'Unknown message type.' });
           break;
