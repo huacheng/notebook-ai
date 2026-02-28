@@ -582,26 +582,17 @@ export function Notebook() {
     useStore.setState({ loadingOlderCells: true });
   }, [cellsOffset]);
 
-  // Scroll-to-top auto-load older cells
-  const rafCellsRef = useRef(0);
+  // IntersectionObserver: auto-load older cells when sentinel becomes visible
+  const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = cellsContainerRef.current?.parentElement;
-    if (!el) return;
-    const onScroll = () => {
-      if (rafCellsRef.current) return;
-      rafCellsRef.current = requestAnimationFrame(() => {
-        rafCellsRef.current = 0;
-        if (cellsOffset <= 0) return;
-        if (el.scrollTop <= 80) {
-          handleLoadMore();
-        }
-      });
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      if (rafCellsRef.current) cancelAnimationFrame(rafCellsRef.current);
-    };
+    const el = sentinelRef.current;
+    if (!el || cellsOffset <= 0) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) handleLoadMore(); },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [cellsOffset, handleLoadMore]);
 
   return (
@@ -614,7 +605,7 @@ export function Notebook() {
         <>
           <div className="notebook-cells" ref={cellsContainerRef}>
             {cellsOffset > 0 && (
-              <div className="notebook-load-more">
+              <div ref={sentinelRef} className="notebook-load-more">
                 {loadingOlderCells ? '加载中…' : `↑ ${cellsOffset} older cells`}
               </div>
             )}

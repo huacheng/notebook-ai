@@ -403,7 +403,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
   const [currentBranch, setCurrentBranch] = useState(cached?.currentBranch ?? '');
   const [selectedBranch, setSelectedBranch] = useState('');
   const debounceRef = useRef<number>(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // scrollRef removed — IntersectionObserver replaces scroll handler
 
   useEffect(() => {
     fetchGitBranches(projectId, authToken)
@@ -548,23 +548,18 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
     if (!loading && hasMore) loadPage(page + 1, search, true, allBranches, selectedBranch);
   }, [loading, hasMore, page, search, allBranches, selectedBranch, loadPage]);
 
-  // Scroll-to-bottom load more
-  const rafRef = useRef(0);
-  const handleScroll = useCallback(() => {
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = 0;
-      const el = scrollRef.current;
-      if (!el || loading || !hasMore) return;
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
-        handleLoadMore();
-      }
-    });
-  }, [loading, hasMore, handleLoadMore]);
-
+  // IntersectionObserver: auto-load more commits when sentinel becomes visible
+  const gitSentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, []);
+    const el = gitSentinelRef.current;
+    if (!el || loading || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) handleLoadMore(); },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, hasMore, handleLoadMore]);
 
   // Lane computation
   const laneMap = useMemo(() => computeLanes(commits), [commits]);
@@ -619,11 +614,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
       {error && <div className="git-history-error">{error}</div>}
 
       {/* Commit list */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="git-commit-list"
-      >
+      <div className="git-commit-list">
         {commits.map((c) => (
           <CommitItem
             key={c.hash}
@@ -644,7 +635,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
         )}
 
         {!loading && hasMore && (
-          <div className="git-load-more">Loading...</div>
+          <div ref={gitSentinelRef} className="git-load-more">Loading...</div>
         )}
       </div>
     </div>
