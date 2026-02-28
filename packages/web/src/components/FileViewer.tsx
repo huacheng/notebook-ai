@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { useFileStream } from '../hooks/useFileStream';
 import { useAnnotationPersistence } from '../hooks/useAnnotationPersistence';
 import type { FileAnnotations } from '../types/fileAnnotations';
-import { EMPTY_FILE_ANNOTATIONS } from '../types/fileAnnotations';
+import { EMPTY_FILE_ANNOTATIONS, resolveAbsolutePath, canEditFile } from '../types/fileAnnotations';
 import { FileViewerStatusBar } from './FileViewerStatusBar';
 import { FileViewerRender } from './FileViewerRender';
 import { FileViewerEditor } from './FileViewerEditor';
@@ -18,6 +18,8 @@ export function FileViewer() {
   const setFileTabLoading = useStore((s) => s.setFileTabLoading);
   const activeNotebookId = useStore((s) => s.activeNotebookId);
   const submitPrompt = useStore((s) => s.submitPrompt);
+  const workspaceDir = useStore((s) => s.workspaceDir);
+  const activeProjectPath = useStore((s) => s.activeProjectPath);
 
   const [mode, setMode] = useState<'render' | 'edit'>('render');
   const [annotations, setAnnotations] = useState<FileAnnotations>(EMPTY_FILE_ANNOTATIONS);
@@ -73,7 +75,10 @@ export function FileViewer() {
   if (!activeFile) return null;
 
   const filename = activeFile.path.split('/').pop() ?? activeFile.path;
-  const canEdit = fileState.format !== null && !fileState.format.endsWith('-binary') && fileState.format !== 'unsupported';
+  const absolutePath = resolveAbsolutePath(
+    activeFile.source, activeFile.path, workspaceDir, activeProjectPath,
+  );
+  const canEdit = canEditFile(fileState.format, absolutePath);
   const isPdf = fileState.format === 'pdf-binary';
   const isText = fileState.format === 'text';
   const showZoom = isPdf || isText;
@@ -116,6 +121,7 @@ export function FileViewer() {
           filePath={activeFile.path}
           onAnnotationsChange={setAnnotations}
           onSendToPrompt={submitPrompt}
+          absolutePath={absolutePath}
           pdfScale={contentScale}
           onPdfPagesLoaded={setPdfPages}
           onPdfVisiblePage={setPdfPage}

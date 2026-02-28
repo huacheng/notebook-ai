@@ -14,13 +14,15 @@ import {
 } from '../types/fileAnnotations';
 
 function makeAnn(overrides: Partial<FileAnnotation> & { type: FileAnnotation['type'] }): FileAnnotation {
+  const { type, ...rest } = overrides;
   return {
-    id: 'ann_test', type: 'comment', file_path: 'f.md',
+    id: 'ann_test', file_path: 'f.md',
     selected_text: 'selected',
     absolute_path: '/home/u/ws/proj/.working/.target.md',
     textOffset: 10,
     author: 'user', timestamp: '', updatedAt: 0,
-    ...overrides,
+    type,
+    ...rest,
   };
 }
 
@@ -98,7 +100,7 @@ describe('buildSingleAnnotationPrompt', () => {
     const obj = JSON.parse(line);
     expect(obj.type).toBe('replace');
     expect(obj.file).toBe('/home/u/ws/proj/.working/.target.md');
-    expect(obj.selected_text).toBe('selected');
+    expect(obj.selected).toBe('selected');
     expect(obj.replacement).toBe('new text');
     expect(obj.before).toBe('0123456789');
     expect(obj.after).toHaveLength(40);
@@ -159,7 +161,7 @@ describe('buildSingleAnnotationPrompt', () => {
     const line = buildSingleAnnotationPrompt(ann, text);
     // Must be valid JSON (JSON.parse would throw on invalid escape)
     const obj = JSON.parse(line);
-    expect(obj.selected_text).toBe('"quote\nnewline\t');
+    expect(obj.selected).toBe('"quote\nnewline\t');
     expect(obj.comment).toBe('has "quotes"');
   });
 });
@@ -247,37 +249,37 @@ describe('buildSendPayload', () => {
 
 describe('canEditFile', () => {
   it('system file + text format returns false', () => {
-    expect(canEditFile('/home/u/ws/.working/.target.md', 'text')).toBe(false);
+    expect(canEditFile('text', '/home/u/ws/.working/.target.md')).toBe(false);
   });
 
   it('system file + html format returns false', () => {
-    expect(canEditFile('/home/u/ws/.working/.plan.md', 'html')).toBe(false);
+    expect(canEditFile('html', '/home/u/ws/.working/.plan.md')).toBe(false);
   });
 
   it('general file + text format returns true', () => {
-    expect(canEditFile('/home/u/ws/readme.md', 'text')).toBe(true);
+    expect(canEditFile('text', '/home/u/ws/readme.md')).toBe(true);
   });
 
   it('general file + html format returns true', () => {
-    expect(canEditFile('/home/u/ws/index.html', 'html')).toBe(true);
+    expect(canEditFile('html', '/home/u/ws/index.html')).toBe(true);
   });
 
   it('binary format always returns false', () => {
-    expect(canEditFile('/home/u/ws/doc.pdf', 'pdf-binary')).toBe(false);
-    expect(canEditFile('/home/u/ws/doc.docx', 'docx-binary')).toBe(false);
-    expect(canEditFile('/home/u/ws/data.xlsx', 'xlsx-binary')).toBe(false);
-    expect(canEditFile('/home/u/ws/slides.pptx', 'pptx-binary')).toBe(false);
+    expect(canEditFile('pdf-binary', '/home/u/ws/doc.pdf')).toBe(false);
+    expect(canEditFile('docx-binary', '/home/u/ws/doc.docx')).toBe(false);
+    expect(canEditFile('xlsx-binary', '/home/u/ws/data.xlsx')).toBe(false);
+    expect(canEditFile('pptx-binary', '/home/u/ws/slides.pptx')).toBe(false);
   });
 
   it('unsupported format returns false', () => {
-    expect(canEditFile('/home/u/ws/file.xyz', 'unsupported')).toBe(false);
+    expect(canEditFile('unsupported', '/home/u/ws/file.xyz')).toBe(false);
   });
 
   it('null format returns false', () => {
-    expect(canEditFile('/home/u/ws/file.txt', null)).toBe(false);
+    expect(canEditFile(null, '/home/u/ws/file.txt')).toBe(false);
   });
 
   it('empty absolutePath returns true (non-system)', () => {
-    expect(canEditFile('', 'text')).toBe(true);
+    expect(canEditFile('text', '')).toBe(true);
   });
 });

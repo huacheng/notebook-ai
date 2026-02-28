@@ -13,7 +13,7 @@ import { renderAsync } from 'docx-preview';
 import * as XLSX from 'xlsx';
 import type { FileFormat } from '../hooks/useFileStream';
 import type { FileAnnotations, FileAnnotation } from '../types/fileAnnotations';
-import { uid, buildAnnotationText } from '../types/fileAnnotations';
+import { uid, buildSendPayload } from '../types/fileAnnotations';
 import { FileSelectionFloat } from './FileSelectionFloat';
 import { FileAnnotationCard } from './FileAnnotationCard';
 import { FileAnnotationDropdown } from './FileAnnotationDropdown';
@@ -185,16 +185,17 @@ interface FileViewerRenderProps {
   filePath: string;
   onAnnotationsChange: (a: FileAnnotations) => void;
   onSendToPrompt: (text: string) => void;
+  absolutePath: string;
   pdfScale?: number;
   onPdfPagesLoaded?: (n: number) => void;
   onPdfVisiblePage?: (n: number) => void;
 }
 
 export function FileViewerRender({
-  format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt,
+  format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath,
   pdfScale = 1.0, onPdfPagesLoaded, onPdfVisiblePage,
 }: FileViewerRenderProps) {
-  const [float, setFloat] = useState<{ x: number; y: number; selectionBottom: number; text: string; rects: { x: number; y: number; width: number; height: number }[] } | null>(null);
+  const [float, setFloat] = useState<{ x: number; y: number; selectionBottom: number; text: string; rects: { x: number; y: number; width: number; height: number }[]; textOffset: number } | null>(null);
   const [editFloat, setEditFloat] = useState<{ x: number; y: number; annotationId: string; isNew: boolean } | null>(null);
   const [highlights, setHighlights] = useState<HighlightsMap>({});
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
@@ -293,8 +294,10 @@ export function FileViewerRender({
       id,
       type,
       file_path: filePath,
+      absolute_path: absolutePath,
       selected_text: selectedText.slice(0, 80),
       content: defaultContent,
+      textOffset: float?.textOffset ?? 0,
       author: 'user',
       timestamp: new Date().toISOString(),
       updatedAt: Date.now(),
@@ -311,7 +314,7 @@ export function FileViewerRender({
       setEditFloat({ x: float!.x, y: float!.selectionBottom, annotationId: id, isNew: true });
     }
     setFloat(null);
-  }, [annotations, filePath, onAnnotationsChange, float, pdfScale]);
+  }, [annotations, filePath, absolutePath, onAnnotationsChange, float, pdfScale]);
 
   const removeAnnotation = useCallback((id: string) => {
     onAnnotationsChange({ items: annotations.items.filter((a) => a.id !== id), updatedAt: Date.now() });
@@ -335,6 +338,11 @@ export function FileViewerRender({
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
     const range = sel.getRangeAt(0);
+    // Compute textOffset: character offset of selection start in rendered text
+    const preRange = document.createRange();
+    preRange.setStart(container, 0);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    const textOffset = preRange.toString().length;
     const rangeRect = range.getBoundingClientRect();
     const scrollTop = container.scrollTop;
     const scrollLeft = container.scrollLeft;
@@ -350,19 +358,22 @@ export function FileViewerRender({
       selectionBottom: rangeRect.bottom - containerRect.top + scrollTop + 8,
       text,
       rects,
+      textOffset,
     });
   }, []);
+
+  const getRenderedText = useCallback(() => containerRef.current?.innerText ?? '', []);
 
   const handleSendSingle = useCallback((id: string) => {
     const ann = annotations.items.find((a) => a.id === id);
     if (ann) {
-      onSendToPrompt(`[File annotation: ${ann.type}] "${ann.selected_text}"${ann.content ? ` → ${ann.content}` : ''}`);
+      onSendToPrompt(buildSendPayload([ann], getRenderedText()));
     }
-  }, [annotations, onSendToPrompt]);
+  }, [annotations, onSendToPrompt, getRenderedText]);
 
   const handleSendAll = useCallback(() => {
-    onSendToPrompt(buildAnnotationText(annotations));
-  }, [annotations, onSendToPrompt]);
+    onSendToPrompt(buildSendPayload(annotations.items, getRenderedText()));
+  }, [annotations, onSendToPrompt, getRenderedText]);
 
   const handleCancelAll = useCallback(() => {
     onAnnotationsChange({ items: [], updatedAt: Date.now() });

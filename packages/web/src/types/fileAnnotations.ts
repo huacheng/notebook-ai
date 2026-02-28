@@ -70,9 +70,9 @@ export function buildSingleAnnotationPrompt(ann: FileAnnotation, fullText: strin
   const after = fullText.substring(afterStart, afterStart + CONTEXT_CAP);
 
   const obj: Record<string, string> = {
-    type,
     file: absolute_path,
-    selected_text,
+    type,
+    selected: selected_text,
     before,
     after,
   };
@@ -105,7 +105,7 @@ export function buildSendPayload(annotations: FileAnnotation[], fullText: string
   return jsonl;
 }
 
-export function canEditFile(absolutePath: string, format: string | null): boolean {
+export function canEditFile(format: string | null, absolutePath: string): boolean {
   if (format === null) return false;
   if (format === 'unsupported') return false;
   if (format.endsWith('-binary')) return false;
@@ -113,34 +113,3 @@ export function canEditFile(absolutePath: string, format: string | null): boolea
   return true;
 }
 
-export function buildAnnotationText(annotations: FileAnnotations): string {
-  const { items } = annotations;
-  if (items.length === 0) return '';
-
-  const lines: string[] = ['## File Annotations'];
-  const byType = {
-    insert: items.filter((a) => a.type === 'insert'),
-    delete: items.filter((a) => a.type === 'delete'),
-    replace: items.filter((a) => a.type === 'replace'),
-    comment: items.filter((a) => a.type === 'comment'),
-  };
-
-  if (byType.insert.length > 0) {
-    lines.push('\n### Insert');
-    byType.insert.forEach((a) => lines.push(`- After "${a.selected_text}": ${a.content ?? ''}`));
-  }
-  if (byType.delete.length > 0) {
-    lines.push('\n### Delete');
-    byType.delete.forEach((a) => lines.push(`- "${a.selected_text}"`));
-  }
-  if (byType.replace.length > 0) {
-    lines.push('\n### Replace');
-    byType.replace.forEach((a) => lines.push(`- "${a.selected_text}" → ${a.content ?? ''}`));
-  }
-  if (byType.comment.length > 0) {
-    lines.push('\n### Comment');
-    byType.comment.forEach((a) => lines.push(`- "${a.selected_text}": ${a.content ?? ''}`));
-  }
-
-  return lines.join('\n');
-}
