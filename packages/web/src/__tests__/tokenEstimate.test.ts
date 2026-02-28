@@ -50,19 +50,19 @@ describe('estimateTokens', () => {
 // ── getStatusLabel ──────────────────────────────────────────────────────────
 
 describe('getStatusLabel', () => {
-  it('returns "Thinking…" when isThinking', () => {
-    expect(getStatusLabel(true, true, 10)).toBe('Thinking…');
+  it('returns "Status: Thinking…" when isThinking', () => {
+    expect(getStatusLabel(true, true, 10)).toBe('Status: Thinking…');
   });
 
-  it('returns "Processing…" when no output and elapsed >5s', () => {
-    expect(getStatusLabel(false, false, 6)).toBe('Processing…');
+  it('returns "Status: Processing…" when no output and elapsed >5s', () => {
+    expect(getStatusLabel(false, false, 6)).toBe('Status: Processing…');
   });
 
-  it('returns "Running…" when output exists', () => {
-    expect(getStatusLabel(false, true, 6)).toBe('Running…');
+  it('returns "Status: Running…" when output exists', () => {
+    expect(getStatusLabel(false, true, 6)).toBe('Status: Running…');
   });
 
-  it('returns "Running…" when no output but elapsed <5s', () => {
-    expect(getStatusLabel(false, false, 3)).toBe('Running…');
+  it('returns "Status: Running…" when no output but elapsed <5s', () => {
+    expect(getStatusLabel(false, false, 3)).toBe('Status: Running…');
   });
 });

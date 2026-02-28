@@ -66,7 +66,7 @@ export function estimateTokens(
 
 /** Determine the status label for RunningStatus. */
 export function getStatusLabel(isThinking: boolean, hasAnyOutput: boolean, elapsedSec: number): string {
-  if (isThinking) return 'Thinking…';
-  if (!hasAnyOutput && elapsedSec >= 5) return 'Processing…';
-  return 'Running…';
+  if (isThinking) return 'Status: Thinking…';
+  if (!hasAnyOutput && elapsedSec >= 5) return 'Status: Processing…';
+  return 'Status: Running…';
 }
