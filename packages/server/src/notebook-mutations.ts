@@ -99,3 +99,16 @@ export function findRunningCellId(notebook: Notebook): string | null {
   const running = notebook.cells.find((c) => c.status === 'running');
   return running ? running.id : null;
 }
+
+/** Returns the cell ID containing a tool_use output with the given tool_use_id. */
+export function findCellByToolUseId(notebook: Notebook, toolUseId: string): string | null {
+  for (const cell of notebook.cells) {
+    if (cell.type !== 'prompt') continue;
+    for (const out of cell.outputs) {
+      if (out.type === 'tool_use' && out.tool_use_id === toolUseId) {
+        return cell.id;
+      }
+    }
+  }
+  return null;
+}

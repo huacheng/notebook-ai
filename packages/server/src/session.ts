@@ -16,6 +16,7 @@ import {
   appendCellOutput,
   attachToolResult,
   findRunningCellId,
+  findCellByToolUseId,
 } from './notebook-mutations.js';
 const MEMORY_SYSTEM_PROMPT =
   'At the start of each session, read the MEMORY.md file in your ' +
@@ -684,7 +685,10 @@ export class SessionManager {
 
       case 'tool_result': {
         const toolResult = msg as ClaudeToolResultMessage;
-        const cellId = findRunningCellId(session.notebook);
+        // Prefer exact match by tool_use_id (handles race: result before tool_result,
+        // and stale results for previous cells). Fall back to running cell.
+        const cellId = findCellByToolUseId(session.notebook, toolResult.tool_use_id)
+          ?? findRunningCellId(session.notebook);
         if (!cellId) break;
 
         // Normalise content to a plain string.
