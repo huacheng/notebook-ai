@@ -382,7 +382,7 @@ function FileBrowser() {
         });
         if (res.ok) {
           const data = await res.json();
-          openTab(data.notebookId, data.notebook, data.sessionId);
+          openTab(data.notebookId, data.notebook, data.sessionId, data.workspaceDir);
           sub(data.sessionId);
         }
       } catch (err) {

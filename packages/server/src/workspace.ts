@@ -84,18 +84,36 @@ export function uniqueSlug(baseSlug: string, userId?: string | null): string {
  * shared library directory path relative to the workspace.
  * Safe to call multiple times — overwrites any existing MEMORY.md.
  */
-export async function initWorkspaceMemory(workspaceDir: string): Promise<void> {
+export async function initWorkspaceMemory(workspaceDir: string, projectPath?: string): Promise<void> {
   mkdirSync(workspaceDir, { recursive: true });
   const libraryDir = getLibraryDir();
-  const relPath = path.relative(workspaceDir, libraryDir);
-  const content =
+  const libRelPath = path.relative(workspaceDir, libraryDir);
+
+  let content =
     `# MEMORY\n\n` +
     `## Shared Library Directory\n\n` +
-    `Path (relative to this workspace): \`${relPath}\`\n` +
+    `Path (relative to this workspace): \`${libRelPath}\`\n` +
     `Absolute path: \`${libraryDir}\`\n\n` +
     `This is the shared library directory accessible to all notebooks.\n` +
     `You can both read from and write to this directory.\n` +
     `Use it to store datasets, scripts, configuration files, and other\n` +
-    `resources that should be shared across notebooks.\n`;
+    `resources that should be shared across notebooks.\n\n` +
+    `## Deliverables Directory\n\n` +
+    `Path: \`.deliverables\`\n` +
+    `Absolute path: \`${path.join(workspaceDir, '.deliverables')}\`\n\n` +
+    `This is the deliverables directory for this notebook.\n` +
+    `Place final outputs here — reports, exported files, generated artifacts,\n` +
+    `and any other deliverables that should be presented to the user.\n` +
+    `Files in this directory are shown in the right panel of the UI.\n`;
+
+  if (projectPath) {
+    const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
+    content +=
+      `\n## Project Deliverables Directory\n\n` +
+      `Path (relative to this workspace): \`${projDelRel}\`\n` +
+      `Absolute path: \`${path.join(projectPath, '.deliverables')}\`\n\n` +
+      `This is the project-level deliverables directory shared across all notebooks in the project.\n`;
+  }
+
   await writeFile(path.join(workspaceDir, 'MEMORY.md'), content, 'utf-8');
 }

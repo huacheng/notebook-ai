@@ -136,7 +136,7 @@ export function createNotebooksRouter(
             activeSessionRow.tmux_session, nbPath, existingRow.workspace_dir,
             notebook, activeSessionRow.jsonl_path, notebookId,
           );
-          res.json({ notebookId, notebook, sessionId: result.session.id });
+          res.json({ notebookId, notebook, sessionId: result.session.id, workspaceDir: cwd });
           return;
         }
       } else {
@@ -163,7 +163,7 @@ export function createNotebooksRouter(
         cwd, status: 'active', created_at: new Date().toISOString(),
       });
 
-      res.json({ notebookId, notebook, sessionId: session.id });
+      res.json({ notebookId, notebook, sessionId: session.id, workspaceDir: cwd });
     } catch (err) {
       res.status(500).json({ error: String(err) });
     }

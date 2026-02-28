@@ -87,7 +87,7 @@ export function WelcomeScreen() {
         });
         if (res.ok) {
           const data = await res.json();
-          openNotebookTab(data.notebookId, data.notebook, data.sessionId);
+          openNotebookTab(data.notebookId, data.notebook, data.sessionId, data.workspaceDir);
           subscribeToSession(data.sessionId);
         }
       } catch { /* notebook created but couldn't auto-open */ }

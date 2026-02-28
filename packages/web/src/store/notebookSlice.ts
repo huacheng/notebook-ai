@@ -370,15 +370,16 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     }
   },
 
-  openNotebookTab: (notebookId, notebook, sessionId) => {
+  openNotebookTab: (notebookId, notebook, sessionId, workspaceDir) => {
     set(state => ({
       openNotebooks: {
         ...state.openNotebooks,
-        [notebookId]: { notebook, sessionId, scrollY: 0 },
+        [notebookId]: { notebook, sessionId, scrollY: 0, workspaceDir: workspaceDir ?? null },
       },
       activeNotebookTabId: notebookId,
       notebook: notebook,  // keep backward compat
       sessionId,
+      workspaceDir: workspaceDir ?? state.workspaceDir,
       gitTabOpen: false,
       activeTab: 'notebook' as const,
     }));
@@ -396,6 +397,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         activeNotebookTabId: newActiveId,
         notebook: newActiveId ? rest[newActiveId]?.notebook ?? null : null,
         sessionId: newActiveId ? rest[newActiveId]?.sessionId ?? null : null,
+        workspaceDir: newActiveId ? rest[newActiveId]?.workspaceDir ?? null : null,
         editMode: false,
         pendingDeletes: new Set<string>(),
       };
@@ -418,6 +420,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         activeNotebookTabId: newActiveId,
         notebook: newActiveId ? rest[newActiveId]?.notebook ?? null : null,
         sessionId: newActiveId ? rest[newActiveId]?.sessionId ?? null : null,
+        workspaceDir: newActiveId ? rest[newActiveId]?.workspaceDir ?? null : null,
         editMode: false,
         pendingDeletes: new Set<string>(),
       };
@@ -437,6 +440,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         activeNotebookTabId: notebookId,
         notebook: updated[notebookId]?.notebook ?? null,
         sessionId: updated[notebookId]?.sessionId ?? null,
+        workspaceDir: updated[notebookId]?.workspaceDir ?? null,
         openFile: null, // C3: clear FileViewer when switching tabs
         editMode: false,
         pendingDeletes: new Set<string>(),

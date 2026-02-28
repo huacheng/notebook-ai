@@ -70,7 +70,7 @@ export interface NotebookStore {
   fileBrowserPath: string;
 
   // ── Multi-notebook state ──────────────────────────────────────────────
-  openNotebooks: Record<string, { notebook: Notebook; sessionId: string; scrollY: number }>;
+  openNotebooks: Record<string, { notebook: Notebook; sessionId: string; scrollY: number; workspaceDir: string | null }>;
   activeNotebookTabId: string | null;
   streamBuffer: Record<string, { text: string; thinking: string }>;
 
@@ -169,7 +169,7 @@ export interface NotebookStore {
   createNotebook(projectId: string, title: string, agent?: 'claude' | 'gemini'): Promise<{ sessionId: string; notebookPath: string }>;
 
   // ── Multi-notebook actions ────────────────────────────────────────────
-  openNotebookTab(notebookId: string, notebook: Notebook, sessionId: string): void;
+  openNotebookTab(notebookId: string, notebook: Notebook, sessionId: string, workspaceDir?: string | null): void;
   closeNotebookTab(notebookId: string): void;
   closeProjectNotebookTabs(projectId: string): void;
   setActiveNotebookTab(notebookId: string): void;

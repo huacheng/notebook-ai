@@ -45,6 +45,38 @@ describe('initWorkspaceMemory', () => {
     expect(content).toMatch(/read.*write|write.*read/i);
   });
 
+  it('includes notebook deliverables with absolute path', async () => {
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(workspaceDir);
+
+    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    expect(content).toContain('.deliverables');
+    expect(content).toContain(path.join(workspaceDir, '.deliverables'));
+  });
+
+  it('includes project deliverables when projectPath is provided', async () => {
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    const projectPath = path.join(tmpRoot, 'my-project');
+    const worktree = path.join(projectPath, '.worktrees', 'task-fix');
+    await mkdir(worktree, { recursive: true });
+
+    await initWorkspaceMemory(worktree, projectPath);
+
+    const content = await readFile(path.join(worktree, 'MEMORY.md'), 'utf-8');
+    // notebook-level deliverables
+    expect(content).toContain(path.join(worktree, '.deliverables'));
+    // project-level deliverables
+    expect(content).toContain(path.join(projectPath, '.deliverables'));
+  });
+
+  it('omits project deliverables section when no projectPath', async () => {
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(workspaceDir);
+
+    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    expect(content).not.toContain('Project Deliverables');
+  });
+
   it('overwrites an existing MEMORY.md without throwing', async () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);

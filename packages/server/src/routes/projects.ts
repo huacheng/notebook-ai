@@ -13,7 +13,7 @@ import type { NotebookStore } from '../notebook-store.js';
 import { GitManager } from '../git.js';
 import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
-import { titleToSlug } from '../workspace.js';
+import { titleToSlug, initWorkspaceMemory } from '../workspace.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -109,6 +109,7 @@ export function createProjectsRouter(
       // Initialize task-ai working directory files (within worktree)
       await initTaskWorkingDir({ worktreePath, nbSlug, title, branchName });
       await ensureLibrarySkeleton(workspacesRoot, project.path);
+      await initWorkspaceMemory(worktreePath, project.path);
 
       const notebook = notebookStore.createNew(title, worktreePath);
       notebook.metadata.project_id = project.id;
