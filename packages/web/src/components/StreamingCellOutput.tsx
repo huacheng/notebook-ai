@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
@@ -36,29 +36,42 @@ export function StreamingText({ cellId, lastTextContent }: { cellId: string; las
   );
 }
 
+/** Max lines shown in collapsed (preview) mode */
+const PREVIEW_LINES = 4;
+
+function lastNLines(text: string, n: number): string {
+  const lines = text.split('\n');
+  return lines.length <= n ? text : lines.slice(-n).join('\n');
+}
+
 export function StreamingThinking({ cellId, lastThinkingContent }: { cellId: string; lastThinkingContent?: string }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLPreElement>(null);
-  const lastRendered = useRef('');
+  const [thinking, setThinking] = useState(() => {
+    const buf = useStore.getState().streamBuffer[cellId];
+    return buf?.thinking ?? '';
+  });
 
   useEffect(() => {
+    let lastRendered = '';
     const interval = setInterval(() => {
       const buf = useStore.getState().streamBuffer[cellId];
       if (!buf) return;
-      // De-duplicate: if streamBuffer thinking equals an already-committed output, skip
       if (lastThinkingContent && buf.thinking === lastThinkingContent) {
-        if (containerRef.current) containerRef.current.textContent = '';
+        if (lastRendered !== '') {
+          lastRendered = '';
+          setThinking('');
+        }
         return;
       }
-      if (buf.thinking !== lastRendered.current) {
-        lastRendered.current = buf.thinking;
-        if (containerRef.current) {
-          containerRef.current.textContent = buf.thinking;
-        }
+      if (buf.thinking !== lastRendered) {
+        lastRendered = buf.thinking;
+        setThinking(buf.thinking);
       }
-    }, 20);
+    }, 50);
     return () => clearInterval(interval);
   }, [cellId, lastThinkingContent]);
+
+  if (!thinking) return null;
 
   return (
     <div className="output-thinking streaming">
@@ -71,11 +84,11 @@ export function StreamingThinking({ cellId, lastThinkingContent }: { cellId: str
         Thinking…
         <span className="spinner" aria-hidden="true" style={{ marginLeft: 6 }} />
       </button>
-      {open && (
-        <div className="output-thinking-content">
-          <pre ref={containerRef} className="output-thinking-text" />
-        </div>
-      )}
+      <div className="output-thinking-content">
+        <pre className="output-thinking-text">
+          {open ? thinking : lastNLines(thinking, PREVIEW_LINES)}
+        </pre>
+      </div>
     </div>
   );
 }

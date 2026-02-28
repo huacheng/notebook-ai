@@ -259,15 +259,34 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
 
   const hasStaticOutput = outputs.length > 0;
   const hasStreaming = isRunning && cellId;
+  const userScrolledUp = useRef(false);
 
-  // Auto-scroll timeline window to bottom during streaming
+  // Auto-scroll timeline window to bottom during streaming,
+  // but pause when user manually scrolls up
   useEffect(() => {
     if (!hasStreaming) return;
+    const el = timelineRef.current;
+    if (!el) return;
+
+    userScrolledUp.current = false;
+
+    const onScroll = () => {
+      // Consider "at bottom" if within 30px of the bottom edge
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+      userScrolledUp.current = !atBottom;
+    };
+    el.addEventListener('scroll', onScroll);
+
     const iv = setInterval(() => {
-      const el = timelineRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (!userScrolledUp.current) {
+        el.scrollTop = el.scrollHeight;
+      }
     }, 200);
-    return () => clearInterval(iv);
+
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      clearInterval(iv);
+    };
   }, [hasStreaming]);
 
   if (!hasStaticOutput && !hasStreaming) return null;
