@@ -1211,7 +1211,7 @@ textarea.cell-input {
 
 /* ── Status badge ────────────────────────────────────────── */
 .cell-status {
-  font-size: 0.695rem;
+  font-size: var(--font-size-sm);   /* 0.8125rem, was 0.695rem */
   display: inline-flex;
   align-items: center;
   gap: 4px;

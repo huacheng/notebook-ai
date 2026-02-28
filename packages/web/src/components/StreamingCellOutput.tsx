@@ -12,7 +12,14 @@ export function StreamingText({ cellId, lastTextContent }: { cellId: string; las
     let lastRendered = '';
     const interval = setInterval(() => {
       const buf = useStore.getState().streamBuffer[cellId];
-      if (!buf) return;
+      // Buffer flushed (execution complete) → clear text
+      if (!buf) {
+        if (lastRendered !== '') {
+          lastRendered = '';
+          setText('');
+        }
+        return;
+      }
       // De-duplicate: if streamBuffer text equals an already-committed output, skip
       if (lastTextContent && buf.text === lastTextContent) {
         if (lastRendered !== '') {
@@ -25,7 +32,7 @@ export function StreamingText({ cellId, lastTextContent }: { cellId: string; las
         lastRendered = buf.text;
         setText(buf.text);
       }
-    }, 100); // 100ms for markdown rendering performance
+    }, 50);
     return () => clearInterval(interval);
   }, [cellId, lastTextContent]);
 
@@ -55,7 +62,14 @@ export function StreamingThinking({ cellId, lastThinkingContent }: { cellId: str
     let lastRendered = '';
     const interval = setInterval(() => {
       const buf = useStore.getState().streamBuffer[cellId];
-      if (!buf) return;
+      // Buffer flushed (execution complete) → clear thinking
+      if (!buf) {
+        if (lastRendered !== '') {
+          lastRendered = '';
+          setThinking('');
+        }
+        return;
+      }
       if (lastThinkingContent && buf.thinking === lastThinkingContent) {
         if (lastRendered !== '') {
           lastRendered = '';
