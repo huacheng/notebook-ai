@@ -47,20 +47,33 @@ React 19 SPA with a three-column layout: project sidebar, notebook content area,
 | Tiptap | Rich-text file editor |
 | WebSocket | Real-time streaming & session multiplexing |
 
-**UI Layout:**
+**UI Layout (normal mode):**
 
 ```
 ┌──────────────── Toolbar (model selector, connection status) ─────────────────┐
 ├─ Sidebar (272px) ─┬─ Main Content ──────────────────────────┬─ Right Panel ──┤
-│ L1: Project List  │  Notebook Tabs                          │ Deliverables   │
+│ L1: Project List  │  Notebook Tabs ─── Git Tab              │ Deliverables   │
 │ L2: File Browser  │  ┌─ StatusBar (sticky) ──────────────┐  │ File Section   │
 │ ── divider ──     │  │  Cell list (prompt + AI response)  │  │                │
-│ Library Section   │  │  ...streaming output...            │  │                │
+│ Library           │  │  ...streaming output...            │  │                │
 │                   │  └─ InputBar (sticky) ────────────────┘  │                │
 └───────────────────┴──────────────────────────────────────────┴────────────────┘
 ```
 
-Panels are draggable-resizable. Main content area renders one of: Notebook, FileViewer, GitHistoryPanel, PluginManager, or WelcomeScreen. In split-view mode (file + notebook), the tab bar splits into two groups aligned with the left (file tabs) and right (notebook + Git tabs) panes.
+**UI Layout (split-view mode — file + notebook):**
+
+```
+┌──────────────── Toolbar (model selector, connection status) ─────────────────┐
+├─ Sidebar ─┬─ File Tabs ──────┬─ Notebook Tabs ─── Git Tab ──┬─ Right Panel ──┤
+│ Project   │  ┌────────────┐  │  ┌─ StatusBar ────────────┐   │ Deliverables   │
+│ Files     │  │ FileViewer │  │  │  Cell list             │   │ File Section   │
+│ ── div ── │  │            │  │  │  ...streaming...       │   │                │
+│ Library   │  │            │  │  └─ InputBar ─────────────┘   │                │
+│           │  └────────────┘  │                               │                │
+└───────────┴──────────────────┴───────────────────────────────┴────────────────┘
+```
+
+Panels are draggable-resizable. Tab bar splits into two groups in split-view mode, aligned with FileViewer (left) and Notebook (right). Git tab is always pinned last on the right.
 
 ### packages/server
 
