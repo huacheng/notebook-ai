@@ -110,11 +110,11 @@ describe('CellOutput streaming layout', () => {
       source: 'prompt',
     });
 
-    expect(html).toContain('cell-timeline-window');
+    expect(html).toContain('tl-frame');
     expect(html).toContain('cell-status-running');
     expect(html).toContain('streaming-text-area');
 
-    const timelineIdx = html.indexOf('cell-timeline-window');
+    const timelineIdx = html.indexOf('tl-frame');
     const statusIdx = html.indexOf('cell-status-running');
     const textIdx = html.indexOf('streaming-text-area');
     expect(timelineIdx).toBeLessThan(statusIdx);
@@ -132,8 +132,8 @@ describe('CellOutput streaming layout', () => {
       source: 'p',
     });
 
-    const timelineStart = html.indexOf('cell-timeline-window');
-    const thinkingIdx = html.indexOf('output-thinking streaming');
+    const timelineStart = html.indexOf('tl-frame');
+    const thinkingIdx = html.indexOf('tl-block tl-block--thinking streaming');
     const statusIdx = html.indexOf('cell-status-running');
     expect(thinkingIdx).toBeGreaterThan(timelineStart);
     expect(thinkingIdx).toBeLessThan(statusIdx);
@@ -160,7 +160,7 @@ describe('CellOutput completed layout', () => {
       cellStatus: 'completed',
     });
 
-    expect(html).toContain('cell-timeline-window');
+    expect(html).toContain('tl-frame');
     expect(html).toContain('markdown-rendered');
   });
 
@@ -171,9 +171,9 @@ describe('CellOutput completed layout', () => {
       cellStatus: 'completed',
     });
 
-    const timelineStart = html.indexOf('cell-timeline-window');
-    const toolIdx = html.indexOf('output-tool-use');
-    const thinkIdx = html.indexOf('output-thinking');
+    const timelineStart = html.indexOf('tl-frame');
+    const toolIdx = html.indexOf('tl-block--tool');
+    const thinkIdx = html.indexOf('tl-block--thinking');
     const mdIdx = html.indexOf('markdown-rendered');
 
     expect(thinkIdx).toBeGreaterThan(timelineStart);
@@ -188,7 +188,7 @@ describe('CellOutput completed layout', () => {
       cellStatus: 'completed',
     });
 
-    expect(html).not.toContain('cell-timeline-window');
+    expect(html).not.toContain('tl-frame');
     expect(html).toContain('markdown-rendered');
   });
 
@@ -199,7 +199,7 @@ describe('CellOutput completed layout', () => {
       cellStatus: 'completed',
     });
 
-    expect(html).toContain('cell-timeline-window');
+    expect(html).toContain('tl-frame');
     expect(html).not.toContain('output-text-md');
   });
 });

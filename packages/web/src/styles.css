@@ -1773,13 +1773,7 @@ textarea.cell-input {
   font-weight: 500;
 }
 
-/* Thinking */
-.output-thinking {
-  border: 1px solid #fde68a;
-  border-radius: var(--radius-md);
-  background: var(--bg-thinking);
-  overflow: hidden;
-}
+/* Thinking — properties now on .tl-block--thinking */
 
 .output-thinking-content {
   padding: var(--space-md);
@@ -1796,13 +1790,7 @@ textarea.cell-input {
   line-height: 1.6;
 }
 
-/* Tool use */
-.output-tool-use {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--bg-tool-use);
-  overflow: hidden;
-}
+/* Tool use — properties now on .tl-block--tool */
 
 .tool-use-label {
   font-family: var(--font-display);
@@ -5272,7 +5260,7 @@ button:focus-visible {
   line-height: 1.6;
 }
 
-.output-thinking.streaming {
+.tl-block--thinking.streaming {
   border-left: 2px solid var(--color-running);
   animation: pulse-border 1s ease-in-out infinite;
 }
@@ -5289,16 +5277,44 @@ button:focus-visible {
   50% { border-left-color: transparent; }
 }
 
-/* ── Timeline window (streaming) ──────────────────────────── */
-.cell-timeline-window {
-  max-height: calc(1.6em * 10 + 8px);   /* ~10 lines max */
-  min-height: calc(1.6em * 1 + 8px);    /* 1 line min */
+/* ── Timeline frame (unified thinking + tools) ────────────── */
+.tl-frame {
+  max-height: 200px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
   padding: 4px 0;
   scroll-behavior: smooth;
+}
+
+/* ── Timeline block base ──────────────────────────────────── */
+.tl-block {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.tl-block--thinking {
+  border: 1px solid #fde68a;
+  background: var(--bg-thinking);
+}
+
+.tl-block--tool {
+  border: 1px solid var(--border-default);
+  background: var(--bg-tool-use);
+}
+
+.tl-block--pending {
+  border-left: 3px solid var(--color-running);
+  animation: pulse-border 1s ease-in-out infinite;
+}
+
+/* ── Output cell (model text, no height limit) ────────────── */
+.output-cell {
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
 }
 
 /* ── Running status metrics ───────────────────────────────── */

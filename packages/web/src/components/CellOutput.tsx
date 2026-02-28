@@ -7,6 +7,7 @@ import type { AskQuestion } from '../utils/interactiveOptions';
 import { useStore } from '../store';
 import { formatTime, formatTokens, estimateTokens, getStatusLabel } from '../utils/runningStatus';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { buildTimelineItems } from '../utils/timelineItems';
 
 // ── SVG sanitizer ────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ type ThinkingItem = Extract<CellOutputItem, { type: 'thinking' }>;
 function InlineThinking({ item }: { item: ThinkingItem }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="output-thinking">
+    <div className="tl-block tl-block--thinking">
       <button
         className="output-collapsible-toggle"
         onClick={() => setOpen((o) => !o)}
@@ -99,10 +100,13 @@ function ToolRow({ item }: { item: ToolItem }) {
   const hasResult = item.result !== undefined;
   const isError = item.is_error ?? false;
   const pending = !hasResult;
-  const statusClass = hasResult ? (isError ? 'tool-result-error' : 'tool-result-ok') : '';
+
+  const classes = ['tl-block', 'tl-block--tool'];
+  if (hasResult) classes.push(isError ? 'tool-result-error' : 'tool-result-ok');
+  if (pending) classes.push('tl-block--pending');
 
   return (
-    <div className={`output-tool-use${statusClass ? ` ${statusClass}` : ''}`}>
+    <div className={classes.join(' ')}>
       <button
         className="output-collapsible-toggle"
         onClick={() => setOpen((o) => !o)}
@@ -297,14 +301,18 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
     const lastThinking = outputs.filter((o) => o.type === 'thinking').at(-1);
     const lastText = outputs.filter((o) => o.type === 'text').at(-1);
 
+    const { timeline: timelineItems } = buildTimelineItems(outputs);
+
     return (
       <div className="cell-output-area">
-        <div className="cell-timeline-window" ref={timelineRef}>
-          <TimelineOutputs outputs={outputs} />
+        <div className="tl-frame" ref={timelineRef}>
+          <TimelineOutputs outputs={timelineItems} />
           <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
         </div>
         <RunningStatus cellId={cellId} outputs={outputs} source={source} />
-        <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
+        <div className="output-cell">
+          <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />
+        </div>
       </div>
     );
   }
@@ -312,22 +320,19 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
   // ── Completed branch: two-zone layout ──
   // Zone A: thinking + tools (10-line scrollable)
   // Zone B: text/error/chart outputs (full-height markdown)
-  const timelineOutputs = outputs.filter(
-    (o) => o.type === 'thinking' || o.type === 'tool_use',
-  );
-  const contentOutputs = outputs.filter(
-    (o) => o.type !== 'thinking' && o.type !== 'tool_use',
-  );
+  const { timeline, content } = buildTimelineItems(outputs);
 
   return (
     <div className="cell-output-area">
-      {timelineOutputs.length > 0 && (
-        <div className="cell-timeline-window">
-          <TimelineOutputs outputs={timelineOutputs} />
+      {timeline.length > 0 && (
+        <div className="tl-frame">
+          <TimelineOutputs outputs={timeline} />
         </div>
       )}
-      {contentOutputs.length > 0 && (
-        <TimelineOutputs outputs={contentOutputs} />
+      {content.length > 0 && (
+        <div className="output-cell">
+          <TimelineOutputs outputs={content} />
+        </div>
       )}
     </div>
   );

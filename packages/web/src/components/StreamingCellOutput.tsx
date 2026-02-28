@@ -88,7 +88,7 @@ export function StreamingThinking({ cellId, lastThinkingContent }: { cellId: str
   if (!thinking) return null;
 
   return (
-    <div className="output-thinking streaming">
+    <div className="tl-block tl-block--thinking streaming">
       <button
         className="output-collapsible-toggle"
         onClick={() => setOpen((o) => !o)}

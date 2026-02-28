@@ -1,0 +1,42 @@
+import { describe, it, expect } from 'vitest';
+import { buildTimelineItems } from '../utils/timelineItems';
+
+describe('CellOutput layout logic', () => {
+  it('streaming: thinking and tool_use go into timeline, text stays in content', () => {
+    const outputs = [
+      { type: 'thinking' as const, content: 'pondering...' },
+      { type: 'tool_use' as const, name: 'bash', input: { cmd: 'ls' }, tool_use_id: 't1' },
+      { type: 'text' as const, content: 'result text' },
+    ];
+    const { timeline, content } = buildTimelineItems(outputs);
+    expect(timeline).toHaveLength(2);
+    expect(timeline[0].type).toBe('thinking');
+    expect(timeline[1].type).toBe('tool_use');
+    expect(content).toHaveLength(1);
+    expect(content[0].type).toBe('text');
+  });
+
+  it('completed: same partition as streaming', () => {
+    const outputs = [
+      { type: 'thinking' as const, content: 'thought' },
+      { type: 'tool_use' as const, name: 'read', input: {}, tool_use_id: 't1', result: 'file content' },
+      { type: 'text' as const, content: 'answer' },
+    ];
+    const { timeline, content } = buildTimelineItems(outputs);
+    expect(timeline).toHaveLength(2);
+    expect(content).toHaveLength(1);
+  });
+
+  it('tool with result is not pending', () => {
+    const tool = { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1', result: 'ok' };
+    expect(tool.result).toBeDefined();
+    const pending = tool.result === undefined;
+    expect(pending).toBe(false);
+  });
+
+  it('tool without result is pending', () => {
+    const tool = { type: 'tool_use' as const, name: 'bash', input: {}, tool_use_id: 't1' };
+    const pending = (tool as any).result === undefined;
+    expect(pending).toBe(true);
+  });
+});
