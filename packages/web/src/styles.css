@@ -223,7 +223,7 @@ textarea.cell-input {
   font-family: var(--font-mono);
   font-size: 0.65rem;
   color: rgba(255, 255, 255, 0.5);
-  margin-left: 6px;
+  margin-left: 2px;
   letter-spacing: 0;
 }
 
