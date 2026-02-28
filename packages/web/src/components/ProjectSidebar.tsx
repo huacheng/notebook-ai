@@ -396,19 +396,47 @@ function FileBrowser() {
       useStore.getState().deactivateFileTab();
       useStore.setState({ notebookLoading: true, gitTabOpen: false });
       try {
-        const { authToken: token, openNotebookTab: openTab, subscribeToSession: sub } = useStore.getState();
-        const res = await fetch('/api/notebooks/open-by-path', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ path: notebookPath }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          openTab(data.notebookId, data.notebook, data.sessionId, data.workspaceDir);
-          sub(data.sessionId);
+        const { ws, openNotebookTab: openTab, subscribeToSession: sub, authToken: token } = useStore.getState();
+
+        // Try WS first, fallback to REST
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          const requestId = crypto.randomUUID();
+          const opened = await new Promise<any>((resolve, reject) => {
+            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 10_000);
+            function onOpened(e: Event) {
+              const d = (e as CustomEvent).detail;
+              if (d.request_id === requestId) { cleanup(); resolve(d); }
+            }
+            function onError(e: Event) {
+              const d = (e as CustomEvent).detail;
+              if (d.request_id === requestId) { cleanup(); reject(new Error(d.error)); }
+            }
+            function cleanup() {
+              clearTimeout(timeout);
+              window.removeEventListener('nb:notebook-opened', onOpened);
+              window.removeEventListener('nb:notebook-open-error', onError);
+            }
+            window.addEventListener('nb:notebook-opened', onOpened);
+            window.addEventListener('nb:notebook-open-error', onError);
+            ws.send(JSON.stringify({ type: 'notebook_open', request_id: requestId, path: notebookPath }));
+          });
+          openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
+          sub(opened.session_id);
+        } else {
+          // REST fallback
+          const res = await fetch('/api/notebooks/open-by-path', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ path: notebookPath }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            openTab(data.notebookId, data.notebook, data.sessionId, data.workspaceDir);
+            sub(data.sessionId);
+          }
         }
       } catch (err) {
         console.error('Failed to open notebook:', err);

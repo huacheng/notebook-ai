@@ -944,6 +944,7 @@ textarea.cell-input {
   margin-left: calc(-1 * var(--space-xl));
   margin-right: calc(-1 * var(--space-xl));
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
 .notebook-statusbar-title {
@@ -3570,8 +3571,8 @@ button:focus-visible {
 .fp-entry-up .fp-name { color: var(--text-secondary); opacity: 0.45; }
 
 /* ── Custom tooltip for file names (faster than native title) ── */
-.fp-name[data-tooltip] { position: relative; }
-.fp-name[data-tooltip]::after {
+/* Placed on .fp-entry (not .fp-name) so overflow:hidden on .fp-name won't clip the tooltip. */
+.fp-entry[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
   left: 0;
@@ -3588,7 +3589,7 @@ button:focus-visible {
   z-index: 50;
   transition: opacity 0.12s 0.15s;
 }
-.fp-name[data-tooltip]:hover::after { opacity: 1; }
+.fp-entry[data-tooltip]:hover::after { opacity: 1; }
 
 /* ── Type badges — warm muted palette matching the Atelier theme ── */
 .fp-badge {

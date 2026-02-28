@@ -514,7 +514,7 @@ export function FileSection({
           {!loading && files.map((f) => {
             const isNbDir = f.type === 'directory' && (f as any).isNotebook;
             return f.type === 'directory' ? (
-            <div key={f.name} className="fp-entry fp-entry-dir" onClick={async () => {
+            <div key={f.name} className="fp-entry fp-entry-dir" data-tooltip={f.name} onClick={async () => {
               const meta = { isNotebook: isNbDir || undefined, worktreePath: (f as any).worktreePath as string | undefined };
               if (onDirClick) {
                 const result = await onDirClick(subPath, f.name, meta);
@@ -523,7 +523,7 @@ export function FileSection({
               navigateInto((f as any).worktreePath || f.name);
             }}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
-              <span className="fp-name" data-tooltip={f.name}>{f.name}</span>
+              <span className="fp-name">{f.name}</span>
               {isNbDir && <TypeBadge name={`${f.name}.notebook.json`} />}
               {renderItemActions?.(f, subPath) ?? (
                 !isReadOnly && !noDeleteFilter?.(f.name, subPath) && (
@@ -544,12 +544,13 @@ export function FileSection({
             <div
               key={f.name}
               className={`fp-entry${!noDragFilter?.(f.name) ? ' fp-entry-draggable' : ''}`}
+              data-tooltip={f.name}
               draggable={!noDragFilter?.(f.name)}
               onDragStart={!noDragFilter?.(f.name) ? (e) => startFileDrag(e, f.name) : undefined}
               onClick={() => onFileClick?.(subPath, f.name)}
               style={{ cursor: onFileClick ? 'pointer' : undefined }}
             >
-              <span className="fp-name" data-tooltip={f.name}>{f.name}</span>
+              <span className="fp-name">{f.name}</span>
               <FileIcon name={f.name} />
               {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions">

@@ -26,6 +26,65 @@ import { generateSlice } from '../slice-generator.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * Core logic for opening a notebook by path.
+ * Shared by both the REST handler and the WS handler.
+ */
+export async function openNotebookByPath(
+  nbPath: string,
+  db: NotebookDb,
+  notebookStore: NotebookStore,
+  sessionManager: SessionManager,
+): Promise<{ notebookId: string; notebook: Notebook; sessionId: string; workspaceDir: string }> {
+  // Load notebook from disk
+  const notebook = await notebookStore.load(nbPath);
+
+  const cwd = path.dirname(nbPath);
+
+  // Check if this notebook already has a DB record (by notebook_path)
+  const existingRows = db.listNotebooks();
+  const existingRow = existingRows.find(r => r.notebook_path === nbPath);
+
+  let notebookId: string;
+
+  if (existingRow) {
+    notebookId = existingRow.id;
+    // Reconnect or create session
+    const activeSessionRow = db.getActiveSession(notebookId);
+    if (activeSessionRow) {
+      const result = await sessionManager.reconnectSession(
+        activeSessionRow.tmux_session, nbPath, existingRow.workspace_dir,
+        notebook, activeSessionRow.jsonl_path, notebookId,
+      );
+      return { notebookId, notebook, sessionId: result.session.id, workspaceDir: cwd };
+    }
+  } else {
+    // Create a DB record for this notebook
+    notebookId = crypto.randomUUID();
+    const title = notebook.metadata.title || 'Untitled';
+    const slug = path.basename(nbPath, '.notebook.json');
+    const now = new Date().toISOString();
+    db.createNotebook({
+      id: notebookId, user_id: null, title, slug,
+      workspace_dir: cwd, notebook_path: nbPath,
+      status: 'active', created_at: now, updated_at: now,
+    });
+  }
+
+  // Create a new session
+  const session = await sessionManager.createSession(nbPath, cwd);
+  session.notebook = notebook;
+  session.notebookDbId = notebookId;
+
+  db.createSessionRecord({
+    id: session.id, notebook_id: notebookId,
+    tmux_session: session.id, jsonl_path: null,
+    cwd, status: 'active', created_at: new Date().toISOString(),
+  });
+
+  return { notebookId, notebook, sessionId: session.id, workspaceDir: cwd };
+}
+
 export function createNotebooksRouter(
   db: NotebookDb,
   sessionManager: SessionManager,
@@ -110,62 +169,15 @@ export function createNotebooksRouter(
     }
 
     try {
-      // Load notebook from disk
-      let notebook: Notebook;
-      try {
-        notebook = await notebookStore.load(nbPath);
-      } catch {
-        res.status(404).json({ error: `Notebook file not found: ${nbPath}` });
-        return;
-      }
-
-      const cwd = path.dirname(nbPath);
-
-      // Check if this notebook already has a DB record (by notebook_path)
-      const existingRows = db.listNotebooks();
-      const existingRow = existingRows.find(r => r.notebook_path === nbPath);
-
-      let notebookId: string;
-
-      if (existingRow) {
-        notebookId = existingRow.id;
-        // Reconnect or create session
-        const activeSessionRow = db.getActiveSession(notebookId);
-        if (activeSessionRow) {
-          const result = await sessionManager.reconnectSession(
-            activeSessionRow.tmux_session, nbPath, existingRow.workspace_dir,
-            notebook, activeSessionRow.jsonl_path, notebookId,
-          );
-          res.json({ notebookId, notebook, sessionId: result.session.id, workspaceDir: cwd });
-          return;
-        }
-      } else {
-        // Create a DB record for this notebook
-        notebookId = crypto.randomUUID();
-        const title = notebook.metadata.title || 'Untitled';
-        const slug = path.basename(nbPath, '.notebook.json');
-        const now = new Date().toISOString();
-        db.createNotebook({
-          id: notebookId, user_id: null, title, slug,
-          workspace_dir: cwd, notebook_path: nbPath,
-          status: 'active', created_at: now, updated_at: now,
-        });
-      }
-
-      // Create a new session
-      const session = await sessionManager.createSession(nbPath, cwd);
-      session.notebook = notebook;
-      session.notebookDbId = notebookId;
-
-      db.createSessionRecord({
-        id: session.id, notebook_id: notebookId,
-        tmux_session: session.id, jsonl_path: null,
-        cwd, status: 'active', created_at: new Date().toISOString(),
-      });
-
-      res.json({ notebookId, notebook, sessionId: session.id, workspaceDir: cwd });
+      const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);
+      res.json(result);
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      const msg = String(err);
+      if (msg.includes('ENOENT') || msg.includes('not found')) {
+        res.status(404).json({ error: `Notebook file not found: ${nbPath}` });
+      } else {
+        res.status(500).json({ error: msg });
+      }
     }
   });
 

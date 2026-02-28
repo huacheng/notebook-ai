@@ -344,6 +344,13 @@ export const ChangeModelSchema = z.object({
   model: z.string(),
 });
 
+// Client → Server: notebook open via WebSocket (request-response)
+export const NotebookOpenSchema = z.object({
+  type: z.literal('notebook_open'),
+  request_id: z.string(),
+  path: z.string(),
+});
+
 // Client → Server: watch subscribe/unsubscribe (file & git change notifications)
 export const WatchSubscribeSchema = z.object({
   type: z.literal('watch_subscribe'),
@@ -356,6 +363,17 @@ export const WatchSubscribeSchema = z.object({
 export const WatchUnsubscribeSchema = z.object({
   type: z.literal('watch_unsubscribe'),
   watch_id: z.string(),
+});
+
+// Client → Server: git log via WebSocket (request-response)
+export const GitLogRequestSchema = z.object({
+  type: z.literal('git_log_request'),
+  request_id: z.string(),
+  project_id: z.string(),
+  page: z.number().int().positive(),
+  limit: z.number().int().positive(),
+  all: z.boolean().optional(),
+  stats: z.boolean().optional(),
 });
 
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
@@ -378,6 +396,8 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   ChangeModelSchema,
   WatchSubscribeSchema,
   WatchUnsubscribeSchema,
+  NotebookOpenSchema,
+  GitLogRequestSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
 ]);
@@ -563,6 +583,38 @@ export const SystemMessageSchema = z.object({
   cell_id: z.string().optional(),
 });
 
+// Server → Client: notebook open responses
+export const NotebookOpenedSchema = z.object({
+  type: z.literal('notebook_opened'),
+  request_id: z.string(),
+  notebook_id: z.string(),
+  notebook: NotebookSchema,
+  session_id: z.string(),
+  workspace_dir: z.string(),
+});
+
+export const NotebookOpenErrorSchema = z.object({
+  type: z.literal('notebook_open_error'),
+  request_id: z.string(),
+  error: z.string(),
+});
+
+// Server → Client: git log responses
+export const GitLogResponseSchema = z.object({
+  type: z.literal('git_log_response'),
+  request_id: z.string(),
+  commits: z.array(z.unknown()),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+});
+
+export const GitLogErrorSchema = z.object({
+  type: z.literal('git_log_error'),
+  request_id: z.string(),
+  error: z.string(),
+});
+
 // Server → Client: watch change notifications
 export const GitChangedSchema = z.object({
   type: z.literal('git_changed'),
@@ -608,6 +660,10 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   SystemMessageSchema,
   GitChangedSchema,
   FilesChangedSchema,
+  NotebookOpenedSchema,
+  NotebookOpenErrorSchema,
+  GitLogResponseSchema,
+  GitLogErrorSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -720,3 +776,10 @@ export type FilesChanged = z.infer<typeof FilesChangedSchema>;
 
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectListItem = z.infer<typeof ProjectListItemSchema>;
+
+export type NotebookOpen = z.infer<typeof NotebookOpenSchema>;
+export type NotebookOpened = z.infer<typeof NotebookOpenedSchema>;
+export type NotebookOpenError = z.infer<typeof NotebookOpenErrorSchema>;
+export type GitLogRequest = z.infer<typeof GitLogRequestSchema>;
+export type GitLogResponse = z.infer<typeof GitLogResponseSchema>;
+export type GitLogError = z.infer<typeof GitLogErrorSchema>;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useStore } from '../store';
 import { fetchGitLog, fetchGitDiff, fetchGitBranches, fetchGitCommitFiles } from '../api/git';
+import type { GitLogResponse } from '../api/git';
 import type { CommitInfo, CommitFile, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
@@ -431,12 +432,63 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
     if (commitsRef.current.length === 0) setLoading(true);
     setError(null);
     try {
-      const resp = await fetchGitLog(projectId, authToken, {
-        page: p,
-        file: file || undefined,
-        all: all || undefined,
-        branch: branch || undefined,
-      });
+      let resp: GitLogResponse;
+
+      // Try WS for simple queries (no file/branch filter) — avoids HTTP overhead
+      const ws = useStore.getState().ws;
+      if (!file && !branch && ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          resp = await new Promise<GitLogResponse>((resolve, reject) => {
+            const requestId = crypto.randomUUID();
+            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 10_000);
+            function onResponse(e: Event) {
+              const d = (e as CustomEvent).detail;
+              if (d.request_id === requestId) {
+                cleanup();
+                const hasMore = d.commits.length > 0;
+                resolve({ commits: d.commits, hasMore, error: undefined });
+              }
+            }
+            function onError(e: Event) {
+              const d = (e as CustomEvent).detail;
+              if (d.request_id === requestId) {
+                cleanup();
+                resolve({ commits: [], hasMore: false, error: d.error });
+              }
+            }
+            function cleanup() {
+              clearTimeout(timeout);
+              window.removeEventListener('nb:git-log-response', onResponse);
+              window.removeEventListener('nb:git-log-error', onError);
+            }
+            window.addEventListener('nb:git-log-response', onResponse);
+            window.addEventListener('nb:git-log-error', onError);
+            ws.send(JSON.stringify({
+              type: 'git_log_request',
+              request_id: requestId,
+              project_id: projectId,
+              page: p,
+              limit: 5,
+              all: all || undefined,
+              stats: undefined,
+            }));
+          });
+        } catch {
+          // WS failed — fallback to REST
+          resp = await fetchGitLog(projectId, authToken, {
+            page: p,
+            all: all || undefined,
+          });
+        }
+      } else {
+        resp = await fetchGitLog(projectId, authToken, {
+          page: p,
+          file: file || undefined,
+          all: all || undefined,
+          branch: branch || undefined,
+        });
+      }
+
       if (resp.error) setError(resp.error);
       const newCommits = append ? [...commitsRef.current, ...resp.commits] : resp.commits;
       setCommits(newCommits);

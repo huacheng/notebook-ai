@@ -8,6 +8,7 @@ import {
 import type { SessionManager } from './session.js';
 import type { NotebookDb } from './db.js';
 import { NotebookStore } from './notebook-store.js';
+import { openNotebookByPath } from './routes/notebooks.js';
 import { authEnabled } from './auth.js';
 import { validateWorkspacePath } from './workspace-files.js';
 import { exportToHtml } from './export.js';
@@ -569,8 +570,105 @@ export function setupWebSocket(
           break;
         }
 
+        case 'notebook_open': {
+          const { request_id, path: nbPath } = msg;
+          try {
+            const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);
+            sendToClient(ws, {
+              type: 'notebook_opened',
+              request_id,
+              notebook_id: result.notebookId,
+              notebook: result.notebook,
+              session_id: result.sessionId,
+              workspace_dir: result.workspaceDir,
+            });
+          } catch (err) {
+            sendToClient(ws, {
+              type: 'notebook_open_error',
+              request_id,
+              error: String(err),
+            });
+          }
+          break;
+        }
+
+        case 'git_log_request': {
+          const { request_id, project_id, page, limit, all, stats } = msg;
+          try {
+            const project = db.getProject(project_id);
+            if (!project) {
+              sendToClient(ws, { type: 'git_log_error', request_id, error: `Project "${project_id}" not found` });
+              break;
+            }
+            const { execFile: execFileCb } = await import('child_process');
+            const { promisify } = await import('util');
+            const execFileAsync = promisify(execFileCb);
+            const { unquoteGitPath } = await import('./git-utils.js');
+            const cwd = project.path;
+            const EXEC_TIMEOUT = 10000;
+            const skip = (page - 1) * limit;
+
+            const SEP = '---GIT-LOG-SEP---';
+            const format = `${SEP}%n%H%n%h%n%P%n%D%n%s%n%an%n%aI`;
+            const args = ['log', '--topo-order', `--pretty=format:${format}`, `--skip=${skip}`, `-${limit + 1}`];
+            if (stats) args.splice(3, 0, '--numstat');
+            if (all) args.splice(1, 0, '--all');
+
+            const { stdout } = await execFileAsync('git', args, { cwd, timeout: EXEC_TIMEOUT });
+            const commits: unknown[] = [];
+            const blocks = stdout.split(SEP).filter((b: string) => b.trim());
+
+            for (const block of blocks) {
+              const rawLines = block.split('\n');
+              if (rawLines[0] === '') rawLines.shift();
+              if (rawLines.length < 7) continue;
+
+              const [hash, shortHash, parentLine, refLine, message, author, date, ...fileLines] = rawLines;
+              const parents = parentLine.trim() ? parentLine.trim().split(' ') : [];
+              const refs: { type: string; name: string }[] = [];
+              if (refLine.trim()) {
+                for (const raw of refLine.split(',')) {
+                  const part = raw.trim();
+                  if (!part) continue;
+                  if (part.startsWith('HEAD -> ')) refs.push({ type: 'head', name: part.slice(8) });
+                  else if (part === 'HEAD') refs.push({ type: 'head', name: 'HEAD' });
+                  else if (part.startsWith('tag: ')) refs.push({ type: 'tag', name: part.slice(5) });
+                  else if (part.includes('/')) refs.push({ type: 'remote', name: part });
+                  else refs.push({ type: 'branch', name: part });
+                }
+              }
+              const files: { path: string; additions: number; deletions: number }[] = [];
+              for (const fl of fileLines) {
+                const match = fl.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+                if (match) {
+                  files.push({
+                    additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+                    deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+                    path: unquoteGitPath(match[3]),
+                  });
+                }
+              }
+              commits.push({ hash, shortHash, parents, refs, message, author, date, files });
+            }
+
+            const hasMore = commits.length > limit;
+            if (hasMore) commits.pop();
+
+            sendToClient(ws, {
+              type: 'git_log_response',
+              request_id,
+              commits,
+              total: commits.length,
+              page,
+              limit,
+            });
+          } catch (err) {
+            sendToClient(ws, { type: 'git_log_error', request_id, error: String(err) });
+          }
+          break;
+        }
+
         default: {
-          msg satisfies never;
           sendToClient(ws, { type: 'error', message: 'Unknown message type.' });
           break;
         }

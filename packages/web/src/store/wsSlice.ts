@@ -303,6 +303,18 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'files_changed':
           window.dispatchEvent(new CustomEvent('nb:files-changed', { detail: parsed }));
           break;
+        case 'notebook_opened':
+          window.dispatchEvent(new CustomEvent('nb:notebook-opened', { detail: parsed }));
+          break;
+        case 'notebook_open_error':
+          window.dispatchEvent(new CustomEvent('nb:notebook-open-error', { detail: parsed }));
+          break;
+        case 'git_log_response':
+          window.dispatchEvent(new CustomEvent('nb:git-log-response', { detail: parsed }));
+          break;
+        case 'git_log_error':
+          window.dispatchEvent(new CustomEvent('nb:git-log-error', { detail: parsed }));
+          break;
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };
