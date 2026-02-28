@@ -83,13 +83,6 @@ function InlineThinking({ item }: { item: ThinkingItem }) {
 
 type ToolItem = Extract<CellOutputItem, { type: 'tool_use' }>;
 
-/** Truncate to first N lines, append "…" if truncated */
-function previewLines(text: string, maxLines = 2): string {
-  const lines = text.split('\n');
-  if (lines.length <= maxLines) return text;
-  return lines.slice(0, maxLines).join('\n') + '\n…';
-}
-
 function ToolRow({ item }: { item: ToolItem }) {
   const [open, setOpen] = useState(false);
 
@@ -123,13 +116,6 @@ function ToolRow({ item }: { item: ToolItem }) {
           </span>
         )}
       </button>
-
-      {/* Result preview (visible without expanding) */}
-      {hasResult && !open && (
-        <pre className={`tool-use-result-preview${isError ? ' tool-use-result-preview-error' : ''}`}>
-          {previewLines(item.result!, 2)}
-        </pre>
-      )}
 
       {open && (
         <div className="tool-use-details">
@@ -317,22 +303,17 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
 
   if (!hasStaticOutput && !hasStreaming) return null;
 
-  // ── Streaming branch: collapsed groups + live streams ──
+  // ── Streaming branch: StreamingThinking + ToolsGroup + StreamingText ──
   if (hasStreaming) {
     const lastThinking = outputs.filter((o) => o.type === 'thinking').at(-1);
     const lastText = outputs.filter((o) => o.type === 'text').at(-1);
 
-    const { thinking, tools } = buildTimelineItems(outputs);
+    const { tools } = buildTimelineItems(outputs);
 
     return (
       <div className="cell-output-area">
-        {(thinking.length > 0 || tools.length > 0) && (
-          <div className="tl-groups">
-            {thinking.length > 0 && <ThinkingGroup items={thinking as ThinkingItem[]} />}
-            {tools.length > 0 && <ToolsGroup items={tools as ToolItem[]} />}
-          </div>
-        )}
         <StreamingThinking cellId={cellId} lastThinkingContent={lastThinking?.type === 'thinking' ? lastThinking.content : undefined} />
+        {tools.length > 0 && <ToolsGroup items={tools as ToolItem[]} />}
         <RunningStatus cellId={cellId} outputs={outputs} source={source} />
         <div className="output-cell">
           <StreamingText cellId={cellId} lastTextContent={lastText?.type === 'text' ? lastText.content : undefined} />

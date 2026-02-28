@@ -99,7 +99,7 @@ describe('CellOutput streaming layout', () => {
     useStore.setState({ streamBuffer: {} });
   });
 
-  it('has zones: groups → streaming-thinking → status → streaming-text', async () => {
+  it('streaming has only 3 components: StreamingThinking → ToolsGroup → StreamingText', async () => {
     useStore.setState({
       streamBuffer: { 'cell-run': { text: 'model output', thinking: 'hmm' } },
     });
@@ -112,55 +112,42 @@ describe('CellOutput streaming layout', () => {
       source: 'prompt',
     });
 
-    expect(html).toContain('tl-groups');
+    // Has ToolsGroup + StreamingThinking + StreamingText + RunningStatus
     expect(html).toContain('tl-group--tools');
     expect(html).toContain('cell-status-running');
     expect(html).toContain('streaming-text-area');
 
-    const groupsIdx = html.indexOf('tl-groups');
+    // NO ThinkingGroup during streaming (StreamingThinking handles live thinking)
+    expect(html).not.toContain('tl-group--thinking');
+
+    // Order: thinking → tools → status → text
+    const thinkingIdx = html.indexOf('tl-block--thinking streaming');
+    const toolsIdx = html.indexOf('tl-group--tools');
     const statusIdx = html.indexOf('cell-status-running');
     const textIdx = html.indexOf('streaming-text-area');
-    expect(groupsIdx).toBeLessThan(statusIdx);
+    expect(thinkingIdx).toBeLessThan(toolsIdx);
+    expect(toolsIdx).toBeLessThan(statusIdx);
     expect(statusIdx).toBeLessThan(textIdx);
   });
 
-  it('StreamingThinking is between groups and status', async () => {
-    useStore.setState({
-      streamBuffer: { c1: { text: '', thinking: 'deep thought' } },
-    });
-    const html = await renderCellOutput({
-      outputs: [],
-      cellId: 'c1',
-      cellStatus: 'running',
-      source: 'p',
-    });
-
-    const thinkingIdx = html.indexOf('tl-block tl-block--thinking streaming');
-    const statusIdx = html.indexOf('cell-status-running');
-    expect(thinkingIdx).toBeLessThan(statusIdx);
-  });
-
-  it('streaming uses collapsed groups, not individual timeline items', async () => {
+  it('streaming: no ThinkingGroup even with completed thinking blocks', async () => {
     useStore.setState({
       streamBuffer: { c2: { text: '', thinking: '' } },
     });
     const html = await renderCellOutput({
       outputs: [
         { type: 'thinking', content: 'thought-1' } as any,
-        { type: 'tool_use', name: 'bash', tool_use_id: 't1', input: { cmd: 'ls' }, result: 'ok' } as any,
+        { type: 'tool_use', name: 'bash', tool_use_id: 't1', input: {}, result: 'ok' } as any,
         { type: 'thinking', content: 'thought-2' } as any,
-        { type: 'tool_use', name: 'read', tool_use_id: 't2', input: { path: '/' }, result: 'data' } as any,
       ],
       cellId: 'c2',
       cellStatus: 'running',
       source: 'p',
     });
 
-    // Should have group headers, not individual blocks
-    expect(html).toContain('tl-group--thinking');
+    // Only ToolsGroup, no ThinkingGroup
     expect(html).toContain('tl-group--tools');
-    // Should NOT have tl-frame (old scrollable timeline)
-    expect(html).not.toContain('tl-frame');
+    expect(html).not.toContain('tl-group--thinking');
   });
 });
 
@@ -225,5 +212,18 @@ describe('CellOutput completed layout', () => {
 
     expect(html).toContain('tl-groups');
     expect(html).not.toContain('output-text-md');
+  });
+
+  it('ToolRow inside group shows no result preview (compact)', async () => {
+    const html = await renderCellOutput({
+      outputs: [toolOutput, textOutput],
+      cellId: 'compact-check',
+      cellStatus: 'completed',
+    });
+
+    // ToolsGroup is collapsed, so no ToolRow rendered at all
+    expect(html).not.toContain('tool-use-result-preview');
+    // But the group header should exist
+    expect(html).toContain('tl-group--tools');
   });
 });
