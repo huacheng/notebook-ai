@@ -398,14 +398,32 @@ function FileBrowser() {
     }
   }, [activeProjectPath, openFileTab]);
 
-  const handleDirClick = useCallback((subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => {
+  const handleDirClick = useCallback(async (_subPath: string, _name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => {
+    if (meta.isNotebook && meta.worktreePath) {
+      // Open the notebook directly — find the .notebook.json inside the worktree dir
+      try {
+        const h: Record<string, string> = {};
+        if (authToken) h['Authorization'] = `Bearer ${authToken}`;
+        const res = await fetch(
+          `/api/projects/${activeProjectId}/files?path=${encodeURIComponent(meta.worktreePath)}`,
+          { headers: h },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const nbEntry = (data.files as { name: string }[]).find(f => f.name.endsWith('.notebook.json'));
+          if (nbEntry) {
+            handleFileClick(meta.worktreePath, nbEntry.name);
+            return;
+          }
+        }
+      } catch { /* fall through to navigate */ }
+    }
+    // isNotebook without worktreePath means it's a regular dir containing a {name}.notebook.json
     if (meta.isNotebook) {
-      // Open the notebook directly instead of navigating into .worktrees/ layer
-      const nbFile = `${name}.notebook.json`;
-      handleFileClick(subPath, nbFile);
+      handleFileClick(_subPath, `${_name}.notebook.json`);
       return true;
     }
-  }, [handleFileClick]);
+  }, [handleFileClick, authToken, activeProjectId]);
 
   const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);
   const canCreateNb = nbTitle.trim().length > 0 && !nbTitleError;

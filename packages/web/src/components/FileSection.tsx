@@ -216,8 +216,8 @@ export interface FileSectionProps {
   readOnlyPath?: (subPath: string) => boolean;
   /** Called when the user navigates to a different sub-path. */
   onSubPathChange?: (subPath: string) => void;
-  /** Optional callback for directory clicks. Return true to prevent default navigateInto. */
-  onDirClick?: (subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => boolean | void;
+  /** Optional callback for directory clicks. Return true (or resolve true) to prevent default navigateInto. */
+  onDirClick?: (subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => boolean | void | Promise<boolean | void>;
 }
 
 export function FileSection({
@@ -528,9 +528,12 @@ export function FileSection({
           {!loading && files.map((f) => {
             const isNbDir = f.type === 'directory' && (f as any).isNotebook;
             return f.type === 'directory' ? (
-            <div key={f.name} className="fp-entry fp-entry-dir" onClick={() => {
+            <div key={f.name} className="fp-entry fp-entry-dir" onClick={async () => {
               const meta = { isNotebook: isNbDir || undefined, worktreePath: (f as any).worktreePath as string | undefined };
-              if (onDirClick?.(subPath, f.name, meta) === true) return;
+              if (onDirClick) {
+                const result = await onDirClick(subPath, f.name, meta);
+                if (result === true) return;
+              }
               navigateInto((f as any).worktreePath || f.name);
             }}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
