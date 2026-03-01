@@ -52,6 +52,7 @@ L2_SCRIPTS=(
   injection-category-count.sh
   plugin-slot-consistency.py
   test-strategy-consistency.py
+  audit-round2-fixes.py
 )
 
 L3_SCRIPTS=(
