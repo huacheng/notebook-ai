@@ -529,6 +529,16 @@ export function setupWebSocket(
           break;
         }
 
+        case 'tool_result_response': {
+          const { session_id, tool_use_id, content } = msg;
+          try {
+            await sessionManager.submitToolResult(session_id, tool_use_id, content);
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+          }
+          break;
+        }
+
         case 'change_model': {
           const { session_id, model } = msg;
           try {

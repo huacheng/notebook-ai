@@ -130,6 +130,28 @@ export class AgentProcess {
     }
   }
 
+  /**
+   * Sends a tool_result back to Claude via stdin (stream-json format).
+   * Used when the frontend collects user input for AskUserQuestion.
+   */
+  sendToolResult(toolUseId: string, content: string, isError = false): void {
+    if (!this.proc?.stdin) {
+      throw new Error(`${this.engine} process is not running.`);
+    }
+    if (this.engine !== 'claude') {
+      throw new Error('Tool results only supported for Claude engine');
+    }
+
+    const line = JSON.stringify({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: toolUseId, content, is_error: isError }],
+      },
+    });
+    this.proc.stdin.write(line + '\n');
+  }
+
   /** Send SIGINT to interrupt current generation without killing the process. */
   interrupt(): void {
     if (!this.proc || this.proc.killed) return;

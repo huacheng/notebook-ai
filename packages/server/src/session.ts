@@ -378,6 +378,12 @@ export class SessionManager {
     console.log(`[session] Model changed to "${model}" for session "${sessionId}"`);
   }
 
+  async submitToolResult(sessionId: string, toolUseId: string, content: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+    session.agentProcess.sendToolResult(toolUseId, content);
+  }
+
   async interruptCell(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);

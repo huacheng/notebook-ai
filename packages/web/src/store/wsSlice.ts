@@ -20,6 +20,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
   | 'interruptCell'
+  | 'submitToolResult'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -517,6 +518,18 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, sessionId } = get();
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
       ws.send(JSON.stringify({ type: 'interrupt_cell', session_id: sessionId }));
+    }
+  },
+
+  submitToolResult(sessionId: string, toolUseId: string, content: string) {
+    const { ws } = get();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'tool_result_response',
+        session_id: sessionId,
+        tool_use_id: toolUseId,
+        content,
+      }));
     }
   },
 });

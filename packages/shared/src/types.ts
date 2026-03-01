@@ -419,6 +419,12 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   GitDiffRequestSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
+  z.object({
+    type: z.literal('tool_result_response'),
+    session_id: z.string(),
+    tool_use_id: z.string(),
+    content: z.string(),
+  }),
 ]);
 
 // Server → Client: all session-scoped messages carry session_id

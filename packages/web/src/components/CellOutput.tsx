@@ -189,13 +189,18 @@ function ToolsGroup({ items }: { items: ToolItem[] }) {
 // ── Interactive options wrapper ──────────────────────────────────────────────
 
 function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
-  const submitPrompt = useStore((s) => s.submitPrompt);
+  const submitToolResult = useStore((s) => s.submitToolResult);
+  const sessionId = useStore((s) => s.sessionId);
   const questions = (item.input as { questions: AskQuestion[] }).questions;
 
   return (
     <InteractiveOptions
       questions={questions}
-      onSelect={(answer) => submitPrompt(answer)}
+      onSelect={(answer) => {
+        if (sessionId && item.tool_use_id) {
+          submitToolResult(sessionId, item.tool_use_id, answer);
+        }
+      }}
     />
   );
 }
