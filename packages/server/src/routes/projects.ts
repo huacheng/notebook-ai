@@ -26,8 +26,9 @@ export function createProjectsRouter(
 ): IRouter {
   const router = Router();
 
-  // List projects
-  router.get('/', (_req, res) => {
+  // List projects (prune orphaned notebook records first)
+  router.get('/', async (_req, res) => {
+    await db.pruneOrphanedNotebooks();
     const projects = db.listProjects();
     res.json(projects);
   });

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import os from 'os';
-import { mkdirSync } from 'fs';
+import { mkdirSync, promises as fsp } from 'fs';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -287,6 +287,27 @@ export class NotebookDb {
     return this.db.prepare(
       `SELECT id, workspace_dir FROM notebooks WHERE project_id = ?`
     ).all(projectId) as { id: string; workspace_dir: string }[];
+  }
+
+  /**
+   * Remove active notebook records whose notebook_path no longer exists on disk.
+   * Returns the number of pruned records.
+   */
+  async pruneOrphanedNotebooks(): Promise<number> {
+    const rows = this.db.prepare(
+      `SELECT id, notebook_path FROM notebooks WHERE status = 'active'`
+    ).all() as { id: string; notebook_path: string }[];
+
+    let pruned = 0;
+    for (const row of rows) {
+      try {
+        await fsp.access(row.notebook_path);
+      } catch {
+        this.deleteNotebook(row.id);
+        pruned++;
+      }
+    }
+    return pruned;
   }
 
   // ── File Annotations ─────────────────────────────────────────────────────
