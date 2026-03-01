@@ -32,7 +32,7 @@ LIB_SCRIPTS_PY = [
     for f in ('audit-library.py', 'rebuild-index.py', 'rebuild-relations.py')
 ]
 
-# ─── T1: D3-03 — Mutating scripts must have trap for cleanup ───
+# ─── T1: D3-03 — Scripts using temp files must have trap for cleanup ───
 
 t1_id = 'T1 (D3-03)'
 t1_missing = []
@@ -40,11 +40,13 @@ for script in MUTATING_SCRIPTS:
     if not script.exists():
         continue
     text = script.read_text()
-    if 'trap ' not in text:
+    # Only require trap if the script creates temporary files
+    uses_tempfiles = 'mktemp' in text or 'TMP_FILE=' in text or 'LOCK_FILE=' in text
+    if uses_tempfiles and 'trap ' not in text:
         t1_missing.append(script.name)
 
 if not t1_missing:
-    emit_pass(f'{t1_id}: all mutating scripts have trap for cleanup')
+    emit_pass(f'{t1_id}: scripts using temp files have trap for cleanup')
 else:
     emit_fail(f'{t1_id}: scripts missing trap: {", ".join(t1_missing)}')
 

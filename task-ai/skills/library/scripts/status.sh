@@ -26,7 +26,7 @@ fi
 # 2. Check Git Repository Status
 echo -e "
 --- Repository Status ---"
-cd "$LIB_PATH"
+cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
 if [[ -d ".git" ]]; then
     git status -s
     echo -e "

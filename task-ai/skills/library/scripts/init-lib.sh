@@ -13,7 +13,7 @@ if [[ ! -d "$LIB_PATH" ]]; then
     mkdir -p "$LIB_PATH"
 fi
 
-cd "$LIB_PATH"
+cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
 
 if [[ ! -d ".git" ]]; then
     echo "Initializing Git repository for Library..."

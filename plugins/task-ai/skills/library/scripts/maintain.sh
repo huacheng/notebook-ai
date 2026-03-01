@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Git 提交逻辑：同步图书馆中所有受控文件
-cd "$LIB_PATH"
+cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
 
 # 使用 git add . 配合完善的 .gitignore 是最稳健的策略
 # 确保所有 .md 和索引文件都被跟踪

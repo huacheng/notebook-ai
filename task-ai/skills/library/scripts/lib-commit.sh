@@ -21,7 +21,7 @@ if [[ ! -d "$LIB_PATH/.git" ]]; then
     exit 1
 fi
 
-cd "$LIB_PATH"
+cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
 
 # Stage only specified files
 for f in "${FILES[@]}"; do

@@ -3,7 +3,7 @@
 # Usage: report.sh <notebook> [--format full|summary]
 
 set -uo pipefail
-trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
+trap 'rm -f "${TMP_FILE:-}"' EXIT INT TERM
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
@@ -93,7 +93,7 @@ $( [[ -d "$WORK_DIR/.notes" ]] && cat "$WORK_DIR/.notes"/*.md 2>/dev/null | head
 EOF
 
     # Git Commit to Library (Library Repo Protocol)
-    cd "$LIB_PATH"
+    cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
     git add "$EXP_FILE"
     git commit -m "task-ai($NOTEBOOK):report distill experience"
     cd - > /dev/null

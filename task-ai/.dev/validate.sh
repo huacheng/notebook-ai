@@ -65,6 +65,7 @@ L2_SCRIPTS=(
   test-strategy-consistency.py
   audit-round2-fixes.py
   audit-round3-fixes.py
+  audit-round4-fixes.py
   init-stage-field.sh
   state-stage-done.py
 )

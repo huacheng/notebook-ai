@@ -3,7 +3,7 @@
 # Usage: auto.sh <notebook> [--start|--stop|--status]
 
 set -uo pipefail
-trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
+trap 'rm -f "${TMP_FILE:-}"' EXIT INT TERM
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"

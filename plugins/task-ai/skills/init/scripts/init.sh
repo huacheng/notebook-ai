@@ -46,13 +46,13 @@ if git branch --list "$BRANCH_NAME" | grep -qF "$BRANCH_NAME"; then
 fi
 
 # 3. Git Operations
-git branch "$BRANCH_NAME"
+git branch "$BRANCH_NAME" || { echo "[ERROR] Failed to create branch $BRANCH_NAME" >&2; exit 1; }
 if [[ $USE_WORKTREE -eq 1 ]]; then
     WORKTREE_PATH=".worktrees/task-$NOTEBOOK_NAME"
-    git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
+    git worktree add "$WORKTREE_PATH" "$BRANCH_NAME" || { echo "[ERROR] Failed to create worktree" >&2; git branch -d "$BRANCH_NAME"; exit 1; }
     WORKING_DIR="$WORKTREE_PATH/.working"
 else
-    git checkout "$BRANCH_NAME"
+    git checkout "$BRANCH_NAME" || { echo "[ERROR] Failed to checkout $BRANCH_NAME" >&2; git branch -d "$BRANCH_NAME"; exit 1; }
     WORKING_DIR="$TARGET_DIR/.working"
 fi
 
