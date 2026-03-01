@@ -9,6 +9,10 @@ import {
   setCellGitDiffInNotebook,
 } from './notebookMutations';
 
+// Module-level tracker for WS in CONNECTING state (not yet stored in zustand).
+// Prevents race conditions when connectWebSocket is called multiple times.
+let _pendingWs: WebSocket | null = null;
+
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
   | 'lastEventIndex' | 'updateLastEventIndex'
@@ -25,6 +29,16 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   lastEventIndex: {},
 
   async connectWebSocket() {
+    // Clean up any pending (CONNECTING) WS from a previous call
+    if (_pendingWs) {
+      _pendingWs.onopen = null;
+      _pendingWs.onclose = null;
+      _pendingWs.onerror = null;
+      _pendingWs.onmessage = null;
+      _pendingWs.close();
+      _pendingWs = null;
+    }
+    // Clean up existing connected WS in store
     const existing = get().ws;
     if (existing) {
       existing.onclose = null;
@@ -33,7 +47,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       existing.close();
     }
 
-    set({ wsStatus: 'connecting', latency: null });
+    set({ wsStatus: 'connecting', ws: null, latency: null });
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = get().authToken;
@@ -56,7 +70,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       wsUrl = `${protocol}//${window.location.host}/ws`;
     }
 
+    // After await: check if another connectWebSocket() has already started
+    if (_pendingWs) return; // superseded by a newer call
+
     const ws = new WebSocket(wsUrl);
+    _pendingWs = ws; // track until onopen promotes it to store
 
     let pingTimer: ReturnType<typeof setInterval> | null = null;
     let pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,28 +102,30 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     }
 
     ws.onopen = () => {
-      if (get().ws === ws) {
-        set({ wsStatus: 'connected' });
-        // Re-subscribe to all open notebook sessions on reconnect
-        const { openNotebooks, sessionId, lastEventIndex } = get();
-        const subscribedIds = new Set(
-          Object.values(openNotebooks).map((e) => e.sessionId).filter(Boolean),
-        );
-        // Also include the active sessionId for backward compat
-        if (sessionId) subscribedIds.add(sessionId);
-        for (const sid of subscribedIds) {
-          const msg: Record<string, unknown> = { type: 'subscribe', session_id: sid };
-          if (lastEventIndex[sid] !== undefined) {
-            msg.resume_after = lastEventIndex[sid];
-          }
-          ws.send(JSON.stringify(msg));
+      // Only promote to store if this is still the current pending WS
+      if (_pendingWs !== ws) { ws.close(); return; }
+      _pendingWs = null;
+      set({ ws, wsStatus: 'connected' });
+      // Re-subscribe to all open notebook sessions on reconnect
+      const { openNotebooks, sessionId, lastEventIndex } = get();
+      const subscribedIds = new Set(
+        Object.values(openNotebooks).map((e) => e.sessionId).filter(Boolean),
+      );
+      // Also include the active sessionId for backward compat
+      if (sessionId) subscribedIds.add(sessionId);
+      for (const sid of subscribedIds) {
+        const msg: Record<string, unknown> = { type: 'subscribe', session_id: sid };
+        if (lastEventIndex[sid] !== undefined) {
+          msg.resume_after = lastEventIndex[sid];
         }
-        sendPing();
-        pingTimer = setInterval(sendPing, PING_INTERVAL);
+        ws.send(JSON.stringify(msg));
       }
+      sendPing();
+      pingTimer = setInterval(sendPing, PING_INTERVAL);
     };
 
     ws.onclose = () => {
+      if (_pendingWs === ws) _pendingWs = null;
       if (get().ws === ws) {
         stopPing();
         set({ wsStatus: 'disconnected', ws: null, latency: null });
@@ -113,6 +133,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     };
 
     ws.onerror = () => {
+      if (_pendingWs === ws) _pendingWs = null;
       if (get().ws === ws) {
         stopPing();
         set({ wsStatus: 'disconnected', ws: null, latency: null });
@@ -362,10 +383,21 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       }
     };
 
-    set({ ws });
+    // NOTE: ws is NOT stored here — it's promoted to store in onopen
+    // to ensure store.ws is always OPEN. This prevents components from
+    // calling ws.send() on a CONNECTING WebSocket.
   },
 
   disconnectWebSocket() {
+    // Clean up pending WS
+    if (_pendingWs) {
+      _pendingWs.onopen = null;
+      _pendingWs.onclose = null;
+      _pendingWs.onerror = null;
+      _pendingWs.onmessage = null;
+      _pendingWs.close();
+      _pendingWs = null;
+    }
     const { ws } = get();
     if (ws) {
       ws.close();
