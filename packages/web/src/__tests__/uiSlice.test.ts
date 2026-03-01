@@ -429,3 +429,53 @@ describe('closeProjectFileTabs', () => {
     expect(Object.keys(state.openFiles).length).toBe(before);
   });
 });
+
+// ── closeDeletedFileTabs ──────────────────────────────────────────────
+
+describe('closeDeletedFileTabs', () => {
+  it('closes tabs whose paths fall under a deleted directory', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: '.working/test.py', source: 'workspace', sessionId: 's1' });
+    getAction('openFileTab')({ path: '.working/sub/data.json', source: 'workspace', sessionId: 's1' });
+    getAction('openFileTab')({ path: 'MEMORY.md', source: 'workspace', sessionId: 's1' });
+    expect(Object.keys(state.openFiles).length).toBe(3);
+
+    // Simulate: '.working' directory was deleted — pass deleted paths
+    getAction('closeDeletedFileTabs')(['.working']);
+
+    expect(Object.keys(state.openFiles).length).toBe(1);
+    expect(state.openFiles['workspace::MEMORY.md']).toBeDefined();
+  });
+
+  it('closes tabs for deleted files (not just directories)', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: 'report.md', source: 'workspace', sessionId: 's1' });
+    getAction('openFileTab')({ path: 'notes.txt', source: 'workspace', sessionId: 's1' });
+
+    getAction('closeDeletedFileTabs')(['report.md']);
+
+    expect(Object.keys(state.openFiles).length).toBe(1);
+    expect(state.openFiles['workspace::notes.txt']).toBeDefined();
+  });
+
+  it('updates activeFileTabId when active tab is closed', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: '.working/a.py', source: 'workspace', sessionId: 's1' });
+    getAction('openFileTab')({ path: 'other.md', source: 'workspace', sessionId: 's1' });
+    getAction('setActiveFileTab')('workspace::.working/a.py');
+
+    getAction('closeDeletedFileTabs')(['.working']);
+
+    expect(state.activeFileTabId).not.toBe('workspace::.working/a.py');
+    expect(Object.keys(state.openFiles).length).toBe(1);
+  });
+
+  it('no-op when no tabs match deleted paths', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: 'keep.md', source: 'workspace', sessionId: 's1' });
+
+    getAction('closeDeletedFileTabs')(['.working']);
+
+    expect(Object.keys(state.openFiles).length).toBe(1);
+  });
+});

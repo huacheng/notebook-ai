@@ -554,8 +554,8 @@ function FileBrowser() {
         renderItemActions={renderItemActions}
         onSubPathChange={setCurrentSubPath}
         refreshKey={fileRefreshKey}
-        noDeleteFilter={(_name, subPath) => {
-          return subPath === '.working' || subPath.startsWith('.working/');
+        noDeleteFilter={(name, subPath) => {
+          return name === '.working' || subPath === '.working' || subPath.startsWith('.working/');
         }}
       />
       {!isInsideNotebook && (

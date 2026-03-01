@@ -140,6 +140,24 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     });
   },
 
+  closeDeletedFileTabs(deletedPaths) {
+    set(s => {
+      const remaining: typeof s.openFiles = {};
+      for (const [tabId, file] of Object.entries(s.openFiles)) {
+        const hit = deletedPaths.some(dp =>
+          file.path === dp || file.path.startsWith(dp + '/')
+        );
+        if (!hit) remaining[tabId] = file;
+      }
+      const activeGone = s.activeFileTabId && !(s.activeFileTabId in remaining);
+      const ids = Object.keys(remaining);
+      return {
+        openFiles: remaining,
+        activeFileTabId: activeGone ? (ids[0] ?? null) : s.activeFileTabId,
+      };
+    });
+  },
+
   setFileTabLoading(tabId, loading) {
     set(s => {
       const entry = s.openFiles[tabId];

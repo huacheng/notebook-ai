@@ -354,10 +354,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'git_changed':
           window.dispatchEvent(new CustomEvent('nb:git-changed', { detail: parsed }));
           break;
-        case 'files_changed':
-          handleFilesPush(parsed as any);
+        case 'files_changed': {
+          const deleted = handleFilesPush(parsed as any);
+          if (deleted.length > 0) {
+            store.closeDeletedFileTabs(deleted);
+          }
           window.dispatchEvent(new CustomEvent('nb:files-changed', { detail: parsed }));
           break;
+        }
         case 'notebook_opened':
           window.dispatchEvent(new CustomEvent('nb:notebook-opened', { detail: parsed }));
           break;
