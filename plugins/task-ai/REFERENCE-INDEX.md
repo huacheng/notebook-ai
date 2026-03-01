@@ -8,7 +8,7 @@
 
 | File | Description |
 |------|-------------|
-| `annotation-format.md` | `.tmp-annotations.json` schema (Insert/Delete/Replace/Comment) |
+| `annotation-format.md` | Annotation JSONL format (Insert/Delete/Replace/Comment) |
 | `changelog-consumption-protocol.md` | 4-step library context loading protocol |
 | `concurrency.md` | Lock protocol, shared dir protection, lock ordering |
 | `depends-on-format.md` | Dependency format spec and enforcement rules |
@@ -20,6 +20,8 @@
 | `state-matrix.md` | State x command matrix with all combinations |
 | `summary-formats.md` | `.summary.md` table formats for experiences/references |
 | `type-field.md` | Type format, auto-discovery, validation, directory-safe transform |
+| `test-strategy-by-type.md` | Type → test strategy mapping (Strategy Matrix, Classification Rules, Regression Test Protocol, VFP Applicability, Phase Responsibilities) |
+| `progressive-target.md` | Progressive target definition — multi-stage objective refinement |
 | `verification-first-protocol.md` | VFP v1.0 — verification hypothesis lifecycle, CGG, HIL, compliance scoring |
 
 ## Skills (18)
@@ -71,13 +73,14 @@
 
 | File | Description |
 |------|-------------|
+| `references/self-audit-checklist.md` | Plan self-audit checklist for six-dimension review |
 | `references/type-profiling.md` | Dynamic type profiling system, hybrid types, shared profiles |
 
 ### check
 
 | File | Description |
 |------|-------------|
-| `references/six-perspective-audit.md` | Six-perspective audit framework with domain adaptation |
+| `references/six-dimension-audit.md` | Six-dimension audit framework (D1-D6) with domain adaptation |
 
 ### annotate
 

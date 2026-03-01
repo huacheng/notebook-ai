@@ -3,9 +3,10 @@
 # Usage: verify.sh <notebook> [--checkpoint quick|full|step-N]
 
 set -uo pipefail
+trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
+source "$SCRIPT_DIR/../../../core/lib.sh"
 
 
 NOTEBOOK="${1:-}"
@@ -20,13 +21,13 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-TEST_DIR="$WORK_DIR/../.test"
-mkdir -p "$TEST_DIR"
-
 if [[ ! -d "$WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
     exit 1
 fi
+
+TEST_DIR="$WORK_DIR/../.test"
+mkdir -p "$TEST_DIR"
 
 echo "Verifying $NOTEBOOK with checkpoint: $CHECKPOINT"
 

@@ -191,7 +191,7 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
 - **Tool chain**: <specific tools and their roles>
 
 ## Audit Adaptation
-<!-- Domain-specific checkpoints that augment the six-perspective base (see check/references/six-perspective-audit.md) -->
+<!-- Domain-specific checkpoints that augment the six-dimension base (see check/references/six-dimension-audit.md) -->
 <!-- research populates from seed tables + web research; check/verify/exec refine from experience -->
 - **Security**: <+domain-specific security concerns>
 - **Architecture**: <+domain-specific structural concerns>

@@ -3,9 +3,10 @@
 # Usage: research.sh <notebook> [--caller target|plan|test|verify|check|exec] [--phase objective|requirements] [--scope full|gap]
 
 set -uo pipefail
+trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
+source "$SCRIPT_DIR/../../../core/lib.sh"
 
 
 NOTEBOOK="${1:-}"

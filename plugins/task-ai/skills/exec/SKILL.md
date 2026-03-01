@@ -3,6 +3,17 @@ name: exec
 description: "Execute the implementation plan for a reviewed task module. Triggered after check PASS (from review status) or on NEEDS_FIX continuation (from executing status with fix guidance)."
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [执行, 实现, 开干, 动手, 开始做, 写代码, 跑起来]
+    en: [execute, implement, start working, do it, write code, run the plan, build it]
+  phrases:
+    zh: [开始执行, 按计划做, 动手实现, 开始写代码, 继续做, 执行计划, 修这个bug]
+    en: [execute the plan, start implementing, carry out the plan, continue execution, fix this issue]
+  disambiguate: >
+    Core intent: carry out the implementation plan by writing code / making changes.
+    User says "do it" or "start implementing" → exec.
+    User says "plan how to do it" → plan. User says "run it automatically" → auto.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"
@@ -56,7 +67,7 @@ Read the `type` field from `.index.json` to determine the task domain. Execution
 For each implementation step:
 
 1. **Read** relevant files (source code, configs, scripts, documentation)
-2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[Red: ...]` annotations in `.plan.md`) before implementing:
+2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[VH: ...]` annotations in `.plan.md`) before implementing:
    - **Expected: all Red (failing)** → proceed to implementation
    - **Unexpected: any Green (passing)** → log warning in `.notes/`: "Step N: test X was Green before implementation — test may be trivially satisfied or implementation leaked from a prior step". Continue implementation but flag for review
 3. **Implement** the change using **domain-appropriate methods** as described in the plan (see `init/references/seed-types/<type>.md` for per-type seed methodology, or `.type-profile.md` for task-specific guidance)

@@ -159,7 +159,7 @@ Writers: `check` sets `phase: needs-plan` on REPLAN and on NEEDS_REVISION when s
 
 ### Annotation Format (for `annotate` sub-command)
 
-> **See `commands/references/annotation-format.md`** for the `.tmp-annotations.json` schema — four annotation types (Insert/Delete/Replace/Comment) with context_before/context_after positioning.
+> **See `commands/references/annotation-format.md`** for the JSONL prompt format — four annotation types (Insert/Delete/Replace/Comment) with rendered-text context positioning.
 
 ### depends_on Format
 

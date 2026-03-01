@@ -11,8 +11,28 @@ def get_lock(index_path):
     lock_path = index_path + ".lock"
     try:
         fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
         return fd, lock_path
     except FileExistsError:
+        # Stale-lock recovery: check if the holding PID is still alive
+        try:
+            with open(lock_path, 'r') as lf:
+                pid = int(lf.read().strip())
+            os.kill(pid, 0)  # signal 0 = check if alive
+        except (ValueError, ProcessLookupError, PermissionError, OSError):
+            # PID is dead or lock file is corrupt — recover
+            stale_path = f"{lock_path}.stale.{os.getpid()}"
+            try:
+                os.rename(lock_path, stale_path)
+            except OSError:
+                pass
+            # Retry acquisition
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                return fd, lock_path
+            except FileExistsError:
+                pass  # Another process won the race
         print(f"[ERROR] Could not acquire lock for {index_path}. Is another process running?", file=sys.stderr)
         sys.exit(1)
 
@@ -28,7 +48,11 @@ def read_state(index_path):
         print(f"[ERROR] Index file missing: {index_path}", file=sys.stderr)
         sys.exit(1)
     with open(index_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        try:
+            return json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Malformed JSON in {index_path}: {e}", file=sys.stderr)
+            sys.exit(1)
 
 def write_state(index_path, state):
     state['updated'] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -82,7 +106,14 @@ def cmd_transition(args):
             state['branch'] = args.branch
         if args.worktree is not None:
             state['worktree'] = args.worktree
-            
+        if args.stage_current is not None:
+            stage = state.setdefault('stage', {})
+            stage['current'] = args.stage_current
+        if args.stage_completed is not None:
+            stage = state.setdefault('stage', {})
+            completed = stage.setdefault('completed', [])
+            completed.append(args.stage_completed)
+
         write_state(args.file, state)
     finally:
         release_lock(fd, lock_path)
@@ -107,6 +138,8 @@ if __name__ == "__main__":
     p_trans.add_argument("--completed-steps", type=int, help="Steps completed")
     p_trans.add_argument("--branch", help="Git branch")
     p_trans.add_argument("--worktree", help="Worktree path")
+    p_trans.add_argument("--stage-current", type=int, help="Current stage number")
+    p_trans.add_argument("--stage-completed", help="Stage name to append to stage.completed[]")
 
     args = parser.parse_args()
     if args.command == "get": cmd_get(args)

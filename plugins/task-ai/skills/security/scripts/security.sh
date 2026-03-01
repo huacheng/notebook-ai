@@ -6,7 +6,7 @@ set -uo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
+source "$SCRIPT_DIR/../../../core/lib.sh"
 
 NOTEBOOK="${1:-}"
 ACTION="${2:-}"
@@ -82,7 +82,7 @@ audit_plan() {
     local content=$(cat "$plan_md")
     
     # Semantic deviation audit (simulated)
-    if echo "$content" | grep -qE "rm -rf|curl | bash|wget"; then
+    if echo "$content" | grep -qE "rm -rf|curl\s*\|\s*bash|wget"; then
         echo "[SECURITY] BLOCKED: High risk operations detected in plan"
         return 1
     fi

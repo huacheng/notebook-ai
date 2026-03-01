@@ -3,6 +3,17 @@ name: highlight
 description: "Experience distillation engine — defines the unified protocol for experience/thinking library writes, and provides independent complete distillation and ad-hoc experience capture. Replaces light."
 model_tier: medium
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [经验, 提炼, 总结经验, 学到了, 记住, 教训, 心得]
+    en: [experience, distill, lessons learned, takeaway, remember this, insight]
+  phrases:
+    zh: [总结一下经验, 提炼经验, 记住这个经验, 学到了什么, 沉淀一下, 这次有什么教训]
+    en: [distill the experience, what did we learn, capture this insight, save this lesson, extract takeaways]
+  disambiguate: >
+    Core intent: distill and persist reusable experience/thinking into the library.
+    User wants to capture lessons or insights → highlight.
+    User wants a formal task REPORT → report. User wants to refresh .summary.md → summarize.
 arguments:
   - name: notebook
     description: "Notebook name for task-context distillation (e.g., auth-refactor)"

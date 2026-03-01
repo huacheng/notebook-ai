@@ -3,6 +3,18 @@ name: research
 description: "Target objective deepening & lifecycle intelligence — default mode guides multi-stage objective refinement through background research, feasibility analysis, and goal synthesis; also callable from any phase for reference collection"
 model_tier: heavy
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [调研, 研究, 调查, 背景, 可行性, 文献, 参考, 最佳实践, 技术选型, 深化]
+    en: [research, investigate, background, feasibility, references, best practices, state of the art, literature, survey, deepen]
+  phrases:
+    zh: [先了解一下, 研究一下, 调研一下, 查查看, 有什么方案, 了解背景, 可行性分析, 技术路线, 深化目标, 参考实现, O1, O2, O3]
+    en: [look into, find out about, what are the options, explore approaches, feasibility analysis, reference implementation, deepen objective]
+  disambiguate: >
+    Core intent: investigate / explore / collect knowledge — output is Insights or .references/ files.
+    User wants to understand before acting ("先调研一下") → research.
+    User says "深化目标" → research --caller target (progressive O1→O2→O3).
+    Ambiguous word "需求": user ANALYZING requirement gaps or proposing missing ones → research --phase requirements.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"
@@ -123,7 +135,7 @@ Callable independently for preparatory research before any phase, or to suppleme
      - Compare against type registry — detect single match, hybrid indicators, or novel domain
      - For hybrid tasks: write type as `A|B` pipe-separated format (e.g., `data-pipeline|ml`)
      - For novel domains: **register** new type in `$NB_WORKSPACES_LIBRARY/.type-registry.md` (append row with date + source task)
-   10.4. **Write** or update `.type-profile.md` with all sections including **Phase Intelligence** and **Audit Adaptation** (per-perspective domain checkpoints — use seed tables from `check/references/six-perspective-audit.md` Domain Adaptation as starting point, supplement with web research for novel types)
+   10.4. **Write** or update `.type-profile.md` with all sections including **Phase Intelligence** and **Audit Adaptation** (per-dimension domain checkpoints — use seed tables from `check/references/six-dimension-audit.md` Domain Adaptation as starting point, supplement with web research for novel types)
    10.5. **Update** `type` in `.index.json` (use `A|B` format for hybrids)
    10.6. **Sync to shared**: copy `.type-profile.md` to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (acquire `.memory/.type-profiles/.lock` first; apply directory-safe transform: replace `:` with `-` in type segment when used as filename, e.g., `science:astro` → `science-astro`). For ALL types — seed types also benefit from cross-task profile accumulation. Release lock after write
    10.7. **If `--caller verify|check|exec`** and `.type-profile.md` exists:
@@ -317,6 +329,8 @@ Git commit: `task-ai(<notebook>):research deepen target requirements`
 
 These steps execute when `--caller test` is specified. Steps 1–18 run first
 (type discovery + reference collection); then the test-specific steps below.
+
+> Collection targets by task type: see `commands/references/test-strategy-by-type.md` §Strategy Matrix and §Phase Responsibilities.
 
 **Test-S1. Read `.index.json` status to determine routing**
 

@@ -3,9 +3,10 @@
 # Usage: check.sh <notebook> [--checkpoint post-plan|mid-exec|post-exec]
 
 set -uo pipefail
+trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
+source "$SCRIPT_DIR/../../../core/lib.sh"
 
 
 NOTEBOOK="${1:-}"
@@ -21,13 +22,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 INDEX_JSON="$WORK_DIR/.index.json"
-ANALYSIS_DIR="$WORK_DIR/../.analysis"
-mkdir -p "$ANALYSIS_DIR"
 
 if [[ ! -d "$WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
     exit 1
 fi
+
+ANALYSIS_DIR="$WORK_DIR/../.analysis"
+mkdir -p "$ANALYSIS_DIR"
 
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 

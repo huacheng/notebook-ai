@@ -3,6 +3,17 @@ name: verify
 description: "Run domain-adapted tests and verification procedures, producing result files. Triggered after plan generation (post-plan), during execution (per-step), or after execution completes (post-exec) to provide evidence for check's verdict."
 model_tier: medium
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [测试, 验证, 跑测试, 测一下, 验收, 通过了吗]
+    en: [test, verify, run tests, validate, check tests, passing]
+  phrases:
+    zh: [跑一下测试, 验证一下, 测试通过了吗, 看看测试结果, 全量测试, 快速验证]
+    en: [run the tests, verify it works, are tests passing, run verification, quick check, full test suite]
+  disambiguate: >
+    Core intent: run tests and produce result files — does NOT render verdicts.
+    User says "run tests" or "does it pass?" → verify.
+    User says "is the plan OK?" or "can we merge?" → check (renders verdict).
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"
@@ -42,6 +53,7 @@ Run domain-adapted tests and verification procedures for a task module, producin
 7. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — keyword match against task domain → read matched `.memory/.references/<topic>.md` files for domain verification guidance (testing frameworks, tools, best practices)
 8. **Gap check**: if `.type-profile.md` lacks verification standards OR `.references/` lacks testing/verification knowledge for the task `type`, trigger `research --scope gap --caller verify` to collect missing references before proceeding
 9. **Determine** verification strategy: use `.type-profile.md` "Verification Standards" first, supplement with per-type seed file `init/references/seed-types/<type>.md` (verify section), combine with `.references/` domain knowledge. If verification reveals that `.type-profile.md` standards are inadequate, update its "Verification Standards" section with findings. For hybrid types (`A|B`), read seed files and experience for all segments
+   > **See `commands/references/test-strategy-by-type.md`** §VFP Applicability for per-type VH mode defaults and compliance thresholds.
 10. **Execute** verification procedures per checkpoint scope:
     - **VFP delegation** (`full` or `step-N` checkpoint, `type` contains `software`): Follow `auto/references/plugin-delegation.md` to attempt matching the `tdd` capability slot. For `software` types, tdd delegation is **default-enabled** (not optional) at `full` and `step-N` checkpoints. If matched, invoke via Task subagent — delegate test generation/execution, merge results into standard verification output. No match or failure → continue standard verification flow
     - `quick`: build, lint, type check — fast feedback loop

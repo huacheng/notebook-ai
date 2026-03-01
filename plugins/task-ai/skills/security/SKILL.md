@@ -3,6 +3,18 @@ name: security
 description: "Runtime Guardian — audits plans and intercepts high-risk shell commands before execution to prevent latent attacks."
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [安全, 安全审计, 风险, 安全检查, 危险命令]
+    en: [security, security audit, risk, safety check, dangerous command]
+  phrases:
+    zh: [安全审计一下, 这个命令安全吗, 检查安全风险, 审计计划安全性]
+    en: [audit for security, is this command safe, check for security risks, review plan security]
+  disambiguate: >
+    Core intent: audit plans for security risks or intercept dangerous shell commands.
+    User asks about security of a plan or command → security.
+    User asks to EVALUATE plan feasibility (broader than security) → check.
+    Normally invoked automatically as a pre-hook by check and exec — rarely called manually.
 arguments:
   - name: notebook
     description: "Notebook name"

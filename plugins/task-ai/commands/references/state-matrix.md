@@ -26,3 +26,4 @@ Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays s
 - `re-planning` must pass through `check` to reach `review`
 - `highlight` has no state transitions — it operates as a distillation protocol without affecting notebook status
 - NEEDS_FIX/NEEDS_REVISION self-loops are broken by auto signal routing (`next` field)
+- `annotate` transitions depend on (file layer × annotation type). Matrix shows the most aggressive path (planning-layer modification). Full two-dimensional routing: see `skills/annotate/SKILL.md` §State Transitions

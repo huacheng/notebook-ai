@@ -3,6 +3,17 @@ name: report
 description: "Generate a completion report for a finished task module. Triggered after merge completes, or manually for blocked/cancelled tasks to document progress and lessons learned."
 model_tier: medium
 auto_delegatable: true
+triggers:
+  keywords:
+    zh: [报告, 总结, 复盘, 结项, 汇报]
+    en: [report, summary, wrap-up, postmortem, retrospective, completion report]
+  phrases:
+    zh: [生成报告, 出个总结, 任务复盘, 结项报告, 做个汇报]
+    en: [generate a report, write a summary, task retrospective, completion report, what did we accomplish]
+  disambiguate: >
+    Core intent: generate a structured completion report documenting the full task lifecycle.
+    User asks for a formal task report → report.
+    User asks to distill EXPERIENCES/LESSONS → highlight. User asks to refresh summaries → summarize.
 arguments:
   - name: notebook
     description: "Notebook name (e.g., auth-refactor)"

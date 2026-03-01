@@ -1,29 +1,11 @@
 #!/usr/bin/env python3
 import os
+import sys
 import json
-import re
 from pathlib import Path
 
-# 复用鲁棒的解析器
-def parse_frontmatter(content):
-    fm = {}
-    match = re.search(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL | re.MULTILINE)
-    if not match: return fm
-    lines = match.group(1).split('\n')
-    current_key = None
-    for line in lines:
-        stripped = line.strip()
-        if not stripped: continue
-        if ':' in line and not stripped.startswith('-'):
-            k, v = line.split(':', 1)
-            current_key = k.strip()
-            val = v.strip().strip('"').strip("'")
-            fm[current_key] = val if val else []
-        elif stripped.startswith('-') and current_key:
-            val = stripped[1:].strip().strip('"').strip("'")
-            if isinstance(fm.get(current_key), list):
-                fm[current_key].append(val)
-    return fm
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'core'))
+from frontmatter import parse_frontmatter
 
 def rebuild_relations():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))

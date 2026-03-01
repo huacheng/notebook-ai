@@ -3,6 +3,17 @@ name: plan
 description: "Generate implementation plans for a task module. Triggered after init when .target.md requirements are defined, or on re-plan when check/exec identify issues requiring plan revision."
 model_tier: heavy
 auto_delegatable: false
+triggers:
+  keywords:
+    zh: [计划, 方案, 规划, 实现步骤, 怎么做, 出方案, 拆步骤]
+    en: [plan, approach, implementation steps, how to implement, design plan, break down]
+  phrases:
+    zh: [出个计划, 制定方案, 怎么实现, 拆成步骤, 做个规划, 重新规划, 换个方案]
+    en: [generate a plan, make an implementation plan, how should we implement this, break it into steps, replan]
+  disambiguate: >
+    Core intent: generate or regenerate an actionable implementation plan (.plan.md).
+    User asks HOW to implement something → plan.
+    User asks WHAT to implement → target. User asks to INVESTIGATE options → research.
 arguments:
   - name: notebook
     description: "Notebook name (optional — detected from context if omitted)"
@@ -67,9 +78,21 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 22. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 23. Update `.index.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
 24. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
-25. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
-26. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
-27. Report plan summary to user
+25. **L1 六维自审** — scan `.plan.md` against `.target.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
+    - Read `.plan.md`, `.target.md`, `.type-profile.md` (if exists)
+    - D1 Correctness: requirements coverage, acceptance criteria mapping, input/output consistency
+    - D2 Security: security-sensitive step identification, input validation coverage
+    - D3 Reliability: dependency explicitness, failure fallback, inter-step coupling
+    - D4 Performance: redundant steps, step granularity
+    - D5 Architecture: module boundaries, incremental delivery, separation of concerns
+    - D6 Maintainability: step executability, terminology consistency, test traceability
+    - **Weight adjustment**: read `.type-profile.md` to shift emphasis (e.g., `software` → Security↑ Reliability↑, `infrastructure` → Security↑↑ Reliability↑↑). Full weight table in `references/self-audit-checklist.md` section 2
+    - If issues found → edit `.plan.md` directly (no `.analysis/` files — that is check's responsibility)
+    - If no issues → skip, proceed to step 26
+    - **Non-fatal**: if self-audit fails (exception/timeout), skip and proceed to step 26. Log "Self-audit: skipped (error)" for step 28 report
+26. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
+27. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
+28. Report plan summary to user. Include self-audit summary: "Self-audit: N issues found and corrected" or "Self-audit: clean" or "Self-audit: skipped (error)"
 
 **Context management (plan)**: When `.summary.md` exists, read it as the primary context source for plan generation instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest file from each directory for the most recent assessment/issue/note. See also `exec/SKILL.md` for the equivalent exec-phase context rule.
 
@@ -111,4 +134,4 @@ Plan methodology MUST adapt to the task domain. Different domains require differ
 - When researching implementation plans, use the project codebase as context (read relevant project files)
 - **Evidence-based decisions**: Primary domain research is handled by the `research` sub-command (step 2). For plan-specific decisions, use shell commands to verify claims (curl docs/APIs, npm info, etc.) rather than relying solely on internal knowledge
 - **Concurrency**: Plan acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`). Reference writing is handled by the `research` sub-command (which manages its own `.memory/.references/.lock`)
-- **Task-type-aware test design**: `.test/` criteria must use domain-appropriate verification methods (e.g., unit tests for code, SSIM/PSNR for image processing, SNR for audio/DSP, schema validation for data pipelines). Research established best practices for the task domain before writing test criteria. See `check/SKILL.md` Task-Type-Aware Verification section for the full domain reference table
+- **Task-type-aware test design**: `.test/` criteria must use domain-appropriate verification methods (e.g., unit tests for code, SSIM/PSNR for image processing, SNR for audio/DSP, schema validation for data pipelines). Research established best practices for the task domain before writing test criteria. See `commands/references/test-strategy-by-type.md` for the full domain test strategy reference
