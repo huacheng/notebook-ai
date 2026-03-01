@@ -1789,6 +1789,57 @@ textarea.cell-input {
   font-weight: 500;
 }
 
+/* Other input row */
+.interactive-other-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.interactive-other-label,
+.interactive-decline-label {
+  flex-shrink: 0;
+  width: 60px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.interactive-other-input,
+.interactive-decline-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.interactive-other-input:focus,
+.interactive-decline-input:focus {
+  border-color: var(--color-primary);
+  border-style: solid;
+  background: var(--bg-cell);
+}
+.interactive-other-row--active .interactive-other-input {
+  border-color: var(--color-primary);
+  border-style: solid;
+  background: var(--bg-cell);
+}
+
+/* Decline input row */
+.interactive-decline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.interactive-decline-row--active .interactive-decline-input {
+  border-color: var(--text-secondary);
+  border-style: solid;
+}
+
 /* Thinking — properties now on .tl-block--thinking */
 
 .output-thinking-content {

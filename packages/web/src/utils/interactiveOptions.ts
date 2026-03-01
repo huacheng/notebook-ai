@@ -26,17 +26,43 @@ export function isAskUserQuestion(item: ToolUseItem): boolean {
   );
 }
 
+export interface FormatAnswerOpts {
+  otherTexts?: string[];   // per-question custom text (when __other__ selected)
+  declineReason?: string;  // reason text (when __decline__ selected)
+}
+
 /**
  * Format user selections into a text answer.
  *
+ * - __decline__ in any question → "Declined" or "Declined: {reason}"
+ * - __other__ in a question → replaced with "Other: {text}"
  * - Single question, single/multi selection → plain labels (comma-separated if multi)
  * - Multiple questions → "header: labels" per line
  */
-export function formatAnswer(questions: AskQuestion[], selections: string[][]): string {
+export function formatAnswer(
+  questions: AskQuestion[],
+  selections: string[][],
+  opts?: FormatAnswerOpts,
+): string {
+  // Decline is global — if any question has __decline__, return decline format
+  if (selections.some((s) => s.includes('__decline__'))) {
+    const reason = opts?.declineReason?.trim();
+    return reason ? `Declined: ${reason}` : 'Declined';
+  }
+
+  // Resolve __other__ per question
+  const resolved = selections.map((s, qIdx) =>
+    s.map((label) =>
+      label === '__other__'
+        ? `Other: ${opts?.otherTexts?.[qIdx] ?? ''}`
+        : label,
+    ),
+  );
+
   if (questions.length === 1) {
-    return selections[0]?.join(', ') ?? '';
+    return resolved[0]?.join(', ') ?? '';
   }
   return questions
-    .map((q, i) => `${q.header}: ${selections[i]?.join(', ') ?? ''}`)
+    .map((q, i) => `${q.header}: ${resolved[i]?.join(', ') ?? ''}`)
     .join('\n');
 }

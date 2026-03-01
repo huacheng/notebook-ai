@@ -139,4 +139,40 @@ describe('formatAnswer', () => {
     const result = formatAnswer(askToolUse.input.questions, [[]]);
     expect(result).toBe('');
   });
+
+  it('formats Other selection with custom text', () => {
+    const result = formatAnswer(
+      askToolUse.input.questions,
+      [['__other__']],
+      { otherTexts: ['My custom answer'] },
+    );
+    expect(result).toBe('Other: My custom answer');
+  });
+
+  it('formats Decline with reason', () => {
+    const result = formatAnswer(
+      askToolUse.input.questions,
+      [['__decline__']],
+      { declineReason: 'Not relevant' },
+    );
+    expect(result).toBe('Declined: Not relevant');
+  });
+
+  it('formats Decline without reason', () => {
+    const result = formatAnswer(
+      askToolUse.input.questions,
+      [['__decline__']],
+      { declineReason: '' },
+    );
+    expect(result).toBe('Declined');
+  });
+
+  it('formats multi-question with Other in one', () => {
+    const result = formatAnswer(
+      multiQuestionToolUse.input.questions,
+      [['React'], ['__other__']],
+      { otherTexts: ['', 'my style'] },
+    );
+    expect(result).toBe('框架: React\n样式: Other: my style');
+  });
 });
