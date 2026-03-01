@@ -20,6 +20,7 @@
 | `state-matrix.md` | State x command matrix with all combinations |
 | `summary-formats.md` | `.summary.md` table formats for experiences/references |
 | `type-field.md` | Type format, auto-discovery, validation, directory-safe transform |
+| `test-strategy-by-type.md` | Type → test strategy mapping (Strategy Matrix, Classification Rules, Regression Test Protocol, VFP Applicability, Phase Responsibilities) |
 | `verification-first-protocol.md` | VFP v1.0 — verification hypothesis lifecycle, CGG, HIL, compliance scoring |
 
 ## Skills (18)
