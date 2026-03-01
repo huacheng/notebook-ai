@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
 # L2: Functional test for init sub-command
 # Verifies directory creation, branch safety, and metadata integrity.
+# Runs init.sh inside a temporary git worktree to avoid checkout on the main working tree.
 
 source "$(dirname "$0")/lib.sh"
 
 INIT_SH="$TASK_AI_ROOT/skills/init/scripts/init.sh"
 TEST_PROJECT="test-project"
 TEST_NB="functional-test-$(date +%s)"
-CURRENT_BRANCH=$(git branch --show-current)
+
+# Create a temporary worktree so init.sh's git checkout doesn't touch the main tree
+TEST_WT="/tmp/nb-init-func-wt-$$"
+git worktree add --detach "$TEST_WT" HEAD > /dev/null 2>&1
+
+export NB_WORKSPACES_ROOT="$TEST_WT"
+trap 'git worktree remove "$TEST_WT" --force 2>/dev/null; git branch -D "task/$TEST_NB" 2>/dev/null; git branch -D "task/branch-clash" 2>/dev/null' EXIT
 
 # --- Test 1: Successful Initialization ---
-export NB_WORKSPACES_ROOT="/tmp/task-ai-test"
-trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
-rm -rf "$NB_WORKSPACES_ROOT"
-mkdir -p "$NB_WORKSPACES_ROOT"
-
-"$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Functional Test" --tags "test,qa" > /dev/null
+(cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Functional Test" --tags "test,qa") > /dev/null 2>&1
 
 if [[ -f "$NB_WORKSPACES_ROOT/$TEST_PROJECT/$TEST_NB/.working/.index.json" ]]; then
     emit_pass "init: successfully created metadata and directory"
@@ -23,7 +25,7 @@ else
     emit_fail "init: failed to create metadata"
 fi
 
-# Check branch creation
+# Check branch creation (branches are shared across worktrees)
 if git branch --list "task/$TEST_NB" | grep -q "$TEST_NB"; then
     emit_pass "init: successfully created git branch"
 else
@@ -31,8 +33,7 @@ else
 fi
 
 # --- Test 2: Negative Test - Directory Collision ---
-# Try to init the same name again
-OUTPUT=$("$INIT_SH" "$TEST_PROJECT" "$TEST_NB" 2>&1)
+OUTPUT=$( (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB") 2>&1 )
 if echo "$OUTPUT" | grep -q "Directory already exists"; then
     emit_pass "init: correctly blocked directory collision"
 else
@@ -40,12 +41,10 @@ else
 fi
 
 # --- Test 3: Negative Test - Branch Collision ---
-# Try to init with a name that has an existing branch but no directory
-git checkout "$CURRENT_BRANCH" > /dev/null 2>&1
 DUPLICATE_BRANCH="task/branch-clash"
 git branch "$DUPLICATE_BRANCH" > /dev/null 2>&1
 
-OUTPUT=$("$INIT_SH" "$TEST_PROJECT" "branch-clash" 2>&1)
+OUTPUT=$( (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "branch-clash") 2>&1 )
 if echo "$OUTPUT" | grep -q "Git branch already exists"; then
     emit_pass "init: correctly blocked branch collision"
 else
@@ -61,18 +60,15 @@ else
 fi
 
 # --- Test: init.sh escapes $TITLE before JSON injection ---
-# The heredoc on line ~65 injects $TITLE raw into JSON. If TITLE contains
-# double quotes or backslashes, it will produce broken JSON.
 if grep -n '"title": "\$TITLE"' "$INIT_SH" | grep -qv '^#'; then
   emit_fail "init: raw \$TITLE in JSON heredoc — quotes/backslashes break JSON"
 else
   emit_pass "init: \$TITLE is escaped or sanitized before JSON injection"
 fi
 
-# Cleanup
-git checkout "$CURRENT_BRANCH" > /dev/null 2>&1
+# Cleanup (also covered by trap)
+git worktree remove "$TEST_WT" --force 2>/dev/null
 git branch -D "task/$TEST_NB" > /dev/null 2>&1
 git branch -D "$DUPLICATE_BRANCH" > /dev/null 2>&1
-rm -rf "$NB_WORKSPACES_ROOT"
 
 summary

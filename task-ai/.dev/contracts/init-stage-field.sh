@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # L2: Verify init creates .index.json with stage field (progressive target v1)
+# Runs init.sh inside a temporary git worktree to avoid checkout on the main working tree.
 #
 # Tests:
 #   1. .index.json has "stage" key after init
@@ -13,15 +14,16 @@ source "$(dirname "$0")/lib.sh"
 INIT_SH="$TASK_AI_ROOT/skills/init/scripts/init.sh"
 TEST_PROJECT="test-stage"
 TEST_NB="stage-init-$(date +%s)"
-CURRENT_BRANCH=$(git branch --show-current)
 
-export NB_WORKSPACES_ROOT="/tmp/task-ai-stage-test"
-trap 'git checkout "$CURRENT_BRANCH" 2>/dev/null; git branch -D "task/$TEST_NB" 2>/dev/null; rm -rf "$NB_WORKSPACES_ROOT"' EXIT
-rm -rf "$NB_WORKSPACES_ROOT"
-mkdir -p "$NB_WORKSPACES_ROOT"
+# Create a temporary worktree so init.sh's git checkout doesn't touch the main tree
+TEST_WT="/tmp/nb-init-stage-wt-$$"
+git worktree add --detach "$TEST_WT" HEAD > /dev/null 2>&1
 
-# Run init
-"$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Stage Test" > /dev/null 2>&1
+export NB_WORKSPACES_ROOT="$TEST_WT"
+trap 'git worktree remove "$TEST_WT" --force 2>/dev/null; git branch -D "task/$TEST_NB" 2>/dev/null' EXIT
+
+# Run init inside the worktree
+(cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Stage Test") > /dev/null 2>&1
 
 INDEX_FILE="$NB_WORKSPACES_ROOT/$TEST_PROJECT/$TEST_NB/.working/.index.json"
 
@@ -87,8 +89,8 @@ else
     emit_fail "init: stage unexpectedly contains highlight_file"
 fi
 
-# Cleanup
-git checkout "$CURRENT_BRANCH" > /dev/null 2>&1
+# Cleanup (also covered by trap)
+git worktree remove "$TEST_WT" --force 2>/dev/null
 git branch -D "task/$TEST_NB" > /dev/null 2>&1
 
 summary
