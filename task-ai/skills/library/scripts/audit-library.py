@@ -52,9 +52,8 @@ def audit_library():
                     if age > staleness_threshold:
                         print(f"[STALE] {rel_path}: {age} days since last verification")
                         stale_count += 1
-            except Exception as e:
-                # print(f"[DEBUG] Error parsing {rel_path}: {e}")
-                pass
+            except (OSError, UnicodeDecodeError, ValueError) as e:
+                print(f"[WARN] Skipping {rel_path}: {e}", file=sys.stderr)
 
     orphans = physical_files - indexed_files
     ghosts = indexed_files - physical_files

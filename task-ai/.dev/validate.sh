@@ -66,6 +66,7 @@ L2_SCRIPTS=(
   audit-round2-fixes.py
   audit-round3-fixes.py
   audit-round4-fixes.py
+  audit-round5-fixes.py
   init-stage-field.sh
   state-stage-done.py
 )

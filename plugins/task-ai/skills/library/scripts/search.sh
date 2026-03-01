@@ -6,11 +6,12 @@ set -uo pipefail
 
 QUERY="${1:-}"
 LIMIT=10
+TYPE_FILTER=""
 
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --type)  shift 2 ;; # TODO: Implement type filter in grep
+    --type)  TYPE_FILTER="$2"; shift 2 ;;
     --limit) LIMIT="$2"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -29,7 +30,15 @@ START_TIME=$(date +%s%3N)
 echo "--- Layer 1: Keyword Match ---"
 # Use -F (Fixed strings) for security to prevent regex injection from user input
 # Use -i for case-insensitive matching
-MATCHES=$(grep -Fi "$QUERY" "$MASTER_INDEX" | head -n "$LIMIT" || true)
+MATCHES=$(grep -Fi "$QUERY" "$MASTER_INDEX" || true)
+
+# Apply --type filter on the Type column (column 2) if specified
+if [[ -n "$TYPE_FILTER" && -n "$MATCHES" ]]; then
+    MATCHES=$(echo "$MATCHES" | awk -F '|' -v t="$TYPE_FILTER" 'tolower($3) ~ tolower(t)' || true)
+fi
+
+# Apply limit
+MATCHES=$(echo "$MATCHES" | head -n "$LIMIT")
 
 if [[ -z "$MATCHES" ]]; then
     echo "No direct matches found."
