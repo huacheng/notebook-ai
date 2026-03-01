@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import sys
 import json
 from pathlib import Path
@@ -42,7 +43,8 @@ def rebuild_relations():
                 for t in related:
                     if t:
                         relations.append({"s": str(p.relative_to(lib_path)), "p": "related-to", "o": t, "w": 1})
-            except Exception: pass
+            except (OSError, UnicodeDecodeError, ValueError) as e:
+                print(f"[WARN] Skipping {p}: {e}", file=sys.stderr)
 
     with open(relations_path, 'w', encoding='utf-8') as f:
         for rel in relations:

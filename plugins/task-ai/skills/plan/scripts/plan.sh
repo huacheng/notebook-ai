@@ -34,6 +34,11 @@ fi
 echo "Planning for task type: $TYPE"
 
 # 2. Generate .plan.md (Scaffold)
+if [[ -f "$WORK_DIR/.plan.md" ]]; then
+    BACKUP="$WORK_DIR/.plan.md.bak"
+    cp "$WORK_DIR/.plan.md" "$BACKUP"
+    echo "[WARN] Existing .plan.md backed up to $BACKUP"
+fi
 cat > "$WORK_DIR/.plan.md" <<EOF
 # Implementation Plan: $NOTEBOOK
 
