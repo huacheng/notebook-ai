@@ -22,6 +22,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
   | 'interruptCell'
   | 'submitToolResult'
+  | 'urlCapturing' | 'captureUrl'
+  | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -166,6 +168,19 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               appendOutputToNotebook(nb, parsed.cell_id, parsed.output)));
           } else {
             store.appendCellOutput(parsed.cell_id, parsed.output);
+          }
+          // Detect SuggestNextStep tool_use → auto-reply + show suggestions
+          if (parsed.output.type === 'tool_use' && parsed.output.name === 'SuggestNextStep') {
+            try {
+              const input = parsed.output.input as { suggestions?: string[] };
+              if (input?.suggestions && Array.isArray(input.suggestions) && input.suggestions.length > 0) {
+                store.setPendingSuggestions({ cellId: parsed.cell_id, suggestions: input.suggestions });
+                // Auto-reply acknowledged so the model can finish
+                if (parsed.output.tool_use_id && msgSessionId) {
+                  store.submitToolResult(msgSessionId, parsed.output.tool_use_id, 'acknowledged');
+                }
+              }
+            } catch { /* ignore parse errors */ }
           }
           break;
         case 'cell_stream':
@@ -367,6 +382,19 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'git_diff_error':
           window.dispatchEvent(new CustomEvent('nb:git-diff-error', { detail: parsed }));
           break;
+        case 'url_capture_result': {
+          set({ urlCapturing: false });
+          const ucr = parsed as any;
+          if (ucr.error) {
+            console.error('[ws] url_capture error:', ucr.error);
+          } else if (ucr.file_path) {
+            const sid = get().sessionId;
+            if (sid) {
+              get().openFileTab({ path: ucr.file_path, source: 'workspace', sessionId: sid });
+            }
+          }
+          break;
+        }
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };
@@ -534,5 +562,26 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         content,
       }));
     }
+  },
+
+  // ── URL Capture ──────────────────────────────────────────────────────
+  urlCapturing: false,
+
+  captureUrl(url: string) {
+    const { ws, sessionId } = get();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    set({ urlCapturing: true });
+    ws.send(JSON.stringify({ type: 'url_capture', session_id: sessionId, url }));
+  },
+
+  // ── SuggestNextStep ──────────────────────────────────────────────────
+  pendingSuggestions: null,
+
+  setPendingSuggestions(s: { cellId: string; suggestions: string[] }) {
+    set({ pendingSuggestions: s });
+  },
+
+  clearPendingSuggestions() {
+    set({ pendingSuggestions: null });
   },
 });

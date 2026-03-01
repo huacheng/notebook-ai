@@ -23,6 +23,9 @@ function NotebookStatusBar() {
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
   const isRestarting = restartPhase === 'restarting' || restartPhase === 'done';
+  const captureUrl = useStore((s) => s.captureUrl);
+  const urlCapturing = useStore((s) => s.urlCapturing);
+  const [urlInput, setUrlInput] = useState('');
 
   const editMode = useStore((s) => s.editMode);
   const pendingDeletes = useStore((s) => s.pendingDeletes);
@@ -129,6 +132,22 @@ function NotebookStatusBar() {
         >
           {inSlice ? '◂ Notebook' : 'Slice ▸'}
         </button>
+        <input
+          className="nb-url-input"
+          placeholder="URL"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && urlInput.trim()) {
+              e.preventDefault();
+              captureUrl(urlInput.trim());
+              setUrlInput('');
+            }
+          }}
+          disabled={!connected || urlCapturing}
+          title="Paste URL, Ctrl+Enter to screenshot"
+        />
+        {urlCapturing && <span className="nb-url-spinner" />}
       </div>
 
       {showCommitModal && (
@@ -211,6 +230,8 @@ function NotebookInputBar() {
   const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
   const editMode = useStore((s) => s.editMode);
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
+  const pendingSuggestions = useStore((s) => s.pendingSuggestions);
+  const clearPendingSuggestions = useStore((s) => s.clearPendingSuggestions);
 
   // Draft key: per-notebook (falls back to sessionId for compat)
   const draftKey = activeNotebookTabId || sessionId || '';
@@ -358,6 +379,20 @@ function NotebookInputBar() {
               <button className="nb-image-remove" onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>×</button>
             </div>
           ))}
+        </div>
+      )}
+      {pendingSuggestions && !isRunning && (
+        <div className="nb-suggestions">
+          <span className="nb-suggestions-label">Suggestions:</span>
+          {pendingSuggestions.suggestions.map((s, i) => (
+            <button key={i} className="nb-suggestion-btn" onClick={() => {
+              submitPrompt(s);
+              clearPendingSuggestions();
+            }}>
+              {s}
+            </button>
+          ))}
+          <button className="nb-suggestion-dismiss" onClick={() => clearPendingSuggestions()}>×</button>
         </div>
       )}
       <div className="notebook-input-row">

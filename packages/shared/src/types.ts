@@ -401,6 +401,29 @@ export const GitDiffRequestSchema = z.object({
   file: z.string().optional(),
 });
 
+// ─── URL Capture ───
+
+export const UrlCaptureRequestSchema = z.object({
+  type: z.literal('url_capture'),
+  session_id: z.string(),
+  url: z.string().url(),
+});
+
+export const UrlCaptureResultSchema = z.object({
+  type: z.literal('url_capture_result'),
+  url: z.string(),
+  file_path: z.string(),
+  format: z.literal('image'),
+  error: z.string().optional(),
+});
+
+// ─── SuggestNextStep ───
+
+export const SuggestNextStepSchema = z.object({
+  suggestions: z.array(z.string()).min(1).max(4),
+  context: z.string().optional(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -425,6 +448,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   GitLogRequestSchema,
   GitCommitFilesRequestSchema,
   GitDiffRequestSchema,
+  UrlCaptureRequestSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
   z.object({
@@ -503,7 +527,7 @@ export const FileOpenMetaSchema = z.object({
   session_id: z.string(),
   size: z.number(),
   mtime: z.number(),
-  format: z.enum(['text', 'html', 'pdf-binary', 'docx-binary', 'xlsx-binary', 'pptx-binary', 'unsupported']),
+  format: z.enum(['text', 'html', 'pdf-binary', 'docx-binary', 'xlsx-binary', 'pptx-binary', 'image', 'unsupported']),
 });
 
 export const FileChunkSchema = z.object({
@@ -747,6 +771,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   GitCommitFilesErrorSchema,
   GitDiffResponseSchema,
   GitDiffErrorSchema,
+  UrlCaptureResultSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -872,3 +897,7 @@ export type GitCommitFilesError = z.infer<typeof GitCommitFilesErrorSchema>;
 export type GitDiffRequest = z.infer<typeof GitDiffRequestSchema>;
 export type GitDiffResponse = z.infer<typeof GitDiffResponseSchema>;
 export type GitDiffError = z.infer<typeof GitDiffErrorSchema>;
+
+export type UrlCaptureRequest = z.infer<typeof UrlCaptureRequestSchema>;
+export type UrlCaptureResult = z.infer<typeof UrlCaptureResultSchema>;
+export type SuggestNextStep = z.infer<typeof SuggestNextStepSchema>;

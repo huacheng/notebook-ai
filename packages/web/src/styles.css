@@ -1059,6 +1059,91 @@ textarea.cell-input {
 }
 
 
+/* ── URL Input in status bar ── */
+.nb-url-input {
+  height: 26px;
+  width: 160px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-cell);
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.nb-url-input:focus { border-color: var(--color-primary); }
+.nb-url-input:disabled { opacity: 0.5; }
+.nb-url-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+/* ── Suggestion buttons ── */
+.nb-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--bg-cell-hover);
+  border-bottom: 1px solid var(--border-default);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.nb-suggestions-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-right: 2px;
+}
+.nb-suggestion-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nb-suggestion-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+.nb-suggestion-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.nb-suggestion-dismiss:hover { color: var(--text-primary); }
+
+/* ── Image renderer ── */
+.fv-render__image {
+  padding: var(--space-md);
+}
+.fv-render__image img {
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
 .notebook-load-more {
   display: block;
   width: 100%;

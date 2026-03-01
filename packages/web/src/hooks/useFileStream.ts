@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
 
-export type FileFormat = 'text' | 'html' | 'pdf-binary' | 'docx-binary' | 'xlsx-binary' | 'pptx-binary' | 'unsupported';
+export type FileFormat = 'text' | 'html' | 'pdf-binary' | 'docx-binary' | 'xlsx-binary' | 'pptx-binary' | 'image' | 'unsupported';
 
 export interface FileStreamState {
   status: 'idle' | 'loading' | 'converting' | 'complete' | 'error';
@@ -46,7 +46,7 @@ export function useFileStream(
   const flushState = useCallback(() => {
     setState((prev) => ({
       ...prev,
-      content: formatRef.current?.endsWith('-binary') ? prev.content : contentRef.current,
+      content: (formatRef.current?.endsWith('-binary') || formatRef.current === 'image') ? prev.content : contentRef.current,
     }));
   }, []);
 
@@ -75,21 +75,21 @@ export function useFileStream(
     let cachedMtime = 0;
     let cachedContent = '';
     let cachedFormat: FileFormat | null = null;
-    const ttl = filePath.match(/\.(pdf|docx|xlsx|pptx)$/i) ? TTL.BINARY_CONTENT : TTL.FILE_CONTENT;
+    const ttl = filePath.match(/\.(pdf|docx|xlsx|pptx|png|jpg|jpeg|gif|webp)$/i) ? TTL.BINARY_CONTENT : TTL.FILE_CONTENT;
     const cached = cacheGet<{ content: string; mtime: number; format: FileFormat }>(cacheKey, ttl);
     if (cached) {
       cachedMtime = cached.mtime;
       cachedContent = cached.content;
       cachedFormat = cached.format;
       formatRef.current = cached.format;
-      if (!cached.format.endsWith('-binary')) {
+      if (!(cached.format.endsWith('-binary') || cached.format === 'image')) {
         contentRef.current = cached.content;
       }
       // Render cached content immediately while waiting for server mtime check
       setState({
         status: 'loading',
         format: cached.format,
-        content: cached.format.endsWith('-binary') ? '' : cached.content,
+        content: cached.format.endsWith('-binary') || cached.format === 'image' ? '' : cached.content,
         binaryBuffer: null,
         mtime: cached.mtime,
         error: null,
@@ -111,7 +111,7 @@ export function useFileStream(
           formatRef.current = format;
           // If mtime matches cache, skip streaming — use cached content
           if (mtime === cachedMtime && cachedContent && cachedFormat === format) {
-            if (format.endsWith('-binary')) {
+            if (format.endsWith('-binary') || format === 'image') {
               skipStreamRef.current = true;
               b64ToUint8Array(cachedContent).then((buf) => {
                 if (stale) return;
@@ -153,7 +153,7 @@ export function useFileStream(
           if (throttleRef.current !== null) { clearTimeout(throttleRef.current); throttleRef.current = null; }
           const fmt = formatRef.current;
           const mtime = (msg as unknown as { mtime: number }).mtime;
-          if (fmt?.endsWith('-binary')) {
+          if (fmt?.endsWith('-binary') || fmt === 'image') {
             const b64 = b64Ref.current;
             b64ToUint8Array(b64).then((buffer) => {
               if (stale) return;

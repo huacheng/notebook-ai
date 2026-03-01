@@ -18,23 +18,15 @@ export class AgentProcess {
     private readonly cwd: string,
     private readonly systemPrompt?: string,
     public readonly model?: string,
+    private readonly allowedDirs?: string[],
   ) {}
 
   getClaudeSessionId(): string | null {
     return this.claudeSessionId;
   }
 
-  /**
-   * Spawns the agent process and sets up persistent communication.
-   */
-  async start(
-    onMessage: (msg: unknown) => void,
-    onExit?: (code: number | null) => void,
-    resumeSessionId?: string,
-  ): Promise<void> {
-    const env = { ...process.env };
-    delete env['CLAUDECODE'];
-
+  /** Build CLI args — extracted for testability. */
+  _buildArgs(resumeSessionId?: string): string[] {
     const args: string[] = [];
 
     if (this.engine === 'claude') {
@@ -55,15 +47,34 @@ export class AgentProcess {
       if (this.systemPrompt) {
         args.push('--append-system-prompt', this.systemPrompt);
       }
+      if (this.allowedDirs) {
+        for (const dir of this.allowedDirs) {
+          args.push('--add-dir', dir);
+        }
+      }
     } else {
       // Gemini CLI
       args.push(
         '-o', 'stream-json',
         '-y', // YOLO mode
       );
-      // To keep Gemini resident, we don't pass a prompt argument.
-      // Depending on the version, it might need '--prompt' '' or just no prompt.
     }
+
+    return args;
+  }
+
+  /**
+   * Spawns the agent process and sets up persistent communication.
+   */
+  async start(
+    onMessage: (msg: unknown) => void,
+    onExit?: (code: number | null) => void,
+    resumeSessionId?: string,
+  ): Promise<void> {
+    const env = { ...process.env };
+    delete env['CLAUDECODE'];
+
+    const args = this._buildArgs(resumeSessionId);
 
     console.log(`[agent-process] Starting persistent ${this.engine} in ${this.cwd}...`);
 

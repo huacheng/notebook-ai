@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, readdir } from 'fs/promises';
+import * as path from 'path';
 import crypto from 'crypto';
 import { AgentProcess, type AgentEngine } from './agent-process.js';
 import { GitManager } from './git.js';
@@ -137,10 +138,22 @@ export class SessionManager {
       if (parsed?.metadata?.model) model = parsed.metadata.model;
     } catch { /* file doesn't exist yet — default claude */ }
 
+    // Compute allowedDirs: sibling worktree directories under the same project
+    let allowedDirs: string[] | undefined;
+    try {
+      const parentDir = path.dirname(cwd);
+      const siblings = await readdir(parentDir, { withFileTypes: true });
+      const cwdName = path.basename(cwd);
+      allowedDirs = siblings
+        .filter((d) => d.isDirectory() && d.name !== cwdName && !d.name.startsWith('.'))
+        .map((d) => path.join(parentDir, d.name));
+      if (allowedDirs.length === 0) allowedDirs = undefined;
+    } catch { /* parent doesn't exist or not readable — skip */ }
+
     const session: NotebookSession = {
       id: sessionName,
       cwd,
-      agentProcess: new AgentProcess(engine, cwd, MEMORY_SYSTEM_PROMPT, model),
+      agentProcess: new AgentProcess(engine, cwd, MEMORY_SYSTEM_PROMPT, model, allowedDirs),
       notebook,
       gitManager,
       notebookPath,

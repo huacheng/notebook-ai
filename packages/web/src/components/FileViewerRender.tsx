@@ -143,6 +143,27 @@ function PptxPlaceholder({ buffer, filename }: { buffer: Uint8Array; filename: s
   );
 }
 
+// ── Image Renderer ───────────────────────────────────────────────────────
+function ImageRenderer({ buffer, filename }: { buffer: Uint8Array; filename: string }) {
+  const objectUrl = useMemo(() => {
+    const ext = filename.split('.').pop()?.toLowerCase() ?? 'png';
+    const mime = ext === 'svg' ? 'image/svg+xml'
+      : ext === 'gif' ? 'image/gif'
+      : ext === 'webp' ? 'image/webp'
+      : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+      : 'image/png';
+    return URL.createObjectURL(new Blob([buffer.slice().buffer], { type: mime }));
+  }, [buffer, filename]);
+
+  useEffect(() => () => URL.revokeObjectURL(objectUrl), [objectUrl]);
+
+  return (
+    <div className="fv-render__image">
+      <img src={objectUrl} alt={filename} style={{ maxWidth: '100%', display: 'block' }} />
+    </div>
+  );
+}
+
 // ── Edit Float — in-place editing near selected text ─────────────────────
 function AnnotationEditFloat({ x, y, initialContent, onSave, onCancel }: {
   x: number; y: number; initialContent?: string;
@@ -562,6 +583,7 @@ export function FileViewerRender({
       {format === 'docx-binary' && binaryBuffer && <DocxRenderer buffer={binaryBuffer} />}
       {format === 'xlsx-binary' && binaryBuffer && <XlsxRenderer buffer={binaryBuffer} />}
       {format === 'pptx-binary' && binaryBuffer && <PptxPlaceholder buffer={binaryBuffer} filename={filename} />}
+      {format === 'image' && binaryBuffer && <ImageRenderer buffer={binaryBuffer} filename={filename} />}
 
       {/* Edit float — in-place editing near selected text */}
       {editFloat && (

@@ -184,6 +184,15 @@ export interface NotebookStore {
   setRightPanelOpen(open: boolean): void;
   setRightPanelSplitRatio(ratio: number): void;
 
+  // ── URL Capture ────────────────────────────────────────────────────────
+  urlCapturing: boolean;
+  captureUrl(url: string): void;
+
+  // ── SuggestNextStep ──────────────────────────────────────────────────
+  pendingSuggestions: { cellId: string; suggestions: string[] } | null;
+  setPendingSuggestions(s: { cellId: string; suggestions: string[] }): void;
+  clearPendingSuggestions(): void;
+
   // ── WebSocket actions ──────────────────────────────────────────────────
   connectWebSocket(): Promise<void>;
   disconnectWebSocket(): void;

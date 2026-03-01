@@ -18,6 +18,7 @@ import { getLibraryDir } from './workspace.js';
 import { unquoteGitPath } from './git-utils.js';
 import type { GitWatcher, FileWatcher } from './watcher.js';
 import { computeFileCacheKey, computeProjectFileList } from './project-file-list.js';
+import { captureUrl } from './url-capture.js';
 
 const execFileAsync = promisify(execFileCb);
 const EXEC_TIMEOUT = 10000;
@@ -394,12 +395,16 @@ export function setupWebSocket(
               pdf: 'pdf-binary', docx: 'docx-binary', xlsx: 'xlsx-binary', pptx: 'pptx-binary',
             };
 
+            const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
+
             let format: string;
 
             if (TEXT_EXTS.has(ext)) {
               format = 'text';
             } else if (BINARY_FORMAT[ext]) {
               format = BINARY_FORMAT[ext];
+            } else if (IMAGE_EXTS.has(ext)) {
+              format = 'image';
             } else {
               format = 'unsupported';
             }
@@ -414,7 +419,7 @@ export function setupWebSocket(
             const fileContent = await fs.readFile(safePath);
             const CHUNK_SIZE = 16384;
 
-            if (format.endsWith('-binary')) {
+            if (format.endsWith('-binary') || format === 'image') {
               const b64 = fileContent.toString('base64');
               for (let i = 0; i < b64.length; i += CHUNK_SIZE) {
                 sendToClient(ws, { type: 'file-chunk', session_id, data: b64.slice(i, i + CHUNK_SIZE), encoding: 'base64' });
@@ -547,6 +552,22 @@ export function setupWebSocket(
             sendToClient(ws, { type: 'model_changed', session_id, model });
           } catch (err) {
             sendToClient(ws, { type: 'error', session_id, message: String(err) });
+          }
+          break;
+        }
+
+        case 'url_capture': {
+          const { session_id, url } = msg;
+          const session = sessionManager.getSession(session_id);
+          if (!session) {
+            sendToClient(ws, { type: 'url_capture_result', url, file_path: '', format: 'image' as const, error: 'Session not found' });
+            break;
+          }
+          try {
+            const filePath = await captureUrl(url, session.cwd);
+            sendToClient(ws, { type: 'url_capture_result', url, file_path: filePath, format: 'image' as const });
+          } catch (err) {
+            sendToClient(ws, { type: 'url_capture_result', url, file_path: '', format: 'image' as const, error: String(err) });
           }
           break;
         }
