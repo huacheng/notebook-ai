@@ -184,7 +184,7 @@ export interface NotebookStore {
   setRightPanelSplitRatio(ratio: number): void;
 
   // ── WebSocket actions ──────────────────────────────────────────────────
-  connectWebSocket(): void;
+  connectWebSocket(): Promise<void>;
   disconnectWebSocket(): void;
   subscribeToSession(sessionId: string): void;
   unsubscribeFromSession(sessionId: string): void;

@@ -62,6 +62,37 @@ setInterval(() => {
   }
 }, 10 * 60_000);
 
+// ── WS one-time ticket ──────────────────────────────────────────────────────
+
+const TICKET_TTL_MS = 30_000; // 30 seconds
+
+interface WsTicket {
+  expiresAt: number;
+}
+
+const wsTickets = new Map<string, WsTicket>();
+
+export function createWsTicket(): string {
+  const ticket = crypto.randomUUID();
+  wsTickets.set(ticket, { expiresAt: Date.now() + TICKET_TTL_MS });
+  return ticket;
+}
+
+export function consumeWsTicket(ticket: string): boolean {
+  const entry = wsTickets.get(ticket);
+  if (!entry) return false;
+  wsTickets.delete(ticket); // one-time use
+  return Date.now() < entry.expiresAt;
+}
+
+// Cleanup expired tickets every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [t, rec] of wsTickets) {
+    if (now >= rec.expiresAt) wsTickets.delete(t);
+  }
+}, 5 * 60_000);
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -124,6 +155,31 @@ export function handleVerify(req: Request, res: Response): void {
     return;
   }
   res.json({ ok: true });
+}
+
+// ── WS ticket endpoint ─────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/ws-ticket — exchange a valid bearer token for a one-time WS ticket.
+ * Manually validates the bearer token so it works regardless of middleware ordering.
+ */
+export function handleWsTicket(req: Request, res: Response): void {
+  if (!authEnabled) {
+    // No auth configured — return a ticket anyway (WS handler will skip check)
+    res.json({ ticket: createWsTicket() });
+    return;
+  }
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authorization required.' });
+    return;
+  }
+  const token = authHeader.slice(7);
+  if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
+    res.status(401).json({ error: 'Invalid token.' });
+    return;
+  }
+  res.json({ ticket: createWsTicket() });
 }
 
 // ── Auth status endpoint ────────────────────────────────────────────────────

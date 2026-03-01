@@ -24,7 +24,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   restartError: '',
   lastEventIndex: {},
 
-  connectWebSocket() {
+  async connectWebSocket() {
     const existing = get().ws;
     if (existing) {
       existing.onclose = null;
@@ -37,9 +37,25 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = get().authToken;
-    const wsUrl = token
-      ? `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`
-      : `${protocol}//${window.location.host}/ws`;
+
+    let wsUrl: string;
+    if (token) {
+      try {
+        const res = await fetch('/api/auth/ws-ticket', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('ticket fetch failed');
+        const { ticket } = await res.json() as { ticket: string };
+        wsUrl = `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
+      } catch {
+        set({ wsStatus: 'disconnected' });
+        return;
+      }
+    } else {
+      wsUrl = `${protocol}//${window.location.host}/ws`;
+    }
+
     const ws = new WebSocket(wsUrl);
 
     let pingTimer: ReturnType<typeof setInterval> | null = null;

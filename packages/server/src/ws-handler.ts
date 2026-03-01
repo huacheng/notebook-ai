@@ -11,7 +11,7 @@ import type { SessionManager } from './session.js';
 import type { NotebookDb } from './db.js';
 import { NotebookStore } from './notebook-store.js';
 import { openNotebookByPath } from './routes/notebooks.js';
-import { authEnabled } from './auth.js';
+import { authEnabled, consumeWsTicket } from './auth.js';
 import { validateWorkspacePath } from './workspace-files.js';
 import { exportToHtml } from './export.js';
 import { getLibraryDir } from './workspace.js';
@@ -104,11 +104,10 @@ export function setupWebSocket(
 
   wss.on('connection', (ws: WebSocket, req) => {
     const url = new URL(req.url ?? '/', `http://localhost`);
-    const token = url.searchParams.get('token') ?? undefined;
+    const ticket = url.searchParams.get('ticket') ?? undefined;
 
     if (authEnabled) {
-      const NB_AUTH_TOKEN = process.env['NB_AUTH_TOKEN'] ?? '';
-      if (!token || token !== NB_AUTH_TOKEN) {
+      if (!ticket || !consumeWsTicket(ticket)) {
         sendToClient(ws, { type: 'error', message: 'Unauthorized.' });
         ws.close(4001, 'Unauthorized');
         return;
