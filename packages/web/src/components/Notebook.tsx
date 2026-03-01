@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, type RefObject } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 import { Cell } from './Cell';
 import { SliceView } from './SliceView';
 import { loadDraft, saveDraft, clearDraft } from '../utils/promptDraft';
@@ -9,6 +10,7 @@ import { extractImagesFromClipboard, MAX_IMAGES, type PastedImage } from '../uti
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
 function NotebookStatusBar() {
+  const t = useT();
   const notebook = useStore((s) => s.notebook);
   const activeNotebookId = useStore((s) => s.activeNotebookId);
   const notebookList = useStore((s) => s.notebookList);
@@ -23,9 +25,6 @@ function NotebookStatusBar() {
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
   const isRestarting = restartPhase === 'restarting' || restartPhase === 'done';
-  const captureUrl = useStore((s) => s.captureUrl);
-  const urlCapturing = useStore((s) => s.urlCapturing);
-  const [urlInput, setUrlInput] = useState('');
 
   const editMode = useStore((s) => s.editMode);
   const pendingDeletes = useStore((s) => s.pendingDeletes);
@@ -69,85 +68,69 @@ function NotebookStatusBar() {
             className="notebook-statusbar-btn notebook-statusbar-edit-btn"
             onClick={() => setEditMode(true)}
             disabled={!connected || isRunning || inSlice}
-            title="Edit mode — select cells to delete"
+            title={t('status.editTitle')}
           >
-            Edit
+            {t('status.edit')}
           </button>
         ) : (
           <button
             className="notebook-statusbar-btn notebook-statusbar-edit-btn active"
             onClick={handleEditDone}
             disabled={editSavePhase === 'saving'}
-            title={pendingDeletes.size > 0 ? `Done — delete ${pendingDeletes.size} cell(s)` : 'Done — exit edit mode'}
+            title={pendingDeletes.size > 0 ? t('status.doneDeleteTitle', String(pendingDeletes.size)) : t('status.doneExitTitle')}
           >
-            Done{pendingDeletes.size > 0 ? ` (${pendingDeletes.size})` : ''}
+            {t('status.done')}{pendingDeletes.size > 0 ? ` (${pendingDeletes.size})` : ''}
           </button>
         )}
         <button
           className="notebook-statusbar-btn notebook-statusbar-restart-btn"
           onClick={restartSession}
           disabled={!connected || isRestarting || editMode}
-          title={isRestarting ? 'Restarting session…' : 'Restart agent session'}
+          title={isRestarting ? t('status.restarting') : t('status.restartTitle')}
         >
-          {isRestarting ? '...' : 'Restart'}
+          {isRestarting ? '...' : t('status.restart')}
         </button>
         <button
           className="notebook-statusbar-btn notebook-statusbar-rerun-btn"
           onClick={() => setShowRerunModal(true)}
           disabled={!connected || isRunning || isRestarting || editMode}
-          title="Rerun all cells from scratch (clean context)"
+          title={t('status.rerunTitle')}
         >
-          Rerun
+          {t('status.rerun')}
         </button>
         {isRunning && (
           <button
             className="notebook-statusbar-btn notebook-statusbar-esc-btn"
             onClick={interruptCell}
-            title="Interrupt running cell (Esc)"
+            title={t('status.escTitle')}
           >
-            Esc
+            {t('status.esc')}
           </button>
         )}
         <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}
           disabled={!connected || editMode}
-          title={connected ? 'Save notebook' : 'Not connected'}
+          title={connected ? t('status.saveTitle') : t('status.notConnected')}
         >
-          Save
+          {t('status.save')}
         </button>
         <button
           className="notebook-statusbar-btn"
           onClick={handleExport}
           disabled={!sessionId || editMode}
-          title={sessionId ? 'Export notebook as bundle' : 'No active session'}
+          title={sessionId ? t('status.exportTitle') : t('status.noActiveSession')}
         >
-          Export
+          {t('status.export')}
         </button>
         <button
           className={`notebook-statusbar-btn notebook-statusbar-slice-btn${inSlice ? ' active' : ''}`}
           onClick={() => setActiveTab(inSlice ? 'notebook' : 'slice')}
           disabled={editMode}
-          title={inSlice ? 'Back to Notebook' : 'Open Slice view'}
+          title={inSlice ? t('status.sliceBackTitle') : t('status.sliceOpenTitle')}
         >
-          {inSlice ? '◂ Notebook' : 'Slice ▸'}
+          {inSlice ? t('status.sliceBack') : t('status.sliceOpen')}
         </button>
-        <input
-          className="nb-url-input"
-          placeholder="URL"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && urlInput.trim()) {
-              e.preventDefault();
-              captureUrl(urlInput.trim());
-              setUrlInput('');
-            }
-          }}
-          disabled={!connected || urlCapturing}
-          title="Paste URL, Ctrl+Enter to screenshot"
-        />
-        {urlCapturing && <span className="nb-url-spinner" />}
       </div>
 
       {showCommitModal && (
@@ -177,18 +160,19 @@ function NotebookStatusBar() {
 // ── Edit commit modal ───────────────────────────────────────────────────────
 
 function EditCommitModal({ count, onCancel, onConfirm }: { count: number; onCancel: () => void; onConfirm: () => void }) {
+  const t = useT();
   return (
     <div className="annotation-modal-overlay" onClick={onCancel}>
       <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: 'var(--font-size-lg)' }}>
-          Delete {count} cell{count > 1 ? 's' : ''}?
+          {t('modal.deleteCells', String(count))}
         </h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-xl) 0' }}>
-          This will permanently remove the selected cell{count > 1 ? 's' : ''} and {count > 1 ? 'their' : 'its'} responses.
+          {t('modal.deleteCellsDesc')}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)' }}>
-          <button className="annotation-modal-btn" onClick={onCancel}>Cancel</button>
-          <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>Delete</button>
+          <button className="annotation-modal-btn" onClick={onCancel}>{t('modal.cancel')}</button>
+          <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>{t('modal.delete')}</button>
         </div>
       </div>
     </div>
@@ -198,18 +182,19 @@ function EditCommitModal({ count, onCancel, onConfirm }: { count: number; onCanc
 // ── Rerun confirm modal ─────────────────────────────────────────────────────
 
 function RerunConfirmModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const t = useT();
   return (
     <div className="annotation-modal-overlay" onClick={onCancel}>
       <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: 'var(--font-size-lg)' }}>
-          Rerun all cells?
+          {t('modal.rerunAll')}
         </h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-xl) 0' }}>
-          This will clear all cell outputs, reset the agent session (clean context), and re-execute every cell from scratch.
+          {t('modal.rerunAllDesc')}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)' }}>
-          <button className="annotation-modal-btn" onClick={onCancel}>Cancel</button>
-          <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>Rerun</button>
+          <button className="annotation-modal-btn" onClick={onCancel}>{t('modal.cancel')}</button>
+          <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={onConfirm}>{t('modal.rerun')}</button>
         </div>
       </div>
     </div>
@@ -224,6 +209,7 @@ type UploadStatus =
   | { phase: 'error'; message: string };
 
 function NotebookInputBar() {
+  const t = useT();
   const submitPrompt = useStore((s) => s.submitPrompt);
   const sessionId = useStore((s) => s.sessionId);
   const notebook = useStore((s) => s.notebook);
@@ -325,7 +311,7 @@ function NotebookInputBar() {
     if (!files || files.length === 0) return;
 
     if (!sessionId) {
-      setUploadStatus({ phase: 'error', message: 'No active session — open a notebook first.' });
+      setUploadStatus({ phase: 'error', message: t('input.noSession') });
       return;
     }
 
@@ -365,9 +351,9 @@ function NotebookInputBar() {
       {uploadStatus && (
         <div className={`upload-status upload-status-${uploadStatus.phase}`}>
           {uploadStatus.phase === 'uploading' && (
-            <><span className="spinner" aria-hidden="true" /> Uploading {uploadStatus.count} file{uploadStatus.count > 1 ? 's' : ''}…</>
+            <><span className="spinner" aria-hidden="true" /> {t('input.uploading', String(uploadStatus.count))}</>
           )}
-          {uploadStatus.phase === 'success' && <>✓ Attached: {uploadStatus.names.join(', ')}</>}
+          {uploadStatus.phase === 'success' && <>{t('input.attached', uploadStatus.names.join(', '))}</>}
           {uploadStatus.phase === 'error' && <>✗ {uploadStatus.message}</>}
         </div>
       )}
@@ -375,7 +361,7 @@ function NotebookInputBar() {
         <div className="nb-image-preview-strip">
           {images.map((img, i) => (
             <div key={i} className="nb-image-thumb">
-              <img src={img.preview} alt={`Pasted ${i + 1}`} />
+              <img src={img.preview} alt={t('input.pasted', String(i + 1))} />
               <button className="nb-image-remove" onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>×</button>
             </div>
           ))}
@@ -383,7 +369,7 @@ function NotebookInputBar() {
       )}
       {pendingSuggestions && !isRunning && (
         <div className="nb-suggestions">
-          <span className="nb-suggestions-label">Suggestions:</span>
+          <span className="nb-suggestions-label">{t('input.suggestions')}</span>
           {pendingSuggestions.suggestions.map((s, i) => (
             <button key={i} className="nb-suggestion-btn" onClick={() => {
               submitPrompt(s);
@@ -418,14 +404,14 @@ function NotebookInputBar() {
           }}
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
           disabled={disabled}
-          placeholder={editMode ? 'Exit edit mode to send prompts' : 'Enter a prompt… (Ctrl+Enter to run)'}
+          placeholder={editMode ? t('input.editModePlaceholder') : t('input.placeholder')}
           rows={3}
           spellCheck={false}
         />
         <div className="notebook-input-actions">
           <button
             className="nb-attach-btn"
-            title="Attach file to prompt"
+            title={t('input.attachFile')}
             disabled={disabled}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -435,7 +421,7 @@ function NotebookInputBar() {
             className="nb-run-btn"
             onClick={handleRun}
             disabled={disabled || (!text.trim() && images.length === 0)}
-            title="Run (Ctrl+Enter)"
+            title={t('input.run')}
           >
             {isRunning ? '■' : '▶'}
           </button>
@@ -448,6 +434,7 @@ function NotebookInputBar() {
 // ── Restart overlay ──────────────────────────────────────────────────────────
 
 function RestartOverlay() {
+  const t = useT();
   const restartPhase = useStore((s) => s.restartPhase);
   const restartError = useStore((s) => s.restartError);
 
@@ -460,7 +447,7 @@ function RestartOverlay() {
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div className="nb-delete-spinner" />
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
-              Restarting session...
+              {t('overlay.restarting')}
             </p>
           </div>
         )}
@@ -468,7 +455,7 @@ function RestartOverlay() {
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-completed)' }}>&#10003;</div>
             <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
-              Session restarted
+              {t('overlay.restarted')}
             </p>
           </div>
         )}
@@ -476,20 +463,20 @@ function RestartOverlay() {
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-error)' }}>&#10007;</div>
             <p style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-sm)', fontWeight: 500, marginBottom: 'var(--space-md)' }}>
-              Restart failed: {restartError}
+              {t('overlay.restartFailed', restartError)}
             </p>
             <button
               className="notebook-statusbar-btn"
               onClick={() => useStore.getState().restartSession()}
               style={{ marginRight: 'var(--space-sm)' }}
             >
-              Retry
+              {t('overlay.retry')}
             </button>
             <button
               className="notebook-statusbar-btn"
               onClick={() => useStore.setState({ restartPhase: 'idle', restartError: '' })}
             >
-              Close
+              {t('overlay.close')}
             </button>
           </div>
         )}
@@ -501,6 +488,7 @@ function RestartOverlay() {
 // ── Edit save overlay ────────────────────────────────────────────────────────
 
 function EditSaveOverlay() {
+  const t = useT();
   const editSavePhase = useStore((s) => s.editSavePhase);
   const editSaveError = useStore((s) => s.editSaveError);
 
@@ -513,7 +501,7 @@ function EditSaveOverlay() {
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div className="nb-delete-spinner" />
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
-              Saving changes...
+              {t('overlay.saving')}
             </p>
           </div>
         )}
@@ -528,13 +516,13 @@ function EditSaveOverlay() {
               onClick={() => useStore.getState().commitEdits()}
               style={{ marginRight: 'var(--space-sm)' }}
             >
-              Retry
+              {t('overlay.retry')}
             </button>
             <button
               className="notebook-statusbar-btn"
               onClick={() => useStore.setState({ editSavePhase: 'idle', editSaveError: '' })}
             >
-              Cancel
+              {t('modal.cancel')}
             </button>
           </div>
         )}
@@ -546,6 +534,7 @@ function EditSaveOverlay() {
 // ── Scroll-to-bottom floating button ─────────────────────────────────────────
 
 function ScrollToBottomButton({ bottomRef }: { bottomRef: RefObject<HTMLDivElement | null> }) {
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const [rightPx, setRightPx] = useState(0);
 
@@ -588,7 +577,7 @@ function ScrollToBottomButton({ bottomRef }: { bottomRef: RefObject<HTMLDivEleme
       className="scroll-to-bottom"
       style={{ right: rightPx }}
       onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-      aria-label="Scroll to bottom"
+      aria-label={t('notebook.scrollToBottom')}
     >
       ↓
     </button>
@@ -598,6 +587,7 @@ function ScrollToBottomButton({ bottomRef }: { bottomRef: RefObject<HTMLDivEleme
 // ── Main Notebook component ─────────────────────────────────────────────────
 
 export function Notebook() {
+  const t = useT();
   const notebook = useStore((s) => s.notebook);
   const activeTab = useStore((s) => s.activeTab);
   const editMode = useStore((s) => s.editMode);
@@ -666,12 +656,12 @@ export function Notebook() {
           <div className="notebook-cells" ref={cellsContainerRef}>
             {cellsOffset > 0 && (
               <div ref={sentinelRef} className="notebook-load-more">
-                {loadingOlderCells ? '加载中…' : `↑ ${cellsOffset} older cells`}
+                {loadingOlderCells ? t('notebook.loading') : t('notebook.olderCells', String(cellsOffset))}
               </div>
             )}
             {cells.length === 0 && cellsOffset === 0 && (
               <div className="notebook-empty">
-                <p>Send a prompt below to get started.</p>
+                <p>{t('notebook.empty')}</p>
               </div>
             )}
             {cells.map((cell, i) => (

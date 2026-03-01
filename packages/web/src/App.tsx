@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { Notebook } from './components/Notebook';
 import { ProjectSidebar } from './components/ProjectSidebar';
@@ -15,6 +15,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
 import { computeSplitEntryWidth } from './utils/splitView';
+import { I18nProvider, createT } from './i18n';
 import './styles.css';
 
 // ── Scroll position persistence ─────────────────────────────────────────────
@@ -80,18 +81,21 @@ function useScrollRestoration(
 }
 
 function NotebookLoadingScreen() {
+  const t = createT(useStore.getState().language);
   return (
     <div className="notebook-loading-screen">
       <div className="notebook-loading-bar" />
       <div className="notebook-loading-body">
         <div className="notebook-loading-spinner" />
-        <p className="notebook-loading-text">Loading notebook…</p>
+        <p className="notebook-loading-text">{t('notebook.loadingNotebook')}</p>
       </div>
     </div>
   );
 }
 
 function AuthenticatedApp() {
+  const language = useStore((s) => s.language);
+  const t = useMemo(() => createT(language), [language]);
   const notebook = useStore((s) => s.notebook);
   const notebookLoading = useStore((s) => s.notebookLoading);
   const activeNotebookId = useStore((s) => s.activeNotebookId);
@@ -251,24 +255,25 @@ function AuthenticatedApp() {
   }, [hasActiveFile, hasNotebook]);
 
   return (
+    <I18nProvider value={t}>
     <div className="app">
       {modelSwitching && (
         <div className="model-switch-overlay">
           <div className="model-switch-overlay-content">
             <span className="spinner" aria-hidden="true" />
-            <span>Switching model…</span>
+            <span>{t('app.switchingModel')}</span>
           </div>
         </div>
       )}
       <Toolbar />
       {wsReconnectExhausted && wsStatus === 'disconnected' && (
         <div className="ws-exhausted-banner">
-          连接已断开，请刷新页面重试。
+          {t('app.wsExhausted')}
           <button
             className="ws-exhausted-reload"
             onClick={() => window.location.reload()}
           >
-            刷新
+            {t('app.refresh')}
           </button>
         </div>
       )}
@@ -280,15 +285,15 @@ function AuthenticatedApp() {
         return (
           <div className="plugin-banner">
             <span className="plugin-banner-text">
-              部分插件市场未添加，点击管理进行配置。
+              {t('app.missingMarkets')}
             </span>
             <button className="plugin-banner-install" onClick={openPluginPanel}>
-              管理插件
+              {t('app.managePlugins')}
             </button>
             <button
               className="plugin-banner-close"
               onClick={dismissPluginBanner}
-              aria-label="关闭"
+              aria-label={t('app.closeBanner')}
             >
               ×
             </button>
@@ -319,7 +324,7 @@ function AuthenticatedApp() {
                         <div className="split-notebook-overlay">
                           <div className="split-notebook-overlay-icon">&#9881;</div>
                           <p className="split-notebook-overlay-text">
-                            Git History is active. Switch to a notebook tab to continue
+                            {t('app.gitActive')}
                           </p>
                         </div>
                       ) : (
@@ -352,10 +357,13 @@ function AuthenticatedApp() {
         <RightPanel />
       </div>
     </div>
+    </I18nProvider>
   );
 }
 
 export default function App() {
+  const language = useStore((s) => s.language);
+  const t = useMemo(() => createT(language), [language]);
   const authRequired = useStore((s) => s.authRequired);
   const authToken = useStore((s) => s.authToken);
   const authError = useStore((s) => s.authError);
@@ -371,21 +379,25 @@ export default function App() {
   // Still checking auth status
   if (authRequired === null) {
     return (
-      <div className="app-loading">
-        <div className="login-logo">NB</div>
-        <p>Loading...</p>
-      </div>
+      <I18nProvider value={t}>
+        <div className="app-loading">
+          <div className="login-logo">NB</div>
+          <p>{t('login.loading')}</p>
+        </div>
+      </I18nProvider>
     );
   }
 
   // Auth required but no token
   if (authRequired && !authToken) {
     return (
-      <LoginPage
-        onLogin={login}
-        error={authError}
-        loading={authLoading}
-      />
+      <I18nProvider value={t}>
+        <LoginPage
+          onLogin={login}
+          error={authError}
+          loading={authLoading}
+        />
+      </I18nProvider>
     );
   }
 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 import { FileSection } from './FileSection';
 import { runDeleteFlow } from './deleteFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
@@ -12,6 +13,7 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   errorMsg: string;
   onDismiss: () => void;
 }) {
+  const t = useT();
   return (
     <div className="annotation-modal-overlay" onClick={phase === 'error' ? onDismiss : undefined}>
       <div className="annotation-modal" onClick={e => e.stopPropagation()}>
@@ -19,7 +21,7 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div className="nb-delete-spinner" />
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
-              Creating <strong>{label}</strong>...
+              {t('sidebar.creating', label)}
             </p>
           </div>
         )}
@@ -27,18 +29,18 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
             <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
-              {label} created
+              {t('sidebar.created', label)}
             </p>
           </div>
         )}
         {phase === 'error' && (
           <>
-            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Create Failed</div>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>{t('sidebar.createFailed')}</div>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
               {errorMsg}
             </p>
             <div className="annotation-modal-actions">
-              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onDismiss}>Close</button>
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onDismiss}>{t('sidebar.close')}</button>
             </div>
           </>
         )}
@@ -53,6 +55,7 @@ function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequest
   projectId: string; projectSlug: string; authToken: string | null;
   onClose: () => void; onRequestDelete: () => void;
 }) {
+  const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,13 +83,14 @@ function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequest
 
   return (
     <div className="project-item-menu" ref={menuRef} onClick={e => e.stopPropagation()}>
-      <button className="project-item-menu-item" onClick={handleExport}>Export</button>
-      <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>Delete</button>
+      <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>
+      <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>{t('sidebar.delete')}</button>
     </div>
   );
 }
 
 function ProjectList() {
+  const t = useT();
   const { projects, projectsLoading, createProject, setActiveProject, importProject } = useStore();
   const deleteProject = useStore(s => s.deleteProject);
   const authToken = useStore(s => s.authToken);
@@ -130,9 +134,9 @@ function ProjectList() {
   return (
     <div className="project-list">
       <div className="project-list-header">
-        <span>Projects</span>
+        <span>{t('sidebar.projects')}</span>
       </div>
-      {projectsLoading && <div className="project-list-loading">Loading...</div>}
+      {projectsLoading && <div className="project-list-loading">{t('sidebar.loading')}</div>}
       <div className="project-list-items">
         {projects.map(p => (
           <div
@@ -145,11 +149,11 @@ function ProjectList() {
               <button
                 className="project-item-menu-btn"
                 onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id); }}
-                title="Project actions"
+                title={t('sidebar.projectActions')}
               >⋯</button>
             </div>
             <span className="project-list-item-meta">
-              {p.notebook_count} notebooks
+              {t('sidebar.notebooks', String(p.notebook_count))}
             </span>
             {menuOpenId === p.id && (
               <ProjectItemMenu
@@ -168,7 +172,7 @@ function ProjectList() {
       {deleteTarget && (
         <ConfirmDeleteModal
           name={deleteTarget.title}
-          label="Project"
+          label={t('sidebar.projects')}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => deleteProject(deleteTarget.id)}
           onDone={() => {
@@ -197,25 +201,25 @@ function ProjectList() {
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowCreate(false); }}
-              placeholder="Project name..."
+              placeholder={t('sidebar.projectName')}
               maxLength={MAX_TITLE_LENGTH}
               className={titleError ? 'input-error' : ''}
             />
-            <button onClick={handleCreate} disabled={!canCreate}>Create</button>
+            <button onClick={handleCreate} disabled={!canCreate}>{t('sidebar.create')}</button>
           </div>
           {titleError && <div className="create-form-error">{titleError}</div>}
         </div>
       ) : (
         <div className="project-actions-bar">
-          <button className="project-action-btn" onClick={() => setShowCreate(true)}>+ New</button>
-          <button className="project-action-btn" onClick={() => fileInputRef.current?.click()}>&#8593; Import</button>
+          <button className="project-action-btn" onClick={() => setShowCreate(true)}>{t('sidebar.new')}</button>
+          <button className="project-action-btn" onClick={() => fileInputRef.current?.click()}>{t('sidebar.import')}</button>
         </div>
       )}
 
       {createPhase !== 'idle' && (
         <CreateOverlay
           phase={createPhase as 'creating' | 'done' | 'error'}
-          label="Project"
+          label={t('sidebar.projects')}
           errorMsg={createError}
           onDismiss={() => setCreatePhase('idle')}
         />
@@ -232,6 +236,7 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
   /** Called after successful delete + success display. Use for state cleanup. */
   onDone?: () => void;
 }) {
+  const t = useT();
   const [phase, setPhase] = useState<'confirm' | 'deleting' | 'done' | 'error'>('confirm');
   const [errorMsg, setErrorMsg] = useState('');
   const onDoneRef = useRef(onDone);
@@ -250,13 +255,13 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
       <div className="annotation-modal" onClick={e => e.stopPropagation()}>
         {phase === 'confirm' && (
           <>
-            <div className="annotation-modal-title">Delete {label}</div>
+            <div className="annotation-modal-title">{t('sidebar.deleteLabel', label)}</div>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
-              Are you sure you want to delete <strong>{name}</strong>? This cannot be undone.
+              {t('sidebar.deleteConfirm', name)}
             </p>
             <div className="annotation-modal-actions">
-              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Cancel</button>
-              <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={handleConfirm}>Delete</button>
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>{t('sidebar.cancel')}</button>
+              <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={handleConfirm}>{t('sidebar.delete')}</button>
             </div>
           </>
         )}
@@ -264,7 +269,7 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div className="nb-delete-spinner" />
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
-              Deleting <strong>{name}</strong>...
+              {t('sidebar.deleting', name)}
             </p>
           </div>
         )}
@@ -272,18 +277,18 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
           <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
             <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
             <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
-              {label} deleted
+              {t('sidebar.deleted', label)}
             </p>
           </div>
         )}
         {phase === 'error' && (
           <>
-            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Delete Failed</div>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>{t('sidebar.deleteFailed')}</div>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
               {errorMsg}
             </p>
             <div className="annotation-modal-actions">
-              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Close</button>
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>{t('sidebar.close')}</button>
             </div>
           </>
         )}
@@ -295,6 +300,7 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
 function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted }: {
   projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; onClose: () => void; onDeleted?: () => void;
 }) {
+  const t = useT();
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -328,8 +334,8 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
   return (
     <>
       <div className="project-item-menu" ref={menuRef}>
-        {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>Export</button>}
-        <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>Delete</button>
+        {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
+        <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>{t('sidebar.delete')}</button>
       </div>
       {showDeleteModal && (
         <ConfirmDeleteModal
@@ -347,6 +353,7 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
 }
 
 function FileBrowser() {
+  const t = useT();
   const activeProjectId = useStore(s => s.activeProjectId);
   const activeProjectPath = useStore(s => s.activeProjectPath);
   const goBackToProjectList = useStore(s => s.goBackToProjectList);
@@ -522,7 +529,7 @@ function FileBrowser() {
         <button
           className="fp-action"
           onClick={() => setNbMenuPath(nbMenuPath === relPath ? null : relPath)}
-          title="Notebook actions"
+          title={t('sidebar.notebookActions')}
         >⋯</button>
         {nbMenuPath === relPath && activeProjectId && (
           <NotebookItemMenu
@@ -575,21 +582,21 @@ function FileBrowser() {
                   value={nbTitle}
                   onChange={e => setNbTitle(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleCreateNotebook(); if (e.key === 'Escape') setShowNbCreate(false); }}
-                  placeholder="Notebook name..."
+                  placeholder={t('sidebar.notebookName')}
                   disabled={nbCreatePhase === 'creating'}
                   maxLength={MAX_TITLE_LENGTH}
                   className={nbTitleError ? 'input-error' : ''}
                 />
                 <button onClick={handleCreateNotebook} disabled={nbCreatePhase === 'creating' || !canCreateNb}>
-                  Create
+                  {t('sidebar.create')}
                 </button>
               </div>
               {nbTitleError && <div className="create-form-error">{nbTitleError}</div>}
             </div>
           ) : (
             <div className="project-actions-bar">
-              <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>+ New</button>
-              <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>&#8593; Import</button>
+              <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>{t('sidebar.new')}</button>
+              <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>{t('sidebar.import')}</button>
             </div>
           )}
 
@@ -608,6 +615,7 @@ function FileBrowser() {
 }
 
 export function ProjectSidebar() {
+  const t = useT();
   const sidebarLevel = useStore(s => s.sidebarLevel);
   const leftSidebarSplitRatio = useStore(s => s.leftSidebarSplitRatio);
   const setLeftSidebarSplitRatio = useStore(s => s.setLeftSidebarSplitRatio);
@@ -657,14 +665,14 @@ export function ProjectSidebar() {
       />
       <div className="sidebar-bottom" style={{ flex: 1 - leftSidebarSplitRatio }}>
         <div className="sidebar-section-header">
-          <span>Library</span>
+          <span>{t('sidebar.library')}</span>
         </div>
         <FileSection
           baseUrl="/api/library"
           authToken={authToken}
           refreshKey={libraryRefreshKey}
           showDownloadAll
-          dropLabel="Drop to add to Library"
+          dropLabel={t('sidebar.dropToLibrary')}
           workspaceDir={workspaceDir}
           noDeleteFilter={(name, subPath) => {
             // Root-level dot-prefixed entries and MEMORY.md are system files

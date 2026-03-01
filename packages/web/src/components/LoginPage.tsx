@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 
 interface LoginPageProps {
   onLogin: (token: string) => void;
@@ -8,6 +9,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin, error, loading }: LoginPageProps) {
+  const t = useT();
   const [token, setToken] = useState('');
   const [countdown, setCountdown] = useState(0);
   const authRetryAfter = useStore(s => s.authRetryAfter);
@@ -48,13 +50,13 @@ export function LoginPage({ onLogin, error, loading }: LoginPageProps) {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">NB</div>
-        <h1 className="login-title">Notebook AI</h1>
-        <p className="login-subtitle">Enter your access token to continue</p>
+        <h1 className="login-title">{t('login.title')}</h1>
+        <p className="login-subtitle">{t('login.subtitle')}</p>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="login-field">
             <label className="login-label" htmlFor="auth-token">
-              Access Token
+              {t('login.label')}
             </label>
             <input
               ref={inputRef}
@@ -63,7 +65,7 @@ export function LoginPage({ onLogin, error, loading }: LoginPageProps) {
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste your token here"
+              placeholder={t('login.placeholder')}
               disabled={loading || locked}
               autoComplete="off"
             />
@@ -76,7 +78,7 @@ export function LoginPage({ onLogin, error, loading }: LoginPageProps) {
             type="submit"
             disabled={!token.trim() || loading || locked}
           >
-            {loading ? 'Verifying...' : locked ? `Wait ${countdown}s` : 'Sign In'}
+            {loading ? t('login.verifying') : locked ? t('login.wait', String(countdown)) : t('login.signIn')}
           </button>
         </form>
       </div>

@@ -101,6 +101,73 @@ describe('SessionManager.restartSession()', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('should preserve allowedDirs across restart (D2-1 regression)', async () => {
+    // Create sibling directories to trigger allowedDirs computation
+    const projectDir = path.join(tempDir, 'project');
+    const cwdDir = path.join(projectDir, 'notebook-a');
+    const siblingDir = path.join(projectDir, 'notebook-b');
+    fs.mkdirSync(cwdDir, { recursive: true });
+    fs.mkdirSync(siblingDir, { recursive: true });
+
+    const nbPath = path.join(cwdDir, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('AllowedDirs Test', cwdDir));
+
+    const session = await sm.createSession(nbPath, cwdDir);
+
+    // Verify initial AgentProcess has --add-dir in its args
+    const initialArgs = session.agentProcess._buildArgs();
+    expect(initialArgs).toContain('--add-dir');
+    expect(initialArgs).toContain(siblingDir);
+
+    await sm.restartSession(session.id);
+
+    // After restart, the new AgentProcess should also have --add-dir
+    const afterRestart = sm.getSession(session.id);
+    const restartArgs = afterRestart!.agentProcess._buildArgs();
+    expect(restartArgs).toContain('--add-dir');
+    expect(restartArgs).toContain(siblingDir);
+  });
+
+  it('should preserve allowedDirs across rerun (D2-1 regression)', async () => {
+    const projectDir = path.join(tempDir, 'project-rerun');
+    const cwdDir = path.join(projectDir, 'nb-a');
+    const siblingDir = path.join(projectDir, 'nb-b');
+    fs.mkdirSync(cwdDir, { recursive: true });
+    fs.mkdirSync(siblingDir, { recursive: true });
+
+    const nbPath = path.join(cwdDir, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('Rerun AllowedDirs', cwdDir));
+
+    const session = await sm.createSession(nbPath, cwdDir);
+
+    await sm.rerunNotebook(session.id);
+
+    const afterRerun = sm.getSession(session.id);
+    const rerunArgs = afterRerun!.agentProcess._buildArgs();
+    expect(rerunArgs).toContain('--add-dir');
+    expect(rerunArgs).toContain(siblingDir);
+  });
+
+  it('should preserve allowedDirs across changeModel (D2-1 regression)', async () => {
+    const projectDir = path.join(tempDir, 'project-model');
+    const cwdDir = path.join(projectDir, 'nb-a');
+    const siblingDir = path.join(projectDir, 'nb-b');
+    fs.mkdirSync(cwdDir, { recursive: true });
+    fs.mkdirSync(siblingDir, { recursive: true });
+
+    const nbPath = path.join(cwdDir, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('Model AllowedDirs', cwdDir));
+
+    const session = await sm.createSession(nbPath, cwdDir);
+
+    await sm.changeModel(session.id, 'claude-3-haiku');
+
+    const afterChange = sm.getSession(session.id);
+    const modelArgs = afterChange!.agentProcess._buildArgs();
+    expect(modelArgs).toContain('--add-dir');
+    expect(modelArgs).toContain(siblingDir);
+  });
+
   it('should throw when restarting a non-existent session', async () => {
     await expect(sm.restartSession('non-existent')).rejects.toThrow(
       'Session "non-existent" not found',

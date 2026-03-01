@@ -2,15 +2,17 @@ import { memo } from 'react';
 import type { Cell as CellData } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
 import { MarkdownBody } from './MarkdownBody';
+import { useT } from '../i18n';
 
 // ── Status indicator (non-running states only) ──────────────────────────────
 
 const StatusIndicator = memo(function StatusIndicator({ status }: { status: CellData['status'] }) {
+  const t = useT();
   if (status === 'idle' || status === 'completed' || status === 'running') return null;
   return (
     <span className={`cell-status cell-status-${status}`} aria-label={status}>
-      {status === 'error' ? 'Error'
-        : status === 'interrupted' ? 'Interrupted'
+      {status === 'error' ? t('cell.error')
+        : status === 'interrupted' ? t('cell.interrupted')
         : null}
     </span>
   );
@@ -27,6 +29,7 @@ interface CellProps {
 }
 
 export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: CellProps) {
+  const t = useT();
   if (cell.type !== 'prompt') return null;
 
   const execNum = cell.execution_count || index + 1;
@@ -41,8 +44,8 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
         <button
           className="cell-delete-btn"
           onClick={() => onToggleDelete?.(cell.id)}
-          title={pendingDelete ? 'Undo delete' : 'Mark for deletion'}
-          aria-label={pendingDelete ? 'Undo delete' : 'Mark for deletion'}
+          title={pendingDelete ? t('cell.undoDelete') : t('cell.markDelete')}
+          aria-label={pendingDelete ? t('cell.undoDelete') : t('cell.markDelete')}
         >
           {pendingDelete ? '\u21A9' : '\u2715'}
         </button>

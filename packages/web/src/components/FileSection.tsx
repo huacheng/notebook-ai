@@ -3,6 +3,7 @@ import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { makeFetchGuard } from '../utils/fetchGuard';
 import { computeBreadcrumb, computeNavigateUp } from '../utils/worktreePath';
 import { isWsFresh } from '../utils/wsFilesPush';
+import { useT } from '../i18n';
 
 // Compute a POSIX-style relative path from `fromDir` to `toFile`.
 // Both arguments must be absolute Unix paths.
@@ -238,6 +239,7 @@ export function FileSection({
   refreshKey,
   onDirClick,
 }: FileSectionProps) {
+  const t = useT();
   const [subPath, setSubPath] = useState(initialPath);
 
   useEffect(() => {
@@ -448,24 +450,24 @@ export function FileSection({
         <div className="fp-toolbar-btns">
           {!isReadOnly && (
           <>
-          <button className="fp-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload files">
+          <button className="fp-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title={t('file.upload')}>
             <IconUpload />
           </button>
           <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
-          <button className="fp-btn" onClick={() => setCreating('file')} title="New file">
+          <button className="fp-btn" onClick={() => setCreating('file')} title={t('file.newFile')}>
             <IconNewFile />
           </button>
-          <button className="fp-btn" onClick={() => setCreating('folder')} title="New folder">
+          <button className="fp-btn" onClick={() => setCreating('folder')} title={t('file.newFolder')}>
             <IconNewFolder />
           </button>
           </>
           )}
           {showDownloadAll && !isReadOnly && (
-            <button className="fp-btn" onClick={() => triggerDl(`${baseUrl}/files/zip`)} title="Download all (.tar.gz)">
+            <button className="fp-btn" onClick={() => triggerDl(`${baseUrl}/files/zip`)} title={t('file.downloadAll')}>
               <IconDownload />
             </button>
           )}
-          <button className="fp-btn" onClick={() => fetchFiles(subPath)} disabled={loading} title="Refresh">
+          <button className="fp-btn" onClick={() => fetchFiles(subPath)} disabled={loading} title={t('file.refresh')}>
             <IconRefresh />
           </button>
         </div>
@@ -483,8 +485,8 @@ export function FileSection({
             onKeyDown={(e) => { if (e.key === 'Enter') submitCreate(); if (e.key === 'Escape') setCreating(null); }}
             placeholder={creating === 'file' ? 'filename.txt' : 'folder-name'}
           />
-          <button className="fp-new-ok" onClick={submitCreate} title="Create">✓</button>
-          <button className="fp-new-cancel" onClick={() => setCreating(null)} title="Cancel">✗</button>
+          <button className="fp-new-ok" onClick={submitCreate} title={t('file.create')}>✓</button>
+          <button className="fp-new-cancel" onClick={() => setCreating(null)} title={t('fv.cancel')}>✗</button>
         </div>
       )}
 
@@ -511,7 +513,7 @@ export function FileSection({
           </div>
         )}
         <div className="fp-list">
-          {loading && <div className="fp-empty">Loading…</div>}
+          {loading && <div className="fp-empty">{t('file.loading')}</div>}
 
           {/* Up directory */}
           {!loading && subPath !== initialPath && subPath !== '.' && (
@@ -545,7 +547,7 @@ export function FileSection({
                       <button className="fp-confirm-cancel" onClick={() => setConfirmDelete(null)}>✗</button>
                     </span>
                   ) : (
-                    <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
+                    <button className="fp-action" onClick={() => deleteEntry(f.name)} title={t('file.delete')}>✕</button>
                   )}
                 </div>
                 )
@@ -572,9 +574,9 @@ export function FileSection({
                   </span>
                 ) : (
                   <>
-                    {!isReadOnly && <button className="fp-action" onClick={() => downloadFile(f.name)} title="Download">↓</button>}
+                    {!isReadOnly && <button className="fp-action" onClick={() => downloadFile(f.name)} title={t('file.download')}>↓</button>}
                     {!isReadOnly && !noDeleteFilter?.(f.name, subPath) && f.name !== 'MEMORY.md' && (
-                      <button className="fp-action" onClick={() => deleteEntry(f.name)} title="Delete">✕</button>
+                      <button className="fp-action" onClick={() => deleteEntry(f.name)} title={t('file.delete')}>✕</button>
                     )}
                   </>
                 )}
@@ -584,7 +586,7 @@ export function FileSection({
           )})}
 
           {!loading && files.length === 0 && !error && (
-            <div className="fp-empty">Drop files here or click <IconUpload /> upload</div>
+            <div className="fp-empty">{t('file.dropEmpty')}</div>
           )}
         </div>
       </div>

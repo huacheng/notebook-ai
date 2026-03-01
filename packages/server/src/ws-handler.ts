@@ -1,4 +1,49 @@
 import { type WebSocketServer, type WebSocket } from 'ws';
+
+// ── Error sanitization (D2-4) ───────────────────────────────────────────────
+// Patterns that indicate internal details unsafe for client exposure.
+const INTERNAL_PATTERNS = [
+  /\/[a-zA-Z][\w/.\-]*\.\w+/,     // file paths like /home/user/file.ts
+  /at\s+\S+\s+\(/,                 // stack trace frames
+  /SQLITE_/i,                      // SQLite errors
+  /ENOENT|EACCES|EPERM|EISDIR/,    // Node.js fs errors
+  /\bat\b.*:\d+:\d+/,              // stack line references
+];
+
+const SAFE_PATTERNS = [
+  /^Session ".+" not found\.?$/,
+  /not found\.?$/i,
+  /outside the workspace\.?$/i,
+  /already running\.?$/i,
+  /not running\.?$/i,
+  /^Unknown message type\.?$/,
+  /^Missing required/,
+  /^Invalid /,
+  /^Path outside workspace/,
+  /^Save path /,
+];
+
+/** Sanitize error for client — strip internal details, pass safe messages through. */
+export function sanitizeErrorForClient(err: unknown): string {
+  if (err == null || (typeof err !== 'string' && !(err instanceof Error))) {
+    return 'An internal error occurred.';
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  // Check for safe patterns first
+  for (const pattern of SAFE_PATTERNS) {
+    if (pattern.test(msg)) return msg;
+  }
+  // Check for internal details — redact
+  for (const pattern of INTERNAL_PATTERNS) {
+    if (pattern.test(msg)) {
+      console.error('[ws] sanitized error:', msg);
+      return 'An internal error occurred.';
+    }
+  }
+  // No internal details detected but also not a known safe message — pass through
+  // (short messages without obvious internals are likely intentional user-facing messages)
+  return msg;
+}
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { execFile as execFileCb } from 'child_process';
@@ -247,7 +292,7 @@ export function setupWebSocket(
             sendToClient(ws, {
               type: 'error',
               session_id,
-              message: String(err),
+              message: sanitizeErrorForClient(err),
               cell_id,
             });
           }
@@ -276,7 +321,7 @@ export function setupWebSocket(
               });
             }
           } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -287,7 +332,7 @@ export function setupWebSocket(
           try {
             notebook = await notebookStore.load(msg.path);
           } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
             break;
           }
           const loadSession = sessionManager.getSession(session_id);
@@ -311,7 +356,7 @@ export function setupWebSocket(
             const html = await exportToHtml(session.notebook, { ...msg.options, minify: false });
             sendToClient(ws, { type: 'export_complete', session_id, html });
           } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -433,7 +478,7 @@ export function setupWebSocket(
 
             sendToClient(ws, { type: 'file-open-end', session_id, mtime: stat.mtimeMs });
           } catch (err) {
-            sendToClient(ws, { type: 'file-open-error', session_id, error: String(err) });
+            sendToClient(ws, { type: 'file-open-error', session_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -477,7 +522,7 @@ export function setupWebSocket(
             const stat = await fs.stat(safePath);
             sendToClient(ws, { type: 'file-save-ok', session_id, mtime: stat.mtimeMs });
           } catch (err) {
-            sendToClient(ws, { type: 'file-save-error', session_id, error: String(err) });
+            sendToClient(ws, { type: 'file-save-error', session_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -508,7 +553,7 @@ export function setupWebSocket(
             await sessionManager.restartSession(session_id);
             sendToClient(ws, { type: 'session_restarted', session_id });
           } catch (err) {
-            sendToClient(ws, { type: 'session_restart_failed', session_id, error: String(err) });
+            sendToClient(ws, { type: 'session_restart_failed', session_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -519,7 +564,7 @@ export function setupWebSocket(
             await sessionManager.rerunNotebook(session_id);
             sendToClient(ws, { type: 'rerun_started', session_id });
           } catch (err) {
-            sendToClient(ws, { type: 'rerun_failed', session_id, error: String(err) });
+            sendToClient(ws, { type: 'rerun_failed', session_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -530,7 +575,7 @@ export function setupWebSocket(
             await sessionManager.interruptCell(session_id);
             sendToClient(ws, { type: 'cell_interrupted', session_id });
           } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -540,7 +585,7 @@ export function setupWebSocket(
           try {
             await sessionManager.submitToolResult(session_id, tool_use_id, content);
           } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -551,7 +596,7 @@ export function setupWebSocket(
             await sessionManager.changeModel(session_id, model);
             sendToClient(ws, { type: 'model_changed', session_id, model });
           } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: String(err) });
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -567,7 +612,7 @@ export function setupWebSocket(
             const filePath = await captureUrl(url, session.cwd);
             sendToClient(ws, { type: 'url_capture_result', url, file_path: filePath, format: 'image' as const });
           } catch (err) {
-            sendToClient(ws, { type: 'url_capture_result', url, file_path: '', format: 'image' as const, error: String(err) });
+            sendToClient(ws, { type: 'url_capture_result', url, file_path: '', format: 'image' as const, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -616,7 +661,7 @@ export function setupWebSocket(
               console.warn('[ws] Git commit for cell removal failed:', String(err));
             }
           } catch (err) {
-            sendToClient(ws, { type: 'cells_remove_failed', session_id, error: String(err) });
+            sendToClient(ws, { type: 'cells_remove_failed', session_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -715,7 +760,7 @@ export function setupWebSocket(
             sendToClient(ws, {
               type: 'notebook_open_error',
               request_id,
-              error: String(err),
+              error: sanitizeErrorForClient(err),
             });
           }
           break;
@@ -732,7 +777,7 @@ export function setupWebSocket(
             const logData = await computeGitLog(project.path, { page, limit, all, stats });
             sendToClient(ws, { type: 'git_log_response', request_id, ...logData });
           } catch (err) {
-            sendToClient(ws, { type: 'git_log_error', request_id, error: String(err) });
+            sendToClient(ws, { type: 'git_log_error', request_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -766,7 +811,7 @@ export function setupWebSocket(
             }
             sendToClient(ws, { type: 'git_commit_files_response', request_id, files });
           } catch (err) {
-            sendToClient(ws, { type: 'git_commit_files_error', request_id, error: String(err) });
+            sendToClient(ws, { type: 'git_commit_files_error', request_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -798,7 +843,7 @@ export function setupWebSocket(
             const { stdout } = await execFileAsync('git', args, { cwd: project.path, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
             sendToClient(ws, { type: 'git_diff_response', request_id, diff: stdout });
           } catch (err) {
-            sendToClient(ws, { type: 'git_diff_error', request_id, error: String(err) });
+            sendToClient(ws, { type: 'git_diff_error', request_id, error: sanitizeErrorForClient(err) });
           }
           break;
         }
@@ -810,15 +855,18 @@ export function setupWebSocket(
       }
     });
 
+    let cleanedUp = false;
     function cleanup() {
+      if (cleanedUp) return; // guard against double-cleanup
+      cleanedUp = true;
       for (const [session_id, remove] of subscriptions.entries()) {
-        remove();
+        try { remove(); } catch (e) { console.error('[ws] cleanup: session listener removal failed:', e); }
         if (sessionOwners.get(session_id) === ws) sessionOwners.delete(session_id);
       }
       subscriptions.clear();
       // Clean up all watcher subscriptions
       for (const [, unsub] of watchSubscriptions) {
-        unsub();
+        try { unsub(); } catch (e) { console.error('[ws] cleanup: watcher unsub failed:', e); }
       }
       watchSubscriptions.clear();
     }

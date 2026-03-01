@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 
 function CreateForm({
   placeholder,
@@ -12,6 +13,7 @@ function CreateForm({
 }) {
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   const handleSubmit = async () => {
     if (!title.trim() || busy) return;
@@ -35,13 +37,14 @@ function CreateForm({
         autoFocus
       />
       <button onClick={handleSubmit} disabled={busy || !title.trim()}>
-        {busy ? 'Creating...' : buttonLabel}
+        {busy ? t('welcome.creating') : buttonLabel}
       </button>
     </div>
   );
 }
 
 export function WelcomeScreen() {
+  const t = useT();
   const sessionNotice = useStore((s) => s.sessionNotice);
   const clearSessionNotice = useStore((s) => s.clearSessionNotice);
   const activeProjectId = useStore((s) => s.activeProjectId);
@@ -56,7 +59,7 @@ export function WelcomeScreen() {
 
   async function handleFile(file: File) {
     if (!file.name.endsWith('.json') && !file.name.endsWith('.zip')) {
-      alert('Please select a .notebook.json file or an exported .zip bundle.');
+      alert(t('welcome.fileAlert'));
       return;
     }
     setImporting(true);
@@ -102,28 +105,28 @@ export function WelcomeScreen() {
           <button className="session-notice-close" onClick={clearSessionNotice}>✕</button>
         </div>
       )}
-      <h1 className="welcome-title">NoteBook AI</h1>
+      <h1 className="welcome-title">{t('welcome.title')}</h1>
       <p className="welcome-subtitle">
-        An interactive notebook for AI-CLI
+        {t('welcome.subtitle')}
       </p>
 
       {activeProjectId ? (
         <div className="welcome-create-project">
-          <p className="welcome-hint">Create a notebook in the current project</p>
+          <p className="welcome-hint">{t('welcome.createNotebookHint')}</p>
           <CreateForm
-            placeholder="Notebook name..."
-            buttonLabel="Create Notebook"
+            placeholder={t('welcome.notebookName')}
+            buttonLabel={t('welcome.createNotebook')}
             onSubmit={handleCreateNotebook}
           />
 
-          <div className="welcome-divider">or</div>
+          <div className="welcome-divider">{t('welcome.or')}</div>
 
           <button
             className="welcome-import-btn"
             onClick={() => !importing && fileInputRef.current?.click()}
             disabled={importing}
           >
-            {importing ? 'Importing...' : 'Import from file'}
+            {importing ? t('welcome.importing') : t('welcome.importFromFile')}
           </button>
           <input
             ref={fileInputRef}
@@ -135,14 +138,14 @@ export function WelcomeScreen() {
         </div>
       ) : (
         <div className="welcome-create-project">
-          <p className="welcome-hint">Create a project to get started</p>
+          <p className="welcome-hint">{t('welcome.createProjectHint')}</p>
           <CreateForm
-            placeholder="Project name..."
-            buttonLabel="Create Project"
+            placeholder={t('welcome.projectName')}
+            buttonLabel={t('welcome.createProject')}
             onSubmit={(title) => createProject(title)}
           />
           <p className="welcome-hint-sub">
-            Or use the sidebar on the left to create and select a project
+            {t('welcome.sidebarHint')}
           </p>
         </div>
       )}

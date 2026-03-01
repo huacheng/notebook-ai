@@ -6,6 +6,7 @@ import crypto from 'crypto';
 // (open access — useful for local development).
 
 const NB_AUTH_TOKEN = process.env['NB_AUTH_TOKEN'] ?? '';
+const TRUST_PROXY = !!process.env['TRUST_PROXY'];
 
 /** Whether auth is enabled (non-empty NB_AUTH_TOKEN). */
 export const authEnabled = NB_AUTH_TOKEN.length > 0;
@@ -24,9 +25,11 @@ const BASE_LOCKOUT_MS = 60_000;
 /** Max lockout cap: 30 minutes. */
 const MAX_LOCKOUT_MS = 30 * 60_000;
 
-function getClientIp(req: Request): string {
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string') return xff.split(',')[0].trim();
+export function getClientIp(req: Request): string {
+  if (TRUST_PROXY) {
+    const xff = req.headers['x-forwarded-for'];
+    if (typeof xff === 'string') return xff.split(',')[0].trim();
+  }
   return req.socket.remoteAddress ?? 'unknown';
 }
 

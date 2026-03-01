@@ -76,6 +76,8 @@ interface NotebookSession {
   _interrupted?: boolean;
   /** Event buffer for WS resume-after reconnection. */
   eventBuffer: EventBuffer;
+  /** Allowed directories for cross-project isolation (--add-dir). */
+  allowedDirs?: string[];
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -160,6 +162,7 @@ export class SessionManager {
       listeners: new Set(),
       _execStartTimes: new Map(),
       eventBuffer: new EventBuffer(),
+      allowedDirs,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -260,10 +263,10 @@ export class SessionManager {
     // Stop old process
     session.agentProcess.stop();
 
-    // Create new AgentProcess with same config (preserve model)
+    // Create new AgentProcess with same config (preserve model + allowedDirs)
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model);
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model, session.allowedDirs);
 
     // Start new process with same handlers — pass resumeSessionId for context recovery
     await session.agentProcess.start(
@@ -308,7 +311,7 @@ export class SessionManager {
     // 3. Create new AgentProcess WITHOUT resumeSessionId (clean context)
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model);
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model, session.allowedDirs);
 
     // 4. Start new process — no resume
     await session.agentProcess.start(
@@ -375,9 +378,9 @@ export class SessionManager {
     // Stop old process
     session.agentProcess.stop();
 
-    // Create new AgentProcess with updated model
+    // Create new AgentProcess with updated model (preserve allowedDirs)
     const engine = session.agentProcess.engine;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model);
+    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model, session.allowedDirs);
 
     // Start new process (clean — no resume)
     await session.agentProcess.start(

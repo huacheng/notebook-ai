@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 import { findModelById } from './ModelManager';
 
 // ── Connection status badge ─────────────────────────────────────────────────
@@ -6,6 +8,7 @@ import { findModelById } from './ModelManager';
 const SIGNAL_HEIGHTS = [4, 6, 9, 12];
 
 function SignalBars({ latency }: { latency: number | null }) {
+  const t = useT();
   let bars: number;
   let color: string;
 
@@ -22,7 +25,7 @@ function SignalBars({ latency }: { latency: number | null }) {
     bars = 1; color = '#f87171';
   }
 
-  const title = latency === null ? 'Measuring latency…' : `Latency: ${latency}ms`;
+  const title = latency === null ? t('conn.measuringLatency') : t('conn.latency', String(latency));
 
   return (
     <span className="signal-bars" title={title} aria-label={title}>
@@ -44,6 +47,7 @@ function SignalBars({ latency }: { latency: number | null }) {
 }
 
 function ConnectionStatus() {
+  const t = useT();
   const wsStatus = useStore((s) => s.wsStatus);
   const sessionId = useStore((s) => s.sessionId);
   const notebook = useStore((s) => s.notebook);
@@ -53,10 +57,10 @@ function ConnectionStatus() {
   const display = initializing ? 'initializing' : wsStatus;
 
   const label: Record<string, string> = {
-    connected: 'Connected',
-    connecting: 'Connecting…',
-    disconnected: 'Disconnected',
-    initializing: 'Initializing…',
+    connected: t('conn.connected'),
+    connecting: t('conn.connecting'),
+    disconnected: t('conn.disconnected'),
+    initializing: t('conn.initializing'),
   };
 
   // Signal bars reflect connection state via color; show even when not yet connected
@@ -77,14 +81,15 @@ function ConnectionStatus() {
 // ── Logout ──────────────────────────────────────────────────────────────────
 
 function LogoutButton() {
+  const t = useT();
   const authRequired = useStore((s) => s.authRequired);
   const logout = useStore((s) => s.logout);
 
   if (!authRequired) return null;
 
   return (
-    <button className="toolbar-btn" onClick={logout} title="Sign out">
-      Logout
+    <button className="toolbar-btn" onClick={logout} title={t('toolbar.signOut')}>
+      {t('toolbar.logout')}
     </button>
   );
 }
@@ -92,6 +97,7 @@ function LogoutButton() {
 // ── Plugin button ────────────────────────────────────────────────────────────
 
 function PluginButton() {
+  const t = useT();
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
 
@@ -99,9 +105,9 @@ function PluginButton() {
     <button
       className={`toolbar-btn${pluginPanelOpen ? ' toolbar-btn--active' : ''}`}
       onClick={openPluginPanel}
-      title="插件管理"
+      title={t('toolbar.pluginManage')}
     >
-      Plugins
+      {t('toolbar.plugins')}
     </button>
   );
 }
@@ -109,6 +115,7 @@ function PluginButton() {
 // ── Model button ──────────────────────────────────────────────────────────────
 
 function ModelButton() {
+  const t = useT();
   const openModelPanel = useStore((s) => s.openModelPanel);
   const modelPanelOpen = useStore((s) => s.modelPanelOpen);
   const openNotebooks = useStore((s) => s.openNotebooks);
@@ -125,10 +132,58 @@ function ModelButton() {
       className={`toolbar-btn${modelPanelOpen ? ' toolbar-btn--active' : ''}${!hasNotebook ? ' toolbar-btn--disabled' : ''}`}
       onClick={hasNotebook ? openModelPanel : undefined}
       disabled={!hasNotebook}
-      title={hasNotebook ? '模型管理' : '请先打开一个 notebook，然后选择模型'}
+      title={hasNotebook ? t('toolbar.modelManage') : t('toolbar.openNotebookFirst')}
     >
       {label}
     </button>
+  );
+}
+
+// ── Language toggle ──────────────────────────────────────────────────────────
+
+function LangToggle() {
+  const language = useStore((s) => s.language);
+  const setLanguage = useStore((s) => s.setLanguage);
+  return (
+    <button
+      className="toolbar-btn toolbar-lang-btn"
+      onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+      title={language === 'en' ? 'Switch to Chinese' : '切换到英文'}
+    >
+      {language === 'en' ? '中' : 'EN'}
+    </button>
+  );
+}
+
+// ── URL capture input ────────────────────────────────────────────────────────
+
+function ToolbarUrlInput() {
+  const t = useT();
+  const captureUrl = useStore((s) => s.captureUrl);
+  const urlCapturing = useStore((s) => s.urlCapturing);
+  const wsStatus = useStore((s) => s.wsStatus);
+  const connected = wsStatus === 'connected';
+  const [urlInput, setUrlInput] = useState('');
+
+  return (
+    <>
+      <input
+        className="toolbar-url-input"
+        placeholder={t('toolbar.urlPlaceholder')}
+        value={urlInput}
+        onChange={(e) => setUrlInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && urlInput.trim()) {
+            e.preventDefault();
+            captureUrl(urlInput.trim());
+            setUrlInput('');
+          }
+        }}
+        disabled={!connected || urlCapturing}
+        title={t('toolbar.urlTitle')}
+      />
+      {urlCapturing && <span className="toolbar-url-spinner" />}
+    </>
   );
 }
 
@@ -144,9 +199,14 @@ export function Toolbar() {
         </span>
       </div>
 
+      <div className="toolbar-center">
+        <ToolbarUrlInput />
+      </div>
+
       <div className="toolbar-right">
         <ModelButton />
         <PluginButton />
+        <LangToggle />
         <ConnectionStatus />
         <LogoutButton />
       </div>

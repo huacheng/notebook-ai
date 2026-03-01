@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 
 const DEFAULT_MARKETPLACES: { name: string; repo: string }[] = [
   { name: 'anthropic-agent-skills', repo: 'anthropics/skills' },
@@ -9,6 +10,7 @@ const DEFAULT_MARKETPLACES: { name: string; repo: string }[] = [
 ];
 
 export function PluginManager() {
+  const t = useT();
   const pluginStatus = useStore((s) => s.pluginStatus);
   const pluginActionKey = useStore((s) => s.pluginActionKey);
   const pluginOverlay = useStore((s) => s.pluginOverlay);
@@ -24,26 +26,32 @@ export function PluginManager() {
 
   const existingNames = new Set(pluginStatus?.marketplaces.map((m) => m.name) ?? []);
 
+  // Decode pluginOverlay: "key|arg" -> t(key, arg)
+  const overlayText = pluginOverlay ? (() => {
+    const [key, ...args] = pluginOverlay.split('|');
+    return t(key, ...args);
+  })() : null;
+
   const handleAddCustom = useCallback(() => {
     const repo = customRepo.trim();
     if (!repo) return;
-    if (!window.confirm(`添加市场 ${repo}？`)) return;
+    if (!window.confirm(t('plugin.confirmAdd', repo))) return;
     addMarketplace(repo);
     setCustomRepo('');
-  }, [customRepo, addMarketplace]);
+  }, [customRepo, addMarketplace, t]);
 
   const handleTogglePlugin = useCallback(
     (key: string, isInstalled: boolean) => {
-      const action = isInstalled ? '卸载' : '安装';
       const name = key.split('@')[0];
-      if (!window.confirm(`${action} ${name}？所有打开的 notebook 将自动重启以加载变更。`)) return;
+      const confirmKey = isInstalled ? 'plugin.confirmUninstall' : 'plugin.confirmInstall';
+      if (!window.confirm(t(confirmKey, name))) return;
       if (isInstalled) {
         uninstallPlugin(key);
       } else {
         installPlugin(key);
       }
     },
-    [installPlugin, uninstallPlugin],
+    [installPlugin, uninstallPlugin, t],
   );
 
   // Extra marketplaces (not in the default list)
@@ -61,28 +69,28 @@ export function PluginManager() {
 
   return (
     <div className="pm-container">
-      {pluginOverlay && (
+      {overlayText && (
         <div className="pm-overlay">
           <div className="pm-overlay-spinner" />
-          <p className="pm-overlay-text">{pluginOverlay}</p>
+          <p className="pm-overlay-text">{overlayText}</p>
         </div>
       )}
 
       <div className="pm-header">
-        <h2 className="pm-title">插件管理</h2>
-        <button className="pm-close" onClick={closePluginPanel} aria-label="关闭">×</button>
+        <h2 className="pm-title">{t('plugin.title')}</h2>
+        <button className="pm-close" onClick={closePluginPanel} aria-label={t('plugin.close')}>×</button>
       </div>
 
       {/* Marketplaces section */}
       <div className="pm-section">
         <div className="pm-section-header">
-          <h3 className="pm-section-title">插件市场</h3>
+          <h3 className="pm-section-title">{t('plugin.marketplaces')}</h3>
           <button
             className="pm-btn pm-btn--secondary"
             onClick={() => updateMarketplace()}
             disabled={!!pluginOverlay}
           >
-            全部更新
+            {t('plugin.updateAll')}
           </button>
         </div>
         <div className="pm-marketplace-list">
@@ -99,29 +107,29 @@ export function PluginManager() {
                       onClick={() => updateMarketplace(dm.name)}
                       disabled={!!pluginOverlay}
                     >
-                      更新
+                      {t('plugin.update')}
                     </button>
                     <button
                       className="pm-btn pm-btn--danger"
                       onClick={() => {
-                        if (!window.confirm(`移除市场 ${dm.name}？其下所有插件将不可用。`)) return;
+                        if (!window.confirm(t('plugin.confirmRemove', dm.name))) return;
                         removeMarketplace(dm.name);
                       }}
                       disabled={!!pluginOverlay}
                     >
-                      移除
+                      {t('plugin.remove')}
                     </button>
                   </>
                 ) : (
                   <button
                     className="pm-btn pm-btn--primary"
                     onClick={() => {
-                      if (!window.confirm(`添加市场 ${dm.repo}？`)) return;
+                      if (!window.confirm(t('plugin.confirmAdd', dm.repo))) return;
                       addMarketplace(dm.repo);
                     }}
                     disabled={!!pluginOverlay}
                   >
-                    添加
+                    {t('plugin.add')}
                   </button>
                 )}
               </div>
@@ -136,17 +144,17 @@ export function PluginManager() {
                 onClick={() => updateMarketplace(m.name)}
                 disabled={!!pluginOverlay}
               >
-                更新
+                {t('plugin.update')}
               </button>
               <button
                 className="pm-btn pm-btn--danger"
                 onClick={() => {
-                  if (!window.confirm(`移除市场 ${m.name}？其下所有插件将不可用。`)) return;
+                  if (!window.confirm(t('plugin.confirmRemove', m.name))) return;
                   removeMarketplace(m.name);
                 }}
                 disabled={!!pluginOverlay}
               >
-                移除
+                {t('plugin.remove')}
               </button>
             </div>
           ))}
@@ -165,16 +173,16 @@ export function PluginManager() {
             onClick={handleAddCustom}
             disabled={!customRepo.trim() || !!pluginOverlay}
           >
-            添加
+            {t('plugin.add')}
           </button>
         </div>
       </div>
 
       {/* Plugins section */}
       <div className="pm-section">
-        <h3 className="pm-section-title">可安装插件</h3>
+        <h3 className="pm-section-title">{t('plugin.availablePlugins')}</h3>
         {pluginsByMarketplace.size === 0 && (
-          <p className="pm-empty">暂无可用插件。请先添加插件市场。</p>
+          <p className="pm-empty">{t('plugin.noPlugins')}</p>
         )}
         {[...pluginsByMarketplace.entries()].map(([marketplace, plugins]) => (
           <div key={marketplace} className="pm-plugin-group">
@@ -198,12 +206,12 @@ export function PluginManager() {
                       className="pm-btn pm-btn--secondary pm-btn--sm"
                       onClick={(e) => {
                         e.preventDefault();
-                        if (!window.confirm(`更新 ${p.name}？所有打开的 notebook 将自动重启。`)) return;
+                        if (!window.confirm(t('plugin.confirmUpdate', p.name))) return;
                         updatePlugin(p.key);
                       }}
                       disabled={isBusy || !!pluginOverlay}
                     >
-                      更新
+                      {t('plugin.update')}
                     </button>
                   )}
                   {isBusy && <span className="pm-plugin-spinner" />}

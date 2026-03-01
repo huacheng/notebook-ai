@@ -7,6 +7,29 @@ import os from 'os';
 
 const execFile = promisify(execFileCb);
 
+// ── Validation helpers (D2-5) ───────────────────────────────────────────────
+
+/** Plugin key must be name@marketplace — safe chars only, max 200 chars. */
+const PLUGIN_KEY_RE = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+$/;
+
+export function validatePluginKey(key: string): boolean {
+  return key.length > 0 && key.length <= 200 && PLUGIN_KEY_RE.test(key);
+}
+
+/** Marketplace name: alphanumeric + hyphens + underscores + dots, max 100 chars. */
+const MP_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+export function validateMarketplaceName(name: string): boolean {
+  return name.length > 0 && name.length <= 100 && MP_NAME_RE.test(name);
+}
+
+/** Marketplace source: URL or git SSH path, no shell metacharacters, max 500 chars. */
+const SHELL_META_RE = /[;`$(){}|<>&!]/;
+
+export function validateMarketplaceSource(source: string): boolean {
+  return source.length > 0 && source.length <= 500 && !SHELL_META_RE.test(source);
+}
+
 function pluginsDir(): string {
   return path.join(os.homedir(), '.claude', 'plugins');
 }
@@ -99,6 +122,9 @@ export function createPluginRouter(): IRouter {
     if (!pluginKey || typeof pluginKey !== 'string') {
       return res.status(400).json({ error: 'Missing required field: plugin' });
     }
+    if (!validatePluginKey(pluginKey)) {
+      return res.status(400).json({ error: 'Invalid plugin key format. Expected: name@marketplace' });
+    }
     try {
       await execClaude(['plugin', 'install', pluginKey]);
       res.json({ ok: true });
@@ -112,6 +138,9 @@ export function createPluginRouter(): IRouter {
     const pluginKey = req.body?.plugin;
     if (!pluginKey || typeof pluginKey !== 'string') {
       return res.status(400).json({ error: 'Missing required field: plugin' });
+    }
+    if (!validatePluginKey(pluginKey)) {
+      return res.status(400).json({ error: 'Invalid plugin key format. Expected: name@marketplace' });
     }
     try {
       await execClaude(['plugin', 'uninstall', pluginKey]);
@@ -127,6 +156,9 @@ export function createPluginRouter(): IRouter {
     if (!source || typeof source !== 'string') {
       return res.status(400).json({ error: 'Missing required field: source' });
     }
+    if (!validateMarketplaceSource(source)) {
+      return res.status(400).json({ error: 'Invalid marketplace source format.' });
+    }
     try {
       await execClaude(['plugin', 'marketplace', 'add', source]);
       res.json({ ok: true });
@@ -138,6 +170,9 @@ export function createPluginRouter(): IRouter {
   // POST /marketplace/update — update marketplace(s) via claude CLI
   router.post('/marketplace/update', async (req, res) => {
     const name = req.body?.name;
+    if (name && typeof name === 'string' && !validateMarketplaceName(name)) {
+      return res.status(400).json({ error: 'Invalid marketplace name format.' });
+    }
     try {
       const args = ['plugin', 'marketplace', 'update'];
       if (name && typeof name === 'string') args.push(name);
@@ -154,6 +189,9 @@ export function createPluginRouter(): IRouter {
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'Missing required field: name' });
     }
+    if (!validateMarketplaceName(name)) {
+      return res.status(400).json({ error: 'Invalid marketplace name format.' });
+    }
     try {
       await execClaude(['plugin', 'marketplace', 'remove', name]);
       res.json({ ok: true });
@@ -167,6 +205,9 @@ export function createPluginRouter(): IRouter {
     const pluginKey = req.body?.plugin;
     if (!pluginKey || typeof pluginKey !== 'string') {
       return res.status(400).json({ error: 'Missing required field: plugin' });
+    }
+    if (!validatePluginKey(pluginKey)) {
+      return res.status(400).json({ error: 'Invalid plugin key format. Expected: name@marketplace' });
     }
     try {
       await execClaude(['plugin', 'update', pluginKey]);

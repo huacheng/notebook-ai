@@ -5,22 +5,18 @@ import { InteractiveOptions } from './InteractiveOptions';
 import { isAskUserQuestion } from '../utils/interactiveOptions';
 import type { AskQuestion } from '../utils/interactiveOptions';
 import { useStore } from '../store';
-import { formatTime, formatTokens, estimateTokens, getStatusLabel } from '../utils/runningStatus';
+import { formatTime, formatTokens, estimateTokens, getStatusLabelKey } from '../utils/runningStatus';
+import { useT } from '../i18n';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { buildTimelineItems } from '../utils/timelineItems';
 import { thinkingGroupProps, toolsGroupProps } from '../utils/groupProps';
 
-// ── SVG sanitizer ────────────────────────────────────────────────────────────
+import DOMPurify from 'dompurify';
 
-const DANGEROUS_TAGS = /(<script[\s\S]*?<\/script>|<script[^>]*\/>)/gi;
-const DANGEROUS_ATTRS = /\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi;
-const JAVASCRIPT_HREF = /\s+(?:href|xlink:href)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi;
+// ── SVG sanitizer (DOMPurify-based for robust XSS prevention) ───────────────
 
 function sanitizeSvg(svg: string): string {
-  return svg
-    .replace(DANGEROUS_TAGS, '')
-    .replace(DANGEROUS_ATTRS, '')
-    .replace(JAVASCRIPT_HREF, '');
+  return DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } });
 }
 
 // ── Response renderers ───────────────────────────────────────────────────────
@@ -208,6 +204,7 @@ function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
 // ── RunningStatus bar ───────────────────────────────────────────────────────
 
 function RunningStatus({ cellId, outputs, source }: { cellId: string; outputs: CellOutputItem[]; source: string }) {
+  const t = useT();
   const startRef = useRef(Date.now());
   const thinkStartRef = useRef<number | null>(null);
   const thinkAccum = useRef(0);
@@ -256,7 +253,7 @@ function RunningStatus({ cellId, outputs, source }: { cellId: string; outputs: C
   if (toolCount > 0) parts.push(`${toolCount} tool use${toolCount > 1 ? 's' : ''}`);
   if (thinkSec > 0 && !isThinking) parts.push(`thought for ${formatTime(thinkSec)}`);
 
-  const label = getStatusLabel(isThinking, hasAnyOutput, elapsed);
+  const label = t(getStatusLabelKey(isThinking, hasAnyOutput, elapsed));
   const metrics = parts.length > 0 ? ` (${formatTime(elapsed)} · ${parts.join(' · ')})` : ` (${formatTime(elapsed)})`;
 
   return (

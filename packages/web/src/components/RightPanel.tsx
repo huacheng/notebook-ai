@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 import { FileSection } from './FileSection';
 import { getDeliverablesPath } from '../utils/deliverablesPath';
 import { useWatcher } from '../hooks/useWatcher';
 
 export function RightPanel() {
+  const t = useT();
   const rightPanelOpen = useStore(s => s.rightPanelOpen);
   const toggleRightPanel = useStore(s => s.toggleRightPanel);
   const activeProjectId = useStore(s => s.activeProjectId);
@@ -38,7 +40,7 @@ export function RightPanel() {
   return (
     <div className="right-panel" style={{ width: rightPanelWidth }}>
       <div className="right-panel-toolbar">
-        <span className="right-panel-title">Deliverables</span>
+        <span className="right-panel-title">{t('deliverables.title')}</span>
         <button className="right-panel-collapse-btn" onClick={toggleRightPanel}>&#9776;</button>
       </div>
       {activeProjectId ? (
@@ -56,7 +58,7 @@ export function RightPanel() {
           }}
         />
       ) : (
-        <div className="fp-section-body"><div className="fp-empty">No active project</div></div>
+        <div className="fp-section-body"><div className="fp-empty">{t('deliverables.noProject')}</div></div>
       )}
     </div>
   );

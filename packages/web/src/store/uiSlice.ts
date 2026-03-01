@@ -40,6 +40,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'checkPluginStatus' | 'installPlugin' | 'uninstallPlugin' | 'addMarketplace' | 'removeMarketplace' | 'updateMarketplace' | 'updatePlugin'
   | 'dismissPluginBanner' | 'openPluginPanel' | 'closePluginPanel'
   | 'modelPanelOpen' | 'modelSwitching' | 'openModelPanel' | 'closeModelPanel' | 'changeModel'
+  | 'language' | 'setLanguage'
 >> = (set, get) => ({
   activeTab: 'notebook',
   gitTabOpen: false,
@@ -67,6 +68,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   pluginOverlay: null,
   modelPanelOpen: false,
   modelSwitching: false,
+  language: (typeof localStorage !== 'undefined' && localStorage.getItem('nb-lang') as 'en' | 'zh') || 'en',
 
   setActiveTab(tab) {
     set({ activeTab: tab, gitTabOpen: tab === 'git', editMode: false, pendingDeletes: new Set<string>() });
@@ -238,7 +240,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   async installPlugin(key: string) {
-    set({ pluginActionKey: key, pluginOverlay: `正在安装 ${key.split('@')[0]}…` });
+    set({ pluginActionKey: key, pluginOverlay: `plugin.installing|${key.split('@')[0]}` });
     try {
       const { authToken } = get();
       await apiInstallPlugin(authToken, key);
@@ -253,7 +255,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   async uninstallPlugin(key: string) {
-    set({ pluginActionKey: key, pluginOverlay: `正在卸载 ${key.split('@')[0]}…` });
+    set({ pluginActionKey: key, pluginOverlay: `plugin.uninstalling|${key.split('@')[0]}` });
     try {
       const { authToken } = get();
       await apiUninstallPlugin(authToken, key);
@@ -266,7 +268,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   async addMarketplace(source: string) {
-    set({ pluginOverlay: `正在添加市场 ${source}…` });
+    set({ pluginOverlay: `plugin.addingMarket|${source}` });
     try {
       const { authToken } = get();
       await apiAddMarketplace(authToken, source);
@@ -278,7 +280,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   async removeMarketplace(name: string) {
-    set({ pluginOverlay: `正在移除市场 ${name}…` });
+    set({ pluginOverlay: `plugin.removingMarket|${name}` });
     try {
       const { authToken } = get();
       await apiRemoveMarketplace(authToken, name);
@@ -290,7 +292,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   async updateMarketplace(name?: string) {
-    set({ pluginOverlay: name ? `正在更新市场 ${name}…` : '正在更新所有市场…' });
+    set({ pluginOverlay: name ? `plugin.updatingMarket|${name}` : 'plugin.updatingAll' });
     try {
       const { authToken } = get();
       await apiUpdateMarketplace(authToken, name);
@@ -303,7 +305,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   async updatePlugin(key: string) {
-    set({ pluginActionKey: key, pluginOverlay: `正在更新 ${key.split('@')[0]}…` });
+    set({ pluginActionKey: key, pluginOverlay: `plugin.updatingPlugin|${key.split('@')[0]}` });
     try {
       const { authToken } = get();
       await apiUpdatePlugin(authToken, key);
@@ -344,5 +346,10 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       set({ modelSwitching: true, modelPanelOpen: false });
       (ws as WebSocket).send(JSON.stringify({ type: 'change_model', session_id: active.sessionId, model }));
     }
+  },
+
+  setLanguage(lang: 'en' | 'zh') {
+    localStorage.setItem('nb-lang', lang);
+    set({ language: lang });
   },
 });

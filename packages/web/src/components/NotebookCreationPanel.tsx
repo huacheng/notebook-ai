@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 
 export function NotebookCreationPanel() {
+  const t = useT();
   const createNewNotebook = useStore((s) => s.createNewNotebook);
   const importNotebookFile = useStore((s) => s.importNotebookFile);
   const setCreatingNotebook = useStore((s) => s.setCreatingNotebook);
@@ -24,7 +26,7 @@ export function NotebookCreationPanel() {
 
   async function handleFile(file: File) {
     if (!file.name.endsWith('.json') && !file.name.endsWith('.zip')) {
-      alert('Please select a .notebook.json file or an exported .zip bundle.');
+      alert(t('welcome.fileAlert'));
       return;
     }
     setImporting(true);
@@ -47,35 +49,35 @@ export function NotebookCreationPanel() {
         </div>
       )}
 
-      <h1 className="welcome-title">New Notebook</h1>
+      <h1 className="welcome-title">{t('nbCreate.title')}</h1>
       <p className="welcome-subtitle">
-        Create a new notebook or import an existing one
+        {t('nbCreate.subtitle')}
       </p>
 
       <div className="welcome-create-project">
-        <p className="welcome-hint">Create empty notebook</p>
+        <p className="welcome-hint">{t('nbCreate.emptyHint')}</p>
         <div className="welcome-create-form">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-            placeholder="Notebook name..."
+            placeholder={t('nbCreate.notebookName')}
             disabled={creating}
             autoFocus
           />
           <button onClick={handleCreate} disabled={creating}>
-            {creating ? 'Creating...' : 'Create'}
+            {creating ? t('nbCreate.creating') : t('nbCreate.create')}
           </button>
         </div>
 
-        <div className="welcome-divider">or</div>
+        <div className="welcome-divider">{t('welcome.or')}</div>
 
         <button
           className="welcome-import-btn"
           onClick={() => !importing && fileInputRef.current?.click()}
           disabled={importing}
         >
-          {importing ? 'Importing...' : 'Import from file'}
+          {importing ? t('welcome.importing') : t('welcome.importFromFile')}
         </button>
         <input
           ref={fileInputRef}
@@ -86,7 +88,7 @@ export function NotebookCreationPanel() {
         />
 
         <button className="welcome-cancel-btn" onClick={() => setCreatingNotebook(false)}>
-          Cancel
+          {t('nbCreate.cancel')}
         </button>
       </div>
     </div>

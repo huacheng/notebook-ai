@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from 'react';
+import { useT } from '../i18n';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -118,13 +119,14 @@ function XlsxRenderer({ buffer }: { buffer: Uint8Array }) {
           ))}
         </div>
       )}
-      <div className="fv-render__xlsx-content" dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="fv-render__xlsx-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
     </div>
   );
 }
 
 // ── PPTX Placeholder ──────────────────────────────────────────────────────
 function PptxPlaceholder({ buffer, filename }: { buffer: Uint8Array; filename: string }) {
+  const t = useT();
   const handleDownload = useCallback(() => {
     const blob = new Blob([buffer.slice().buffer], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
     const url = URL.createObjectURL(blob);
@@ -137,8 +139,8 @@ function PptxPlaceholder({ buffer, filename }: { buffer: Uint8Array; filename: s
 
   return (
     <div className="fv-render__pptx-placeholder">
-      <p>PPTX preview is not available in the browser.</p>
-      <button onClick={handleDownload}>Download {filename}</button>
+      <p>{t('fv.pptxPreview')}</p>
+      <button onClick={handleDownload}>{t('fv.downloadFile', filename)}</button>
     </div>
   );
 }
@@ -169,6 +171,7 @@ function AnnotationEditFloat({ x, y, initialContent, onSave, onCancel }: {
   x: number; y: number; initialContent?: string;
   onSave: (content: string) => void; onCancel: () => void;
 }) {
+  const t = useT();
   const [text, setText] = useState(initialContent ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -188,11 +191,11 @@ function AnnotationEditFloat({ x, y, initialContent, onSave, onCancel }: {
           if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
         }}
         rows={3}
-        placeholder="Enter content… (Ctrl+Enter to save, Esc to cancel)"
+        placeholder={t('fv.editPlaceholder')}
       />
       <div className="fv-edit-float__actions">
-        <button className="fv-edit-float__btn" onMouseDown={(e) => { e.preventDefault(); onSave(text); }}>Save</button>
-        <button className="fv-edit-float__btn fv-edit-float__btn--cancel" onMouseDown={(e) => { e.preventDefault(); onCancel(); }}>Cancel</button>
+        <button className="fv-edit-float__btn" onMouseDown={(e) => { e.preventDefault(); onSave(text); }}>{t('fv.save')}</button>
+        <button className="fv-edit-float__btn fv-edit-float__btn--cancel" onMouseDown={(e) => { e.preventDefault(); onCancel(); }}>{t('fv.cancel')}</button>
       </div>
     </div>
   );
@@ -217,6 +220,7 @@ export function FileViewerRender({
   format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath,
   pdfScale = 1.0, onPdfPagesLoaded, onPdfVisiblePage,
 }: FileViewerRenderProps) {
+  const t = useT();
   const [float, setFloat] = useState<{ x: number; y: number; selectionBottom: number; text: string; rects: { x: number; y: number; width: number; height: number }[]; renderedOffset: number; renderedTextLen: number } | null>(null);
   const [editFloat, setEditFloat] = useState<{ x: number; y: number; annotationId: string; isNew: boolean } | null>(null);
   const [highlights, setHighlights] = useState<HighlightsMap>({});
@@ -503,7 +507,7 @@ export function FileViewerRender({
               <span
                 className="fv-ann-tag__delete"
                 onClick={(e) => { e.stopPropagation(); removeAnnotation(annId); }}
-                title="删除批注"
+                title={t('fv.deleteAnnotation')}
               >×</span>
             </div>
           </Fragment>
@@ -561,17 +565,17 @@ export function FileViewerRender({
       )}
       {format === 'unsupported' && (
         <div className="fv-render__unsupported">
-          <p>This file format is not supported for preview.</p>
+          <p>{t('fv.unsupported')}</p>
         </div>
       )}
       {format === 'pdf-binary' && pdfFile && (
         <div className="fv-render__pdf-wrapper" style={{ '--pdf-page-gap': `${12 * pdfScale}px` } as React.CSSProperties}>
-          {pdfError && <div className="fv-render__pdf-error">Failed to load PDF: {pdfError}</div>}
+          {pdfError && <div className="fv-render__pdf-error">{t('fv.pdfError', pdfError)}</div>}
           <Document
             file={pdfFile}
             onLoadSuccess={(pdf: { numPages: number }) => { setPdfPages(pdf.numPages); onPdfPagesLoaded?.(pdf.numPages); }}
             onLoadError={(err: Error) => setPdfError(err.message)}
-            loading={<div className="fv-render__pdf-loading">Loading PDF…</div>}
+            loading={<div className="fv-render__pdf-loading">{t('fv.pdfLoading')}</div>}
             className="fv-render__pdf"
           >
             {Array.from({ length: pdfPages }, (_, i) => (

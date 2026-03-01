@@ -64,7 +64,14 @@ export function estimateTokens(
   };
 }
 
-/** Determine the status label for RunningStatus. */
+/** Determine the i18n key for RunningStatus label. */
+export function getStatusLabelKey(isThinking: boolean, hasAnyOutput: boolean, elapsedSec: number): string {
+  if (isThinking) return 'running.thinking';
+  if (!hasAnyOutput && elapsedSec >= 5) return 'running.processing';
+  return 'running.running';
+}
+
+/** @deprecated Use getStatusLabelKey + t() instead */
 export function getStatusLabel(isThinking: boolean, hasAnyOutput: boolean, elapsedSec: number): string {
   if (isThinking) return 'Status: Thinking…';
   if (!hasAnyOutput && elapsedSec >= 5) return 'Status: Processing…';

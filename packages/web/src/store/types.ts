@@ -62,6 +62,7 @@ export interface NotebookStore {
   pluginOverlay: string | null;
   modelPanelOpen: boolean;
   modelSwitching: boolean;
+  language: 'en' | 'zh';
 
   // ── Project state ─────────────────────────────────────────────────────
   projects: ProjectListItem[];
@@ -159,6 +160,7 @@ export interface NotebookStore {
   openModelPanel(): void;
   closeModelPanel(): void;
   changeModel(model: string): void;
+  setLanguage(lang: 'en' | 'zh'): void;
 
   // ── Project actions ───────────────────────────────────────────────────
   fetchProjects(): Promise<void>;
