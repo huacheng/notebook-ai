@@ -114,7 +114,7 @@ export function createNotebooksRouter(
       const notebooks = await notebookStore.list(dir);
       res.json({ notebooks });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -152,7 +152,7 @@ export function createNotebooksRouter(
       await notebookStore.save(savedPath, notebook);
       res.status(201).json({ notebook, path: savedPath });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -171,12 +171,12 @@ export function createNotebooksRouter(
     try {
       const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);
       res.json(result);
-    } catch (err) {
-      const msg = String(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('ENOENT') || msg.includes('not found')) {
-        res.status(404).json({ error: `Notebook file not found: ${nbPath}` });
+        res.status(404).json({ error: 'Notebook file not found.' });
       } else {
-        res.status(500).json({ error: msg });
+        res.status(500).json({ error: 'Internal server error.' });
       }
     }
   });
@@ -202,7 +202,7 @@ export function createNotebooksRouter(
       }));
       res.json({ notebooks: items });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -265,7 +265,7 @@ export function createNotebooksRouter(
         workspaceDir,
       });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -298,7 +298,7 @@ export function createNotebooksRouter(
       const notebook = JSON.parse(content) as Notebook;
       res.json(notebook);
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     } finally {
       await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
       await rm(file.path, { force: true }).catch(() => {});
@@ -322,7 +322,7 @@ export function createNotebooksRouter(
       let notebook: Notebook;
       try {
         notebook = await notebookStore.load(row.notebook_path);
-      } catch {
+      } catch (_err: unknown) {
         notebook = notebookStore.createNew(row.title, row.workspace_dir);
         await notebookStore.save(row.notebook_path, notebook);
       }
@@ -391,7 +391,7 @@ export function createNotebooksRouter(
         totalCells,
       });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -438,7 +438,7 @@ export function createNotebooksRouter(
       const updated = db.updateNotebook(notebookId, updates);
       res.json({ notebook: updated });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -466,7 +466,7 @@ export function createNotebooksRouter(
 
       res.status(204).send();
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -505,7 +505,7 @@ export function createNotebooksRouter(
 
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -541,7 +541,7 @@ export function createNotebooksRouter(
 
       res.json({ sections });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -575,7 +575,7 @@ export function createNotebooksRouter(
       });
     } catch (err) {
       await rm(tmpBase, { recursive: true, force: true }).catch(() => {});
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 

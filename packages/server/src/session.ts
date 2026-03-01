@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir } from 'fs/promises';
+import { readFile, writeFile, readdir, realpath } from 'fs/promises';
 import * as path from 'path';
 import crypto from 'crypto';
 import { AgentProcess, type AgentEngine } from './agent-process.js';
@@ -68,7 +68,7 @@ interface NotebookSession {
   notebookDbId?: string;
   /** Tracks per-cell execution start times (ms) for duration calculation. */
   _execStartTimes: Map<string, number>;
-  /** Claude CLI session ID captured from system.init — used for --resume on restart. */
+  /** Claude CLI session ID captured from hook_started/system.init — used for --resume on restart. */
   claudeSessionId?: string;
   /** Queue of pending cell IDs to execute during a rerun. */
   _rerunQueue?: string[];
@@ -138,19 +138,28 @@ export class SessionManager {
       const parsed = JSON.parse(raw);
       if (parsed?.metadata?.agent === 'gemini') engine = 'gemini';
       if (parsed?.metadata?.model) model = parsed.metadata.model;
-    } catch { /* file doesn't exist yet — default claude */ }
+    } catch (_err: unknown) { /* file doesn't exist yet — default claude */ }
 
     // Compute allowedDirs: sibling worktree directories under the same project
+    // D2-8: resolve symlinks via realpath to prevent symlink escaping
     let allowedDirs: string[] | undefined;
     try {
       const parentDir = path.dirname(cwd);
-      const siblings = await readdir(parentDir, { withFileTypes: true });
+      const realParent = await realpath(parentDir);
+      const siblings = await readdir(realParent, { withFileTypes: true });
       const cwdName = path.basename(cwd);
-      allowedDirs = siblings
-        .filter((d) => d.isDirectory() && d.name !== cwdName && !d.name.startsWith('.'))
-        .map((d) => path.join(parentDir, d.name));
-      if (allowedDirs.length === 0) allowedDirs = undefined;
-    } catch { /* parent doesn't exist or not readable — skip */ }
+      const resolved: string[] = [];
+      for (const d of siblings) {
+        if (!d.isDirectory() || d.name === cwdName || d.name.startsWith('.')) continue;
+        const fullPath = path.join(realParent, d.name);
+        // Verify the resolved path is still under parentDir (no symlink escape)
+        const realFullPath = await realpath(fullPath).catch(() => null);
+        if (realFullPath && realFullPath.startsWith(realParent + path.sep)) {
+          resolved.push(realFullPath);
+        }
+      }
+      allowedDirs = resolved.length > 0 ? resolved : undefined;
+    } catch (_err: unknown) { /* parent doesn't exist or not readable — skip */ }
 
     const session: NotebookSession = {
       id: sessionName,

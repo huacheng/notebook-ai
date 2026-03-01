@@ -122,12 +122,15 @@ export class NotebookDb {
     // Migration: add project_id to notebooks
     try {
       this.db.exec(`ALTER TABLE notebooks ADD COLUMN project_id TEXT REFERENCES projects(id)`);
-    } catch { /* column already exists */ }
+    } catch (_err: unknown) { /* column already exists */ }
 
     // Migration: add agent to notebooks
     try {
       this.db.exec(`ALTER TABLE notebooks ADD COLUMN agent TEXT DEFAULT 'claude'`);
-    } catch { /* column already exists */ }
+    } catch (_err: unknown) { /* column already exists */ }
+
+    // D4-3: index on notebooks.project_id for JOIN performance
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_notebooks_project_id ON notebooks(project_id)`);
   }
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────

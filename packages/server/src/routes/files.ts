@@ -9,6 +9,10 @@ import type { SessionManager } from '../session.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
 import { ensureLibraryDir } from '../workspace.js';
 
+function isPathTraversal(err: unknown): boolean {
+  return err instanceof Error && err.message === 'Path outside workspace';
+}
+
 export function createFilesRouter(sessionManager: SessionManager): IRouter {
   const router = Router();
 
@@ -35,7 +39,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       const result = await listWorkspaceFiles(session.cwd, subPath);
       res.json(result);
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      const status = isPathTraversal(err) ? 403 : 400;
+      res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'Failed to list files.' });
     }
   });
 
@@ -74,7 +79,7 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
           try {
             const libraryDir = ensureLibraryDir();
             await copyFile(file.path, path.join(libraryDir, path.basename(file.originalname)));
-          } catch {}
+          } catch (_err: unknown) { /* library copy non-fatal */ }
           await unlink(file.path).catch(() => {});
           results.push(path.basename(file.originalname));
         }
@@ -83,7 +88,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
         for (const file of uploaded) {
           await unlink(file.path).catch(() => {});
         }
-        res.status(400).json({ error: String(err) });
+        const status = isPathTraversal(err) ? 403 : 400;
+        res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'Upload failed.' });
       }
     },
   );
@@ -115,7 +121,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       res.setHeader('Content-Length', fileStat.size);
       createReadStream(resolved).pipe(res);
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      const status = isPathTraversal(err) ? 403 : 400;
+      res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'Download failed.' });
     }
   });
 
@@ -139,8 +146,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
     const tar = spawn('tar', ['czf', '-', '-C', session.cwd, '.']);
     tar.stdout.pipe(res);
     tar.stderr.on('data', (d: Buffer) => console.error('[tar]', d.toString()));
-    tar.on('error', (err) => {
-      if (!res.headersSent) res.status(500).json({ error: String(err) });
+    tar.on('error', () => {
+      if (!res.headersSent) res.status(500).json({ error: 'Archive creation failed.' });
     });
   });
 
@@ -166,7 +173,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       await writeFile(targetPath, '', { flag: 'wx' });
       res.json({ ok: true });
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      const status = isPathTraversal(err) ? 403 : 400;
+      res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'File creation failed.' });
     }
   });
 
@@ -192,7 +200,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       await mkdir(targetPath);
       res.json({ ok: true });
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      const status = isPathTraversal(err) ? 403 : 400;
+      res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'Directory creation failed.' });
     }
   });
 
@@ -217,7 +226,8 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       await rm(resolved, { recursive: true, force: false });
       res.json({ ok: true });
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      const status = isPathTraversal(err) ? 403 : 400;
+      res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'Delete failed.' });
     }
   });
 

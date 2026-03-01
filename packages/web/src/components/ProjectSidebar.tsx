@@ -562,7 +562,13 @@ function FileBrowser() {
         onSubPathChange={setCurrentSubPath}
         refreshKey={fileRefreshKey}
         noDeleteFilter={(name, subPath) => {
-          return name === '.working' || subPath === '.working' || subPath.startsWith('.working/');
+          // Hide delete for .working directory and all contents inside any .working/ path
+          // Covers root-level .working and worktree paths like .worktrees/task-xxx/.working
+          return name === '.working'
+            || subPath === '.working'
+            || subPath.startsWith('.working/')
+            || subPath.endsWith('/.working')
+            || subPath.includes('/.working/');
         }}
       />
       {!isInsideNotebook && (

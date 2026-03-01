@@ -128,8 +128,8 @@ export function createPluginRouter(): IRouter {
     try {
       await execClaude(['plugin', 'install', pluginKey]);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err.message ?? 'Install failed' });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Install failed' });
     }
   });
 
@@ -145,8 +145,8 @@ export function createPluginRouter(): IRouter {
     try {
       await execClaude(['plugin', 'uninstall', pluginKey]);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err.message ?? 'Uninstall failed' });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Uninstall failed' });
     }
   });
 
@@ -162,8 +162,8 @@ export function createPluginRouter(): IRouter {
     try {
       await execClaude(['plugin', 'marketplace', 'add', source]);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err.message ?? 'Add marketplace failed' });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Add marketplace failed' });
     }
   });
 
@@ -178,8 +178,8 @@ export function createPluginRouter(): IRouter {
       if (name && typeof name === 'string') args.push(name);
       await execClaude(args);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err.message ?? 'Update marketplace failed' });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Update marketplace failed' });
     }
   });
 
@@ -195,8 +195,8 @@ export function createPluginRouter(): IRouter {
     try {
       await execClaude(['plugin', 'marketplace', 'remove', name]);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err.message ?? 'Remove marketplace failed' });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Remove marketplace failed' });
     }
   });
 
@@ -212,8 +212,8 @@ export function createPluginRouter(): IRouter {
     try {
       await execClaude(['plugin', 'update', pluginKey]);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err.message ?? 'Update plugin failed' });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Update plugin failed' });
     }
   });
 

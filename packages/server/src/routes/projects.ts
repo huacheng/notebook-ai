@@ -69,8 +69,8 @@ export function createProjectsRouter(
       });
 
       res.json(project);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
     }
   });
 
@@ -126,7 +126,7 @@ export function createProjectsRouter(
       try {
         const worktreeGit = new GitManager(worktreePath);
         await worktreeGit.commitAll(`task-ai(${nbSlug}): initialize notebook`);
-      } catch { /* ignore if worktree has no changes or git fails */ }
+      } catch (_err: unknown) { /* ignore if worktree has no changes or git fails */ }
 
       // Create session with worktree as cwd
       const session = await sessionManager.createSession(notebookPath, worktreePath);
@@ -149,8 +149,8 @@ export function createProjectsRouter(
         branch: branchName,
         taskStatus: 'draft',
       });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
     }
   });
 
@@ -170,8 +170,8 @@ export function createProjectsRouter(
     try {
       const result = await computeProjectFileList(project.path, subPath);
       res.json(result);
-    } catch (err: any) {
-      if (err.message === 'Path outside workspace') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Path outside workspace') {
         return res.status(403).json({ error: 'path traversal' });
       }
       // realpath may throw ENOENT for non-existent traversal targets — fallback prefix check
@@ -210,14 +210,14 @@ export function createProjectsRouter(
           results.push(name);
         }
         res.json({ uploaded: results });
-      } catch (err: any) {
+      } catch (err: unknown) {
         for (const file of uploaded) {
           await unlink(file.path).catch(() => {});
         }
-        if (err.message === 'Path outside workspace') {
-          res.status(400).json({ error: 'path traversal' });
+        if (err instanceof Error && err.message === 'Path outside workspace') {
+          res.status(403).json({ error: 'Path outside workspace' });
         } else {
-          res.status(400).json({ error: String(err) });
+          res.status(400).json({ error: 'Upload failed.' });
         }
       }
     },
@@ -238,8 +238,12 @@ export function createProjectsRouter(
       const targetPath = await validateWorkspacePath(path.join(subPath, name), project.path);
       await writeFile(targetPath, '', { flag: 'wx' });
       res.json({ ok: true });
-    } catch (err) {
-      res.status(400).json({ error: String(err) });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Path outside workspace') {
+        res.status(403).json({ error: 'Path outside workspace' });
+      } else {
+        res.status(400).json({ error: 'File creation failed.' });
+      }
     }
   });
 
@@ -258,8 +262,12 @@ export function createProjectsRouter(
       const targetPath = await validateWorkspacePath(path.join(subPath, name), project.path);
       await mkdir(targetPath);
       res.json({ ok: true });
-    } catch (err) {
-      res.status(400).json({ error: String(err) });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Path outside workspace') {
+        res.status(403).json({ error: 'Path outside workspace' });
+      } else {
+        res.status(400).json({ error: 'Directory creation failed.' });
+      }
     }
   });
 
@@ -282,11 +290,11 @@ export function createProjectsRouter(
       const resolved = await validateWorkspacePath(filePath, project.path);
       await rm(resolved, { recursive: true, force: false });
       res.json({ ok: true });
-    } catch (err: any) {
-      if (err.message === 'Path outside workspace') {
-        res.status(400).json({ error: 'path traversal' });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Path outside workspace') {
+        res.status(403).json({ error: 'Path outside workspace' });
       } else {
-        res.status(400).json({ error: String(err) });
+        res.status(400).json({ error: 'Operation failed.' });
       }
     }
   });
@@ -309,11 +317,11 @@ export function createProjectsRouter(
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
       res.setHeader('Content-Length', fileStat.size);
       createReadStream(resolved).pipe(res);
-    } catch (err: any) {
-      if (err.message === 'Path outside workspace') {
-        res.status(400).json({ error: 'path traversal' });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Path outside workspace') {
+        res.status(403).json({ error: 'Path outside workspace' });
       } else {
-        res.status(400).json({ error: String(err) });
+        res.status(400).json({ error: 'Operation failed.' });
       }
     }
   });
@@ -346,7 +354,7 @@ export function createProjectsRouter(
     const tar = spawn('tar', ['czf', '-', '-C', targetDir, '.']);
     tar.stdout.pipe(res);
     tar.stderr.on('data', (d: Buffer) => console.error('[tar]', d.toString()));
-    tar.on('error', (err: Error) => { if (!res.headersSent) res.status(500).json({ error: String(err) }); });
+    tar.on('error', () => { if (!res.headersSent) res.status(500).json({ error: 'Archive creation failed.' }); });
   });
 
   // Import project from tar.gz
@@ -372,7 +380,7 @@ export function createProjectsRouter(
       try {
         const indexData = JSON.parse(await readFile(indexPath, 'utf-8'));
         title = indexData.title || '';
-      } catch { /* no .index.json or invalid */ }
+      } catch (_err: unknown) { /* no .index.json or invalid */ }
 
       if (!title) {
         // Derive title from uploaded filename: "my-project.tar.gz" → "my-project"
@@ -437,11 +445,11 @@ export function createProjectsRouter(
             }
           }
         }
-      } catch { /* ignore scan errors */ }
+      } catch (_err: unknown) { /* ignore scan errors */ }
 
       res.json(project);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
     } finally {
       // Cleanup temp files
       await unlink(file.path).catch(() => {});
@@ -483,7 +491,7 @@ export function createProjectsRouter(
                 if (nbRow) break;
               }
             }
-          } catch { /* ignore read errors */ }
+          } catch (_err: unknown) { /* ignore read errors */ }
         }
       }
 
@@ -511,14 +519,14 @@ export function createProjectsRouter(
           try {
             const git = new GitManager(project.path);
             await git.removeWorktree(nbDir);
-          } catch { /* fallback to rm below */ }
+          } catch (_err: unknown) { /* fallback to rm below */ }
         }
         await rm(nbDir, { recursive: true, force: true }).catch(() => {});
       }
 
       res.status(204).send();
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
     }
   });
 
@@ -546,7 +554,7 @@ export function createProjectsRouter(
             await git.removeWorktree(wt.path).catch(() => {});
           }
         }
-      } catch { /* git repo may not exist */ }
+      } catch (_err: unknown) { /* git repo may not exist */ }
 
       // Delete DB records (cascades notebooks → sessions)
       db.deleteProject(project.id);
@@ -556,8 +564,8 @@ export function createProjectsRouter(
       await rm(project.path, { recursive: true, force: true }).catch(() => {});
 
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
     }
   });
 
