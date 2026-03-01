@@ -141,13 +141,13 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     });
   },
 
-  submitPrompt(source) {
+  submitPrompt(source, images) {
     // Intercept frontend slash commands before sending to backend
     const cmd = source.trim().toLowerCase();
     if (cmd === '/model') { get().openModelPanel(); return; }
 
     const cell = makeCell('prompt');
-    const cellWithSource = { ...cell, source };
+    const cellWithSource = { ...cell, source, ...(images && images.length > 0 ? { images } : {}) };
     set((state) => {
       if (!state.notebook) return {};
       return {

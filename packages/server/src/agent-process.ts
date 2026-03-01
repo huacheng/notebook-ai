@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import * as readline from 'readline';
+import type { PromptImage } from '@notebook-ai/shared';
 
 export type AgentEngine = 'claude' | 'gemini';
 
@@ -112,16 +113,26 @@ export class AgentProcess {
    * Sends a raw text prompt to the resident agent.
    * Internal logic handles engine-specific protocol (like Claude's JSON wrapper).
    */
-  sendPrompt(prompt: string): void {
+  sendPrompt(prompt: string, images?: PromptImage[]): void {
     if (!this.proc?.stdin) {
       throw new Error(`${this.engine} process is not running.`);
     }
 
     if (this.engine === 'claude') {
-      // Claude persistent mode requires prompts to be wrapped in JSON lines
+      const hasImages = images && images.length > 0;
+      const content = hasImages
+        ? [
+            { type: 'text', text: prompt },
+            ...images.map((img) => ({
+              type: 'image',
+              source: { type: 'base64', media_type: img.media_type, data: img.data },
+            })),
+          ]
+        : prompt;
+
       const line = JSON.stringify({
         type: 'user',
-        message: { role: 'user', content: prompt },
+        message: { role: 'user', content },
       });
       this.proc.stdin.write(line + '\n');
     } else {

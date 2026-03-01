@@ -1329,6 +1329,45 @@ textarea.cell-input {
   margin-right: calc(-1 * var(--space-xl));
 }
 
+/* Image paste preview strip */
+.nb-image-preview-strip {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  overflow-x: auto;
+}
+.nb-image-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+.nb-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.nb-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Scroll-to-bottom floating button */
 .scroll-to-bottom {
   position: fixed;

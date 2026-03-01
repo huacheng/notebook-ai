@@ -458,6 +458,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           session_id: get().sessionId ?? '',
           cell_id: cellId,
           source: cell.source,
+          ...('images' in cell && cell.images ? { images: cell.images } : {}),
         })
       );
     } else {

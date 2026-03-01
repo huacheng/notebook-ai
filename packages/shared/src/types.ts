@@ -65,9 +65,16 @@ const BaseCellSchema = z.object({
   updated_at: z.string().optional(),
 });
 
+export const PromptImageSchema = z.object({
+  media_type: z.enum(['image/png', 'image/jpeg', 'image/gif', 'image/webp']),
+  data: z.string(),
+});
+export type PromptImage = z.infer<typeof PromptImageSchema>;
+
 export const PromptCellSchema = BaseCellSchema.extend({
   type: z.literal('prompt'),
   source: z.string(),
+  images: z.array(PromptImageSchema).optional(),
   outputs: z.array(CellOutputSchema).default([]),
   git_diff: z.string().optional(),
   duration_ms: z.number().optional(),
@@ -242,6 +249,7 @@ export const ExecuteRequestSchema = z.object({
   session_id: z.string(),
   cell_id: z.string(),
   source: z.string(),
+  images: z.array(PromptImageSchema).optional(),
 });
 
 export const SaveNotebookSchema = z.object({

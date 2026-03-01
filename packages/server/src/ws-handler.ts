@@ -239,9 +239,9 @@ export function setupWebSocket(
         }
 
         case 'execute_request': {
-          const { session_id, cell_id, source } = msg;
+          const { session_id, cell_id, source, images } = msg;
           try {
-            await sessionManager.executeCell(session_id, cell_id, source);
+            await sessionManager.executeCell(session_id, cell_id, source, images);
           } catch (err) {
             sendToClient(ws, {
               type: 'error',

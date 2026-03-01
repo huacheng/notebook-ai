@@ -6,6 +6,7 @@ import type {
   CellOutput,
   SliceSection,
   NotebookListItem,
+  PromptImage,
 } from '@notebook-ai/shared';
 import type { ProjectListItem } from './projectSlice';
 import type { PluginStatusResponse } from '../api/plugin';
@@ -108,7 +109,7 @@ export interface NotebookStore {
   updateTitle(title: string): void;
   updateAgent(agent: 'claude' | 'gemini'): void;
   addCell(type: CellType, index?: number): void;
-  submitPrompt(source: string): void;
+  submitPrompt(source: string, images?: PromptImage[]): void;
   removeCell(cellId: string): void;
   moveCell(cellId: string, direction: 'up' | 'down'): void;
   updateCellSource(cellId: string, source: string): void;

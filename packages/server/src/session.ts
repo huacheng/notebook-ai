@@ -7,6 +7,7 @@ import {
   type Notebook,
   type WSServerMessage,
   type CellOutput,
+  type PromptImage,
 } from '@notebook-ai/shared';
 import { EventBuffer } from './event-buffer.js';
 import {
@@ -174,7 +175,7 @@ export class SessionManager {
    * Sends a prompt to Claude and marks the cell as running.
    * Output messages arrive asynchronously via the process stdout handler.
    */
-  async executeCell(sessionId: string, cellId: string, source: string): Promise<void> {
+  async executeCell(sessionId: string, cellId: string, source: string, images?: PromptImage[]): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new Error(`Session "${sessionId}" not found.`);
@@ -220,7 +221,11 @@ export class SessionManager {
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
     session._execStartTimes.set(cellId, Date.now());
 
-    session.agentProcess.sendPrompt(source);
+    if (images && images.length > 0) {
+      session.agentProcess.sendPrompt(source, images);
+    } else {
+      session.agentProcess.sendPrompt(source);
+    }
   }
 
   getSession(sessionId: string): NotebookSession | undefined {

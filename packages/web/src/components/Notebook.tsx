@@ -4,6 +4,7 @@ import { Cell } from './Cell';
 import { SliceView } from './SliceView';
 import { loadDraft, saveDraft, clearDraft } from '../utils/promptDraft';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
+import { extractImagesFromClipboard, MAX_IMAGES, type PastedImage } from '../utils/pasteImages';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -215,6 +216,7 @@ function NotebookInputBar() {
   const draftKey = activeNotebookTabId || sessionId || '';
 
   const [text, setText] = useState(() => loadDraft(draftKey));
+  const [images, setImages] = useState<PastedImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -267,11 +269,23 @@ function NotebookInputBar() {
     return () => { if (dismissTimer.current) clearTimeout(dismissTimer.current); };
   }, [uploadStatus]);
 
+  async function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = await extractImagesFromClipboard(e);
+    if (pasted.length > 0) {
+      e.preventDefault();
+      setImages((prev) => [...prev, ...pasted].slice(0, MAX_IMAGES));
+    }
+  }
+
   function handleRun() {
     const source = text.trim();
-    if (!source || isRunning) return;
-    submitPrompt(source);
+    if ((!source && images.length === 0) || isRunning) return;
+    const imgs = images.length > 0
+      ? images.map(({ media_type, data }) => ({ media_type, data }))
+      : undefined;
+    submitPrompt(source || '(image)', imgs);
     setText('');
+    setImages([]);
     clearDraft(draftKey);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -336,6 +350,16 @@ function NotebookInputBar() {
           {uploadStatus.phase === 'error' && <>✗ {uploadStatus.message}</>}
         </div>
       )}
+      {images.length > 0 && (
+        <div className="nb-image-preview-strip">
+          {images.map((img, i) => (
+            <div key={i} className="nb-image-thumb">
+              <img src={img.preview} alt={`Pasted ${i + 1}`} />
+              <button className="nb-image-remove" onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="notebook-input-row">
         <input
           ref={fileInputRef}
@@ -351,6 +375,7 @@ function NotebookInputBar() {
           value={text}
           onChange={(e) => { setText(e.target.value); resize(); }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onDrop={(e) => {
             e.preventDefault();
             const dropped = e.dataTransfer.getData('text/plain');
@@ -374,7 +399,7 @@ function NotebookInputBar() {
           <button
             className="nb-run-btn"
             onClick={handleRun}
-            disabled={disabled || !text.trim()}
+            disabled={disabled || (!text.trim() && images.length === 0)}
             title="Run (Ctrl+Enter)"
           >
             {isRunning ? '■' : '▶'}
