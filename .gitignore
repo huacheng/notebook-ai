@@ -13,6 +13,10 @@ AiTasks/.experiences/.lock
 AiTasks/.references/.lock
 AiTasks/.type-profiles/.lock
 
+# Python
+__pycache__/
+*.pyc
+
 # Playwright MCP artifacts
 .playwright-mcp/
 
