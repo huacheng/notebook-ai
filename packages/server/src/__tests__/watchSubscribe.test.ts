@@ -112,4 +112,25 @@ describe('watch_subscribe message parsing', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('FilesChangedSchema accepts message with files array and cache_key', async () => {
+    const { FilesChangedSchema } = await import('@notebook-ai/shared');
+    const result = FilesChangedSchema.safeParse({
+      type: 'files_changed',
+      watch_id: 'w1',
+      dir_path: '/some/path',
+      cache_key: 'nb-filelist-/api/projects/abc-.',
+      files: {
+        dirPath: '/some/path',
+        files: [
+          { name: 'hello.txt', type: 'file', size: 42, modifiedAt: '2025-01-01T00:00:00.000Z' },
+          { name: 'docs', type: 'directory', size: 0, modifiedAt: '2025-01-01T00:00:00.000Z', isNotebook: false },
+        ],
+        truncated: false,
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.cache_key).toBe('nb-filelist-/api/projects/abc-.');
+    expect(result.data!.files!.files).toHaveLength(2);
+  });
 });

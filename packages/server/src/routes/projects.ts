@@ -12,8 +12,9 @@ import type { SessionManager } from '../session.js';
 import type { NotebookStore } from '../notebook-store.js';
 import { GitManager } from '../git.js';
 import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
-import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
+import { validateWorkspacePath } from '../workspace-files.js';
 import { titleToSlug, initWorkspaceMemory } from '../workspace.js';
+import { computeProjectFileList } from '../project-file-list.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -152,33 +153,7 @@ export function createProjectsRouter(
     }
   });
 
-  // Dotfile visibility for project file listing.
-  // Strategy: hide ephemeral/lock files (mirrors GITIGNORE_ENTRIES in task-init.ts),
-  // show everything else — task-ai system files (.target.md, .plan.md, .summary.md,
-  // .index.json, .analysis/, .test/, .bugfix/, .notes/, etc.) should be browsable.
-  const DOTFILE_HIDDEN = new Set([
-    '.tmp-annotations.json',
-    '.auto-signal',
-    '.auto-signal.tmp',
-    '.auto-stop',
-    '.lock',
-    '.library-state.json',
-    '.gitignore',
-  ]);
-  // Top-level dotdirs that should always be hidden from project file browser
-  // .deliverables is shown via the right panel, not the file browser
-  const HIDDEN_TOPDIRS = new Set(['.worktrees', '.git', '.deliverables']);
-  // Dirs hidden at ALL levels (shown via dedicated UI, not the file browser)
-  const ALWAYS_HIDDEN_DIRS = new Set(['.deliverables', '.git']);
-  function isVisibleEntry(name: string, isTopLevel: boolean): boolean {
-    if (!name.startsWith('.')) return true;
-    if (name.endsWith('.notebook.json')) return true;
-    if (ALWAYS_HIDDEN_DIRS.has(name)) return false;
-    if (isTopLevel && HIDDEN_TOPDIRS.has(name)) return false;
-    if (DOTFILE_HIDDEN.has(name)) return false;
-    if (name.startsWith('.lock.stale.')) return false;
-    return true;
-  }
+  // Dotfile visibility logic extracted to project-file-list.ts
 
   const upload = multer({
     dest: path.join(os.tmpdir(), 'nb-uploads'),
@@ -192,54 +167,7 @@ export function createProjectsRouter(
 
     const subPath = (req.query.path as string) || '.';
     try {
-      const result = await listWorkspaceFiles(project.path, subPath);
-      const isTopLevel = subPath === '.' || subPath === '';
-      result.files = result.files.filter(f => isVisibleEntry(f.name, isTopLevel));
-
-      // Mark directories that contain {name}.notebook.json as notebook dirs
-      const dirTarget = path.resolve(project.path, subPath);
-      for (const f of result.files) {
-        if (f.type === 'directory') {
-          const nbFile = path.join(dirTarget, f.name, `${f.name}.notebook.json`);
-          if (existsSync(nbFile)) {
-            (f as any).isNotebook = true;
-          }
-        }
-      }
-
-      // Inject worktree notebooks into top-level listing
-      if (isTopLevel) {
-        const wtRoot = path.join(project.path, '.worktrees');
-        if (existsSync(wtRoot)) {
-          try {
-            const wtEntries = await readdir(wtRoot, { withFileTypes: true });
-            for (const wt of wtEntries) {
-              if (!wt.isDirectory()) continue;
-              // Find any .notebook.json inside the worktree dir
-              const wtPath = path.join(wtRoot, wt.name);
-              const wtFiles = await readdir(wtPath).catch(() => [] as string[]);
-              const hasNb = wtFiles.some(f => f.endsWith('.notebook.json'));
-              if (hasNb) {
-                const s = await stat(wtPath).catch(() => null);
-                result.files.push({
-                  name: wt.name,
-                  type: 'directory',
-                  size: 0,
-                  modifiedAt: s?.mtime.toISOString() ?? new Date().toISOString(),
-                  isNotebook: true,
-                  worktreePath: `.worktrees/${wt.name}`,
-                } as any);
-              }
-            }
-            // Re-sort: dirs first, then alphabetical
-            result.files.sort((a, b) => {
-              if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-              return a.name.localeCompare(b.name);
-            });
-          } catch { /* ignore .worktrees scan errors */ }
-        }
-      }
-
+      const result = await computeProjectFileList(project.path, subPath);
       res.json(result);
     } catch (err: any) {
       if (err.message === 'Path outside workspace') {

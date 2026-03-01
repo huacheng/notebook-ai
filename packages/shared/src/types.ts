@@ -687,6 +687,17 @@ export const FilesChangedSchema = z.object({
   type: z.literal('files_changed'),
   watch_id: z.string(),
   dir_path: z.string(),
+  cache_key: z.string().optional(),
+  files: z.object({
+    dirPath: z.string(),
+    files: z.array(z.object({
+      name: z.string(),
+      type: z.enum(['file', 'directory']),
+      size: z.number(),
+      modifiedAt: z.string(),
+    }).passthrough()),
+    truncated: z.boolean(),
+  }).optional(),
 });
 
 export const WSServerMessageSchema = z.discriminatedUnion('type', [

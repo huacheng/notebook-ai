@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, Fragment } from 'react';
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { makeFetchGuard } from '../utils/fetchGuard';
 import { computeBreadcrumb, computeNavigateUp } from '../utils/worktreePath';
+import { isWsFresh } from '../utils/wsFilesPush';
 
 // Compute a POSIX-style relative path from `fromDir` to `toFile`.
 // Both arguments must be absolute Unix paths.
@@ -263,6 +264,16 @@ export function FileSection({
   const fetchFiles = useCallback(async (path: string, silent = false) => {
     const id = fetchGuard.next();
     const cacheKey = `nb-filelist-${baseUrl}-${path}`;
+
+    // On silent refresh (WS-triggered), check if cache was just written by WS push
+    if (silent && isWsFresh(cacheKey)) {
+      const cached = cacheGet<ListResult>(cacheKey, TTL.FILE_LIST);
+      if (cached) {
+        setFiles(cached.files);
+        setCurrentDirPath(cached.dirPath);
+        return; // Skip REST — WS already pushed fresh data
+      }
+    }
 
     // On non-silent loads, try cache first to avoid loading flash
     if (!silent) {

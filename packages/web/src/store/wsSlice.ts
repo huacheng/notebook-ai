@@ -8,6 +8,7 @@ import {
   updateToolResultInNotebook,
   setCellGitDiffInNotebook,
 } from './notebookMutations';
+import { handleFilesPush } from '../utils/wsFilesPush';
 
 // Module-level tracker for WS in CONNECTING state (not yet stored in zustand).
 // Prevents race conditions when connectWebSocket is called multiple times.
@@ -339,6 +340,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           window.dispatchEvent(new CustomEvent('nb:git-changed', { detail: parsed }));
           break;
         case 'files_changed':
+          handleFilesPush(parsed as any);
           window.dispatchEvent(new CustomEvent('nb:files-changed', { detail: parsed }));
           break;
         case 'notebook_opened':

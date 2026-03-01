@@ -12,11 +12,12 @@ import type { NotebookDb } from './db.js';
 import { NotebookStore } from './notebook-store.js';
 import { openNotebookByPath } from './routes/notebooks.js';
 import { authEnabled, consumeWsTicket } from './auth.js';
-import { validateWorkspacePath } from './workspace-files.js';
+import { listWorkspaceFiles, validateWorkspacePath } from './workspace-files.js';
 import { exportToHtml } from './export.js';
 import { getLibraryDir } from './workspace.js';
 import { unquoteGitPath } from './git-utils.js';
 import type { GitWatcher, FileWatcher } from './watcher.js';
+import { computeFileCacheKey, computeProjectFileList } from './project-file-list.js';
 
 const execFileAsync = promisify(execFileCb);
 const EXEC_TIMEOUT = 10000;
@@ -623,6 +624,8 @@ export function setupWebSocket(
             watchSubscriptions.set(watch_id, unsub);
           } else if (kind === 'files' && fileWatcher) {
             let watchPath: string;
+            let projectPath: string | undefined;
+            let subPath = '.';
             if (dir_path === '__library__') {
               watchPath = getLibraryDir();
             } else if (project_id) {
@@ -631,12 +634,28 @@ export function setupWebSocket(
                 sendToClient(ws, { type: 'error', message: `Project "${project_id}" not found for file watch.` });
                 break;
               }
+              projectPath = project.path;
               watchPath = dir_path ? `${project.path}/${dir_path}` : project.path;
+              if (dir_path) subPath = dir_path;
             } else {
               break; // No valid path to watch
             }
+            const cacheKey = computeFileCacheKey({ dirPath: dir_path, projectId: project_id });
             const unsub = fileWatcher.subscribe(watchPath, (dp) => {
-              sendToClient(ws, { type: 'files_changed', watch_id, dir_path: dp });
+              // Compute file list and push via WS (skip REST round-trip)
+              const listFn = projectPath
+                ? computeProjectFileList(projectPath, subPath)
+                : listWorkspaceFiles(watchPath, '.');
+
+              listFn.then((result) => {
+                sendToClient(ws, {
+                  type: 'files_changed', watch_id, dir_path: dp,
+                  ...(cacheKey ? { cache_key: cacheKey, files: result } : {}),
+                });
+              }).catch(() => {
+                // Fallback: no data, frontend will use REST
+                sendToClient(ws, { type: 'files_changed', watch_id, dir_path: dp });
+              });
             });
             watchSubscriptions.set(watch_id, unsub);
           }
