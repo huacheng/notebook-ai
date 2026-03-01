@@ -330,6 +330,8 @@ Git commit: `task-ai(<notebook>):research deepen target requirements`
 These steps execute when `--caller test` is specified. Steps 1–18 run first
 (type discovery + reference collection); then the test-specific steps below.
 
+> Collection targets by task type: see `commands/references/test-strategy-by-type.md` §Strategy Matrix and §Phase Responsibilities.
+
 **Test-S1. Read `.index.json` status to determine routing**
 
 Use shell script to extract status:
