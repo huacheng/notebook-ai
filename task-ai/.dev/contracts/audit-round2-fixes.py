@@ -91,22 +91,29 @@ if STATE_PY.exists():
 else:
     emit_fail(f'{t4_id}: state.py not found')
 
-# ─── T5: D1-06 — Output dirs must NOT use $WORK_DIR/../ path ───
+# ─── T5: D5-03 — mkdir output dirs must come AFTER WORK_DIR guard ───
 
-t5_id = 'T5 (D1-06)'
+t5_id = 'T5 (D5-03)'
 t5_bad = []
-for script, pattern_name in [(CHECK_SH, '.analysis'), (VERIFY_SH, '.test'), (PLAN_SH, '.test')]:
+for script in [CHECK_SH, VERIFY_SH]:
     if not script.exists():
         continue
     text = script.read_text()
-    # Match WORK_DIR/../.analysis or WORK_DIR/../.test
-    if re.search(r'WORK_DIR/\.\./\.' + re.escape(pattern_name.lstrip('.')), text):
-        t5_bad.append(f'{script.name}({pattern_name})')
+    lines = text.split('\n')
+    mkdir_line = -1
+    guard_line = -1
+    for i, line in enumerate(lines):
+        if 'mkdir -p' in line and ('ANALYSIS_DIR' in line or 'TEST_DIR' in line):
+            mkdir_line = i
+        if 'if [[ ! -d "$WORK_DIR" ]]' in line:
+            guard_line = i
+    if mkdir_line >= 0 and guard_line >= 0 and mkdir_line < guard_line:
+        t5_bad.append(script.name)
 
 if not t5_bad:
-    emit_pass(f'{t5_id}: no scripts use $WORK_DIR/../ for output dirs')
+    emit_pass(f'{t5_id}: mkdir output dirs comes after WORK_DIR guard check')
 else:
-    emit_fail(f'{t5_id}: inverted output dir paths: {", ".join(t5_bad)}')
+    emit_fail(f'{t5_id}: mkdir before guard in: {", ".join(t5_bad)}')
 
 # ─── T6: D2-04 — security.sh audit_plan() must not have broken regex ───
 

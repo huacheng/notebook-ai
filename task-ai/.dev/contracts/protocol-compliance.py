@@ -29,11 +29,47 @@ if refs_dir.exists():
         protocol_files[ref_file.name] = ref_file
         protocol_headings[ref_file.name] = headings
 
+# Also include skills/*/SKILL.md as referenceable files
+skills_dir = TASK_AI_ROOT / 'skills'
+if skills_dir.exists():
+    for skill_md in skills_dir.glob('*/SKILL.md'):
+        ref_key = f'{skill_md.parent.name}/SKILL.md'
+        content = skill_md.read_text()
+        headings = set()
+        for line in content.split('\n'):
+            m = re.match(r'^(#{1,6})\s+(.+)$', line)
+            if m:
+                heading_text = m.group(2).strip()
+                headings.add(heading_text)
+                headings.add(heading_text.rstrip('.,:;'))
+        protocol_files[ref_key] = skill_md
+        protocol_headings[ref_key] = headings
+
 # Scan all SKILL.md files for § references
-# Patterns: "See protocol § Section Name", "§ Section Name", "See `file` § Section"
-section_ref_pattern = re.compile(r'§\s*([^§\n\|`]+?)(?:\s*[`|\n]|$)')
-see_protocol_pattern = re.compile(r'[Ss]ee\s+(?:protocol\s+)?§\s*([^§\n\|`]+?)(?:\s*[`|\n]|$)')
+# Pattern: See `file` §section_id — captures file and section reference
 see_file_pattern = re.compile(r'[Ss]ee\s+`([^`]+)`\s+§\s*([^§\n\|`]+?)(?:\s*[`|\n]|$)')
+# Pattern: See protocol §section or See §section (no specific file)
+see_protocol_pattern = re.compile(r'[Ss]ee\s+(?:protocol\s+)?§\s*([^§\n\|`]+?)(?:\s*[`|\n]|$)')
+
+
+def match_section(section_ref: str, headings: set[str]) -> bool:
+    """Check if a section reference matches any heading.
+
+    Handles both named sections ("Cross-Impact Assessment") and
+    numbered step references ("3.3" matching heading "§3.3 scope=...").
+    """
+    section_ref = section_ref.rstrip(')')
+    # Direct match
+    if section_ref in headings:
+        return True
+    # Numbered step reference: §3.3 should match heading containing "§3.3"
+    num_match = re.match(r'^(\d+\.\d+)', section_ref)
+    if num_match:
+        step_num = num_match.group(1)
+        prefix = f'§{step_num}'
+        return any(prefix in h for h in headings)
+    return False
+
 
 found_refs = 0
 
@@ -49,10 +85,10 @@ for skill_file in find_skills():
             found_refs += 1
 
             if ref_file in protocol_headings:
-                if section in protocol_headings[ref_file]:
-                    emit_pass(f'{skill_name}: § ref "{section}" found in {ref_file}')
+                if match_section(section, protocol_headings[ref_file]):
+                    emit_pass(f'{skill_name}: § ref "{ref_file} §{section[:30]}" found')
                 else:
-                    emit_fail(f'{skill_name}: § ref "{section}" NOT found in {ref_file}')
+                    emit_fail(f'{skill_name}: § ref "{section[:60]}" NOT found in {ref_file}')
             else:
                 emit_fail(f'{skill_name}: protocol file "{ref_file}" not found')
 
@@ -60,20 +96,20 @@ for skill_file in find_skills():
         for m in see_protocol_pattern.finditer(line):
             if see_file_pattern.search(line):
                 continue  # Already handled
-            section = m.group(1).strip()
+            section = m.group(1).strip().rstrip(')')
             found_refs += 1
 
-            # Search all protocol files for this section
+            # Search all protocol files AND current SKILL.md for this section
             found_in_any = False
             for fname, headings in protocol_headings.items():
-                if section in headings:
+                if match_section(section, headings):
                     found_in_any = True
                     break
 
             if found_in_any:
-                emit_pass(f'{skill_name}: § ref "{section}" found in protocols')
+                emit_pass(f'{skill_name}: § ref "{section[:40]}" found in protocols')
             else:
-                emit_fail(f'{skill_name}: § ref "{section}" NOT found in any protocol')
+                emit_fail(f'{skill_name}: § ref "{section[:60]}" NOT found in any protocol')
 
 if found_refs == 0:
     emit_warn('protocol-compliance: no § references found (protocol not yet integrated)')

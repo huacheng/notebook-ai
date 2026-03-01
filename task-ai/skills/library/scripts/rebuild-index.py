@@ -1,34 +1,12 @@
 #!/usr/bin/env python3
 import os
-import re
+import sys
 import json
 from pathlib import Path
 from datetime import datetime
 
-def parse_frontmatter(content):
-    """Robust parser for YAML-like frontmatter with multi-line list support."""
-    fm = {}
-    match = re.search(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL | re.MULTILINE)
-    if not match: return fm
-    
-    lines = match.group(1).split('\n')
-    current_key = None
-    for line in lines:
-        stripped = line.strip()
-        if not stripped: continue
-        
-        # New key-value pair (key: value or key:)
-        if ':' in line and not stripped.startswith('-'):
-            k, v = line.split(':', 1)
-            current_key = k.strip()
-            val = v.strip().strip('"').strip("'")
-            fm[current_key] = val if val else []
-        # List item (- value)
-        elif stripped.startswith('-') and current_key:
-            val = stripped[1:].strip().strip('"').strip("'")
-            if isinstance(fm.get(current_key), list):
-                fm[current_key].append(val)
-    return fm
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'core'))
+from frontmatter import parse_frontmatter
 
 def rebuild_index():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))

@@ -23,6 +23,17 @@ L1_SCRIPTS=(
   state-matrix.py
   frontmatter-validation.sh
   git-commit-conventions.sh
+  stage-defaults.py
+  stage-docs-security.py
+  stage-done-skills.py
+  stage-expected-completeness.py
+  stage-matrix-consistency.py
+  stage-metadata.py
+  stage-r2-consistency.py
+  stage-r2-misc.py
+  stage-review-fixes.py
+  stage-spec-hardening.py
+  stage-target-highlight.py
 )
 
 L2_SCRIPTS=(
@@ -53,6 +64,8 @@ L2_SCRIPTS=(
   plugin-slot-consistency.py
   test-strategy-consistency.py
   audit-round2-fixes.py
+  init-stage-field.sh
+  state-stage-done.py
 )
 
 L3_SCRIPTS=(

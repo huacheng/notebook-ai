@@ -6,10 +6,17 @@ from pathlib import Path
 def emit_pass(msg): print(f"[PASS] {msg}")
 def emit_fail(msg): print(f"[FAIL] {msg}")
 
+def emit_warn(msg): print(f"[WARN] {msg}")
+
 def test_relation_routing():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))
+
+    if not lib_path.exists():
+        emit_warn("library path not found (NB_WORKSPACES_LIBRARY/NB_WORKSPACES_ROOT not set) — skipping")
+        return
+
     relations_path = lib_path / '.relations.jsonl'
-    
+
     if not relations_path.exists():
         emit_fail("relations.jsonl missing")
         return

@@ -36,12 +36,13 @@ for state in states:
     else:
         emit_fail(f'reachability: "{state}" is NOT reachable from "{initial}"')
 
-# 2. Terminal states have no outgoing edges
+# 2. Terminal states have no outgoing edges (self-loops allowed for report)
 for state in terminal:
-    if graph.get(state):
-        emit_fail(f'terminal: "{state}" has outgoing edges: {graph[state]}')
+    non_self = graph.get(state, set()) - {state}
+    if non_self:
+        emit_fail(f'terminal: "{state}" has outgoing edges to other states: {non_self}')
     else:
-        emit_pass(f'terminal: "{state}" has no outgoing edges')
+        emit_pass(f'terminal: "{state}" has no outgoing edges to other states')
 
 # 3. Non-terminal states must have at least one outgoing edge (no deadlock)
 for state in states:

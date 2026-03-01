@@ -3,12 +3,13 @@
 # Usage: target.sh [objective_content]
 
 set -uo pipefail
+trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
 
 OBJECTIVE="${1:-}"
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../../.dev/contracts/lib.sh"
+source "$SCRIPT_DIR/../../../core/lib.sh"
 
 if ! find_nb_context; then
     echo "[ERROR] No active task context detected. Enter a notebook directory or switch to a task branch." >&2

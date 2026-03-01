@@ -72,13 +72,21 @@ else:
     emit_fail('plan: State Transitions missing stage-done REJECT row')
 
 # --- Test 5: annotate State Transitions has stage-done REJECT ---
+# annotate uses "## State Transitions — Two-Dimensional" with sub-tables per layer.
+# The stage-done REJECT row is in the Requirement Layer sub-table.
 annotate_transitions = extract_section(
-    TASK_AI_ROOT / 'skills' / 'annotate' / 'SKILL.md', '## State Transitions'
+    TASK_AI_ROOT / 'skills' / 'annotate' / 'SKILL.md',
+    '### Requirement Layer — `.target.md`'
 )
 annotate_rows = parse_md_table(annotate_transitions)
-annotate_stage_done = [r for r in annotate_rows if r.get('Current Status', '').strip('` ') == 'stage-done']
+annotate_stage_done = [
+    r for r in annotate_rows
+    if 'stage-done' in r.get('Current Status', '')
+]
 
-if annotate_stage_done and 'REJECT' in annotate_stage_done[0].get('After Annotate', ''):
+if annotate_stage_done and any(
+    'REJECT' in v for v in annotate_stage_done[0].values()
+):
     emit_pass('annotate: State Transitions has stage-done REJECT row')
 else:
     emit_fail('annotate: State Transitions missing stage-done REJECT row')

@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 import os
-import re
+import sys
 from pathlib import Path
 from datetime import datetime
 
-def parse_frontmatter(content):
-    fm = {}
-    # Use re.MULTILINE to catch start of string or start of line
-    match = re.search(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL | re.MULTILINE)
-    if match:
-        for line in match.group(1).split('\n'):
-            if ':' in line:
-                k, v = line.split(':', 1)
-                fm[k.strip()] = v.strip().strip('"').strip("'")
-    return fm
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'core'))
+from frontmatter import parse_frontmatter
 
 def audit_library():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))
