@@ -142,6 +142,10 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   },
 
   submitPrompt(source) {
+    // Intercept frontend slash commands before sending to backend
+    const cmd = source.trim().toLowerCase();
+    if (cmd === '/model') { get().openModelPanel(); return; }
+
     const cell = makeCell('prompt');
     const cellWithSource = { ...cell, source };
     set((state) => {

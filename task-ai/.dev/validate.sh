@@ -51,6 +51,7 @@ L2_SCRIPTS=(
   signal-field-names.py
   injection-category-count.sh
   plugin-slot-consistency.py
+  test-strategy-consistency.py
 )
 
 L3_SCRIPTS=(

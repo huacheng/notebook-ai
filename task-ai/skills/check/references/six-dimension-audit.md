@@ -17,6 +17,7 @@ This is the L3 (deep audit) application of the unified six-dimension framework. 
 - [Computation Rule](#computation-rule)
 - [Domain Adaptation](#domain-adaptation)
 - [Audit Workflow](#audit-workflow)
+- [Regression Test Protocol](#regression-test-protocol)
 
 ## D1. Correctness (正确性)
 
@@ -159,4 +160,69 @@ Seed tables below are ordered by scope (broadest → most specialized) and serve
 4. **Flag** issues with severity and specific file:line references
 5. **Cross-reference** findings across dimensions (a security issue may also be a reliability issue)
 6. **Propose** fixes grouped by file to minimize edit passes
-7. **Verify** each fix doesn't introduce new issues in other dimensions
+7. **Design regression tests** for each proposed fix per the [Regression Test Protocol](#regression-test-protocol) below — select test strategy by task type, write RED tests before applying fixes
+8. **Apply fixes** and confirm each RED test turns GREEN
+9. **Run full test suite** to verify no regressions across all dimensions
+
+## Regression Test Protocol
+
+Every audit fix must have a regression test that **fails before the fix (RED)** and **passes after (GREEN)**. The test strategy depends on the task type.
+
+### Test Strategy by Task Type
+
+| Task Type | Code/Script Fix | Spec/SKILL.md Fix | Data/Config Fix |
+|-----------|----------------|-------------------|-----------------|
+| **software** | Unit test or integration test in project test suite | Contract test (`.dev/contracts/`) validating spec content | Schema validation test |
+| **ai-skill** | Contract test (`.dev/contracts/`) for script behavior | Contract test scanning SKILL.md for required content | Fixture update + graph/matrix validator |
+| **documentation** | Link checker or build test | Content validation script (grep/regex) | N/A |
+| **data-pipeline** | Data validation test (row counts, schema) | Contract test for pipeline spec | Fixture-based regression |
+| **infrastructure** | Smoke test or plan-diff test | Contract test for IaC spec | Config schema validation |
+| **science / ml** | Reproducibility test (seed + threshold) | Contract test for experiment spec | Parameter range validation |
+| **Other / unknown** | Closest match from above; default to contract test | Content validation script | Schema or fixture test |
+
+### Test Classification Rules
+
+For each audit finding, classify the fix and select the test approach:
+
+| Fix Category | Test Approach | Example |
+|-------------|---------------|---------|
+| **Runtime code** (`.py`, `.sh`, `.ts`) | Functional test exercising the fixed path — assert correct output for the previously-failing input | `state.py` JSONDecodeError → test with corrupt JSON file |
+| **Spec text** (SKILL.md, references) | Contract test scanning for required content — assert keyword/section/field presence | Missing `realpath` mention in security spec → grep-based contract test |
+| **Fixture data** (`.json`, `.jsonl`) | Property test on the updated fixture — assert structural invariants (count, reachability, completeness) | Missing transitions in `expected-states.json` → graph validator checks count ≥ N |
+| **Cross-reference** (index, ToC, links) | Completeness test — assert every on-disk file appears in the index and vice versa | `REFERENCE-INDEX.md` missing entry → bidirectional existence check |
+| **Stale content** (deprecated terms, dead refs) | Absence test — assert zero matches for the removed term across the scoped file set | `tmux capture-pane` in post-migration code → grep asserts zero hits |
+
+### Protocol
+
+```
+For each finding F:
+  1. Classify F → (fix category, task type) → select test approach
+  2. Write the test (RED):
+     - Test must fail against the current codebase
+     - Test must be minimal — verify exactly one property
+     - Test must be deterministic — no flaky assertions
+  3. Run the test → confirm FAIL (RED)
+  4. Apply the fix
+  5. Run the test → confirm PASS (GREEN)
+  6. Run full suite → confirm zero regressions
+```
+
+### Integration with Existing Test Infrastructure
+
+Tests produced by this protocol are registered in the project's validation harness:
+
+- **Contract tests** → add to `.dev/contracts/`, register in `validate.sh` at the appropriate level (L1 structural / L2 functional / L3 deep)
+- **Unit tests** → add to project test suite (e.g., `vitest`, `pytest`)
+- **Fixture updates** → existing validators (e.g., `state-machine-graph.py`) automatically pick up changes; add new assertions if needed
+
+### Exemptions
+
+Fixes that do **not** require regression tests:
+
+| Exemption | Reason | Example |
+|-----------|--------|---------|
+| Pure typo fix (≤3 characters) | Zero behavioral impact | "single the agent" → "single agent" |
+| Comment-only change | No runtime or spec impact | Adding `# TODO` annotation |
+| Historical doc annotation | Document is superseded, not referenced by active code | Adding "⚠️ superseded" header to archived plan |
+
+All other fixes — including documentation, spec text, scripts, and fixtures — require regression tests.
