@@ -82,6 +82,8 @@ interface NotebookSession {
   _executeLock: Promise<void>;
   /** D3: tracks pending post-completion work (git commit + autoSave) so closeSession can await. */
   _pendingPostComplete: Promise<void>;
+  /** Last cell ID that was running — used for local_command_output that arrives after result. */
+  _lastCellId?: string;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -259,6 +261,7 @@ export class SessionManager {
 
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
     session._execStartTimes.set(cellId, Date.now());
+    session._lastCellId = cellId;
 
     if (images && images.length > 0) {
       session.agentProcess.sendPrompt(source, images);
@@ -384,6 +387,7 @@ export class SessionManager {
 
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
     session._execStartTimes.set(cellId, Date.now());
+    session._lastCellId = cellId;
     session.agentProcess.sendPrompt(cell.source);
   }
 
@@ -815,12 +819,13 @@ export class SessionManager {
           console.log(`[session ${session.id}] Captured Claude session_id: ${sysMsg.session_id}`);
         }
         // Forward non-init/hook system messages to frontend (e.g. context compaction, local_command_output)
+        // Use _lastCellId as fallback since local_command_output may arrive after result completes the cell
         if (sysMsg.subtype && sysMsg.subtype !== 'init' && sysMsg.subtype !== 'hook_started' && sysMsg.subtype !== 'hook_completed') {
           this.broadcast(session, {
             type: 'system_message',
             subtype: sysMsg.subtype,
             message: sysMsg.content ?? sysMsg.message ?? '',
-            cell_id: findRunningCellId(session.notebook),
+            cell_id: findRunningCellId(session.notebook) ?? session._lastCellId,
           } as any);
         }
         break;
