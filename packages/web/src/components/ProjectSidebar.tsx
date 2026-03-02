@@ -52,9 +52,9 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
 
 
 
-function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete }: {
+function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete, onRequestRename }: {
   projectId: string; projectSlug: string; authToken: string | null;
-  onClose: () => void; onRequestDelete: () => void;
+  onClose: () => void; onRequestDelete: () => void; onRequestRename: () => void;
 }) {
   const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -84,6 +84,7 @@ function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequest
 
   return (
     <div className="project-item-menu" ref={menuRef} onClick={e => e.stopPropagation()}>
+      <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>
       <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>
       <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>{t('sidebar.delete')}</button>
     </div>
@@ -99,6 +100,7 @@ function ProjectList() {
   const [showCreate, setShowCreate] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
   const [createPhase, setCreatePhase] = useState<CreatePhase>('idle');
   const [createError, setCreateError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +165,7 @@ function ProjectList() {
                 authToken={authToken}
                 onClose={() => setMenuOpenId(null)}
                 onRequestDelete={() => setDeleteTarget({ id: p.id, title: p.title })}
+                onRequestRename={() => setRenameTarget({ id: p.id, title: p.title })}
               />
             )}
           </div>
@@ -183,6 +186,33 @@ function ProjectList() {
             closeProjectNotebookTabs(deleteTarget.id);
             if (activeProjectId === deleteTarget.id) goBackToProjectList();
             fetchProjects();
+          }}
+        />
+      )}
+
+      {/* Rename modal */}
+      {renameTarget && (
+        <RenameModal
+          currentName={renameTarget.title}
+          label={t('sidebar.projects')}
+          onCancel={() => setRenameTarget(null)}
+          onConfirm={async (newName) => {
+            const res = await fetch(`/api/projects/${renameTarget.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+              },
+              body: JSON.stringify({ title: newName }),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || 'Failed to rename');
+            }
+          }}
+          onDone={() => {
+            setRenameTarget(null);
+            useStore.getState().fetchProjects();
           }}
         />
       )}
