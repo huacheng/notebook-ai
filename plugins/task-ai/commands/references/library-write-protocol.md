@@ -35,7 +35,7 @@ Supported entry types: `experience`, `reference`, `type-profile`, `pattern`, `re
 | Append (`---` separator + O_APPEND index) | `.memory/.thinking/raw/<nb>-<step>-<date>.md`; `<nb>-impl.md`; `<nb>-verify.md`; `<nb>-eval.md` |
 | Overwrite (`.tmp → rename`) | `<nb>-complete.md`; `.memory/.thinking/patterns/*.md`; `.memory/.type-profiles/*.md`; all `.summary.md`; all `.index.md` |
 
-**Note on `.summary.md` staleness**: `exec`, `verify`, and `check` update `.index.md` when writing partial experience files, but do NOT rebuild `.memory/.experiences/<type>/.summary.md` (prose index). That summary is rebuilt by `report` (step 13(f)-(g)). Until `report` runs, the prose summary may not reflect the latest partial entries. Use `library maintain --rebuild-index` to refresh all summaries on demand.
+**Note on `.summary.md` staleness**: `exec`, `verify`, and `check` update `.index.md` when writing partial experience files, but do NOT rebuild `.memory/.experiences/<type>/.summary.md` (prose index). That summary is rebuilt by `highlight` (scope=complete, steps 4f-4g). Until `report` runs, the prose summary may not reflect the latest partial entries. Use `library maintain --rebuild-index` to refresh all summaries on demand.
 
 **Lock ordering**: All library locks follow the global lock ordering convention documented in `commands/task-ai.md` (Lock Ordering Convention section). `.changelog.lock` is always the innermost lock (acquired last, released first).
 

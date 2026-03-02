@@ -35,7 +35,7 @@ The `type` field uses a simple string with pipe separator for hybrids:
 
 **Validation regex**: Each segment must match `[a-zA-Z0-9_:-]+`. Full type field: `[a-zA-Z0-9_:|-]+` (pipe allowed as separator). Parsing: `type.split('|')` → `[0]` is primary, `[1:]` are secondary.
 
-**Experiences mapping**: For hybrid type `A|B`, `report` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. Plan reads `.summary.md` for all segments, drilling into individual entries when relevant.
+**Experiences mapping**: For hybrid type `A|B`, `highlight` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. Plan reads `.summary.md` for all segments, drilling into individual entries when relevant.
 
 ## Type Determination Flow
 
@@ -213,7 +213,7 @@ Per-task `.type-profile.md` is task-specific and non-shared. When task A builds 
 
 ### Solution: `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/`
 
-A shared directory of type profiles, auto-maintained by `research` and `report` for **all** types (seed and discovered):
+A shared directory of type profiles, auto-maintained by `research` and `highlight` for **all** types (seed and discovered):
 
 ```
 $NB_WORKSPACES_LIBRARY/.memory/.type-profiles/
@@ -227,7 +227,7 @@ $NB_WORKSPACES_LIBRARY/.memory/.type-profiles/
 | Phase | Trigger | Action |
 |-------|---------|--------|
 | **research** | Builds or updates `.type-profile.md` for **any** type (seed or discovered) | Copy profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (create or overwrite if confidence is higher). Apply directory-safe transform: replace `:` with `-` in type for filename |
-| **report** | Task completes with a refined `.type-profile.md` | Merge refinements back to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (append refinement log, update sections that changed). Apply directory-safe transform for `:` in type |
+| **highlight** | Task completes with a refined `.type-profile.md` | Merge refinements back to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (append refinement log, update sections that changed). Apply directory-safe transform for `:` in type |
 
 **Note**: ALL types sync to shared profiles — including seed types. Over time, shared profiles become richer than static reference tables because they incorporate real task execution experience (tool discoveries, verified patterns, phase-specific intelligence). Static tables remain as initial fallback only.
 

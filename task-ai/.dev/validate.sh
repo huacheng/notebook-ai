@@ -70,6 +70,7 @@ L2_SCRIPTS=(
   init-stage-field.sh
   state-stage-done.py
   audit-round7-fixes.py
+  audit-round8-fixes.py
 )
 
 L3_SCRIPTS=(

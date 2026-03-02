@@ -39,7 +39,7 @@
 | `check` | Plan feasibility check at post-plan, mid-exec, post-exec checkpoints |
 | `exec` | Execute implementation plan step by step |
 | `merge` | Merge task branch to main with conflict resolution |
-| `report` | Generate completion report, distill experience |
+| `report` | Generate completion report |
 | `auto` | Autonomous execution loop (single-session orchestration) |
 | `cancel` | Cancel task module, stop auto, optional cleanup |
 | `list` | Query task status and dependency relationships (read-only) |

@@ -5,6 +5,10 @@
 set -uo pipefail
 
 QUERY="${1:-}"
+if [[ -z "$QUERY" ]]; then
+    echo "[ERROR] Search query is required." >&2
+    exit 1
+fi
 LIMIT=10
 TYPE_FILTER=""
 

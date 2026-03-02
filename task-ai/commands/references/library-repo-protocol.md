@@ -14,7 +14,7 @@ On any library write operation, check repository status:
           → No  (nothing exists):      mkdir -p + git init + create skeleton + initial commit
 ```
 
-`init` performs this check at step 2. Other skills (`report`, `research`, `exec`, `maintain`) assume the library repo exists — if it doesn't, they emit a warning and skip library writes.
+`init` performs this check at step 2. Other skills (`highlight`, `research`, `exec`, `maintain`) assume the library repo exists — if it doesn't, they emit a warning and skip library writes.
 
 ## Library Commit Helper
 
@@ -40,7 +40,7 @@ cd -                                    # return to previous directory
 |-------|-------------|-------|------|
 | `init` | `init` | Skeleton files (`.changelog`, `.master-index.md`, `.type-registry.md`) | First library setup |
 | `research` | `research` | `.memory/.references/<topic>.md` + `.index.md` + `.summary.md` | After reference write |
-| `report` | `report` | `.memory/.experiences/`, `.memory/.type-profiles/`, `.memory/.thinking/patterns/` | After each distillation batch |
+| `highlight` | `highlight` | `.memory/.experiences/`, `.memory/.type-profiles/`, `.memory/.thinking/patterns/` | After each distillation batch |
 | `exec` | `exec` | `.memory/.experiences/<type>/<notebook>-impl.md` + `.index.md` | After partial experience write |
 | `verify` | `verify` | `.memory/.experiences/<type>/<notebook>-verify.md` + `.index.md` | After verification experience write |
 | `check` | `check` | `.memory/.experiences/<type>/<notebook>-eval.md` + `.index.md` | After evaluation experience write |
@@ -50,7 +50,7 @@ cd -                                    # return to previous directory
 
 ```
 task-ai(auth-refactor):research collect jwt-auth reference
-task-ai(auth-refactor):report distill experiences + patterns
+task-ai(auth-refactor):highlight distill experiences + patterns
 task-ai(auth-refactor):exec write partial experience
 task-ai(library):maintain rebuild index
 task-ai(library):maintain rebuild relations
@@ -80,7 +80,7 @@ Project repo (task branch):                Library repo (always main):
   task-ai(nb):feat add auth middleware
   task-ai(nb):exec step 2/5 done
   ...
-  task-ai(nb):report generate report         task-ai(nb):report distill experiences + patterns
+  task-ai(nb):report generate report         task-ai(nb):highlight distill experiences + patterns
 ```
 
 Library commits happen **on main** (no branching) — the library is append-mostly and uses file-level locking for concurrency, not branch isolation.

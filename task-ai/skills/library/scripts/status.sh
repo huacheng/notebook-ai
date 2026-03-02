@@ -39,4 +39,4 @@ fi
 # 3. Check for Active Locks
 echo -e "
 --- Active Locks ---"
-find "$LIB_PATH" -name ".lock"
+find "$LIB_PATH" -maxdepth 4 -name ".lock" 2>/dev/null
