@@ -24,6 +24,9 @@ interface FileEntry {
   type: 'file' | 'directory';
   size: number;
   modifiedAt: string;
+  /** D6-5: Project file list may include these optional fields */
+  isNotebook?: boolean;
+  worktreePath?: string;
 }
 
 interface ListResult {
@@ -525,15 +528,15 @@ export function FileSection({
 
           {/* Entries */}
           {!loading && files.map((f) => {
-            const isNbDir = f.type === 'directory' && (f as any).isNotebook;
+            const isNbDir = f.type === 'directory' && f.isNotebook;
             return f.type === 'directory' ? (
             <div key={f.name} className="fp-entry fp-entry-dir" data-tooltip={f.name} onClick={async () => {
-              const meta = { isNotebook: isNbDir || undefined, worktreePath: (f as any).worktreePath as string | undefined };
+              const meta = { isNotebook: isNbDir || undefined, worktreePath: f.worktreePath };
               if (onDirClick) {
                 const result = await onDirClick(subPath, f.name, meta);
                 if (result === true) return;
               }
-              navigateInto((f as any).worktreePath || f.name);
+              navigateInto(f.worktreePath || f.name);
             }}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
               <span className="fp-name">{f.name}</span>

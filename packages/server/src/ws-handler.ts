@@ -1,4 +1,5 @@
 import { type WebSocketServer, type WebSocket } from 'ws';
+import path from 'path';
 
 // ── Error sanitization (D2-4) ───────────────────────────────────────────────
 // Patterns that indicate internal details unsafe for client exposure.
@@ -46,6 +47,7 @@ export function sanitizeErrorForClient(err: unknown): string {
 }
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import {
@@ -75,7 +77,7 @@ const DEFAULT_GIT_LOG_LIMIT = 5;
 export async function computeGitLog(
   cwd: string,
   opts: { page?: number; limit?: number; all?: boolean; stats?: boolean } = {},
-): Promise<{ commits: unknown[]; total: number; page: number; limit: number }> {
+): Promise<{ commits: unknown[]; count: number; page: number; limit: number }> {
   const page = opts.page ?? 1;
   const limit = opts.limit ?? DEFAULT_GIT_LOG_LIMIT;
   const skip = (page - 1) * limit;
@@ -126,7 +128,7 @@ export async function computeGitLog(
   const hasMore = commits.length > limit;
   if (hasMore) commits.pop();
 
-  return { commits, total: commits.length, page, limit };
+  return { commits, count: commits.length, page, limit };
 }
 
 function sendToClient(ws: WebSocket, msg: object): void {
@@ -180,14 +182,26 @@ export function setupWebSocket(
 
       const result = WSClientMessageSchema.safeParse(parsed);
       if (!result.success) {
+        // D2: Do not leak Zod schema details (field names, regex) to client
+        console.warn('[ws] Invalid message:', result.error.issues.length, 'validation error(s)');
         sendToClient(ws, {
           type: 'error',
-          message: `Invalid message: ${result.error.message}`,
+          message: `Invalid message format.`,
         });
         return;
       }
 
       const msg = result.data;
+
+      // D2: ownership check — session-mutating commands must originate from the session owner
+      function checkSessionOwner(sid: string): boolean {
+        const owner = sessionOwners.get(sid);
+        if (owner && owner !== ws) {
+          sendToClient(ws, { type: 'error', session_id: sid, message: 'Not the session owner.' });
+          return false;
+        }
+        return true;
+      }
 
       switch (msg.type) {
         case 'subscribe': {
@@ -286,6 +300,7 @@ export function setupWebSocket(
 
         case 'execute_request': {
           const { session_id, cell_id, source, images } = msg;
+          if (!checkSessionOwner(session_id)) break;
           try {
             await sessionManager.executeCell(session_id, cell_id, source, images);
           } catch (err) {
@@ -328,16 +343,27 @@ export function setupWebSocket(
 
         case 'load_notebook': {
           const { session_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
+          const session = sessionManager.getSession(session_id);
+          if (!session) {
+            sendToClient(ws, { type: 'error', session_id, message: `Session "${session_id}" not found.` });
+            break;
+          }
+          // D2: Validate path is within workspace before loading
+          const safePath = await validateWorkspacePath(msg.path, session.cwd).catch(() => null);
+          if (!safePath) {
+            sendToClient(ws, { type: 'error', session_id, message: 'Load path is outside the workspace.' });
+            break;
+          }
           let notebook: Notebook;
           try {
-            notebook = await notebookStore.load(msg.path);
+            notebook = await notebookStore.load(safePath);
           } catch (err) {
             sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
             break;
           }
-          const loadSession = sessionManager.getSession(session_id);
-          if (loadSession) loadSession.notebook = notebook;
-          console.log(`[ws] Notebook loaded from "${msg.path}"`);
+          session.notebook = notebook;
+          console.log(`[ws] Notebook loaded from "${safePath}"`);
           break;
         }
 
@@ -363,6 +389,7 @@ export function setupWebSocket(
 
         case 'slice_update': {
           const { session_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (session) {
             session.notebook = {
@@ -384,6 +411,7 @@ export function setupWebSocket(
 
         case 'update_cell_source': {
           const { session_id, cell_id, source } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (session) {
             session.notebook = {
@@ -398,6 +426,7 @@ export function setupWebSocket(
 
         case 'file-open': {
           const { session_id, path: filePath, source, project_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session && source !== 'library' && !project_id) {
             sendToClient(ws, { type: 'file-open-error', session_id, error: 'Session not found' });
@@ -431,6 +460,14 @@ export function setupWebSocket(
 
             const safePath = await validateWorkspacePath(filePath, basedir);
             const stat = await fs.stat(safePath);
+
+            // D2: reject files exceeding 50 MB to prevent memory exhaustion
+            const MAX_FILE_SIZE = 50 * 1024 * 1024;
+            if (stat.size > MAX_FILE_SIZE) {
+              sendToClient(ws, { type: 'file-open-error', session_id, error: `File too large (${(stat.size / 1024 / 1024).toFixed(1)} MB, max 50 MB)` });
+              break;
+            }
+
             const ext = safePath.split('.').pop()?.toLowerCase() ?? '';
 
             const TEXT_EXTS = new Set(['md', 'txt', 'json', 'yaml', 'yml', 'sh', 'py', 'js', 'ts',
@@ -461,20 +498,22 @@ export function setupWebSocket(
               break;
             }
 
-            const fileContent = await fs.readFile(safePath);
+            // D3: Stream file content in chunks to avoid loading entire file into memory
             const CHUNK_SIZE = 16384;
+            const isBinary = format.endsWith('-binary') || format === 'image';
+            const stream = createReadStream(safePath, { highWaterMark: CHUNK_SIZE });
 
-            if (format.endsWith('-binary') || format === 'image') {
-              const b64 = fileContent.toString('base64');
-              for (let i = 0; i < b64.length; i += CHUNK_SIZE) {
-                sendToClient(ws, { type: 'file-chunk', session_id, data: b64.slice(i, i + CHUNK_SIZE), encoding: 'base64' });
-              }
-            } else {
-              const text = fileContent.toString('utf-8');
-              for (let i = 0; i < text.length; i += CHUNK_SIZE) {
-                sendToClient(ws, { type: 'file-chunk', session_id, data: text.slice(i, i + CHUNK_SIZE), encoding: 'utf8' });
-              }
-            }
+            await new Promise<void>((resolve, reject) => {
+              stream.on('data', (chunk: Buffer | string) => {
+                if (isBinary) {
+                  sendToClient(ws, { type: 'file-chunk', session_id, data: chunk.toString('base64'), encoding: 'base64' });
+                } else {
+                  sendToClient(ws, { type: 'file-chunk', session_id, data: chunk.toString('utf-8'), encoding: 'utf8' });
+                }
+              });
+              stream.on('end', resolve);
+              stream.on('error', reject);
+            });
 
             sendToClient(ws, { type: 'file-open-end', session_id, mtime: stat.mtimeMs });
           } catch (err) {
@@ -485,6 +524,7 @@ export function setupWebSocket(
 
         case 'file-save': {
           const { session_id, path: filePath, source, content, project_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session && source !== 'library' && !project_id) {
             sendToClient(ws, { type: 'file-save-error', session_id, error: 'Session not found' });
@@ -529,6 +569,7 @@ export function setupWebSocket(
 
         case 'annotation-load': {
           const { session_id, path: filePath } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const row = db.getFileAnnotations(session_id, filePath);
           sendToClient(ws, {
             type: 'annotation-data',
@@ -542,6 +583,7 @@ export function setupWebSocket(
 
         case 'annotation-sync': {
           const { session_id, path: filePath, content, updated_at } = msg;
+          if (!checkSessionOwner(session_id)) break;
           db.upsertFileAnnotations(session_id, filePath, content, updated_at);
           sendToClient(ws, { type: 'annotation-sync-ok', session_id, path: filePath, updated_at });
           break;
@@ -549,6 +591,7 @@ export function setupWebSocket(
 
         case 'restart_session': {
           const { session_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
           try {
             await sessionManager.restartSession(session_id);
             sendToClient(ws, { type: 'session_restarted', session_id });
@@ -560,6 +603,7 @@ export function setupWebSocket(
 
         case 'rerun_notebook': {
           const { session_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
           try {
             await sessionManager.rerunNotebook(session_id);
             sendToClient(ws, { type: 'rerun_started', session_id });
@@ -571,6 +615,7 @@ export function setupWebSocket(
 
         case 'interrupt_cell': {
           const { session_id } = msg;
+          if (!checkSessionOwner(session_id)) break;
           try {
             await sessionManager.interruptCell(session_id);
             sendToClient(ws, { type: 'cell_interrupted', session_id });
@@ -582,6 +627,7 @@ export function setupWebSocket(
 
         case 'tool_result_response': {
           const { session_id, tool_use_id, content } = msg;
+          if (!checkSessionOwner(session_id)) break;
           try {
             await sessionManager.submitToolResult(session_id, tool_use_id, content);
           } catch (err) {
@@ -592,6 +638,7 @@ export function setupWebSocket(
 
         case 'change_model': {
           const { session_id, model } = msg;
+          if (!checkSessionOwner(session_id)) break;
           try {
             await sessionManager.changeModel(session_id, model);
             sendToClient(ws, { type: 'model_changed', session_id, model });
@@ -603,6 +650,7 @@ export function setupWebSocket(
 
         case 'url_capture': {
           const { session_id, url } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session) {
             sendToClient(ws, { type: 'url_capture_result', url, file_path: '', format: 'image' as const, error: 'Session not found' });
@@ -631,6 +679,7 @@ export function setupWebSocket(
 
         case 'remove_cells': {
           const { session_id, cell_ids } = msg;
+          if (!checkSessionOwner(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session) {
             sendToClient(ws, { type: 'error', session_id, message: `Session "${session_id}" not found.` });
@@ -701,8 +750,18 @@ export function setupWebSocket(
                 break;
               }
               projectPath = project.path;
-              watchPath = dir_path ? `${project.path}/${dir_path}` : project.path;
-              if (dir_path) subPath = dir_path;
+              if (dir_path) {
+                // D2-8: Validate dir_path to prevent path traversal
+                const resolved = path.resolve(project.path, dir_path);
+                if (!resolved.startsWith(project.path + path.sep) && resolved !== project.path) {
+                  sendToClient(ws, { type: 'error', message: 'Path outside workspace.' });
+                  break;
+                }
+                watchPath = resolved;
+                subPath = dir_path;
+              } else {
+                watchPath = project.path;
+              }
             } else {
               break; // No valid path to watch
             }
@@ -828,9 +887,8 @@ export function setupWebSocket(
               sendToClient(ws, { type: 'git_diff_error', request_id, error: 'Invalid commit hash' });
               break;
             }
-            if (file && (file.includes('..') || file.startsWith('/'))) {
-              sendToClient(ws, { type: 'git_diff_error', request_id, error: 'Invalid file path' });
-              break;
+            if (file) {
+              await validateWorkspacePath(file, project.path);
             }
             let args: string[];
             try {

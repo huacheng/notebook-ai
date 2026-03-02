@@ -81,8 +81,16 @@ function DocxRenderer({ buffer }: { buffer: Uint8Array }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current) return;
-    ref.current.innerHTML = '';
-    renderAsync(buffer.buffer, ref.current, undefined, { className: 'fv-docx', inWrapper: true });
+    const el = ref.current;
+    el.innerHTML = '';
+    // D2: render into a detached element to prevent XSS from inline event handlers
+    // (e.g. <img onerror="...">) firing before sanitization
+    const detached = document.createElement('div');
+    renderAsync(buffer.buffer, detached, undefined, { className: 'fv-docx', inWrapper: true })
+      .then(() => {
+        el.innerHTML = DOMPurify.sanitize(detached.innerHTML);
+      })
+      .catch(() => { /* renderAsync failure — leave empty */ });
   }, [buffer]);
   return <div ref={ref} className="fv-render__docx-container" />;
 }
@@ -92,9 +100,12 @@ function XlsxRenderer({ buffer }: { buffer: Uint8Array }) {
   const [sheets, setSheets] = useState<string[]>([]);
   const [activeSheet, setActiveSheet] = useState(0);
   const [html, setHtml] = useState('');
+  // D4: cache workbook in ref to avoid redundant XLSX.read on sheet switch
+  const wbRef = useRef<ReturnType<typeof XLSX.read> | null>(null);
 
   useEffect(() => {
     const wb = XLSX.read(buffer, { type: 'array' });
+    wbRef.current = wb;
     setSheets(wb.SheetNames);
     if (wb.SheetNames.length > 0) {
       setActiveSheet(0);
@@ -103,10 +114,9 @@ function XlsxRenderer({ buffer }: { buffer: Uint8Array }) {
   }, [buffer]);
 
   useEffect(() => {
-    if (sheets.length === 0) return;
-    const wb = XLSX.read(buffer, { type: 'array' });
-    setHtml(XLSX.utils.sheet_to_html(wb.Sheets[sheets[activeSheet]]));
-  }, [activeSheet, sheets, buffer]);
+    if (sheets.length === 0 || !wbRef.current) return;
+    setHtml(XLSX.utils.sheet_to_html(wbRef.current.Sheets[sheets[activeSheet]]));
+  }, [activeSheet, sheets]);
 
   return (
     <div className="fv-render__xlsx">
@@ -154,6 +164,12 @@ function ImageRenderer({ buffer, filename }: { buffer: Uint8Array; filename: str
       : ext === 'webp' ? 'image/webp'
       : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
       : 'image/png';
+    // D2: sanitize SVG to prevent XSS via embedded scripts/event handlers
+    if (ext === 'svg') {
+      const raw = new TextDecoder().decode(buffer);
+      const clean = DOMPurify.sanitize(raw, { USE_PROFILES: { svg: true, svgFilters: true } });
+      return URL.createObjectURL(new Blob([clean], { type: mime }));
+    }
     return URL.createObjectURL(new Blob([buffer.slice().buffer], { type: mime }));
   }, [buffer, filename]);
 
@@ -259,11 +275,12 @@ export function FileViewerRender({
 
   // Restore highlights from persisted annotation data (after file re-open)
   useEffect(() => {
-    const missing = annotations.items.filter(
-      a => a.highlightRects && a.highlightRects.length > 0 && !highlights[a.id]
-    );
-    if (missing.length === 0) return;
+    if (annotations.items.length === 0) return;
     setHighlights(prev => {
+      const missing = annotations.items.filter(
+        a => a.highlightRects && a.highlightRects.length > 0 && !prev[a.id]
+      );
+      if (missing.length === 0) return prev;
       const rebuilt = rebuildHighlightsFromAnnotations(missing);
       return { ...prev, ...rebuilt };
     });

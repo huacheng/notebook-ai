@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, copyFile, readFile, unlink, stat, rm, readdir } from 'fs/promises';
+import { mkdir, writeFile, copyFile, readFile, unlink, stat, rm, readdir, realpath } from 'fs/promises';
 import { createReadStream, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -70,7 +70,7 @@ export function createProjectsRouter(
 
       res.json(project);
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -150,7 +150,7 @@ export function createProjectsRouter(
         taskStatus: 'draft',
       });
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -338,14 +338,26 @@ export function createProjectsRouter(
     let archiveName = project.slug || 'project';
 
     if (subPath) {
-      const resolved = path.resolve(project.path, subPath);
-      const projectRoot = path.resolve(project.path);
-      if (!resolved.startsWith(projectRoot + path.sep) && resolved !== projectRoot) {
-        res.status(403).json({ error: 'path traversal' });
+      // D2: use realpath for symlink-safe path validation
+      try {
+        const resolved = path.resolve(project.path, subPath);
+        // Quick pre-check before realpath (catches obvious traversal even if path doesn't exist)
+        if (!resolved.startsWith(project.path + path.sep) && resolved !== project.path) {
+          res.status(403).json({ error: 'path traversal' });
+          return;
+        }
+        const realProjectRoot = await realpath(project.path);
+        const realResolved = await realpath(resolved);
+        if (!realResolved.startsWith(realProjectRoot + path.sep) && realResolved !== realProjectRoot) {
+          res.status(403).json({ error: 'path traversal' });
+          return;
+        }
+        targetDir = realResolved;
+        archiveName = path.basename(realResolved);
+      } catch {
+        res.status(404).json({ error: 'path not found' });
         return;
       }
-      targetDir = resolved;
-      archiveName = path.basename(resolved);
     }
 
     const { spawn } = await import('child_process');
@@ -372,6 +384,13 @@ export function createProjectsRouter(
       // Extract to temp directory
       const { mkdtemp } = await import('fs/promises');
       tmpExtract = await mkdtemp(path.join(os.tmpdir(), 'nb-import-extract-'));
+      // Validate archive entries before extraction to prevent tar-slip (path traversal)
+      const { stdout: listing } = await execFileAsync('tar', ['tzf', file.path], { timeout: 30_000 });
+      for (const entry of listing.trim().split('\n')) {
+        if (entry.includes('..') || path.isAbsolute(entry)) {
+          throw new Error('Archive contains unsafe path');
+        }
+      }
       await execFileAsync('tar', ['xzf', file.path, '-C', tmpExtract]);
 
       // Read .index.json for title (fallback to filename)
@@ -449,7 +468,7 @@ export function createProjectsRouter(
 
       res.json(project);
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
+      res.status(500).json({ error: 'Internal server error.' });
     } finally {
       // Cleanup temp files
       await unlink(file.path).catch(() => {});
@@ -466,7 +485,22 @@ export function createProjectsRouter(
       const relPath = typeof req.query['path'] === 'string' ? req.query['path'] : '';
       if (!relPath) return res.status(400).json({ error: 'path required' });
 
-      const absPath = path.join(project.path, relPath);
+      // D2-9: Validate relPath to prevent path traversal (quick check + realpath for symlinks)
+      const resolved = path.resolve(project.path, relPath);
+      if (!resolved.startsWith(project.path + path.sep) && resolved !== project.path) {
+        return res.status(403).json({ error: 'Path outside workspace' });
+      }
+      let absPath: string;
+      try {
+        const realBase = await realpath(project.path);
+        const realTarget = await realpath(resolved);
+        if (!realTarget.startsWith(realBase + path.sep) && realTarget !== realBase) {
+          return res.status(403).json({ error: 'Path outside workspace' });
+        }
+        absPath = realTarget;
+      } catch {
+        absPath = resolved; // path doesn't exist on disk yet — use resolved
+      }
       let nbRow = db.getNotebookByPath(absPath);
 
       // Frontend sends directory path (e.g. ".worktrees/task-my-nb"), but DB stores
@@ -526,7 +560,7 @@ export function createProjectsRouter(
 
       res.status(204).send();
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 
@@ -565,7 +599,7 @@ export function createProjectsRouter(
 
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error.' });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 

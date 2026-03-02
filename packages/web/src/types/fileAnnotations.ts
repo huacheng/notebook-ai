@@ -25,9 +25,8 @@ export const EMPTY_FILE_ANNOTATIONS: FileAnnotations = {
   updatedAt: 0,
 };
 
-let _idCounter = 0;
 export function uid(): string {
-  return `ann_${++_idCounter}_${Date.now()}`;
+  return crypto.randomUUID();
 }
 
 export function storageKey(notebookId: string, filePath: string): string {

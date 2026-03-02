@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import DOMPurify from 'dompurify';
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 
@@ -19,7 +20,8 @@ export function FileViewerEditor({ content, format, sessionId, filePath, source,
 
   const editor = useEditor({
     extensions: [StarterKit],
-    content: format === 'html' ? content : `<pre><code>${content}</code></pre>`,
+    // D2: HTML-escape text content to prevent XSS via malicious file content
+    content: format === 'html' ? DOMPurify.sanitize(content) : `<pre><code>${content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`,
   });
 
   useEffect(() => {

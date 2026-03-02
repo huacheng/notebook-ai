@@ -216,15 +216,14 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     set((state) => ({
       notebookList: state.notebookList.filter((n) => n.id !== notebookId),
     }));
-    if (get().activeNotebookId === notebookId) {
+    // D3-5: Capture notebook reference BEFORE clearing state to avoid dead-code bug
+    const isActive = get().activeNotebookId === notebookId;
+    const notebookForCleanup = isActive ? get().notebook : _loadCachedNotebook(notebookId);
+    if (isActive) {
       set({ notebook: null, sessionId: null, activeNotebookId: null, workspaceDir: null });
       cacheRemove('nb-last-notebook');
     }
     cacheRemove(_cacheKey(notebookId));
-    const notebookForCleanup =
-      get().activeNotebookId === notebookId
-        ? get().notebook
-        : _loadCachedNotebook(notebookId);
     if (notebookForCleanup) {
       for (const cell of notebookForCleanup.cells) {
         cacheRemove(`nb-draft-${cell.id}`);

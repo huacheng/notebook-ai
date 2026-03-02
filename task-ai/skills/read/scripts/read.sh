@@ -2,7 +2,7 @@
 # /task-ai:read implementation
 # Usage: read.sh <file_path> [--depth shallow|deep]
 
-set -uo pipefail
+set -euo pipefail
 
 FILE_PATH="${1:-}"
 DEPTH="shallow"

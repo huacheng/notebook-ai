@@ -15,8 +15,9 @@ import {
   setCellGitDiffInNotebook,
 } from './notebookMutations';
 
-// Adaptive sync timer for cell source updates
-let _sourceSyncTimer: ReturnType<typeof setTimeout> | null = null;
+// D1-3: Per-cell adaptive sync timers (Map<cellId, timer>) to avoid
+// losing edits when quickly switching between cells.
+const _sourceSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function makeCell(type: CellType): Cell {
   const id = crypto.randomUUID();
@@ -212,12 +213,13 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       };
     });
 
-    // Adaptive sync to server: max(200ms, latency × 3)
-    if (_sourceSyncTimer) clearTimeout(_sourceSyncTimer);
+    // Adaptive sync to server: max(200ms, latency × 3), per-cell timer
+    const existingTimer = _sourceSyncTimers.get(cellId);
+    if (existingTimer) clearTimeout(existingTimer);
     const latency = get().latency ?? 30;
     const interval = Math.max(200, latency * 3);
-    _sourceSyncTimer = setTimeout(() => {
-      _sourceSyncTimer = null;
+    _sourceSyncTimers.set(cellId, setTimeout(() => {
+      _sourceSyncTimers.delete(cellId);
       const { ws, sessionId } = get();
       if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
         ws.send(JSON.stringify({
@@ -227,7 +229,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
           source,
         }));
       }
-    }, interval);
+    }, interval));
   },
 
   setCellStatus(cellId, status) {

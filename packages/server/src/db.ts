@@ -188,9 +188,11 @@ export class NotebookDb {
   }
 
   deleteNotebook(id: string): void {
-    // Hard-delete: remove sessions first (no ON DELETE CASCADE), then the notebook.
-    this.db.prepare('DELETE FROM sessions WHERE notebook_id = ?').run(id);
-    this.db.prepare('DELETE FROM notebooks WHERE id = ?').run(id);
+    // D3: wrap in transaction so partial deletes cannot occur
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM sessions WHERE notebook_id = ?').run(id);
+      this.db.prepare('DELETE FROM notebooks WHERE id = ?').run(id);
+    })();
   }
 
   // ── Session CRUD ─────────────────────────────────────────────────────────
@@ -276,14 +278,18 @@ export class NotebookDb {
   }
 
   deleteProject(id: string): void {
-    // Cascade: remove associated notebooks (and their sessions) first
-    const notebooks = this.db.prepare(
-      `SELECT id FROM notebooks WHERE project_id = ?`
-    ).all(id) as { id: string }[];
-    for (const nb of notebooks) {
-      this.deleteNotebook(nb.id);
-    }
-    this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(id);
+    // D3: wrap in transaction so partial deletes cannot occur
+    this.db.transaction(() => {
+      const notebooks = this.db.prepare(
+        `SELECT id FROM notebooks WHERE project_id = ?`
+      ).all(id) as { id: string }[];
+      for (const nb of notebooks) {
+        // Inline delete (avoid nested transaction from this.deleteNotebook)
+        this.db.prepare('DELETE FROM sessions WHERE notebook_id = ?').run(nb.id);
+        this.db.prepare('DELETE FROM notebooks WHERE id = ?').run(nb.id);
+      }
+      this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(id);
+    })();
   }
 
   listProjectNotebooks(projectId: string): { id: string; workspace_dir: string }[] {

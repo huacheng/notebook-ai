@@ -26,6 +26,22 @@ function sanitizeSvgRegex(svg: string): string {
     .replace(JAVASCRIPT_HREF, '');
 }
 
+describe('ImageRenderer SVG blob sanitization (P1-3)', () => {
+  it('should sanitize SVG content with DOMPurify before creating blob URL', () => {
+    // Read the source code to verify ImageRenderer sanitizes SVGs
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../components/FileViewerRender.tsx'),
+      'utf-8',
+    );
+    const fnStart = src.indexOf('function ImageRenderer');
+    const fnEnd = src.indexOf('\nfunction ', fnStart + 1);
+    const block = src.slice(fnStart, fnEnd > 0 ? fnEnd : fnStart + 800);
+    expect(block).toContain('DOMPurify.sanitize');
+  });
+});
+
 describe('SVG sanitization (D2-7)', () => {
   // ── Vectors that the regex misses but DOMPurify catches ──
 

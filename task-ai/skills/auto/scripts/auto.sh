@@ -2,7 +2,7 @@
 # /task-ai:auto implementation
 # Usage: auto.sh <notebook> [--start|--stop|--status]
 
-set -uo pipefail
+set -euo pipefail
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"

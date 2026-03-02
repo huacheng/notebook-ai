@@ -37,8 +37,8 @@ export function useFileStream(
   const wsStatus = useStore((s) => s.wsStatus);
   const [state, setState] = useState<FileStreamState>(INITIAL_STATE);
 
-  const contentRef = useRef('');
-  const b64Ref = useRef('');
+  const contentChunksRef = useRef<string[]>([]);
+  const b64ChunksRef = useRef<string[]>([]);
   const formatRef = useRef<FileFormat | null>(null);
   const throttleRef = useRef<number | null>(null);
   const skipStreamRef = useRef(false);
@@ -46,7 +46,7 @@ export function useFileStream(
   const flushState = useCallback(() => {
     setState((prev) => ({
       ...prev,
-      content: (formatRef.current?.endsWith('-binary') || formatRef.current === 'image') ? prev.content : contentRef.current,
+      content: (formatRef.current?.endsWith('-binary') || formatRef.current === 'image') ? prev.content : contentChunksRef.current.join(''),
     }));
   }, []);
 
@@ -63,8 +63,8 @@ export function useFileStream(
     if (!sessionId && source !== 'library' && !projectId) return;
     const effectiveSessionId = sessionId || (projectId ? `__project_${projectId}__` : '__library__');
 
-    contentRef.current = '';
-    b64Ref.current = '';
+    contentChunksRef.current = [];
+    b64ChunksRef.current = [];
     formatRef.current = null;
     skipStreamRef.current = false;
     let stale = false;
@@ -83,7 +83,7 @@ export function useFileStream(
       cachedFormat = cached.format;
       formatRef.current = cached.format;
       if (!(cached.format.endsWith('-binary') || cached.format === 'image')) {
-        contentRef.current = cached.content;
+        contentChunksRef.current = [cached.content];
       }
       // Render cached content immediately while waiting for server mtime check
       setState({
@@ -121,8 +121,8 @@ export function useFileStream(
                 // Corrupted cache — clear and re-request
                 cacheRemove(cacheKey);
                 skipStreamRef.current = false;
-                contentRef.current = '';
-                b64Ref.current = '';
+                contentChunksRef.current = [];
+                b64ChunksRef.current = [];
                 const retryMsg: Record<string, string> = { type: 'file-open', session_id: effectiveSessionId, path: filePath!, source };
                 if (projectId) retryMsg.project_id = projectId;
                 ws?.send(JSON.stringify(retryMsg));
@@ -132,8 +132,8 @@ export function useFileStream(
               setState({ status: 'complete', format, content: cachedContent, binaryBuffer: null, mtime, error: null });
             }
           } else {
-            contentRef.current = '';
-            b64Ref.current = '';
+            contentChunksRef.current = [];
+            b64ChunksRef.current = [];
           }
           break;
         }
@@ -141,9 +141,9 @@ export function useFileStream(
           if (skipStreamRef.current) break;
           const { data, encoding } = msg as unknown as { data: string; encoding: 'utf8' | 'base64' };
           if (encoding === 'base64') {
-            b64Ref.current += data;
+            b64ChunksRef.current.push(data);
           } else {
-            contentRef.current += data;
+            contentChunksRef.current.push(data);
           }
           scheduleFlush();
           break;
@@ -154,7 +154,7 @@ export function useFileStream(
           const fmt = formatRef.current;
           const mtime = (msg as unknown as { mtime: number }).mtime;
           if (fmt?.endsWith('-binary') || fmt === 'image') {
-            const b64 = b64Ref.current;
+            const b64 = b64ChunksRef.current.join('');
             b64ToUint8Array(b64).then((buffer) => {
               if (stale) return;
               cacheSet(cacheKey, { content: b64, mtime, format: fmt });
@@ -164,8 +164,8 @@ export function useFileStream(
               setState((prev) => ({ ...prev, status: 'error', error: `Failed to decode binary data: ${String(err)}` }));
             });
           } else {
-            cacheSet(cacheKey, { content: contentRef.current, mtime, format: fmt });
-            setState({ status: 'complete', format: fmt ?? 'text', content: contentRef.current, binaryBuffer: null, mtime, error: null });
+            cacheSet(cacheKey, { content: contentChunksRef.current.join(''), mtime, format: fmt });
+            setState({ status: 'complete', format: fmt ?? 'text', content: contentChunksRef.current.join(''), binaryBuffer: null, mtime, error: null });
           }
           break;
         }

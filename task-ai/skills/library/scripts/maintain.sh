@@ -2,7 +2,7 @@
 # Library Maintain Script
 # Usage: maintain.sh [--rebuild-index] [--rebuild-relations] [--compact]
 
-set -uo pipefail
+set -euo pipefail
 
 # 动态获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

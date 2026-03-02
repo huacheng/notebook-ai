@@ -2,7 +2,7 @@
 # /task-ai:plan implementation
 # Usage: plan.sh <notebook> [--generate]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -52,7 +52,7 @@ EOF
 
 # 3. Generate VH Stubs (for software types)
 if [[ "$TYPE" == *"software"* ]]; then
-    TEST_DIR="$WORK_DIR/../.test"
+    TEST_DIR="$WORK_DIR/.test"
     mkdir -p "$TEST_DIR"
     DATE=$(date +%Y-%m-%d)
     STUB_FILE="$TEST_DIR/$DATE-vh-stubs.test.js"

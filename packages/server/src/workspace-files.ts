@@ -11,6 +11,9 @@ export interface FileEntry {
   type: 'file' | 'directory';
   size: number;
   modifiedAt: string;
+  /** D6-4: Optional fields for project file listings */
+  isNotebook?: boolean;
+  worktreePath?: string;
 }
 
 export interface ListResult {

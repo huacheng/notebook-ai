@@ -2,7 +2,7 @@
 # /task-ai:init implementation
 # Usage: init.sh <project_name> <notebook_name> [--title "Title"] [--tags "t1,t2"] [--worktree]
 
-set -uo pipefail
+set -euo pipefail
 
 PROJECT_NAME="${1:-}"
 NOTEBOOK_NAME="${2:-}"

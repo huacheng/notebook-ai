@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 
-const RECONNECT_DELAY_MS = 3000;
-const MAX_RECONNECT_ATTEMPTS = 10;
+// D3-2: Exponential backoff with jitter, never permanently give up
+const BASE_DELAY_MS = 1000;
+const MAX_DELAY_MS = 30_000;
 
 /** Pure helper: compute which sessions need subscribe/unsubscribe. */
 export function computeSubscriptionDiff(
@@ -39,29 +40,52 @@ export function useWebSocket(sessionId: string | null) {
     (s) => Object.values(s.openNotebooks).map((e) => e.sessionId).filter(Boolean).sort().join(','),
   );
 
-  // Connect once on mount; auto-reconnect on disconnect.
+  // Connect once on mount; auto-reconnect with exponential backoff.
   useEffect(() => {
     reconnectAttempts.current = 0;
     setWsReconnectExhausted(false);
     connectWebSocket();
 
-    const interval = setInterval(() => {
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleReconnect = () => {
       const status = useStore.getState().wsStatus;
-      if (status === 'disconnected' && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts.current += 1;
-        connectWebSocket();
-      }
-      if (status === 'disconnected' && reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-        setWsReconnectExhausted(true);
-      }
       if (status === 'connected') {
         reconnectAttempts.current = 0;
         setWsReconnectExhausted(false);
+        return;
       }
-    }, RECONNECT_DELAY_MS);
+      if (status === 'disconnected') {
+        reconnectAttempts.current += 1;
+        // Exponential backoff: 1s, 2s, 4s, 8s, ... capped at 30s + jitter
+        const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, reconnectAttempts.current - 1), MAX_DELAY_MS);
+        const jitter = Math.random() * backoff * 0.3;
+        reconnectTimer = setTimeout(() => {
+          connectWebSocket();
+          scheduleReconnect();
+        }, backoff + jitter);
+      } else {
+        // connecting state — check again in 1s
+        reconnectTimer = setTimeout(scheduleReconnect, 1000);
+      }
+    };
+
+    // Monitor connection state changes via zustand subscribe
+    const unsub = useStore.subscribe((state, prev) => {
+      if (state.wsStatus !== prev.wsStatus) {
+        if (state.wsStatus === 'connected') {
+          reconnectAttempts.current = 0;
+          setWsReconnectExhausted(false);
+          if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+        } else if (state.wsStatus === 'disconnected' && prev.wsStatus === 'connected') {
+          scheduleReconnect();
+        }
+      }
+    });
 
     return () => {
-      clearInterval(interval);
+      unsub();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       disconnectWebSocket();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2,7 +2,7 @@
 # /task-ai:exec implementation
 # Usage: exec.sh <notebook> [--step N]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

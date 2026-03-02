@@ -147,11 +147,17 @@ the agent may stall mid-execution. The daemon detects stalls via heartbeat polli
 
 ### Context Window Management & Quota Handling
 
-Proactive **structured compaction** at ≥ 70% context usage prevents overflow. Instead of a generic "please summarize" prompt, the agent constructs a structured compaction prompt using the template below. `.summary.md` files provide additional compaction recovery context.
+Proactive **structured compaction** prevents overflow. The strategy is **single active compaction + file-based recovery**:
+
+1. **First compaction at ≥ 82%**: When context usage first reaches 82%, send the Structured Compaction Prompt (template below)
+2. **No subsequent active compaction**: After the first compaction, do NOT trigger additional active compactions. Rely on `.summary.md` + `.auto-signal` + `.index.json` for recovery if Claude's system compaction occurs
+3. **Daemon detection**: If Claude's system compaction is detected (see `references/context-quota.md` for detection patterns), the daemon sends a recovery signal to resume the auto loop
+
+This approach prevents compaction cascades (70% → compress → 75% → compress → ...) that lose context continuity.
 
 #### Structured Compaction Prompt Template
 
-When context ≥ 70%, the agent fills in this template and sends it as a single message:
+When context ≥ 82% AND `compaction_count == 0`, the agent fills in this template and sends it as a single message:
 
 ```
 Summarize and compress our conversation context for continuation. Task identity and loop position will be recovered from files — preserve ONLY the following conversation-exclusive context:

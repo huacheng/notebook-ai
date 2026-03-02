@@ -5,7 +5,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
   | 'authToken' | 'authRequired' | 'authError' | 'authRetryAfter' | 'authLoading'
   | 'checkAuthStatus' | 'login' | 'logout'
 >> = (set, get) => ({
-  authToken: localStorage.getItem('nb-auth-token'),
+  authToken: sessionStorage.getItem('nb-auth-token'),
   authRequired: null,
   authError: null,
   authRetryAfter: 0,
@@ -26,7 +26,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
             headers: { 'Authorization': `Bearer ${token}` },
           });
           if (!check.ok) {
-            localStorage.removeItem('nb-auth-token');
+            sessionStorage.removeItem('nb-auth-token');
             set({ authToken: null });
           }
         }
@@ -49,7 +49,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
         set({ authError: data.error, authRetryAfter: data.retryAfter ?? 0, authLoading: false });
         return;
       }
-      localStorage.setItem('nb-auth-token', token);
+      sessionStorage.setItem('nb-auth-token', token);
       set({ authToken: token, authError: null, authRetryAfter: 0, authLoading: false });
     } catch {
       set({ authError: 'Failed to connect to server.', authLoading: false });
@@ -57,7 +57,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
   },
 
   logout() {
-    localStorage.removeItem('nb-auth-token');
+    sessionStorage.removeItem('nb-auth-token');
     set({ authToken: null });
     get().disconnectWebSocket();
   },

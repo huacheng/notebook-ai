@@ -1,6 +1,7 @@
 interface CacheEntry<T> {
   data: T;
   ts: number;
+  ttl?: number;
 }
 
 const DEFAULT_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -19,8 +20,8 @@ export const TTL = {
   FILE_LIST: 5 * 60 * 1000,              // 5 minutes
 } as const;
 
-export function cacheSet<T>(key: string, data: T): void {
-  const entry: CacheEntry<T> = { data, ts: Date.now() };
+export function cacheSet<T>(key: string, data: T, ttl?: number): void {
+  const entry: CacheEntry<T> = { data, ts: Date.now(), ttl };
   try {
     localStorage.setItem(key, JSON.stringify(entry));
   } catch {
@@ -60,8 +61,8 @@ function evictExpired(): void {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const entry = JSON.parse(raw) as { ts?: number };
-      if (typeof entry.ts === 'number' && now - entry.ts > DEFAULT_TTL) {
+      const entry = JSON.parse(raw) as { ts?: number; ttl?: number };
+      if (typeof entry.ts === 'number' && now - entry.ts > (entry.ttl ?? DEFAULT_TTL)) {
         localStorage.removeItem(key);
       }
     } catch { /* skip non-JSON entries */ }

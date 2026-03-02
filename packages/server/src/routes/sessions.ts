@@ -1,6 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import type { SessionManager } from '../session.js';
 import type { NotebookDb } from '../db.js';
+import { validateWorkspacePath } from '../workspace-files.js';
+import { getWorkspaceRoot } from '../workspace.js';
 
 export function createSessionsRouter(sessionManager: SessionManager, db: NotebookDb): IRouter {
   const router = Router();
@@ -26,13 +28,16 @@ export function createSessionsRouter(sessionManager: SessionManager, db: Noteboo
     }
 
     try {
-      const session = await sessionManager.createSession(
-        notebookPath.trim(),
-        cwd.trim(),
-      );
+      const workspaceRoot = getWorkspaceRoot();
+      const safePath = await validateWorkspacePath(notebookPath.trim(), workspaceRoot);
+      const safeCwd = await validateWorkspacePath(cwd.trim(), workspaceRoot);
+      const session = await sessionManager.createSession(safePath, safeCwd);
       res.status(201).json({ sessionId: session.id });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      const msg = err instanceof Error && /outside/i.test(err.message)
+        ? 'Path is outside the workspace.'
+        : 'Internal server error.';
+      res.status(msg.startsWith('Path') ? 403 : 500).json({ error: msg });
     }
   });
 
@@ -48,7 +53,7 @@ export function createSessionsRouter(sessionManager: SessionManager, db: Noteboo
       try { db.closeSessionRecord(id); } catch { /* best effort */ }
       res.status(204).send();
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: 'Internal server error.' });
     }
   });
 

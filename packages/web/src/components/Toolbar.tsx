@@ -175,6 +175,11 @@ function ToolbarUrlInput() {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && urlInput.trim()) {
             e.preventDefault();
+            // D2: Validate URL scheme before sending to backend (defense-in-depth)
+            try {
+              const parsed = new URL(urlInput.trim());
+              if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+            } catch { return; }
             captureUrl(urlInput.trim());
             setUrlInput('');
           }

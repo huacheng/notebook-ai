@@ -3,9 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { rm, readFile, mkdir } from 'fs/promises';
+import { rm, readFile, mkdir, readdir } from 'fs/promises';
 import {
   NotebookSchema,
   type Notebook,
@@ -20,11 +20,13 @@ import {
   ensureWorkspaceDir,
   getNotebookFilePath,
   initWorkspaceMemory,
+  getWorkspaceRoot,
 } from '../workspace.js';
 import { exportToFolder } from '../export.js';
 import { generateSlice } from '../slice-generator.js';
+import { validateWorkspacePath } from '../workspace-files.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Core logic for opening a notebook by path.
@@ -36,14 +38,17 @@ export async function openNotebookByPath(
   notebookStore: NotebookStore,
   sessionManager: SessionManager,
 ): Promise<{ notebookId: string; notebook: Notebook; sessionId: string; workspaceDir: string }> {
-  // Load notebook from disk
-  const notebook = await notebookStore.load(nbPath);
+  // D2-2: Validate path is within workspace root (realpath-based, symlink-safe)
+  const workspaceRoot = getWorkspaceRoot();
+  const safePath = await validateWorkspacePath(nbPath, workspaceRoot);
 
-  const cwd = path.dirname(nbPath);
+  // Load notebook from disk
+  const notebook = await notebookStore.load(safePath);
+
+  const cwd = path.dirname(safePath);
 
   // Check if this notebook already has a DB record (by notebook_path)
-  const existingRows = db.listNotebooks();
-  const existingRow = existingRows.find(r => r.notebook_path === nbPath);
+  const existingRow = db.getNotebookByPath(safePath);
 
   let notebookId: string;
 
@@ -53,7 +58,7 @@ export async function openNotebookByPath(
     const activeSessionRow = db.getActiveSession(notebookId);
     if (activeSessionRow) {
       const result = await sessionManager.reconnectSession(
-        activeSessionRow.tmux_session, nbPath, existingRow.workspace_dir,
+        activeSessionRow.tmux_session, safePath, existingRow.workspace_dir,
         notebook, activeSessionRow.jsonl_path, notebookId,
       );
       return { notebookId, notebook, sessionId: result.session.id, workspaceDir: cwd };
@@ -62,17 +67,17 @@ export async function openNotebookByPath(
     // Create a DB record for this notebook
     notebookId = crypto.randomUUID();
     const title = notebook.metadata.title || 'Untitled';
-    const slug = path.basename(nbPath, '.notebook.json');
+    const slug = path.basename(safePath, '.notebook.json');
     const now = new Date().toISOString();
     db.createNotebook({
       id: notebookId, user_id: null, title, slug,
-      workspace_dir: cwd, notebook_path: nbPath,
+      workspace_dir: cwd, notebook_path: safePath,
       status: 'active', created_at: now, updated_at: now,
     });
   }
 
   // Create a new session
-  const session = await sessionManager.createSession(nbPath, cwd);
+  const session = await sessionManager.createSession(safePath, cwd);
   session.notebook = notebook;
   session.notebookDbId = notebookId;
 
@@ -111,10 +116,14 @@ export function createNotebooksRouter(
     }
 
     try {
-      const notebooks = await notebookStore.list(dir);
+      const safeDir = await validateWorkspacePath(dir, getWorkspaceRoot());
+      const notebooks = await notebookStore.list(safeDir);
       res.json({ notebooks });
     } catch (err) {
-      res.status(500).json({ error: 'Internal server error.' });
+      const msg = err instanceof Error && /outside/i.test(err.message)
+        ? 'Directory is outside the workspace.'
+        : 'Internal server error.';
+      res.status(msg.startsWith('Dir') ? 403 : 500).json({ error: msg });
     }
   });
 
@@ -140,19 +149,24 @@ export function createNotebooksRouter(
     }
 
     try {
-      const notebook = notebookStore.createNew(title.trim(), cwd.trim());
+      const workspaceRoot = getWorkspaceRoot();
+      const safeCwd = await validateWorkspacePath(cwd.trim(), workspaceRoot);
+      const notebook = notebookStore.createNew(title.trim(), safeCwd);
 
       let savedPath: string;
       if (typeof filePath === 'string' && filePath.trim()) {
-        savedPath = filePath.trim();
+        savedPath = await validateWorkspacePath(filePath.trim(), workspaceRoot);
       } else {
-        savedPath = path.join(cwd.trim(), NotebookStore.titleToFilename(title.trim()));
+        savedPath = path.join(safeCwd, NotebookStore.titleToFilename(title.trim()));
       }
 
       await notebookStore.save(savedPath, notebook);
       res.status(201).json({ notebook, path: savedPath });
     } catch (err) {
-      res.status(500).json({ error: 'Internal server error.' });
+      const msg = err instanceof Error && /outside/i.test(err.message)
+        ? 'Path is outside the workspace.'
+        : 'Internal server error.';
+      res.status(msg.startsWith('Path') ? 403 : 500).json({ error: msg });
     }
   });
 
@@ -283,12 +297,23 @@ export function createNotebooksRouter(
     const tmpDir = path.join(os.tmpdir(), `nb-extract-${Date.now()}`);
     try {
       await mkdir(tmpDir, { recursive: true });
-      await execAsync(`unzip -q "${file.path}" -d "${tmpDir}"`);
+      await execFileAsync('unzip', ['-q', file.path, '-d', tmpDir]);
 
-      const { stdout } = await execAsync(
-        `find "${tmpDir}" -name "notebook.json" -path "*/data/notebook.json"`,
-      );
-      const jsonPath = stdout.trim();
+      // Find data/notebook.json via recursive readdir instead of shell `find`
+      let jsonPath = '';
+      const findNotebook = async (dir: string): Promise<void> => {
+        const entries = await readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            await findNotebook(full);
+          } else if (entry.name === 'notebook.json' && full.includes('/data/notebook.json')) {
+            jsonPath = full;
+          }
+          if (jsonPath) return;
+        }
+      };
+      await findNotebook(tmpDir);
       if (!jsonPath) {
         res.status(422).json({ error: 'No data/notebook.json found in the zip.' });
         return;
@@ -564,7 +589,7 @@ export function createNotebooksRouter(
       const bundle = await exportToFolder(session.notebook, tmpBase);
       const zipPath = `${bundle.dir}.zip`;
 
-      await execAsync(`cd "${tmpBase}" && zip -r "${zipPath}" "${path.basename(bundle.dir)}"`);
+      await execFileAsync('zip', ['-r', zipPath, path.basename(bundle.dir)], { cwd: tmpBase });
 
       const zipFilename = `${path.basename(bundle.dir)}.zip`;
       res.setHeader('Content-Type', 'application/zip');

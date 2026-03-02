@@ -67,7 +67,7 @@ const BaseCellSchema = z.object({
 
 export const PromptImageSchema = z.object({
   media_type: z.enum(['image/png', 'image/jpeg', 'image/gif', 'image/webp']),
-  data: z.string(),
+  data: z.string().max(20_000_000),  // D2: cap base64 image at ~20 MB
 });
 export type PromptImage = z.infer<typeof PromptImageSchema>;
 
@@ -288,7 +288,7 @@ export const UpdateCellSourceSchema = z.object({
   type: z.literal('update_cell_source'),
   session_id: z.string(),
   cell_id: z.string(),
-  source: z.string(),
+  source: z.string().max(1_000_000),  // D2: cap cell source at 1 MB
 });
 
 // ── File Viewer messages ────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ export const FileSaveSchema = z.object({
   session_id: z.string(),
   path: z.string(),
   source: z.enum(['workspace', 'library', 'deliverables']),
-  content: z.string(),
+  content: z.string().max(10_000_000),  // D2: cap file save at 10 MB
   format: z.enum(['text', 'html']),
   project_id: z.string().optional(),
 });
@@ -314,14 +314,14 @@ export const FileSaveSchema = z.object({
 export const AnnotationLoadSchema = z.object({
   type: z.literal('annotation-load'),
   session_id: z.string(),
-  path: z.string(),
+  path: z.string().max(2048),
 });
 
 export const AnnotationSyncSchema = z.object({
   type: z.literal('annotation-sync'),
   session_id: z.string(),
-  path: z.string(),
-  content: z.string(),
+  path: z.string().max(2048),
+  content: z.string().max(1_000_000),  // D2: cap annotation HTML at 1 MB
   updated_at: z.number(),
 });
 
@@ -336,7 +336,7 @@ export const LoadCellsSchema = z.object({
   type: z.literal('load_cells'),
   session_id: z.string(),
   offset: z.number().int().nonnegative(),
-  limit: z.number().int().positive(),
+  limit: z.number().int().positive().max(200),
 });
 
 // Client → Server: remove cells (batch delete)
@@ -349,7 +349,7 @@ export const RemoveCellsSchema = z.object({
 export const ChangeModelSchema = z.object({
   type: z.literal('change_model'),
   session_id: z.string(),
-  model: z.string(),
+  model: z.string().regex(/^[a-zA-Z0-9._:/-]{1,100}$/),  // D2: alphanumeric model ID whitelist
 });
 
 // Client → Server: notebook open via WebSocket (request-response)
@@ -379,7 +379,7 @@ export const GitLogRequestSchema = z.object({
   request_id: z.string(),
   project_id: z.string(),
   page: z.number().int().positive(),
-  limit: z.number().int().positive(),
+  limit: z.number().int().positive().max(100),
   all: z.boolean().optional(),
   stats: z.boolean().optional(),
 });
@@ -389,7 +389,7 @@ export const GitCommitFilesRequestSchema = z.object({
   type: z.literal('git_commit_files_request'),
   request_id: z.string(),
   project_id: z.string(),
-  commit: z.string(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/),  // D2: valid git commit hash
 });
 
 // Client → Server: git diff via WebSocket (request-response)
@@ -397,7 +397,7 @@ export const GitDiffRequestSchema = z.object({
   type: z.literal('git_diff_request'),
   request_id: z.string(),
   project_id: z.string(),
-  commit: z.string(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/),  // D2: valid git commit hash
   file: z.string().optional(),
 });
 
@@ -455,7 +455,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('tool_result_response'),
     session_id: z.string(),
     tool_use_id: z.string(),
-    content: z.string(),
+    content: z.string().max(1_000_000),
   }),
 ]);
 

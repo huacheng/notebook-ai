@@ -2,7 +2,7 @@
 # Library Status Script
 # Usage: status.sh
 
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUDIT_PY="${AUDIT_PY:-$SCRIPT_DIR/audit-library.py}"

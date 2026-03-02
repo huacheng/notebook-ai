@@ -37,7 +37,7 @@ export function createLibraryRouter(): IRouter {
       const result = await listWorkspaceFiles(libraryDir, subPath);
       res.json(result);
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      res.status(400).json({ error: 'File listing failed.' });
     }
   });
 
@@ -71,7 +71,7 @@ export function createLibraryRouter(): IRouter {
         for (const file of uploaded) {
           await unlink(file.path).catch(() => {});
         }
-        res.status(400).json({ error: String(err) });
+        res.status(400).json({ error: 'Operation failed.' });
       }
     },
   );
@@ -88,7 +88,7 @@ export function createLibraryRouter(): IRouter {
     const tar = spawn('tar', ['czf', '-', '-C', libraryDir, '.']);
     tar.stdout.pipe(res);
     tar.stderr.on('data', (d: Buffer) => console.error('[tar]', d.toString()));
-    tar.on('error', (err: Error) => { if (!res.headersSent) res.status(500).json({ error: String(err) }); });
+    tar.on('error', (err: Error) => { if (!res.headersSent) res.status(500).json({ error: 'Archive creation failed.' }); });
   });
 
   /**
@@ -111,7 +111,7 @@ export function createLibraryRouter(): IRouter {
       res.setHeader('Content-Length', fileStat.size);
       createReadStream(resolved).pipe(res);
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      res.status(400).json({ error: 'Operation failed.' });
     }
   });
 
@@ -132,7 +132,7 @@ export function createLibraryRouter(): IRouter {
       await writeFile(targetPath, '', { flag: 'wx' });
       res.json({ ok: true });
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      res.status(400).json({ error: 'Operation failed.' });
     }
   });
 
@@ -153,7 +153,7 @@ export function createLibraryRouter(): IRouter {
       await mkdir(targetPath);
       res.json({ ok: true });
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      res.status(400).json({ error: 'Operation failed.' });
     }
   });
 
@@ -180,7 +180,7 @@ export function createLibraryRouter(): IRouter {
       await rm(resolved, { recursive: true, force: false });
       res.json({ ok: true });
     } catch (err) {
-      res.status(400).json({ error: String(err) });
+      res.status(400).json({ error: 'Operation failed.' });
     }
   });
 

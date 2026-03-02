@@ -1,5 +1,5 @@
 import path from 'path';
-import { rename, rm } from 'fs/promises';
+import { rename, rmdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import type { NotebookDb } from './db.js';
 
@@ -32,11 +32,11 @@ export async function migrateNotebookPaths(db: NotebookDb): Promise<void> {
     // Update DB
     db.updateNotebook(row.id, { notebook_path: newNbPath });
 
-    // Clean up old empty directory
+    // D3-4: Only remove old directory if it's empty (rmdir fails on non-empty)
     const oldDir = path.dirname(row.notebook_path);
     try {
-      await rm(oldDir, { recursive: true, force: true });
-    } catch { /* ignore if dir not empty or already gone */ }
+      await rmdir(oldDir);
+    } catch (_err: unknown) { /* ignore if dir not empty or already gone */ }
 
     console.log(`[migration] ${row.id}: ${row.notebook_path} → ${newNbPath}`);
   }

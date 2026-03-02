@@ -147,16 +147,25 @@ export function handleVerify(req: Request, res: Response): void {
     res.json({ ok: true });
     return;
   }
+  const ip = getClientIp(req);
+  const { blocked, retryAfterSec } = checkRateLimit(ip);
+  if (blocked) {
+    res.status(429).json({ ok: false, retryAfter: retryAfterSec });
+    return;
+  }
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    recordFailure(ip);
     res.status(401).json({ ok: false });
     return;
   }
   const token = authHeader.slice(7);
   if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
+    recordFailure(ip);
     res.status(401).json({ ok: false });
     return;
   }
+  clearFailures(ip);
   res.json({ ok: true });
 }
 
@@ -172,16 +181,25 @@ export function handleWsTicket(req: Request, res: Response): void {
     res.json({ ticket: createWsTicket() });
     return;
   }
+  const ip = getClientIp(req);
+  const { blocked, retryAfterSec } = checkRateLimit(ip);
+  if (blocked) {
+    res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
+    return;
+  }
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    recordFailure(ip);
     res.status(401).json({ error: 'Authorization required.' });
     return;
   }
   const token = authHeader.slice(7);
   if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
+    recordFailure(ip);
     res.status(401).json({ error: 'Invalid token.' });
     return;
   }
+  clearFailures(ip);
   res.json({ ticket: createWsTicket() });
 }
 
@@ -198,10 +216,14 @@ export function handleAuthStatus(_req: Request, res: Response): void {
  * except the auth endpoints themselves and health check.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Always allow auth endpoints and health check
+  // Always allow auth endpoints and health check.
+  // /verify and /ws-ticket perform their own internal Bearer token validation
+  // with rate limiting — bypass middleware to avoid redundant double-validation.
   if (
     req.path === '/api/auth/login' ||
     req.path === '/api/auth/status' ||
+    req.path === '/api/auth/verify' ||
+    req.path === '/api/auth/ws-ticket' ||
     req.path === '/api/health'
   ) {
     next();

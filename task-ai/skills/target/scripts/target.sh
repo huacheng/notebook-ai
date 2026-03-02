@@ -2,7 +2,7 @@
 # /task-ai:target implementation
 # Usage: target.sh [objective_content]
 
-set -uo pipefail
+set -euo pipefail
 trap 'rm -f "${TMP_FILE:-}"' EXIT INT TERM
 
 OBJECTIVE="${1:-}"

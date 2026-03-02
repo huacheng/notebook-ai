@@ -5,7 +5,7 @@ import { writeFile } from 'fs/promises';
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'nb-workspaces');
 
-function getWorkspaceRoot(): string {
+export function getWorkspaceRoot(): string {
   return process.env['NB_WORKSPACE_DIR'] ?? DEFAULT_WORKSPACE_ROOT;
 }
 

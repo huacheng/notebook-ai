@@ -274,6 +274,9 @@ const CommitItem = memo(function CommitItem({
   const diffFileRef = useRef(diffFile);
   diffFileRef.current = diffFile;
   const filesLoadedRef = useRef(commit.files.length > 0);
+  // D3: Track mount state to avoid setState on unmounted component
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // On-demand: load file list when first expanded (if not already loaded from stats)
   const handleToggle = useCallback(() => {
@@ -288,11 +291,11 @@ const CommitItem = memo(function CommitItem({
           const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 10_000);
           function onResponse(e: Event) {
             const d = (e as CustomEvent).detail;
-            if (d.request_id === requestId) { cleanup(); setFiles(d.files); setLoadingFiles(false); }
+            if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setFiles(d.files); setLoadingFiles(false); } }
           }
           function onError(e: Event) {
             const d = (e as CustomEvent).detail;
-            if (d.request_id === requestId) { cleanup(); setFiles([]); setLoadingFiles(false); }
+            if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setFiles([]); setLoadingFiles(false); } }
           }
           function cleanup() {
             clearTimeout(timeout);
@@ -301,7 +304,7 @@ const CommitItem = memo(function CommitItem({
           }
           function fallbackRest() {
             fetchGitCommitFiles(projectId, token, commit.hash)
-              .then((f) => setFiles(f)).catch(() => setFiles([])).finally(() => setLoadingFiles(false));
+              .then((f) => { if (mountedRef.current) setFiles(f); }).catch(() => { if (mountedRef.current) setFiles([]); }).finally(() => { if (mountedRef.current) setLoadingFiles(false); });
           }
           window.addEventListener('nb:git-commit-files-response', onResponse);
           window.addEventListener('nb:git-commit-files-error', onError);
@@ -328,11 +331,11 @@ const CommitItem = memo(function CommitItem({
       const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 10_000);
       function onResponse(e: Event) {
         const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) { cleanup(); setDiffContent(d.diff); setLoadingDiff(false); }
+        if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setDiffContent(d.diff); setLoadingDiff(false); } }
       }
       function onError(e: Event) {
         const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) { cleanup(); setDiffContent('Failed to load diff'); setLoadingDiff(false); }
+        if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setDiffContent('Failed to load diff'); setLoadingDiff(false); } }
       }
       function cleanup() {
         clearTimeout(timeout);
@@ -341,7 +344,7 @@ const CommitItem = memo(function CommitItem({
       }
       function fallbackRest() {
         fetchGitDiff(projectId, token, commit.hash, filePath)
-          .then((d) => setDiffContent(d)).catch(() => setDiffContent('Failed to load diff')).finally(() => setLoadingDiff(false));
+          .then((d) => { if (mountedRef.current) setDiffContent(d); }).catch(() => { if (mountedRef.current) setDiffContent('Failed to load diff'); }).finally(() => { if (mountedRef.current) setLoadingDiff(false); });
       }
       window.addEventListener('nb:git-diff-response', onResponse);
       window.addEventListener('nb:git-diff-error', onError);

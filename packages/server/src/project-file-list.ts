@@ -69,7 +69,7 @@ export async function computeProjectFileList(
     if (f.type === 'directory') {
       const nbFile = path.join(dirTarget, f.name, `${f.name}.notebook.json`);
       if (existsSync(nbFile)) {
-        (f as any).isNotebook = true;
+        f.isNotebook = true;
       }
     }
   }
@@ -94,7 +94,7 @@ export async function computeProjectFileList(
               modifiedAt: s?.mtime.toISOString() ?? new Date().toISOString(),
               isNotebook: true,
               worktreePath: `.worktrees/${wt.name}`,
-            } as any);
+            });
           }
         }
         result.files.sort((a, b) => {

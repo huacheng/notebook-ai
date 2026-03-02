@@ -49,32 +49,20 @@ let loadPromise: Promise<any> | null = null;
 async function loadMermaid(): Promise<any> {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    const CDN_URLS = [
-      'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs',
-      'https://unpkg.com/mermaid@11/dist/mermaid.esm.min.mjs',
-    ];
-    let lastErr: unknown;
-    for (const url of CDN_URLS) {
-      try {
-        const mod = await import(/* @vite-ignore */ url);
-        const mermaid = mod.default;
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'default',
-          themeVariables: {
-            fontFamily: 'var(--font-body)',
-            primaryColor: '#e0f2fe',
-            primaryTextColor: '#0c4a6e',
-            primaryBorderColor: '#0ea5e9',
-            lineColor: '#78716c',
-          },
-        });
-        return mermaid;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    throw lastErr;
+    // D2: Local import (vendored via npm) — eliminates CDN supply-chain risk
+    const mermaid = (await import('mermaid')).default;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      themeVariables: {
+        fontFamily: 'var(--font-body)',
+        primaryColor: '#e0f2fe',
+        primaryTextColor: '#0c4a6e',
+        primaryBorderColor: '#0ea5e9',
+        lineColor: '#78716c',
+      },
+    });
+    return mermaid;
   })();
   return loadPromise;
 }

@@ -12,10 +12,10 @@ import {
 
 function restartAllNotebooks(get: () => NotebookStore) {
   const { ws, openNotebooks } = get();
-  if (!ws || (ws as WebSocket).readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
   for (const [, { sessionId }] of Object.entries(openNotebooks)) {
     if (sessionId) {
-      (ws as WebSocket).send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
+      ws.send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
     }
   }
 }
@@ -68,7 +68,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   pluginOverlay: null,
   modelPanelOpen: false,
   modelSwitching: false,
-  language: (typeof localStorage !== 'undefined' && localStorage.getItem('nb-lang') as 'en' | 'zh') || 'en',
+  language: (() => {
+    if (typeof localStorage === 'undefined') return 'en';
+    const stored = localStorage.getItem('nb-lang');
+    return stored === 'zh' ? 'zh' : 'en';
+  })(),
 
   setActiveTab(tab) {
     set({ activeTab: tab, gitTabOpen: tab === 'git', editMode: false, pendingDeletes: new Set<string>() });
@@ -205,8 +209,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   togglePendingDelete(cellId) {
-    set((s: any) => {
-      const next = new Set(s.pendingDeletes as Set<string>);
+    set((s) => {
+      const next = new Set(s.pendingDeletes);
       if (next.has(cellId)) {
         next.delete(cellId);
       } else {
@@ -219,11 +223,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   commitEdits() {
     set({ editSavePhase: 'saving' });
     const { ws, sessionId, pendingDeletes } = get();
-    if (ws && (ws as WebSocket).readyState === WebSocket.OPEN && sessionId) {
-      (ws as WebSocket).send(JSON.stringify({
+    if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
+      ws.send(JSON.stringify({
         type: 'remove_cells',
         session_id: sessionId,
-        cell_ids: [...(pendingDeletes as Set<string>)],
+        cell_ids: [...pendingDeletes],
       }));
     }
   },
@@ -339,12 +343,12 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   changeModel(model: string) {
     const { ws, openNotebooks, activeNotebookTabId } = get();
-    if (!ws || (ws as WebSocket).readyState !== WebSocket.OPEN) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (!activeNotebookTabId) return;
     const active = openNotebooks[activeNotebookTabId];
     if (active?.sessionId) {
       set({ modelSwitching: true, modelPanelOpen: false });
-      (ws as WebSocket).send(JSON.stringify({ type: 'change_model', session_id: active.sessionId, model }));
+      ws.send(JSON.stringify({ type: 'change_model', session_id: active.sessionId, model }));
     }
   },
 

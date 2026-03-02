@@ -187,7 +187,7 @@ function ToolsGroup({ items }: { items: ToolItem[] }) {
 function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
   const submitToolResult = useStore((s) => s.submitToolResult);
   const sessionId = useStore((s) => s.sessionId);
-  const questions = (item.input as { questions: AskQuestion[] }).questions;
+  const questions = (item.input as { questions?: AskQuestion[] })?.questions ?? [];
 
   return (
     <InteractiveOptions

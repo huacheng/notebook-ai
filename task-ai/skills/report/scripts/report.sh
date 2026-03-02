@@ -2,7 +2,7 @@
 # /task-ai:report implementation
 # Usage: report.sh <notebook> [--format full|summary]
 
-set -uo pipefail
+set -euo pipefail
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
@@ -42,7 +42,7 @@ TYPE=$(python3 "$STATE_PY" get "$INDEX_JSON" type)
 TYPE=${TYPE:-generic}
 
 # 2. Compose Report (Simplified for script)
-REPORT_FILE="$WORK_DIR/../.report.md"
+REPORT_FILE="$WORK_DIR/.report.md"
 cat > "$REPORT_FILE" <<EOF
 # Task Report: $TITLE
 
@@ -64,42 +64,10 @@ EOF
 
 echo "Report written to $REPORT_FILE."
 
-# 3. Distill Experience to Library (Step 13)
-if [[ -d "$LIB_PATH" && -n "$TYPE" ]]; then
-    echo "Distilling experience to library..."
-    # Standardize type for directory name
-    DIR_SAFE_TYPE=$(echo "$TYPE" | sed 's/:/-/g' | cut -d'|' -f1) # Handle primary segment
-    EXP_DIR="$LIB_PATH/.memory/.experiences/$DIR_SAFE_TYPE"
-    mkdir -p "$EXP_DIR"
-    
-    EXP_FILE="$EXP_DIR/$NOTEBOOK-complete.md"
-    cat > "$EXP_FILE" <<EOF
----
-notebook: $NOTEBOOK
-type: $TYPE
-quality_status: verified
-completeness: complete
-date: $COMPLETED
----
-# Experience: $TITLE
+# Note: Experience distillation moved to /task-ai:highlight skill
+# This script only generates reports; use highlight for library writes
 
-## Key Learnings
-$( [[ -d "$WORK_DIR/.notes" ]] && cat "$WORK_DIR/.notes"/*.md 2>/dev/null | head -n 50 || echo "N/A" )
-
-## Decisions
-- Automated library distillation implemented.
-- TDD retroactively applied to core skills.
-EOF
-
-    # Git Commit to Library (Library Repo Protocol)
-    cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
-    git add "$EXP_FILE"
-    git commit -m "task-ai($NOTEBOOK):report distill experience"
-    cd - > /dev/null
-    echo "Experience distilled to library."
-fi
-
-# 4. Final Maintain Hook
+# 3. Final Maintain Hook
 MAINTAIN_SH="$(dirname "$0")/../../../skills/library/scripts/maintain.sh"
 if [[ -x "$MAINTAIN_SH" ]]; then
     "$MAINTAIN_SH" --rebuild-index --rebuild-relations

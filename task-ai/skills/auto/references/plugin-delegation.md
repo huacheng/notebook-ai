@@ -53,7 +53,24 @@ If no seed slot matched AND no registry entry matched, perform a broad semantic 
 |---------|--------|
 | Match found | Invoke via Task subagent |
 | No match | Skip delegation, continue with inline logic. **Cache the negative result**: write a `(none)` entry to `.plugin-registry.md` for the attempted slot + type combination (e.g., `tdd` + `software` → `(none)`). Subsequent discovery attempts for the same slot + type skip Level 3 scan entirely |
-| Multiple matches | Prefer the most specific match; if tied, use the first alphabetically |
+| Multiple matches | Select using **health-weighted scoring** (see Plugin Selection below) |
+
+### Plugin Selection (Health-Weighted)
+
+When multiple plugins match, select based on combined relevance and health score:
+
+```
+combinedScore = 0.7 × relevanceScore + 0.3 × healthScore
+```
+
+**Health Score Components**:
+- **60%** Success rate (invocations that returned usable results)
+- **30%** Average confidence (high=1.0, medium=0.6, low=0.3)
+- **10%** Trend bonus (improving: +0.05, declining: -0.05, stable: 0)
+
+**Sample Penalty**: Plugins with < 5 invocations have scores shrunk toward 0.5 (neutral).
+
+**Implementation Reference**: `packages/server/src/task-ai/plugin-health.ts`
 
 **Negative cache expiry**: `(none)` entries are valid for the current task only. On `init` of a new task, the registry is NOT cleared (capabilities are persistent), but `(none)` entries are ignored when the available skill/tool list has changed (checked at Level 2 by comparing the current available plugin count against the count stored in the `(none)` entry).
 
@@ -80,6 +97,26 @@ Created on first successful delegation. Updated on each new capability discovery
 ## Task Subagent Invocation Template
 
 All plugin delegations execute through the Task tool with a subagent, isolating external plugin output from the main session context.
+
+### Dynamic Context Budget
+
+Input and output limits vary by slot and model tier:
+
+| Slot | Input Limit | Output Limit | Allow Overflow |
+|------|-------------|--------------|----------------|
+| `doc-parse` | 1000 | 2000 | yes |
+| `brainstorm` | 3000 | 800 | yes |
+| `code-review` | 8000 | 1000 | yes |
+| `frontend-design` | 2000 | 600 | no |
+| `debugging` | 4000 | 800 | yes |
+| `tdd` | 3000 | 600 | no |
+| `domain-*` | 2000 | 500 | no |
+
+**Tier Multipliers**: heavy (1.5×), medium (1.0×), light (0.7×)
+
+**Smart Truncation**: When input exceeds limit, preserve 40% head + tail with `[N chars omitted]` marker. For git diffs, prioritize `+`/`-` lines over context.
+
+**Implementation Reference**: `packages/server/src/task-ai/context-budget.ts`
 
 ### Input Contract
 
@@ -130,12 +167,74 @@ The subagent returns a structured summary with three sections:
 
 Total output: <=500 characters. The calling skill incorporates this as supplementary input.
 
+### Output Processing (Sanitization)
+
+Before incorporating subagent output into the main session, apply sanitization to prevent injection attacks:
+
+```typescript
+import { sanitizePluginOutput } from 'packages/server/src/task-ai/plugin-sanitizer';
+
+const result = sanitizePluginOutput(rawSubagentOutput);
+
+if (result.risk_level === 'high') {
+  // Log to .notes/<date>-delegate-<slot>-sanitized.md
+  // Force Confidence: low regardless of subagent's claimed confidence
+}
+```
+
+**Sanitization Categories** (10 active threat patterns):
+
+| # | Category | Detection | Risk |
+|---|----------|-----------|------|
+| 1 | Direct instruction injection | `<!-- -->`, `<system>`, "ignore previous" | high |
+| 3 | Unicode hidden attacks | Zero-width chars, bidirectional control | medium |
+| 4 | ANSI terminal sequences | `\x1b[...` escape codes | medium |
+| 5 | Resource exhaustion | Output > 600 chars | low |
+| 6 | System format impersonation | `{"step":`, `.auto-signal`, `task-ai(` | high |
+| 7 | Encoding obfuscation | `base64 -d`, hex sequences | high |
+| 8 | Two-stage loading | `curl \|`, `wget \|`, `eval(` | high |
+| 10 | Command injection | `--require=`, `--eval=`, `LD_PRELOAD` | high |
+
+**Risk Level Handling**:
+
+| Risk Level | Action |
+|------------|--------|
+| `high` | Log sanitization event, force Confidence: low, proceed with sanitized output |
+| `medium` | Log warning, proceed normally with sanitized output |
+| `low`/`none` | Proceed normally |
+
+**Implementation Reference**: `packages/server/src/task-ai/plugin-sanitizer.ts`
+
+## Retry Strategy
+
+Plugin invocations use error-aware retry logic:
+
+| Error Category | Max Retries | Backoff |
+|----------------|-------------|---------|
+| Network (`ECONNREFUSED`, `ETIMEDOUT`) | 2 | 1000ms × attempt |
+| Timeout | 2 | 2000ms × attempt |
+| Empty result | 1 | 500ms |
+| Format error (JSON parse) | 0 | — |
+| Plugin error | 0 | — |
+| Unknown | 0 | — |
+
+**Slot Timeouts**:
+
+| Slot | Timeout |
+|------|---------|
+| `doc-parse` | 60s |
+| `code-review`, `debugging` | 45s |
+| `brainstorm`, `tdd` | 35s |
+| Others | 30s |
+
+**Implementation Reference**: `packages/server/src/task-ai/plugin-retry.ts`
+
 ## Degradation Rules
 
 | Scenario | Behavior |
 |----------|----------|
 | No matching plugin found | Skip delegation entirely — continue with inline logic |
-| Plugin invocation fails (error/timeout) | Log failure to `.notes/<date>-delegate-<slot>-failed.md`, continue with inline logic |
+| Plugin invocation fails after retries | Log failure to `.notes/<date>-delegate-<slot>-failed.md`, update health record, continue with inline logic |
 | Low confidence result | Use as supplementary input only — do not override inline decisions |
 | Medium confidence result | Integrate into decision-making alongside inline analysis |
 | High confidence result | Treat as primary guidance for the delegated capability |
@@ -182,3 +281,69 @@ Each lifecycle skill adds a small delegation check at its designated cut-in poin
 | exec | Per-Step step 2 | `frontend-design`, `debugging`, `tdd`, `domain-*` | Type/context match (see trigger conditions per slot) |
 | check | step 9 | `code-review` | post-exec checkpoint |
 | verify | step 9 | `tdd` | `type` contains `software` and `.test/` criteria exist (also checked by exec) |
+
+## Delegation Metrics
+
+All delegation events are recorded for observability and health tracking:
+
+**Event File**: `$NB_WORKSPACES_LIBRARY/.delegation-events.jsonl`
+
+**Event Structure**:
+```json
+{
+  "id": "evt-001",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "notebook": "my-task",
+  "slot": "code-review",
+  "plugin": "superpowers:code-review",
+  "confidence": "high",
+  "actionItems": ["Fix bug", "Add test"],
+  "latencyMs": 1500
+}
+```
+
+**Outcome Structure** (recorded after action items are processed):
+```json
+{
+  "delegationId": "evt-001",
+  "adoptedItems": 2,
+  "totalItems": 2,
+  "contributedToReplan": false
+}
+```
+
+**Aggregated Metrics** (via `library status`):
+- `totalCalls` — invocation count per slot/plugin
+- `adoptedRate` — percentage of action items adopted
+- `replanContributions` — count of delegations that led to REPLAN
+- `avgLatencyMs` — average invocation latency
+
+**Implementation Reference**: `packages/server/src/task-ai/delegation-metrics.ts`
+
+## User Preferences
+
+Users can customize delegation behavior via `~/.claude/settings.json`:
+
+```json
+{
+  "task-ai": {
+    "plugin-delegation": {
+      "slotBindings": { "code-review": "superpowers:code-review" },
+      "disabledPlugins": ["untrusted:plugin"],
+      "disabledSlots": ["domain-*"],
+      "confidenceThreshold": "medium",
+      "trustLevelMinimum": "verified"
+    }
+  }
+}
+```
+
+| Setting | Effect |
+|---------|--------|
+| `slotBindings` | Force specific plugin for a slot (bypass discovery) |
+| `disabledPlugins` | Never use these plugins |
+| `disabledSlots` | Skip delegation for these slots entirely |
+| `confidenceThreshold` | Ignore results below this level |
+| `trustLevelMinimum` | Only use plugins meeting trust criteria |
+
+**Implementation Reference**: `packages/server/src/task-ai/plugin-preferences.ts`

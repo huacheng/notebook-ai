@@ -78,6 +78,10 @@ interface NotebookSession {
   eventBuffer: EventBuffer;
   /** Allowed directories for cross-project isolation (--add-dir). */
   allowedDirs?: string[];
+  /** D3: per-session mutex to prevent TOCTOU race in executeCell. */
+  _executeLock: Promise<void>;
+  /** D3: tracks pending post-completion work (git commit + autoSave) so closeSession can await. */
+  _pendingPostComplete: Promise<void>;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -170,6 +174,8 @@ export class SessionManager {
       notebookPath,
       listeners: new Set(),
       _execStartTimes: new Map(),
+      _executeLock: Promise.resolve(),
+      _pendingPostComplete: Promise.resolve(),
       eventBuffer: new EventBuffer(),
       allowedDirs,
     };
@@ -206,6 +212,14 @@ export class SessionManager {
       throw new Error(`Session "${sessionId}" not found.`);
     }
 
+    // D3: per-session mutex — serialize executeCell to prevent TOCTOU race
+    let unlock: () => void;
+    const acquired = new Promise<void>((resolve) => { unlock = resolve; });
+    const prev = session._executeLock;
+    session._executeLock = acquired;
+    await prev;
+
+    try {
     // If the agent process died (e.g. SIGINT during interrupt), force-complete any
     // stale running cell and restart the process before the concurrency check.
     if (!session.agentProcess.isAlive()) {
@@ -250,6 +264,9 @@ export class SessionManager {
       session.agentProcess.sendPrompt(source, images);
     } else {
       session.agentProcess.sendPrompt(source);
+    }
+    } finally {
+      unlock!();
     }
   }
 
@@ -430,11 +447,22 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    // D3: Await any pending post-completion work (git commit + autoSave) before closing
+    await session._pendingPostComplete.catch(() => {});
+
     session.agentProcess.stop();
     session.listeners.clear();
     session.eventBuffer.clear();
     this.sessions.delete(sessionId);
     console.log(`[session] Closed session "${sessionId}"`);
+  }
+
+  /** D3-1: Close all active sessions (for graceful shutdown). */
+  async closeAllSessions(): Promise<void> {
+    const ids = Array.from(this.sessions.keys());
+    for (const id of ids) {
+      await this.closeSession(id);
+    }
   }
 
   /**
@@ -544,15 +572,18 @@ export class SessionManager {
     // execution_complete WebSocket message is flushed first.
     // IMPORTANT: tryGitCommit must complete before autoSave so that git_diff
     // is persisted to disk (otherwise a page reload would lose git diff info).
-    setTimeout(() => {
-      this.tryGitCommit(session, cellId)
-        .catch(() => {})
-        .finally(() => {
-          this.autoSave(session).catch((err) => {
-            console.error(`[session ${session.id}] auto-save failed:`, err);
+    // D3: Track the pending work so closeSession can await it.
+    session._pendingPostComplete = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        this.tryGitCommit(session, cellId)
+          .catch(() => {})
+          .finally(() => {
+            this.autoSave(session).catch((err) => {
+              console.error(`[session ${session.id}] auto-save failed:`, err);
+            }).finally(resolve);
           });
-        });
-    }, 0);
+      }, 0);
+    });
 
     // Chain rerun execution: if there are more cells in the queue, execute next.
     if (session._rerunQueue && session._rerunQueue.length > 0) {

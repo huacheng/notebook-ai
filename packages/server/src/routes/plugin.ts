@@ -129,7 +129,7 @@ export function createPluginRouter(): IRouter {
       await execClaude(['plugin', 'install', pluginKey]);
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Install failed' });
+      res.status(500).json({ ok: false, error: 'Install failed.' });
     }
   });
 
@@ -146,7 +146,7 @@ export function createPluginRouter(): IRouter {
       await execClaude(['plugin', 'uninstall', pluginKey]);
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Uninstall failed' });
+      res.status(500).json({ ok: false, error: 'Uninstall failed.' });
     }
   });
 
@@ -163,7 +163,7 @@ export function createPluginRouter(): IRouter {
       await execClaude(['plugin', 'marketplace', 'add', source]);
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Add marketplace failed' });
+      res.status(500).json({ ok: false, error: 'Add marketplace failed.' });
     }
   });
 
@@ -179,7 +179,7 @@ export function createPluginRouter(): IRouter {
       await execClaude(args);
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Update marketplace failed' });
+      res.status(500).json({ ok: false, error: 'Update marketplace failed.' });
     }
   });
 
@@ -196,7 +196,7 @@ export function createPluginRouter(): IRouter {
       await execClaude(['plugin', 'marketplace', 'remove', name]);
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Remove marketplace failed' });
+      res.status(500).json({ ok: false, error: 'Remove marketplace failed.' });
     }
   });
 
@@ -213,7 +213,7 @@ export function createPluginRouter(): IRouter {
       await execClaude(['plugin', 'update', pluginKey]);
       res.json({ ok: true });
     } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: err instanceof Error ? err.message :'Update plugin failed' });
+      res.status(500).json({ ok: false, error: 'Update plugin failed.' });
     }
   });
 

@@ -2,7 +2,7 @@
 # Library Search Script
 # Usage: search.sh "<query>" [--type <type>] [--limit 10]
 
-set -uo pipefail
+set -euo pipefail
 
 QUERY="${1:-}"
 if [[ -z "$QUERY" ]]; then
