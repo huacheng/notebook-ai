@@ -537,7 +537,15 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
       }
 
       if (resp.error) setError(resp.error);
-      const newCommits = append ? [...commitsRef.current, ...resp.commits] : resp.commits;
+      // Deduplicate when appending to avoid React key warnings
+      let newCommits: CommitInfo[];
+      if (append) {
+        const existingHashes = new Set(commitsRef.current.map((c) => c.hash));
+        const deduped = resp.commits.filter((c) => !existingHashes.has(c.hash));
+        newCommits = [...commitsRef.current, ...deduped];
+      } else {
+        newCommits = resp.commits;
+      }
       setCommits(newCommits);
       setHasMore(resp.hasMore);
       setPage(p);
