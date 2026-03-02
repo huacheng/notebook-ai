@@ -9,6 +9,7 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { NotebookCreationPanel } from './components/NotebookCreationPanel';
 import { GitHistoryPanel } from './components/GitHistoryPanel';
 import { LoginPage } from './components/LoginPage';
+import { RegisterPage } from './components/RegisterPage';
 import { PluginManager } from './components/PluginManager';
 import { ModelManager } from './components/ModelManager';
 import { useWebSocket } from './hooks/useWebSocket';

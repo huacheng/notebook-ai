@@ -99,6 +99,7 @@ export interface NotebookStore {
   checkAuthStatus(): Promise<void>;
   login(token: string): Promise<void>;
   logout(): void;
+  register(username: string, password: string, inviteCode: string): Promise<boolean>;
 
   // ── Sidebar / history actions ──────────────────────────────────────────
   toggleSidebar(): void;

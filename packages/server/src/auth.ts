@@ -107,6 +107,152 @@ function timingSafeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(paddedA, paddedB) && bufA.length === bufB.length;
 }
 
+// ── Password hashing (scrypt) ─────────────────────────────────────────────────
+
+const SCRYPT_KEYLEN = 64;
+const SCRYPT_COST = 16384; // N
+const SCRYPT_BLOCK_SIZE = 8; // r
+const SCRYPT_PARALLEL = 1; // p
+
+export function hashPassword(password: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    crypto.scrypt(password, salt, SCRYPT_KEYLEN, { N: SCRYPT_COST, r: SCRYPT_BLOCK_SIZE, p: SCRYPT_PARALLEL }, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(`${salt}:${derivedKey.toString('hex')}`);
+    });
+  });
+}
+
+export function verifyPassword(password: string, stored: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const [salt, hash] = stored.split(':');
+    if (!salt || !hash) { resolve(false); return; }
+    crypto.scrypt(password, salt, SCRYPT_KEYLEN, { N: SCRYPT_COST, r: SCRYPT_BLOCK_SIZE, p: SCRYPT_PARALLEL }, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(crypto.timingSafeEqual(Buffer.from(hash, 'hex'), derivedKey));
+    });
+  });
+}
+
+// ── Registration with invite code ────────────────────────────────────────────
+
+// Lazy import to avoid circular dependency (db.ts imports nothing from auth.ts)
+let _db: import('./db').NotebookDb | null = null;
+function getDb(): import('./db').NotebookDb {
+  if (!_db) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { NotebookDb } = require('./db') as typeof import('./db');
+    _db = new NotebookDb();
+  }
+  return _db;
+}
+
+interface InviteCodeRow {
+  code: string;
+  max_uses: number;
+  used_count: number;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+}
+
+/**
+ * POST /api/auth/register — register a new user with an invitation code.
+ * Body: { username, password, inviteCode }
+ */
+export async function handleRegister(req: Request, res: Response): Promise<void> {
+  const ip = getClientIp(req);
+  const { blocked, retryAfterSec } = checkRateLimit(ip);
+  if (blocked) {
+    res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
+    return;
+  }
+
+  const { username, password, inviteCode } = req.body as {
+    username?: unknown;
+    password?: unknown;
+    inviteCode?: unknown;
+  };
+
+  // Validate input
+  if (typeof username !== 'string' || !username || username.length < 3 || username.length > 32) {
+    recordFailure(ip);
+    res.status(400).json({ error: 'Username must be 3-32 characters.' });
+    return;
+  }
+  if (typeof password !== 'string' || !password || password.length < 8) {
+    recordFailure(ip);
+    res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    return;
+  }
+  if (typeof inviteCode !== 'string' || !inviteCode) {
+    recordFailure(ip);
+    res.status(400).json({ error: 'Invitation code is required.' });
+    return;
+  }
+
+  const db = getDb();
+  const rawDb = (db as unknown as { db: import('better-sqlite3').Database }).db;
+
+  // Validate invite code
+  const invite = rawDb.prepare(
+    'SELECT * FROM invite_codes WHERE code = ?'
+  ).get(inviteCode) as InviteCodeRow | undefined;
+
+  if (!invite) {
+    recordFailure(ip);
+    res.status(400).json({ error: 'Invalid invitation code.' });
+    return;
+  }
+
+  // Check expiration
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    recordFailure(ip);
+    res.status(400).json({ error: 'Invitation code has expired.' });
+    return;
+  }
+
+  // Check usage limit
+  if (invite.used_count >= invite.max_uses) {
+    recordFailure(ip);
+    res.status(400).json({ error: 'Invitation code has reached its usage limit.' });
+    return;
+  }
+
+  // Check duplicate username
+  const existing = rawDb.prepare(
+    'SELECT id FROM users WHERE username = ?'
+  ).get(username);
+  if (existing) {
+    res.status(409).json({ error: 'Username already taken.' });
+    return;
+  }
+
+  // Hash password and create user
+  try {
+    const passwordHash = await hashPassword(password);
+    const userId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    rawDb.transaction(() => {
+      rawDb.prepare(
+        'INSERT INTO users (id, username, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(userId, username, passwordHash, 'active', now);
+
+      // Increment invite code usage
+      rawDb.prepare(
+        'UPDATE invite_codes SET used_count = used_count + 1 WHERE code = ?'
+      ).run(inviteCode);
+    })();
+
+    clearFailures(ip);
+    res.json({ ok: true, userId });
+  } catch (err) {
+    res.status(500).json({ error: 'Registration failed.' });
+  }
+}
+
 // ── Login endpoint handler ──────────────────────────────────────────────────
 
 export function handleLogin(req: Request, res: Response): void {
@@ -221,6 +367,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   // with rate limiting — bypass middleware to avoid redundant double-validation.
   if (
     req.path === '/api/auth/login' ||
+    req.path === '/api/auth/register' ||
     req.path === '/api/auth/status' ||
     req.path === '/api/auth/verify' ||
     req.path === '/api/auth/ws-ticket' ||

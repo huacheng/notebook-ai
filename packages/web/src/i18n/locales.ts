@@ -96,6 +96,23 @@ export const messages: Record<Language, Record<string, string>> = {
     'login.verifying': 'Verifying...',
     'login.wait': 'Wait {0}s',
     'login.loading': 'Loading...',
+    'login.noAccount': "Don't have an account?",
+    'login.register': 'Register',
+
+    // ── Register ────────────────────────────────────────────────────────
+    'register.title': 'Create Account',
+    'register.subtitle': 'Enter your details and invitation code',
+    'register.username': 'Username',
+    'register.usernamePlaceholder': '3-32 characters',
+    'register.password': 'Password',
+    'register.passwordPlaceholder': 'At least 8 characters',
+    'register.inviteCode': 'Invitation Code',
+    'register.inviteCodePlaceholder': 'Enter your invitation code',
+    'register.submit': 'Create Account',
+    'register.creating': 'Creating...',
+    'register.hasAccount': 'Already have an account?',
+    'register.login': 'Sign In',
+    'register.success': 'Account created! You can now sign in.',
 
     // ── ModelManager ─────────────────────────────────────────────────────
     'model.title': 'Model Manager',
@@ -336,6 +353,23 @@ export const messages: Record<Language, Record<string, string>> = {
     'login.verifying': '验证中...',
     'login.wait': '等待 {0}s',
     'login.loading': '加载中...',
+    'login.noAccount': '没有账号？',
+    'login.register': '注册',
+
+    // ── Register ────────────────────────────────────────────────────────
+    'register.title': '创建账号',
+    'register.subtitle': '填写信息和邀请码',
+    'register.username': '用户名',
+    'register.usernamePlaceholder': '3-32 个字符',
+    'register.password': '密码',
+    'register.passwordPlaceholder': '至少 8 个字符',
+    'register.inviteCode': '邀请码',
+    'register.inviteCodePlaceholder': '输入你的邀请码',
+    'register.submit': '创建账号',
+    'register.creating': '创建中...',
+    'register.hasAccount': '已有账号？',
+    'register.login': '登录',
+    'register.success': '账号已创建！现在可以登录了。',
 
     // ── ModelManager ─────────────────────────────────────────────────────
     'model.title': '模型管理',

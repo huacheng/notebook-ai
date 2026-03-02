@@ -131,6 +131,29 @@ export class NotebookDb {
 
     // D4-3: index on notebooks.project_id for JOIN performance
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_notebooks_project_id ON notebooks(project_id)`);
+
+    // ── Users & Invite Codes (multi-user support) ─────────────────────────────
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id            TEXT PRIMARY KEY,
+        username      TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        status        TEXT DEFAULT 'active',
+        created_at    TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS invite_codes (
+        code          TEXT PRIMARY KEY,
+        max_uses      INTEGER DEFAULT 1,
+        used_count    INTEGER DEFAULT 0,
+        created_by    TEXT,
+        created_at    TEXT NOT NULL,
+        expires_at    TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+      CREATE INDEX IF NOT EXISTS idx_invite_codes_expires ON invite_codes(expires_at);
+    `);
   }
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────

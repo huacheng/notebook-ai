@@ -6,9 +6,10 @@ interface LoginPageProps {
   onLogin: (token: string) => void;
   error: string | null;
   loading: boolean;
+  onRegister?: () => void;
 }
 
-export function LoginPage({ onLogin, error, loading }: LoginPageProps) {
+export function LoginPage({ onLogin, error, loading, onRegister }: LoginPageProps) {
   const t = useT();
   const [token, setToken] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -81,6 +82,15 @@ export function LoginPage({ onLogin, error, loading }: LoginPageProps) {
             {loading ? t('login.verifying') : locked ? t('login.wait', String(countdown)) : t('login.signIn')}
           </button>
         </form>
+
+        {onRegister && (
+          <div className="login-footer">
+            <span>{t('login.noAccount')}</span>
+            <button type="button" className="login-link" onClick={onRegister}>
+              {t('login.register')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
