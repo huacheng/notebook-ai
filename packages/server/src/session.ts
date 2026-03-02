@@ -737,9 +737,26 @@ export class SessionManager {
             cell_id: cellId,
             output,
           });
+        } else if (result.result) {
+          // For slash commands (like /context, /cost), there are no 'assistant' messages —
+          // the output is ONLY in result.result. Add it if the cell has no outputs yet.
+          const cell = session.notebook.cells.find((c) => c.id === cellId);
+          const hasOutput = cell?.type === 'prompt' && cell.outputs && cell.outputs.length > 0;
+          if (!hasOutput) {
+            const output: CellOutput = {
+              type: 'text',
+              content: result.result,
+              timestamp: new Date().toISOString(),
+            };
+            session.notebook = appendCellOutput(session.notebook, cellId, output);
+            this.broadcast(session, {
+              type: 'cell_output',
+              cell_id: cellId,
+              output,
+            });
+          }
+          // If cell already has output, result.result duplicates content from 'assistant' messages.
         }
-        // Success: result.result duplicates the text already broadcast via
-        // 'assistant' messages — skip it to avoid duplicate output.
 
         // 'result' is the definitive completion signal — no idle timer needed.
         this.completeCell(session, cellId, result.is_error);

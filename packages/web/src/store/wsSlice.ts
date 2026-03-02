@@ -374,9 +374,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             } else {
               store.appendCellOutput(parsed.cell_id, output);
             }
-          } else {
-            // Log other system messages (e.g. context compaction) for future UI display
-            console.log(`[ws] system: ${parsed.subtype} — ${parsed.message}`);
           }
           break;
         }

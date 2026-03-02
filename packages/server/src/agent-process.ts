@@ -111,8 +111,8 @@ export class AgentProcess {
           this.claudeSessionId = msg.session_id;
         }
         onMessage(msg);
-      } catch (e) {
-        // Silently ignore non-JSON output
+      } catch {
+        // Ignore non-JSON lines (verbose output)
       }
     });
 
