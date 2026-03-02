@@ -8,11 +8,12 @@ interface RegisterPageProps {
 
 export function RegisterPage({ onBack }: RegisterPageProps) {
   const t = useT();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const authError = useStore(s => s.authError);
   const authRetryAfter = useStore(s => s.authRetryAfter);
@@ -48,9 +49,9 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    if (!username.trim() || !password.trim() || !inviteCode.trim() || authLoading || locked) return;
+    if (!email.trim() || !password.trim() || !inviteCode.trim() || authLoading || locked) return;
 
-    const ok = await register(username.trim(), password.trim(), inviteCode.trim());
+    const ok = await register(email.trim(), password.trim(), inviteCode.trim());
     if (ok) {
       setSuccess(true);
     }
@@ -80,21 +81,19 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="login-field">
-            <label className="login-label" htmlFor="reg-username">
-              {t('register.username')}
+            <label className="login-label" htmlFor="reg-email">
+              {t('register.email')}
             </label>
             <input
               ref={inputRef}
-              id="reg-username"
+              id="reg-email"
               className="login-input"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={t('register.usernamePlaceholder')}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t('register.emailPlaceholder')}
               disabled={authLoading || locked}
-              autoComplete="username"
-              minLength={3}
-              maxLength={32}
+              autoComplete="email"
             />
           </div>
 
@@ -102,17 +101,32 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
             <label className="login-label" htmlFor="reg-password">
               {t('register.password')}
             </label>
-            <input
-              id="reg-password"
-              className="login-input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('register.passwordPlaceholder')}
-              disabled={authLoading || locked}
-              autoComplete="new-password"
-              minLength={8}
-            />
+            <div className="login-input-wrap">
+              <input
+                id="reg-password"
+                className="login-input"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('register.passwordPlaceholder')}
+                disabled={authLoading || locked}
+                autoComplete="new-password"
+                minLength={8}
+              />
+              <button
+                type="button"
+                className={`login-pwd-toggle ${showPassword ? 'visible' : ''}`}
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                  {!showPassword && <line x1="2" y1="2" x2="22" y2="22" strokeLinecap="round"/>}
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="login-field">
@@ -136,7 +150,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
           <button
             className="login-btn"
             type="submit"
-            disabled={!username.trim() || !password.trim() || !inviteCode.trim() || authLoading || locked}
+            disabled={!email.trim() || !password.trim() || !inviteCode.trim() || authLoading || locked}
           >
             {authLoading ? t('register.creating') : locked ? t('login.wait', String(countdown)) : t('register.submit')}
           </button>

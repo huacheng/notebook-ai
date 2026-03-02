@@ -522,6 +522,26 @@ export const SessionAlreadyOpenSchema = z.object({
   session_id: z.string(),
 });
 
+// ── Multi-device collaboration messages ───────────────────────────────────────
+
+export const DeviceConnectedSchema = z.object({
+  type: z.literal('device_connected'),
+  session_id: z.string(),
+  device_count: z.number().int().positive(),
+});
+
+export const DeviceDisconnectedSchema = z.object({
+  type: z.literal('device_disconnected'),
+  session_id: z.string(),
+  device_count: z.number().int().nonnegative(),
+});
+
+export const DeviceLimitExceededSchema = z.object({
+  type: z.literal('device_limit_exceeded'),
+  max_devices: z.number().int().positive(),
+  message: z.string(),
+});
+
 export const FileOpenMetaSchema = z.object({
   type: z.literal('file-open-meta'),
   session_id: z.string(),
@@ -742,6 +762,9 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   SliceUpdateSchema,
   ToolResultMessageSchema,
   SessionAlreadyOpenSchema,
+  DeviceConnectedSchema,
+  DeviceDisconnectedSchema,
+  DeviceLimitExceededSchema,
   PongSchema,
   FileOpenMetaSchema,
   FileChunkSchema,
@@ -851,6 +874,9 @@ export type ExportComplete = z.infer<typeof ExportCompleteSchema>;
 export type ErrorMessage = z.infer<typeof ErrorMessageSchema>;
 
 export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
+export type DeviceConnected = z.infer<typeof DeviceConnectedSchema>;
+export type DeviceDisconnected = z.infer<typeof DeviceDisconnectedSchema>;
+export type DeviceLimitExceeded = z.infer<typeof DeviceLimitExceededSchema>;
 export type WSClientMessage = z.infer<typeof WSClientMessageSchema>;
 export type WSServerMessage = z.infer<typeof WSServerMessageSchema>;
 export type ExportOptions = z.infer<typeof ExportOptionsSchema>;

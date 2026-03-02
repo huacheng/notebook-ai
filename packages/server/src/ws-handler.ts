@@ -148,20 +148,56 @@ export function setupWebSocket(
   // Purge stale file annotations on startup
   db.cleanupOldFileAnnotations(7);
 
-  // Global: session_id → the one WS connection allowed to subscribe to it.
-  const sessionOwners = new Map<string, WebSocket>();
+  // ── Multi-device collaboration data structures ──────────────────────────────
+  const MAX_DEVICES_PER_USER = 5;
+
+  /** Per-user connection tracking (for 5-device limit enforcement). */
+  const userConnections = new Map<string, Set<WebSocket>>();
+
+  /** Per-session subscribers (multiple devices from same user). */
+  const sessionSubscribers = new Map<string, Set<WebSocket>>();
+
+  /** WS → userId mapping. */
+  const wsUserMap = new WeakMap<WebSocket, string>();
+
+  /** Session ownership: session_id → userId (prevents cross-user access). */
+  const sessionOwningUser = new Map<string, string>();
 
   wss.on('connection', (ws: WebSocket, req) => {
     const url = new URL(req.url ?? '/', `http://localhost`);
     const ticket = url.searchParams.get('ticket') ?? undefined;
 
+    let userId: string;
+
     if (authEnabled) {
-      if (!ticket || !consumeWsTicket(ticket)) {
+      const ticketResult = ticket ? consumeWsTicket(ticket) : { valid: false };
+      if (!ticketResult.valid || !ticketResult.userId) {
         sendToClient(ws, { type: 'error', message: 'Unauthorized.' });
         ws.close(4001, 'Unauthorized');
         return;
       }
+      userId = ticketResult.userId;
+    } else {
+      // Auth disabled: use a default user ID for testing
+      userId = 'default-user';
     }
+
+    // Check device limit per user
+    const existingConns = userConnections.get(userId) ?? new Set();
+    if (existingConns.size >= MAX_DEVICES_PER_USER) {
+      sendToClient(ws, {
+        type: 'device_limit_exceeded',
+        max_devices: MAX_DEVICES_PER_USER,
+        message: `Maximum ${MAX_DEVICES_PER_USER} devices allowed per user.`,
+      });
+      ws.close(4003, 'Device limit exceeded');
+      return;
+    }
+
+    // Register this connection
+    existingConns.add(ws);
+    userConnections.set(userId, existingConns);
+    wsUserMap.set(ws, userId);
 
     const clientId = crypto.randomUUID();
     console.log(`[ws] Client ${clientId} connected`);
@@ -192,12 +228,19 @@ export function setupWebSocket(
       }
 
       const msg = result.data;
+      const currentUserId = wsUserMap.get(ws);
 
-      // D2: ownership check — session-mutating commands must originate from the session owner
-      function checkSessionOwner(sid: string): boolean {
-        const owner = sessionOwners.get(sid);
-        if (owner && owner !== ws) {
-          sendToClient(ws, { type: 'error', session_id: sid, message: 'Not the session owner.' });
+      // D2: permission check — session-mutating commands must come from a user who owns the session
+      function checkSessionPermission(sid: string): boolean {
+        const owningUser = sessionOwningUser.get(sid);
+        if (owningUser && owningUser !== currentUserId) {
+          sendToClient(ws, { type: 'error', session_id: sid, message: 'Access denied: session belongs to another user.' });
+          return false;
+        }
+        // Also check if this WS is subscribed to the session
+        const subscribers = sessionSubscribers.get(sid);
+        if (!subscribers || !subscribers.has(ws)) {
+          sendToClient(ws, { type: 'error', session_id: sid, message: 'Not subscribed to this session.' });
           return false;
         }
         return true;
@@ -208,14 +251,15 @@ export function setupWebSocket(
           const { session_id } = msg;
           if (subscriptions.has(session_id)) break;
 
-          const owner = sessionOwners.get(session_id);
-          if (owner && owner !== ws) {
-            if (owner.readyState === owner.OPEN) {
-              sendToClient(ws, { type: 'session_already_open', session_id });
-              break;
-            }
-            // Old owner is closing/closed — allow takeover
-            sessionOwners.delete(session_id);
+          // Check if session belongs to a different user
+          const owningUser = sessionOwningUser.get(session_id);
+          if (owningUser && owningUser !== currentUserId) {
+            sendToClient(ws, {
+              type: 'error',
+              session_id,
+              message: 'Access denied: session belongs to another user.',
+            });
+            break;
           }
 
           let session = sessionManager.getSession(session_id);
@@ -269,8 +313,35 @@ export function setupWebSocket(
           });
           if (remove) {
             subscriptions.set(session_id, remove);
-            sessionOwners.set(session_id, ws);
-            console.log(`[ws] Client ${clientId} subscribed to session ${session_id}`);
+
+            // Track session ownership and subscribers
+            if (!sessionOwningUser.has(session_id)) {
+              sessionOwningUser.set(session_id, currentUserId!);
+            }
+
+            // Add to session subscribers
+            let subscribers = sessionSubscribers.get(session_id);
+            if (!subscribers) {
+              subscribers = new Set();
+              sessionSubscribers.set(session_id, subscribers);
+            }
+            const wasEmpty = subscribers.size === 0;
+            subscribers.add(ws);
+
+            console.log(`[ws] Client ${clientId} subscribed to session ${session_id} (${subscribers.size} device(s))`);
+
+            // Broadcast device_connected to other subscribers
+            if (!wasEmpty) {
+              for (const sub of subscribers) {
+                if (sub !== ws && sub.readyState === sub.OPEN) {
+                  sendToClient(sub, {
+                    type: 'device_connected',
+                    session_id,
+                    device_count: subscribers.size,
+                  });
+                }
+              }
+            }
 
             // Resume-after: replay buffered events the client missed
             if (msg.resume_after !== undefined) {
@@ -292,7 +363,30 @@ export function setupWebSocket(
           if (remove) {
             remove();
             subscriptions.delete(session_id);
-            if (sessionOwners.get(session_id) === ws) sessionOwners.delete(session_id);
+
+            // Remove from session subscribers
+            const subscribers = sessionSubscribers.get(session_id);
+            if (subscribers) {
+              subscribers.delete(ws);
+
+              // Broadcast device_disconnected to remaining subscribers
+              if (subscribers.size > 0) {
+                for (const sub of subscribers) {
+                  if (sub.readyState === sub.OPEN) {
+                    sendToClient(sub, {
+                      type: 'device_disconnected',
+                      session_id,
+                      device_count: subscribers.size,
+                    });
+                  }
+                }
+              } else {
+                // Last subscriber — clean up ownership
+                sessionSubscribers.delete(session_id);
+                sessionOwningUser.delete(session_id);
+              }
+            }
+
             console.log(`[ws] Client ${clientId} unsubscribed from session ${session_id}`);
           }
           break;
@@ -300,7 +394,7 @@ export function setupWebSocket(
 
         case 'execute_request': {
           const { session_id, cell_id, source, images } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.executeCell(session_id, cell_id, source, images);
           } catch (err) {
@@ -343,7 +437,7 @@ export function setupWebSocket(
 
         case 'load_notebook': {
           const { session_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session) {
             sendToClient(ws, { type: 'error', session_id, message: `Session "${session_id}" not found.` });
@@ -389,7 +483,7 @@ export function setupWebSocket(
 
         case 'slice_update': {
           const { session_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (session) {
             session.notebook = {
@@ -411,7 +505,7 @@ export function setupWebSocket(
 
         case 'update_cell_source': {
           const { session_id, cell_id, source } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (session) {
             session.notebook = {
@@ -426,7 +520,7 @@ export function setupWebSocket(
 
         case 'file-open': {
           const { session_id, path: filePath, source, project_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session && source !== 'library' && !project_id) {
             sendToClient(ws, { type: 'file-open-error', session_id, error: 'Session not found' });
@@ -525,7 +619,7 @@ export function setupWebSocket(
 
         case 'file-save': {
           const { session_id, path: filePath, source, content, project_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session && source !== 'library' && !project_id) {
             sendToClient(ws, { type: 'file-save-error', session_id, error: 'Session not found' });
@@ -570,7 +664,7 @@ export function setupWebSocket(
 
         case 'annotation-load': {
           const { session_id, path: filePath } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const row = db.getFileAnnotations(session_id, filePath);
           sendToClient(ws, {
             type: 'annotation-data',
@@ -584,7 +678,7 @@ export function setupWebSocket(
 
         case 'annotation-sync': {
           const { session_id, path: filePath, content, updated_at } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           db.upsertFileAnnotations(session_id, filePath, content, updated_at);
           sendToClient(ws, { type: 'annotation-sync-ok', session_id, path: filePath, updated_at });
           break;
@@ -592,7 +686,7 @@ export function setupWebSocket(
 
         case 'restart_session': {
           const { session_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.restartSession(session_id);
             sendToClient(ws, { type: 'session_restarted', session_id });
@@ -604,7 +698,7 @@ export function setupWebSocket(
 
         case 'rerun_notebook': {
           const { session_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.rerunNotebook(session_id);
             sendToClient(ws, { type: 'rerun_started', session_id });
@@ -616,7 +710,7 @@ export function setupWebSocket(
 
         case 'interrupt_cell': {
           const { session_id } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.interruptCell(session_id);
             sendToClient(ws, { type: 'cell_interrupted', session_id });
@@ -628,7 +722,7 @@ export function setupWebSocket(
 
         case 'tool_result_response': {
           const { session_id, tool_use_id, content } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.submitToolResult(session_id, tool_use_id, content);
           } catch (err) {
@@ -639,7 +733,7 @@ export function setupWebSocket(
 
         case 'change_model': {
           const { session_id, model } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.changeModel(session_id, model);
             sendToClient(ws, { type: 'model_changed', session_id, model });
@@ -651,7 +745,7 @@ export function setupWebSocket(
 
         case 'url_capture': {
           const { session_id, url } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session) {
             sendToClient(ws, { type: 'url_capture_result', url, file_path: '', format: 'image' as const, error: 'Session not found' });
@@ -680,7 +774,7 @@ export function setupWebSocket(
 
         case 'remove_cells': {
           const { session_id, cell_ids } = msg;
-          if (!checkSessionOwner(session_id)) break;
+          if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (!session) {
             sendToClient(ws, { type: 'error', session_id, message: `Session "${session_id}" not found.` });
@@ -918,11 +1012,47 @@ export function setupWebSocket(
     function cleanup() {
       if (cleanedUp) return; // guard against double-cleanup
       cleanedUp = true;
+
+      // Remove from user connections
+      const connUserId = wsUserMap.get(ws);
+      if (connUserId) {
+        const conns = userConnections.get(connUserId);
+        if (conns) {
+          conns.delete(ws);
+          if (conns.size === 0) {
+            userConnections.delete(connUserId);
+          }
+        }
+      }
+
+      // Remove from session subscriptions and broadcast device_disconnected
       for (const [session_id, remove] of subscriptions.entries()) {
         try { remove(); } catch (e) { console.error('[ws] cleanup: session listener removal failed:', e); }
-        if (sessionOwners.get(session_id) === ws) sessionOwners.delete(session_id);
+
+        const subscribers = sessionSubscribers.get(session_id);
+        if (subscribers) {
+          subscribers.delete(ws);
+
+          // Broadcast device_disconnected to remaining subscribers
+          if (subscribers.size > 0) {
+            for (const sub of subscribers) {
+              if (sub.readyState === sub.OPEN) {
+                sendToClient(sub, {
+                  type: 'device_disconnected',
+                  session_id,
+                  device_count: subscribers.size,
+                });
+              }
+            }
+          } else {
+            // Last subscriber — clean up ownership
+            sessionSubscribers.delete(session_id);
+            sessionOwningUser.delete(session_id);
+          }
+        }
       }
       subscriptions.clear();
+
       // Clean up all watcher subscriptions
       for (const [, unsub] of watchSubscriptions) {
         try { unsub(); } catch (e) { console.error('[ws] cleanup: watcher unsub failed:', e); }

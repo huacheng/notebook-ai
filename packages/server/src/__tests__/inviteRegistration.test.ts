@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import Database from 'better-sqlite3';
@@ -37,7 +37,7 @@ describe('Invitation Registration - Database Schema', () => {
     const colNames = columns.map(c => c.name);
 
     expect(colNames).toContain('id');
-    expect(colNames).toContain('username');
+    expect(colNames).toContain('email');
     expect(colNames).toContain('password_hash');
     expect(colNames).toContain('created_at');
     expect(colNames).toContain('status');
@@ -55,15 +55,15 @@ describe('Invitation Registration - Database Schema', () => {
     expect(colNames).toContain('expires_at');
   });
 
-  it('should enforce unique username constraint', () => {
+  it('should enforce unique email constraint', () => {
     // Insert a test user
-    db.prepare(`INSERT INTO users (id, username, password_hash, created_at, status) VALUES (?, ?, ?, ?, ?)`)
-      .run('test-1', 'alice', 'hash1', new Date().toISOString(), 'active');
+    db.prepare(`INSERT INTO users (id, email, password_hash, created_at, status) VALUES (?, ?, ?, ?, ?)`)
+      .run('test-1', 'alice@example.com', 'hash1', new Date().toISOString(), 'active');
 
-    // Attempt to insert duplicate username should fail
+    // Attempt to insert duplicate email should fail
     expect(() => {
-      db.prepare(`INSERT INTO users (id, username, password_hash, created_at, status) VALUES (?, ?, ?, ?, ?)`)
-        .run('test-2', 'alice', 'hash2', new Date().toISOString(), 'active');
+      db.prepare(`INSERT INTO users (id, email, password_hash, created_at, status) VALUES (?, ?, ?, ?, ?)`)
+        .run('test-2', 'alice@example.com', 'hash2', new Date().toISOString(), 'active');
     }).toThrow();
   });
 
@@ -117,10 +117,16 @@ describe('Invitation Registration - Auth Module', () => {
     expect(block).toContain('400');
   });
 
-  it('handleRegister should return 409 for duplicate username', () => {
+  it('handleRegister should return 409 for duplicate email', () => {
     const start = src.indexOf('function handleRegister');
-    const end = src.indexOf('\nfunction ', start + 1);
-    const block = src.slice(start, end > 0 ? end : start + 2000);
+    // Look for next exported function or comment section boundary
+    const endFunc = src.indexOf('\nexport', start + 50);
+    const endComment = src.indexOf('\n// ──', start + 50);
+    const end = Math.min(
+      endFunc > 0 ? endFunc : Infinity,
+      endComment > 0 ? endComment : Infinity
+    );
+    const block = src.slice(start, end < Infinity ? end : start + 3000);
 
     expect(block).toContain('409');
   });
@@ -171,5 +177,48 @@ describe('Invitation Registration - Invite Code Validation', () => {
 
   it('should increment used_count after successful registration', () => {
     expect(src).toMatch(/UPDATE\s+invite_codes.*used_count/i);
+  });
+});
+
+// ── Part 5: Rate Limit Response Tests ─────────────────────────────────────────
+
+describe('Invitation Registration - Rate Limit Responses', () => {
+  const authPath = path.resolve(__dirname, '../auth.ts');
+  let src: string;
+
+  beforeAll(() => {
+    src = readFileSync(authPath, 'utf-8');
+  });
+
+  it('should return retryAfter when invite code is invalid', () => {
+    // Find the "Invalid invitation code" error response
+    const invalidInviteMatch = src.match(/Invalid invitation code[^}]+/);
+    expect(invalidInviteMatch).toBeTruthy();
+    // Should include retryAfter in the response
+    expect(invalidInviteMatch![0]).toMatch(/retryAfter/);
+  });
+
+  it('should return retryAfter when invite code has expired', () => {
+    const expiredMatch = src.match(/Invitation code has expired[^}]+/);
+    expect(expiredMatch).toBeTruthy();
+    expect(expiredMatch![0]).toMatch(/retryAfter/);
+  });
+
+  it('should return retryAfter when invite code usage limit reached', () => {
+    const limitMatch = src.match(/reached its usage limit[^}]+/);
+    expect(limitMatch).toBeTruthy();
+    expect(limitMatch![0]).toMatch(/retryAfter/);
+  });
+
+  it('should return retryAfter when email validation fails', () => {
+    const emailMatch = src.match(/Valid email address is required[^}]+/);
+    expect(emailMatch).toBeTruthy();
+    expect(emailMatch![0]).toMatch(/retryAfter/);
+  });
+
+  it('should return retryAfter when password validation fails', () => {
+    const pwdMatch = src.match(/Password must be at least[^}]+/);
+    expect(pwdMatch).toBeTruthy();
+    expect(pwdMatch![0]).toMatch(/retryAfter/);
   });
 });

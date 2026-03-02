@@ -3157,6 +3157,33 @@ textarea.cell-input {
   font-family: var(--font-sans);
 }
 
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-input-wrap .login-input {
+  padding-right: 40px;
+}
+
+.login-pwd-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 16px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.login-pwd-toggle:hover {
+  opacity: 1;
+}
+
 .login-error {
   padding: var(--space-sm) var(--space-md);
   background: var(--bg-error);
@@ -3193,6 +3220,33 @@ textarea.cell-input {
 .login-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.login-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.login-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  margin-left: 6px;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+.register-success {
+  color: var(--color-completed);
+  font-weight: 500;
 }
 
 /* ============================================================

@@ -109,7 +109,7 @@ describe('WS subscribe race condition on reconnect', () => {
     expect(alreadyOpen).toBeUndefined();
   });
 
-  it('still blocks truly concurrent connections from different tabs', async () => {
+  it('allows multiple concurrent connections from same user (multi-device)', async () => {
     // Setup
     const nbPath = path.join(tempDir, 'test2.notebook.json');
     await ns.save(nbPath, ns.createNew('Test2', tempDir));
@@ -126,14 +126,15 @@ describe('WS subscribe race condition on reconnect', () => {
     await new Promise(r => setTimeout(r, 50));
 
     // WS2 from another tab tries to subscribe (WS1 is still OPEN)
+    // With multi-device support, this should now be allowed
     const { ws: ws2, sent: sent2 } = createMockWs(1);
     wss.emit('connection', ws2, { url: '/' });
     ws2.emit('message', JSON.stringify({ type: 'subscribe', session_id: session.id }));
     await new Promise(r => setTimeout(r, 50));
 
-    // WS2 SHOULD receive session_already_open
+    // WS2 should NOT receive session_already_open (multi-device allowed)
     const alreadyOpen = sent2.find((m: any) => m.type === 'session_already_open');
-    expect(alreadyOpen).toBeDefined();
+    expect(alreadyOpen).toBeUndefined();
   });
 
   it('allows takeover when old owner readyState is CLOSED (3)', async () => {

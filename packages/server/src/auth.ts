@@ -1,15 +1,16 @@
 import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import { NotebookDb } from './db.js';
 
-// ── Token source ────────────────────────────────────────────────────────────
-// NB_AUTH_TOKEN env var sets the shared secret. If unset, auth is disabled
-// (open access — useful for local development).
+// ── Configuration ────────────────────────────────────────────────────────────
 
-const NB_AUTH_TOKEN = process.env['NB_AUTH_TOKEN'] ?? '';
 const TRUST_PROXY = !!process.env['TRUST_PROXY'];
 
-/** Whether auth is enabled (non-empty NB_AUTH_TOKEN). */
-export const authEnabled = NB_AUTH_TOKEN.length > 0;
+/**
+ * Auth is enabled unless NB_AUTH_DISABLED=1 (for testing only).
+ * In production, always leave this unset.
+ */
+export const authEnabled = process.env['NB_AUTH_DISABLED'] !== '1';
 
 // ── Brute-force protection ──────────────────────────────────────────────────
 
@@ -65,27 +66,73 @@ setInterval(() => {
   }
 }, 10 * 60_000);
 
+// ── Session token management ─────────────────────────────────────────────────
+
+const SESSION_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // 7 days
+
+interface SessionToken {
+  userId: string;
+  email: string;
+  expiresAt: number;
+}
+
+const sessionTokens = new Map<string, SessionToken>();
+
+export function createSessionToken(userId: string, email: string): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessionTokens.set(token, {
+    userId,
+    email,
+    expiresAt: Date.now() + SESSION_TOKEN_TTL_MS,
+  });
+  return token;
+}
+
+export function validateSessionToken(token: string): SessionToken | null {
+  const session = sessionTokens.get(token);
+  if (!session) return null;
+  if (Date.now() >= session.expiresAt) {
+    sessionTokens.delete(token);
+    return null;
+  }
+  return session;
+}
+
+export function revokeSessionToken(token: string): void {
+  sessionTokens.delete(token);
+}
+
+// Cleanup expired sessions every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of sessionTokens) {
+    if (now >= session.expiresAt) sessionTokens.delete(token);
+  }
+}, 30 * 60_000);
+
 // ── WS one-time ticket ──────────────────────────────────────────────────────
 
 const TICKET_TTL_MS = 30_000; // 30 seconds
 
 interface WsTicket {
   expiresAt: number;
+  userId: string;
 }
 
 const wsTickets = new Map<string, WsTicket>();
 
-export function createWsTicket(): string {
+export function createWsTicket(userId: string): string {
   const ticket = crypto.randomUUID();
-  wsTickets.set(ticket, { expiresAt: Date.now() + TICKET_TTL_MS });
+  wsTickets.set(ticket, { expiresAt: Date.now() + TICKET_TTL_MS, userId });
   return ticket;
 }
 
-export function consumeWsTicket(ticket: string): boolean {
+export function consumeWsTicket(ticket: string): { valid: boolean; userId?: string } {
   const entry = wsTickets.get(ticket);
-  if (!entry) return false;
+  if (!entry) return { valid: false };
   wsTickets.delete(ticket); // one-time use
-  return Date.now() < entry.expiresAt;
+  if (Date.now() >= entry.expiresAt) return { valid: false };
+  return { valid: true, userId: entry.userId };
 }
 
 // Cleanup expired tickets every 5 minutes
@@ -95,17 +142,6 @@ setInterval(() => {
     if (now >= rec.expiresAt) wsTickets.delete(t);
   }
 }, 5 * 60_000);
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function timingSafeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  const len = Math.max(bufA.length, bufB.length);
-  const paddedA = Buffer.concat([bufA, Buffer.alloc(len - bufA.length)]);
-  const paddedB = Buffer.concat([bufB, Buffer.alloc(len - bufB.length)]);
-  return crypto.timingSafeEqual(paddedA, paddedB) && bufA.length === bufB.length;
-}
 
 // ── Password hashing (scrypt) ─────────────────────────────────────────────────
 
@@ -135,17 +171,31 @@ export function verifyPassword(password: string, stored: string): Promise<boolea
   });
 }
 
-// ── Registration with invite code ────────────────────────────────────────────
+// ── Email validation ─────────────────────────────────────────────────────────
 
-// Lazy import to avoid circular dependency (db.ts imports nothing from auth.ts)
-let _db: import('./db').NotebookDb | null = null;
-function getDb(): import('./db').NotebookDb {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(email: string): boolean {
+  return EMAIL_REGEX.test(email) && email.length <= 254;
+}
+
+// ── Database access ──────────────────────────────────────────────────────────
+
+// Lazy singleton to avoid creating db connection until needed
+let _db: NotebookDb | null = null;
+function getDb(): NotebookDb {
   if (!_db) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { NotebookDb } = require('./db') as typeof import('./db');
     _db = new NotebookDb();
   }
   return _db;
+}
+
+interface UserRow {
+  id: string;
+  email: string;
+  password_hash: string;
+  status: string;
+  created_at: string;
 }
 
 interface InviteCodeRow {
@@ -157,9 +207,11 @@ interface InviteCodeRow {
   expires_at: string | null;
 }
 
+// ── Registration with invite code ────────────────────────────────────────────
+
 /**
  * POST /api/auth/register — register a new user with an invitation code.
- * Body: { username, password, inviteCode }
+ * Body: { email, password, inviteCode }
  */
 export async function handleRegister(req: Request, res: Response): Promise<void> {
   const ip = getClientIp(req);
@@ -169,63 +221,67 @@ export async function handleRegister(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const { username, password, inviteCode } = req.body as {
-    username?: unknown;
+  const { email, password, inviteCode } = req.body as {
+    email?: unknown;
     password?: unknown;
     inviteCode?: unknown;
   };
 
-  // Validate input
-  if (typeof username !== 'string' || !username || username.length < 3 || username.length > 32) {
-    recordFailure(ip);
-    res.status(400).json({ error: 'Username must be 3-32 characters.' });
+  // Validate email
+  if (typeof email !== 'string' || !email || !isValidEmail(email)) {
+    const lockSec = recordFailure(ip);
+    res.status(400).json({ error: 'Valid email address is required.', retryAfter: lockSec });
     return;
   }
+
+  // Validate password
   if (typeof password !== 'string' || !password || password.length < 8) {
-    recordFailure(ip);
-    res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    const lockSec = recordFailure(ip);
+    res.status(400).json({ error: 'Password must be at least 8 characters.', retryAfter: lockSec });
     return;
   }
+
+  // Validate invite code
   if (typeof inviteCode !== 'string' || !inviteCode) {
-    recordFailure(ip);
-    res.status(400).json({ error: 'Invitation code is required.' });
+    const lockSec = recordFailure(ip);
+    res.status(400).json({ error: 'Invitation code is required.', retryAfter: lockSec });
     return;
   }
 
   const db = getDb();
   const rawDb = (db as unknown as { db: import('better-sqlite3').Database }).db;
 
-  // Validate invite code
+  // Validate invite code in database
   const invite = rawDb.prepare(
     'SELECT * FROM invite_codes WHERE code = ?'
   ).get(inviteCode) as InviteCodeRow | undefined;
 
   if (!invite) {
-    recordFailure(ip);
-    res.status(400).json({ error: 'Invalid invitation code.' });
+    const lockSec = recordFailure(ip);
+    res.status(400).json({ error: 'Invalid invitation code.', retryAfter: lockSec });
     return;
   }
 
   // Check expiration
   if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-    recordFailure(ip);
-    res.status(400).json({ error: 'Invitation code has expired.' });
+    const lockSec = recordFailure(ip);
+    res.status(400).json({ error: 'Invitation code has expired.', retryAfter: lockSec });
     return;
   }
 
   // Check usage limit
   if (invite.used_count >= invite.max_uses) {
-    recordFailure(ip);
-    res.status(400).json({ error: 'Invitation code has reached its usage limit.' });
+    const lockSec = recordFailure(ip);
+    res.status(400).json({ error: 'Invitation code has reached its usage limit.', retryAfter: lockSec });
     return;
   }
 
-  // Check duplicate username
+  // Check duplicate email
   const existing = rawDb.prepare(
-    'SELECT id FROM users WHERE username = ?'
-  ).get(username);
+    'SELECT id FROM users WHERE email = ?'
+  ).get(email.toLowerCase());
   if (existing) {
-    res.status(409).json({ error: 'Username already taken.' });
+    res.status(409).json({ error: 'Email already registered.' });
     return;
   }
 
@@ -237,8 +293,8 @@ export async function handleRegister(req: Request, res: Response): Promise<void>
 
     rawDb.transaction(() => {
       rawDb.prepare(
-        'INSERT INTO users (id, username, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).run(userId, username, passwordHash, 'active', now);
+        'INSERT INTO users (id, email, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(userId, email.toLowerCase(), passwordHash, 'active', now);
 
       // Increment invite code usage
       rawDb.prepare(
@@ -255,12 +311,12 @@ export async function handleRegister(req: Request, res: Response): Promise<void>
 
 // ── Login endpoint handler ──────────────────────────────────────────────────
 
-export function handleLogin(req: Request, res: Response): void {
-  if (!authEnabled) {
-    res.json({ ok: true });
-    return;
-  }
-
+/**
+ * POST /api/auth/login — authenticate with email and password.
+ * Body: { email, password }
+ * Returns: { ok: true, token, userId, email } on success
+ */
+export async function handleLogin(req: Request, res: Response): Promise<void> {
   const ip = getClientIp(req);
   const { blocked, retryAfterSec } = checkRateLimit(ip);
   if (blocked) {
@@ -268,117 +324,153 @@ export function handleLogin(req: Request, res: Response): void {
     return;
   }
 
-  const { token } = req.body as { token?: unknown };
+  const { email, password } = req.body as { email?: unknown; password?: unknown };
 
-  if (typeof token !== 'string' || !token) {
+  if (typeof email !== 'string' || !email) {
     const lockSec = recordFailure(ip);
-    res.status(401).json({ error: `Token is required. Locked for ${lockSec}s.`, retryAfter: lockSec });
+    res.status(401).json({ error: `Email is required. Locked for ${lockSec}s.`, retryAfter: lockSec });
     return;
   }
 
-  if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
+  if (typeof password !== 'string' || !password) {
     const lockSec = recordFailure(ip);
-    res.status(401).json({ error: `Invalid token. Locked for ${lockSec}s.`, retryAfter: lockSec });
+    res.status(401).json({ error: `Password is required. Locked for ${lockSec}s.`, retryAfter: lockSec });
     return;
   }
+
+  const db = getDb();
+  const rawDb = (db as unknown as { db: import('better-sqlite3').Database }).db;
+
+  // Find user by email (case-insensitive)
+  const user = rawDb.prepare(
+    'SELECT * FROM users WHERE email = ? AND status = ?'
+  ).get(email.toLowerCase(), 'active') as UserRow | undefined;
+
+  if (!user) {
+    const lockSec = recordFailure(ip);
+    res.status(401).json({ error: `Invalid credentials. Locked for ${lockSec}s.`, retryAfter: lockSec });
+    return;
+  }
+
+  // Verify password
+  const valid = await verifyPassword(password, user.password_hash);
+  if (!valid) {
+    const lockSec = recordFailure(ip);
+    res.status(401).json({ error: `Invalid credentials. Locked for ${lockSec}s.`, retryAfter: lockSec });
+    return;
+  }
+
+  // Create session token
+  const token = createSessionToken(user.id, user.email);
 
   clearFailures(ip);
-  res.json({ ok: true });
+  res.json({ ok: true, token, userId: user.id, email: user.email });
 }
 
-// ── Token verify endpoint (no rate limiting) ───────────────────────────────
+// ── Token verify endpoint ───────────────────────────────────────────────────
 
+/**
+ * GET /api/auth/verify — verify a session token.
+ * Header: Authorization: Bearer <token>
+ */
 export function handleVerify(req: Request, res: Response): void {
-  if (!authEnabled) {
-    res.json({ ok: true });
-    return;
-  }
   const ip = getClientIp(req);
   const { blocked, retryAfterSec } = checkRateLimit(ip);
   if (blocked) {
     res.status(429).json({ ok: false, retryAfter: retryAfterSec });
     return;
   }
+
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     recordFailure(ip);
     res.status(401).json({ ok: false });
     return;
   }
+
   const token = authHeader.slice(7);
-  if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
+  const session = validateSessionToken(token);
+  if (!session) {
     recordFailure(ip);
     res.status(401).json({ ok: false });
     return;
   }
+
   clearFailures(ip);
-  res.json({ ok: true });
+  res.json({ ok: true, userId: session.userId, email: session.email });
 }
 
 // ── WS ticket endpoint ─────────────────────────────────────────────────────
 
 /**
- * POST /api/auth/ws-ticket — exchange a valid bearer token for a one-time WS ticket.
- * Manually validates the bearer token so it works regardless of middleware ordering.
+ * POST /api/auth/ws-ticket — exchange a valid session token for a one-time WS ticket.
+ * Header: Authorization: Bearer <token>
  */
 export function handleWsTicket(req: Request, res: Response): void {
-  if (!authEnabled) {
-    // No auth configured — return a ticket anyway (WS handler will skip check)
-    res.json({ ticket: createWsTicket() });
-    return;
-  }
   const ip = getClientIp(req);
   const { blocked, retryAfterSec } = checkRateLimit(ip);
   if (blocked) {
     res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
     return;
   }
+
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     recordFailure(ip);
     res.status(401).json({ error: 'Authorization required.' });
     return;
   }
+
   const token = authHeader.slice(7);
-  if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
+  const session = validateSessionToken(token);
+  if (!session) {
     recordFailure(ip);
-    res.status(401).json({ error: 'Invalid token.' });
+    res.status(401).json({ error: 'Invalid or expired token.' });
     return;
   }
+
   clearFailures(ip);
-  res.json({ ticket: createWsTicket() });
+  res.json({ ticket: createWsTicket(session.userId) });
+}
+
+// ── Logout endpoint ─────────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/logout — revoke session token.
+ * Header: Authorization: Bearer <token>
+ */
+export function handleLogout(req: Request, res: Response): void {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    revokeSessionToken(token);
+  }
+  res.json({ ok: true });
 }
 
 // ── Auth status endpoint ────────────────────────────────────────────────────
 
 export function handleAuthStatus(_req: Request, res: Response): void {
-  res.json({ authEnabled });
+  res.json({ authEnabled: true });
 }
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 
 /**
- * Express middleware that checks for a valid Bearer token on every request
+ * Express middleware that checks for a valid session token on every request
  * except the auth endpoints themselves and health check.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Always allow auth endpoints and health check.
-  // /verify and /ws-ticket perform their own internal Bearer token validation
-  // with rate limiting — bypass middleware to avoid redundant double-validation.
   if (
     req.path === '/api/auth/login' ||
     req.path === '/api/auth/register' ||
     req.path === '/api/auth/status' ||
     req.path === '/api/auth/verify' ||
     req.path === '/api/auth/ws-ticket' ||
+    req.path === '/api/auth/logout' ||
     req.path === '/api/health'
   ) {
-    next();
-    return;
-  }
-
-  // If auth is not configured, allow all requests
-  if (!authEnabled) {
     next();
     return;
   }
@@ -390,10 +482,17 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const token = authHeader.slice(7);
-  if (!timingSafeEqual(token, NB_AUTH_TOKEN)) {
-    res.status(401).json({ error: 'Invalid token.' });
+  const session = validateSessionToken(token);
+  if (!session) {
+    res.status(401).json({ error: 'Invalid or expired token.' });
     return;
   }
+
+  // Attach user info to request for downstream handlers
+  (req as Request & { user?: { userId: string; email: string } }).user = {
+    userId: session.userId,
+    email: session.email,
+  };
 
   next();
 }
