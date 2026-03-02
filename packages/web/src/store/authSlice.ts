@@ -3,7 +3,7 @@ import type { NotebookStore } from './types';
 
 export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'authToken' | 'authRequired' | 'authError' | 'authRetryAfter' | 'authLoading'
-  | 'checkAuthStatus' | 'login' | 'logout' | 'register'
+  | 'checkAuthStatus' | 'login' | 'logout' | 'register' | 'clearAuthError'
 >> = (set, get) => ({
   authToken: sessionStorage.getItem('nb-auth-token'),
   authRequired: null,
@@ -36,21 +36,22 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
     }
   },
 
-  async login(token: string) {
+  async login(email: string, password: string) {
     set({ authLoading: true, authError: null });
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error: string; retryAfter?: number };
         set({ authError: data.error, authRetryAfter: data.retryAfter ?? 0, authLoading: false });
         return;
       }
-      sessionStorage.setItem('nb-auth-token', token);
-      set({ authToken: token, authError: null, authRetryAfter: 0, authLoading: false });
+      const data = (await res.json()) as { token: string };
+      sessionStorage.setItem('nb-auth-token', data.token);
+      set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false });
     } catch {
       set({ authError: 'Failed to connect to server.', authLoading: false });
     }
@@ -81,5 +82,9 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       set({ authError: 'Failed to connect to server.', authLoading: false });
       return false;
     }
+  },
+
+  clearAuthError() {
+    set({ authError: null, authRetryAfter: 0 });
   },
 });

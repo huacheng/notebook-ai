@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
+import * as lz4 from 'lz4js';
 
 export type FileFormat = 'text' | 'html' | 'pdf-binary' | 'docx-binary' | 'xlsx-binary' | 'pptx-binary' | 'image' | 'unsupported';
 
@@ -146,6 +147,30 @@ export function useFileStream(
             contentChunksRef.current.push(data);
           }
           scheduleFlush();
+          break;
+        }
+        case 'file-chunk-compressed': {
+          if (skipStreamRef.current) break;
+          const { data, encoding } = msg as unknown as {
+            data: string;
+            encoding: 'utf8' | 'base64';
+          };
+          try {
+            const compressedBytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+            // LZ4 decompression (server always sends LZ4 for chunked compression)
+            const decompressed = lz4.decompress(compressedBytes);
+            if (encoding === 'base64') {
+              // Binary file: convert decompressed bytes back to base64 for existing flow
+              const b64 = btoa(String.fromCharCode(...decompressed));
+              b64ChunksRef.current.push(b64);
+            } else {
+              // Text file: decode as UTF-8
+              const text = new TextDecoder().decode(decompressed);
+              contentChunksRef.current.push(text);
+            }
+          } catch (e) {
+            console.error('[useFileStream] Failed to decompress:', e);
+          }
           break;
         }
         case 'file-open-end': {

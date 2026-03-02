@@ -288,7 +288,7 @@ const CommitItem = memo(function CommitItem({
         const ws = useStore.getState().ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
           const requestId = crypto.randomUUID();
-          const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 10_000);
+          const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
           function onResponse(e: Event) {
             const d = (e as CustomEvent).detail;
             if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setFiles(d.files); setLoadingFiles(false); } }
@@ -328,7 +328,7 @@ const CommitItem = memo(function CommitItem({
     const ws = useStore.getState().ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
-      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 10_000);
+      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
       function onResponse(e: Event) {
         const d = (e as CustomEvent).detail;
         if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setDiffContent(d.diff); setLoadingDiff(false); } }
@@ -487,7 +487,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
         try {
           resp = await new Promise<GitLogResponse>((resolve, reject) => {
             const requestId = crypto.randomUUID();
-            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 10_000);
+            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 120_000);
             function onResponse(e: Event) {
               const d = (e as CustomEvent).detail;
               if (d.request_id === requestId) {

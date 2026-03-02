@@ -89,9 +89,11 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Login ────────────────────────────────────────────────────────────
     'login.title': 'Notebook AI',
-    'login.subtitle': 'Enter your access token to continue',
-    'login.label': 'Access Token',
-    'login.placeholder': 'Paste your token here',
+    'login.subtitle': 'Sign in to your account',
+    'login.email': 'Email',
+    'login.emailPlaceholder': 'Enter email address',
+    'login.password': 'Password',
+    'login.passwordPlaceholder': 'Enter password',
     'login.signIn': 'Sign In',
     'login.verifying': 'Verifying...',
     'login.wait': 'Wait {0}s',
@@ -102,8 +104,8 @@ export const messages: Record<Language, Record<string, string>> = {
     // ── Register ────────────────────────────────────────────────────────
     'register.title': 'Create Account',
     'register.subtitle': 'Enter your details and invitation code',
-    'register.username': 'Username',
-    'register.usernamePlaceholder': '3-32 characters',
+    'register.email': 'Email',
+    'register.emailPlaceholder': 'Enter email address',
     'register.password': 'Password',
     'register.passwordPlaceholder': 'At least 8 characters',
     'register.inviteCode': 'Invitation Code',
@@ -346,9 +348,11 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Login ────────────────────────────────────────────────────────────
     'login.title': 'Notebook AI',
-    'login.subtitle': '输入访问令牌以继续',
-    'login.label': '访问令牌',
-    'login.placeholder': '在此粘贴令牌',
+    'login.subtitle': '登录你的账号',
+    'login.email': '邮箱',
+    'login.emailPlaceholder': '输入邮箱地址',
+    'login.password': '密码',
+    'login.passwordPlaceholder': '输入密码',
     'login.signIn': '登录',
     'login.verifying': '验证中...',
     'login.wait': '等待 {0}s',
@@ -359,8 +363,8 @@ export const messages: Record<Language, Record<string, string>> = {
     // ── Register ────────────────────────────────────────────────────────
     'register.title': '创建账号',
     'register.subtitle': '填写信息和邀请码',
-    'register.username': '用户名',
-    'register.usernamePlaceholder': '3-32 个字符',
+    'register.email': '邮箱',
+    'register.emailPlaceholder': '输入邮箱地址',
     'register.password': '密码',
     'register.passwordPlaceholder': '至少 8 个字符',
     'register.inviteCode': '邀请码',

@@ -73,6 +73,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
   | 'openNotebookTab' | 'closeNotebookTab' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab'
   | 'appendStreamDelta' | 'flushStreamBuffer'
+  | 'loadingCellIds' | 'requestCellLoad' | 'replaceCellStub'
 >> = (set, get) => ({
   notebook: null,
   sliceLoading: false,
@@ -82,6 +83,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   openNotebooks: {},
   activeNotebookTabId: null,
   streamBuffer: {},
+  loadingCellIds: new Set<string>(),
 
   setNotebook(nb) {
     set({ notebook: nb });
@@ -435,5 +437,61 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       return { streamBuffer: newBuf };
     });
     return text;
+  },
+
+  // ── Cell lazy loading ────────────────────────────────────────────────────
+  requestCellLoad: (cellId: string) => {
+    const { ws, sessionId, loadingCellIds } = get();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    if (loadingCellIds.has(cellId)) return; // prevent duplicate requests
+
+    // Mark as loading
+    set(state => ({
+      loadingCellIds: new Set([...state.loadingCellIds, cellId]),
+    }));
+
+    // Send cell_load request
+    ws.send(JSON.stringify({
+      type: 'cell_load',
+      request_id: crypto.randomUUID(),
+      session_id: sessionId,
+      cell_id: cellId,
+    }));
+  },
+
+  replaceCellStub: (cellId: string, fullCell: Cell) => {
+    set(state => {
+      const newLoadingIds = new Set(state.loadingCellIds);
+      newLoadingIds.delete(cellId);
+
+      // Update state.notebook
+      const updatedNotebook = state.notebook
+        ? {
+            ...state.notebook,
+            cells: state.notebook.cells.map(c => c.id === cellId ? fullCell : c),
+          }
+        : null;
+
+      // D1: Also update openNotebooks to maintain consistency across tabs
+      const updatedOpenNotebooks = { ...state.openNotebooks };
+      for (const [nbId, entry] of Object.entries(updatedOpenNotebooks)) {
+        const idx = entry.notebook.cells.findIndex(c => c.id === cellId);
+        if (idx !== -1) {
+          updatedOpenNotebooks[nbId] = {
+            ...entry,
+            notebook: {
+              ...entry.notebook,
+              cells: entry.notebook.cells.map(c => c.id === cellId ? fullCell : c),
+            },
+          };
+        }
+      }
+
+      return {
+        loadingCellIds: newLoadingIds,
+        notebook: updatedNotebook,
+        openNotebooks: updatedOpenNotebooks,
+      };
+    });
   },
 });

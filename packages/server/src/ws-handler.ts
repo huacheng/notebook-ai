@@ -1,5 +1,6 @@
 import { type WebSocketServer, type WebSocket } from 'ws';
 import path from 'path';
+import * as lz4 from 'lz4js';
 
 // ── Error sanitization (D2-4) ───────────────────────────────────────────────
 // Patterns that indicate internal details unsafe for client exposure.
@@ -592,18 +593,37 @@ export function setupWebSocket(
               break;
             }
 
-            // D3: Stream file content in chunks to avoid loading entire file into memory
-            // Use 16383 (multiple of 3) so base64 chunks don't have padding except the last one
-            const CHUNK_SIZE = 16383;
             const isBinary = format.endsWith('-binary') || format === 'image';
+
+            // Use LZ4 compression for files larger than 100KB, streaming chunks
+            const COMPRESS_THRESHOLD = 100 * 1024;
+            const CHUNK_SIZE = 512 * 1024; // 512KB chunks for better throughput
+            const useCompression = stat.size >= COMPRESS_THRESHOLD;
+
             const stream = createReadStream(safePath, { highWaterMark: CHUNK_SIZE });
+            let chunkIndex = 0;
 
             await new Promise<void>((resolve, reject) => {
               stream.on('data', (chunk: Buffer | string) => {
-                if (isBinary) {
-                  sendToClient(ws, { type: 'file-chunk', session_id, data: chunk.toString('base64'), encoding: 'base64' });
+                const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+                if (useCompression) {
+                  // LZ4 compress each chunk individually for streaming decompression
+                  const compressed = Buffer.from(lz4.compress(chunkBuffer));
+                  sendToClient(ws, {
+                    type: 'file-chunk-compressed',
+                    session_id,
+                    data: compressed.toString('base64'),
+                    encoding: isBinary ? 'base64' : 'utf8',
+                    compression: 'lz4',
+                    chunk_index: chunkIndex++,
+                  });
                 } else {
-                  sendToClient(ws, { type: 'file-chunk', session_id, data: chunk.toString('utf-8'), encoding: 'utf8' });
+                  // Small files: no compression
+                  if (isBinary) {
+                    sendToClient(ws, { type: 'file-chunk', session_id, data: chunkBuffer.toString('base64'), encoding: 'base64' });
+                  } else {
+                    sendToClient(ws, { type: 'file-chunk', session_id, data: chunkBuffer.toString('utf-8'), encoding: 'utf8' });
+                  }
                 }
               });
               stream.on('end', resolve);
@@ -893,27 +913,106 @@ export function setupWebSocket(
         }
 
         case 'notebook_open': {
-          const { request_id, path: nbPath } = msg;
+          const { request_id, path: nbPath, lazy } = msg;
           try {
             const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);
-            const CELL_PAGE_SIZE = 5;
             const totalCells = result.notebook.cells.length;
-            const paginatedNotebook = totalCells > CELL_PAGE_SIZE
-              ? { ...result.notebook, cells: result.notebook.cells.slice(-CELL_PAGE_SIZE) }
-              : result.notebook;
-            sendToClient(ws, {
-              type: 'notebook_opened',
-              request_id,
-              notebook_id: result.notebookId,
-              notebook: paginatedNotebook,
-              session_id: result.sessionId,
-              workspace_dir: result.workspaceDir,
-              total_cells: totalCells,
-            });
+
+            if (lazy) {
+              // Lazy mode: send metadata + cell stubs only (no full outputs)
+              const cellStubs = result.notebook.cells.map((cell: { id: string; type: string; source?: string; outputs?: unknown[]; status?: string }) => ({
+                id: cell.id,
+                type: cell.type,
+                source_preview: (cell.source ?? '').slice(0, 200),
+                output_count: cell.outputs?.length ?? 0,
+                status: cell.status ?? 'complete',
+              }));
+              // Store notebook in session for later cell_load requests
+              const session = sessionManager.getSession(result.sessionId);
+              if (session) {
+                session.notebook = result.notebook;
+              }
+              sendToClient(ws, {
+                type: 'notebook_opened',
+                request_id,
+                notebook_id: result.notebookId,
+                metadata: result.notebook.metadata,
+                cell_stubs: cellStubs,
+                session_id: result.sessionId,
+                workspace_dir: result.workspaceDir,
+                total_cells: totalCells,
+                lazy: true,
+              });
+            } else {
+              // Non-lazy mode: send paginated cells with LZ4 compression
+              const CELL_PAGE_SIZE = 2;
+              const paginatedNotebook = totalCells > CELL_PAGE_SIZE
+                ? { ...result.notebook, cells: result.notebook.cells.slice(-CELL_PAGE_SIZE) }
+                : result.notebook;
+              const notebookJson = JSON.stringify(paginatedNotebook);
+              const compressed = Buffer.from(lz4.compress(Buffer.from(notebookJson, 'utf-8')));
+              sendToClient(ws, {
+                type: 'notebook_opened',
+                request_id,
+                notebook_id: result.notebookId,
+                notebook_compressed: compressed.toString('base64'),
+                compression: 'lz4',
+                session_id: result.sessionId,
+                workspace_dir: result.workspaceDir,
+                total_cells: totalCells,
+              });
+            }
           } catch (err) {
             sendToClient(ws, {
               type: 'notebook_open_error',
               request_id,
+              error: sanitizeErrorForClient(err),
+            });
+          }
+          break;
+        }
+
+        case 'cell_load': {
+          const { request_id, session_id, cell_id } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          try {
+            const session = sessionManager.getSession(session_id);
+            if (!session || !session.notebook) {
+              sendToClient(ws, {
+                type: 'cell_load_error',
+                request_id,
+                cell_id,
+                error: 'Session or notebook not found',
+              });
+              break;
+            }
+            const cell = session.notebook.cells.find((c: { id: string }) => c.id === cell_id);
+            if (!cell) {
+              sendToClient(ws, {
+                type: 'cell_load_error',
+                request_id,
+                cell_id,
+                error: 'Cell not found',
+              });
+              break;
+            }
+            // Compress cell with LZ4 for fast transfer
+            const cellJson = JSON.stringify(cell);
+            const cellBuffer = Buffer.from(cellJson, 'utf-8');
+            const compressed = Buffer.from(lz4.compress(cellBuffer));
+            sendToClient(ws, {
+              type: 'cell_loaded',
+              request_id,
+              session_id, // D1: Include session_id for client-side verification
+              cell_id,
+              cell_compressed: compressed.toString('base64'),
+              compression: 'lz4',
+            });
+          } catch (err) {
+            sendToClient(ws, {
+              type: 'cell_load_error',
+              request_id,
+              cell_id,
               error: sanitizeErrorForClient(err),
             });
           }

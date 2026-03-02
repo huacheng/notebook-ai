@@ -78,6 +78,9 @@ export interface NotebookStore {
   activeNotebookTabId: string | null;
   streamBuffer: Record<string, { text: string; thinking: string }>;
 
+  // ── Cell lazy loading state ────────────────────────────────────────────
+  loadingCellIds: Set<string>;  // cells currently being loaded
+
   // ── Right panel state ─────────────────────────────────────────────────
   rightPanelOpen: boolean;
   rightPanelSplitRatio: number;
@@ -105,9 +108,10 @@ export interface NotebookStore {
 
   // ── Auth actions ───────────────────────────────────────────────────────
   checkAuthStatus(): Promise<void>;
-  login(token: string): Promise<void>;
+  login(email: string, password: string): Promise<void>;
   logout(): void;
   register(username: string, password: string, inviteCode: string): Promise<boolean>;
+  clearAuthError(): void;
 
   // ── Sidebar / history actions ──────────────────────────────────────────
   toggleSidebar(): void;
@@ -196,6 +200,10 @@ export interface NotebookStore {
   setActiveNotebookTab(notebookId: string): void;
   appendStreamDelta(cellId: string, delta: string, blockType: 'text' | 'thinking'): void;
   flushStreamBuffer(cellId: string): string;
+
+  // ── Cell lazy loading actions ──────────────────────────────────────────
+  requestCellLoad(cellId: string): void;
+  replaceCellStub(cellId: string, fullCell: Cell): void;
 
   // ── Right panel actions ───────────────────────────────────────────────
   toggleRightPanel(): void;

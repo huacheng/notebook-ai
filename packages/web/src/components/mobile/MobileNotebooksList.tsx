@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { MobileHeader } from './MobileHeader';
+import { useNotebookActions } from '../../hooks/useNotebookActions';
 
 interface NotebookEntry {
   name: string;
@@ -10,19 +11,27 @@ interface NotebookEntry {
 /**
  * Mobile Notebooks List (Level 2)
  * Shows notebooks in the selected project.
+ *
+ * Uses useNotebookActions hook for unified notebook operations,
+ * ensuring consistency with desktop UI behavior.
  */
 export function MobileNotebooksList() {
   const activeProjectId = useStore((s) => s.activeProjectId);
   const projects = useStore((s) => s.projects);
   const setMobileView = useStore((s) => s.setMobileView);
   const authToken = useStore((s) => s.authToken);
-  const createNotebook = useStore((s) => s.createNotebook);
-  const openNotebookTab = useStore((s) => s.openNotebookTab);
 
   const [notebooks, setNotebooks] = useState<NotebookEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
+
+  // Unified notebook actions hook - same logic as desktop
+  const { openNotebookWithTab, createAndOpenNotebook } = useNotebookActions({
+    onError: (err: Error) => {
+      alert(err.message || 'Failed to perform notebook operation');
+    },
+  });
 
   useEffect(() => {
     if (!activeProjectId) return;
@@ -52,33 +61,12 @@ export function MobileNotebooksList() {
   };
 
   const handleNotebookClick = async (nb: NotebookEntry) => {
-    if (!activeProjectId) return;
-
     try {
-      const res = await fetch(`/api/projects/${activeProjectId}/notebooks/open`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ path: nb.path }),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      openNotebookTab(
-        data.notebook.id,
-        data.notebook,
-        data.sessionId,
-        data.workspaceDir
-      );
+      // Use unified hook - same as desktop
+      await openNotebookWithTab(nb.path);
       setMobileView('notebook');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to open notebook');
+    } catch {
+      // Error already handled by onError callback
     }
   };
 
@@ -88,32 +76,11 @@ export function MobileNotebooksList() {
     const title = prompt('Notebook name:');
     if (title?.trim()) {
       try {
-        const { sessionId, notebookPath } = await createNotebook(
-          activeProjectId,
-          title.trim()
-        );
-        // Fetch the notebook data
-        const res = await fetch(`/api/projects/${activeProjectId}/notebooks/open`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
-          body: JSON.stringify({ path: notebookPath }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          openNotebookTab(
-            data.notebook.id,
-            data.notebook,
-            sessionId,
-            data.workspaceDir
-          );
-          setMobileView('notebook');
-        }
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to create notebook');
+        // Use unified hook - same as desktop
+        await createAndOpenNotebook(activeProjectId, title.trim());
+        setMobileView('notebook');
+      } catch {
+        // Error already handled by onError callback
       }
     }
   };

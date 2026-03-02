@@ -401,7 +401,7 @@ export function createNotebooksRouter(
 
       db.updateNotebook(notebookId, { updated_at: new Date().toISOString() });
 
-      const CELL_PAGE_SIZE = 5;
+      const CELL_PAGE_SIZE = 2;
       const totalCells = notebook.cells.length;
       const paginatedNotebook = totalCells > CELL_PAGE_SIZE
         ? { ...notebook, cells: notebook.cells.slice(-CELL_PAGE_SIZE) }

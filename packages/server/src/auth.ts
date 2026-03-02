@@ -22,9 +22,11 @@ interface FailRecord {
 const failMap = new Map<string, FailRecord>();
 
 /** Base lockout in ms after first failure. Doubles each subsequent failure. */
-const BASE_LOCKOUT_MS = 60_000;
+export const BASE_LOCKOUT_MS = 60_000;
+/** Base lockout in seconds (for display/sharing with frontend). */
+export const BASE_LOCKOUT_SEC = BASE_LOCKOUT_MS / 1000;
 /** Max lockout cap: 30 minutes. */
-const MAX_LOCKOUT_MS = 30 * 60_000;
+export const MAX_LOCKOUT_MS = 30 * 60_000;
 
 export function getClientIp(req: Request): string {
   if (TRUST_PROXY) {

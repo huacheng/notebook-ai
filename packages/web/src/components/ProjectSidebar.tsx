@@ -409,7 +409,7 @@ function FileBrowser() {
         if (ws && ws.readyState === WebSocket.OPEN) {
           const requestId = crypto.randomUUID();
           const opened = await new Promise<any>((resolve, reject) => {
-            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 10_000);
+            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 180_000);
             function onOpened(e: Event) {
               const d = (e as CustomEvent).detail;
               if (d.request_id === requestId) { cleanup(); resolve(d); }

@@ -5,6 +5,8 @@ import { MobileDrawer } from './MobileDrawer';
 import { MobileInputBar } from './MobileInputBar';
 import { MobileFileViewer } from './MobileFileViewer';
 import { MobileSplitView } from './MobileSplitView';
+import { MobileModelSheet } from './MobileModelSheet';
+import { MobilePluginSheet } from './MobilePluginSheet';
 import { Cell } from '../Cell';
 import { useOrientation } from '../../hooks/useOrientation';
 
@@ -71,19 +73,32 @@ export function MobileNotebookView() {
         showLeftMenu
         showRightMenu
         rightContent={
-          <button
-            className="mobile-settings-btn"
-            onClick={() => useStore.getState().openModelPanel()}
-            aria-label="Settings"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+          <>
+            {/* Plugin button */}
+            <button
+              className="mobile-header-btn"
+              onClick={() => useStore.getState().openPluginPanel()}
+              aria-label="Plugins"
+            >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+              </svg>
+            </button>
+            {/* Model button */}
+            <button
+              className="mobile-header-btn"
+              onClick={() => useStore.getState().openModelPanel()}
+              aria-label="Model"
+            >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </>
         }
       />
 
@@ -142,6 +157,10 @@ export function MobileNotebookView() {
 
       {/* Input bar */}
       <MobileInputBar />
+
+      {/* Bottom sheets */}
+      <MobileModelSheet />
+      <MobilePluginSheet />
     </div>
   );
 }

@@ -357,6 +357,15 @@ export const NotebookOpenSchema = z.object({
   type: z.literal('notebook_open'),
   request_id: z.string(),
   path: z.string(),
+  lazy: z.boolean().optional(), // If true, return cell stubs instead of full cells
+});
+
+// Client → Server: load single cell (for lazy loading)
+export const CellLoadSchema = z.object({
+  type: z.literal('cell_load'),
+  request_id: z.string(),
+  session_id: z.string(),
+  cell_id: z.string(),
 });
 
 // Client → Server: watch subscribe/unsubscribe (file & git change notifications)
@@ -445,6 +454,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   WatchSubscribeSchema,
   WatchUnsubscribeSchema,
   NotebookOpenSchema,
+  CellLoadSchema,
   GitLogRequestSchema,
   GitCommitFilesRequestSchema,
   GitDiffRequestSchema,
@@ -661,19 +671,50 @@ export const SystemMessageSchema = z.object({
 });
 
 // Server → Client: notebook open responses
+// Supports both compressed notebook (gzip) and lazy mode (cell_stubs)
+export const CellStubSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  source_preview: z.string(),
+  output_count: z.number().int().nonnegative(),
+  status: z.string(),
+});
+
 export const NotebookOpenedSchema = z.object({
   type: z.literal('notebook_opened'),
   request_id: z.string(),
   notebook_id: z.string(),
-  notebook: NotebookSchema,
   session_id: z.string(),
   workspace_dir: z.string(),
   total_cells: z.number().int().nonnegative(),
+  // Non-lazy mode: compressed notebook
+  notebook: NotebookSchema.optional(),
+  notebook_compressed: z.string().optional(), // gzip + base64
+  // Lazy mode: metadata + stubs
+  metadata: z.record(z.unknown()).optional(),
+  cell_stubs: z.array(CellStubSchema).optional(),
+  lazy: z.boolean().optional(),
 });
 
 export const NotebookOpenErrorSchema = z.object({
   type: z.literal('notebook_open_error'),
   request_id: z.string(),
+  error: z.string(),
+});
+
+// Server → Client: cell load responses (for lazy loading)
+export const CellLoadedSchema = z.object({
+  type: z.literal('cell_loaded'),
+  request_id: z.string(),
+  cell_id: z.string(),
+  cell_compressed: z.string(), // LZ4 + base64
+  compression: z.literal('lz4'),
+});
+
+export const CellLoadErrorSchema = z.object({
+  type: z.literal('cell_load_error'),
+  request_id: z.string(),
+  cell_id: z.string(),
   error: z.string(),
 });
 
@@ -788,6 +829,8 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   FilesChangedSchema,
   NotebookOpenedSchema,
   NotebookOpenErrorSchema,
+  CellLoadedSchema,
+  CellLoadErrorSchema,
   GitLogResponseSchema,
   GitLogErrorSchema,
   GitCommitFilesResponseSchema,

@@ -1279,6 +1279,45 @@ textarea.cell-input {
   border-color: #16a34a;
 }
 
+/* ── Lazy loading: cell stub styles ─────────────────────── */
+.cell--stub {
+  min-height: 80px;
+}
+
+.cell-stub-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.cell-stub-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cell-stub-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: cell-stub-spin 0.8s linear infinite;
+}
+
+@keyframes cell-stub-spin {
+  to { transform: rotate(360deg); }
+}
+
+.cell-stub-preview {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 /* ── Prompt row: right-aligned bubble ───────────────────── */
 .cell-prompt-row {
   display: flex;
@@ -6536,7 +6575,8 @@ button:focus-visible {
 
 .mobile-back-btn,
 .mobile-menu-btn,
-.mobile-settings-btn {
+.mobile-settings-btn,
+.mobile-header-btn {
   width: var(--mobile-touch-target);
   height: var(--mobile-touch-target);
   display: flex;
@@ -6552,7 +6592,8 @@ button:focus-visible {
 
 .mobile-back-btn:hover,
 .mobile-menu-btn:hover,
-.mobile-settings-btn:hover {
+.mobile-settings-btn:hover,
+.mobile-header-btn:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -7001,6 +7042,49 @@ button:focus-visible {
 
 .mobile-sheet-cancel:hover {
   background: var(--bg-cell-hover);
+}
+
+.mobile-sheet-content {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.mobile-sheet-loading,
+.mobile-sheet-empty {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.mobile-sheet-hint {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: var(--space-sm);
+}
+
+.mobile-sheet-plugin {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.mobile-sheet-plugin:last-child {
+  border-bottom: none;
+}
+
+.mobile-sheet-plugin-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.mobile-sheet-plugin-version {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-output);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── Mobile File Viewer ──────────────────────────────────────────────────── */

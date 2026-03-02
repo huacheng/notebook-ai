@@ -3,6 +3,7 @@ import type { WSServerMessage } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 import type { Command } from '../mention/types';
 import DOMPurify from 'dompurify';
+import * as lz4 from 'lz4js';
 import { applyToSession } from './wsRouting';
 import {
   appendOutputToNotebook,
@@ -146,7 +147,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (_pendingWs === ws) _pendingWs = null;
       if (get().ws === ws) {
         stopPing();
-        set({ wsStatus: 'disconnected', ws: null, latency: null });
+        // D3: Clear loadingCellIds on disconnect to avoid stuck loading states
+        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>() });
       }
     };
 
@@ -378,12 +380,65 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           window.dispatchEvent(new CustomEvent('nb:files-changed', { detail: parsed }));
           break;
         }
-        case 'notebook_opened':
-          window.dispatchEvent(new CustomEvent('nb:notebook-opened', { detail: parsed }));
+        case 'notebook_opened': {
+          // Decompress notebook if compressed (LZ4)
+          const detail = { ...parsed } as Record<string, unknown>;
+          if (detail.notebook_compressed && typeof detail.notebook_compressed === 'string') {
+            try {
+              const compressed = Uint8Array.from(atob(detail.notebook_compressed), c => c.charCodeAt(0));
+              const decompressed = lz4.decompress(compressed);
+              const text = new TextDecoder().decode(decompressed);
+              detail.notebook = JSON.parse(text);
+              delete detail.notebook_compressed;
+              delete detail.compression;
+            } catch (e) {
+              console.error('[ws] Failed to decompress notebook:', e);
+            }
+          }
+          window.dispatchEvent(new CustomEvent('nb:notebook-opened', { detail }));
           break;
+        }
         case 'notebook_open_error':
           window.dispatchEvent(new CustomEvent('nb:notebook-open-error', { detail: parsed }));
           break;
+        case 'cell_loaded': {
+          // D1: Verify session_id matches before processing
+          const { cell_id, cell_compressed, session_id: loadedSessionId } = parsed as {
+            cell_id: string;
+            cell_compressed: string;
+            session_id?: string;
+          };
+          // Skip if session doesn't match (stale response from different session)
+          if (loadedSessionId && loadedSessionId !== store.sessionId) break;
+
+          try {
+            const compressed = Uint8Array.from(atob(cell_compressed), c => c.charCodeAt(0));
+            const decompressed = lz4.decompress(compressed);
+            const text = new TextDecoder().decode(decompressed);
+            const fullCell = JSON.parse(text);
+            store.replaceCellStub(cell_id, fullCell);
+          } catch (e) {
+            console.error('[ws] Failed to decompress cell:', e);
+            // D3: Clean up loadingCellIds on decompression failure
+            set(state => {
+              const newLoadingIds = new Set(state.loadingCellIds);
+              newLoadingIds.delete(cell_id);
+              return { loadingCellIds: newLoadingIds };
+            });
+          }
+          break;
+        }
+        case 'cell_load_error': {
+          const { cell_id } = parsed as { cell_id: string };
+          // Remove from loading set on error
+          set(state => {
+            const newLoadingIds = new Set(state.loadingCellIds);
+            newLoadingIds.delete(cell_id);
+            return { loadingCellIds: newLoadingIds };
+          });
+          console.error('[ws] cell_load_error:', parsed);
+          break;
+        }
         case 'git_log_response':
           window.dispatchEvent(new CustomEvent('nb:git-log-response', { detail: parsed }));
           break;

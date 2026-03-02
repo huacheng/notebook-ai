@@ -18,6 +18,7 @@
     "docx-preview": "^0.3.7",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",
+    "lz4js": "^0.2.0",
     "mermaid": "^11.12.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -3,6 +3,7 @@ import type { Cell as CellData } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
 import { MarkdownBody } from './MarkdownBody';
 import { useT } from '../i18n';
+import { useCellLazyLoad, isCellStub, type CellStub } from '../hooks/useCellLazyLoad';
 
 // ── Status indicator (non-running states only) ──────────────────────────────
 
@@ -32,12 +33,17 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
   const t = useT();
   if (cell.type !== 'prompt') return null;
 
+  // Lazy loading: detect if cell is a stub
+  const isStub = isCellStub(cell);
+  const { ref, isLoading } = useCellLazyLoad(cell.id, isStub);
+
   const execNum = cell.execution_count || index + 1;
-  const hasResponse = cell.outputs.length > 0 || cell.status === 'running';
+  const hasResponse = !isStub && (cell.outputs.length > 0 || cell.status === 'running');
 
   return (
     <div
-      className={`cell${pendingDelete ? ' cell--pending-delete' : ''}`}
+      ref={ref}
+      className={`cell${pendingDelete ? ' cell--pending-delete' : ''}${isStub ? ' cell--stub' : ''}`}
       data-cell-id={cell.id}
     >
       {editMode && (
@@ -56,6 +62,19 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
         <span className="cell-index">[{execNum}]</span>
         <MarkdownBody content={cell.source} className="cell-prompt-source" />
       </div>
+
+      {/* ── Stub loading indicator ── */}
+      {isStub && (
+        <div className="cell-stub-indicator">
+          {isLoading ? (
+            <span className="cell-stub-loading">Loading...</span>
+          ) : (
+            <span className="cell-stub-preview">
+              {(cell as CellStub).output_count > 0 && `${(cell as CellStub).output_count} outputs`}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Divider ── */}
       {hasResponse && <div className="cell-response-divider" />}
