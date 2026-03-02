@@ -425,8 +425,9 @@ function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone 
   );
 }
 
-function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted }: {
-  projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; onClose: () => void; onDeleted?: () => void;
+function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted, onRequestRename }: {
+  projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean;
+  onClose: () => void; onDeleted?: () => void; onRequestRename?: () => void;
 }) {
   const t = useT();
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
@@ -462,6 +463,7 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
   return (
     <>
       <div className="project-item-menu" ref={menuRef}>
+        {onRequestRename && <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>}
         {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
         <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>{t('sidebar.delete')}</button>
       </div>
@@ -496,6 +498,7 @@ function FileBrowser() {
   const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
   const [nbCreateError, setNbCreateError] = useState('');
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
+  const [nbRenameTarget, setNbRenameTarget] = useState<{ path: string; name: string } | null>(null);
   const [currentSubPath, setCurrentSubPath] = useState('.');
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
   const nbImportRef = useRef<HTMLInputElement>(null);
@@ -652,6 +655,7 @@ function FileBrowser() {
     if (!isNbDir && !isNbFile) return null;
     const relPath = (file as any).worktreePath
       || (subPath === '.' ? file.name : `${subPath}/${file.name}`);
+    const displayName = file.name.replace('.notebook.json', '').replace(/^task-/, '');
     return (
       <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
         <button
@@ -668,6 +672,7 @@ function FileBrowser() {
             showExport={isNbDir}
             onClose={() => setNbMenuPath(null)}
             onDeleted={() => setFileRefreshKey(k => k + 1)}
+            onRequestRename={() => setNbRenameTarget({ path: relPath, name: displayName })}
           />
         )}
       </div>
@@ -744,6 +749,36 @@ function FileBrowser() {
             />
           )}
         </>
+      )}
+
+      {/* Notebook rename modal */}
+      {nbRenameTarget && activeProjectId && (
+        <RenameModal
+          currentName={nbRenameTarget.name}
+          label="Notebook"
+          onCancel={() => setNbRenameTarget(null)}
+          onConfirm={async (newName) => {
+            const res = await fetch(`/api/projects/${activeProjectId}/notebooks/rename`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+              },
+              body: JSON.stringify({
+                notebookPath: `${activeProjectPath}/${nbRenameTarget.path}`,
+                title: newName,
+              }),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || 'Failed to rename');
+            }
+          }}
+          onDone={() => {
+            setNbRenameTarget(null);
+            setFileRefreshKey(k => k + 1);
+          }}
+        />
       )}
     </div>
   );
