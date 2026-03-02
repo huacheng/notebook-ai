@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { MentionPlugin, MentionState } from '../mention/types';
 
 interface Props<T> {
@@ -20,22 +21,26 @@ export function MentionPopup<T>({ state, position, onSelect }: Props<T>) {
 
   const plugin = state.plugin as MentionPlugin<T>;
 
-  // Position popup above the cursor position
-  // Use fixed positioning - popup appears above the caret
-  const popupHeight = 240; // max-height from CSS
-  const lineHeight = 24; // approximate line height
-  const style: React.CSSProperties = position.x > 0 && position.y > 0
+  // Position popup above the input bar
+  // Find the input bar to anchor the popup
+  const inputBar = document.querySelector('.notebook-input-bar');
+  const inputBarRect = inputBar?.getBoundingClientRect();
+
+  // Calculate position: above the input bar, aligned with caret x position
+  const style: React.CSSProperties = inputBarRect
     ? {
-        left: Math.max(8, Math.min(position.x, window.innerWidth - 220)),
-        top: Math.max(8, position.y - popupHeight - lineHeight),
+        left: Math.max(8, Math.min(position.x || 24, window.innerWidth - 420)),
+        bottom: window.innerHeight - inputBarRect.top + 8,
       }
     : {
-        // Fallback: position at left edge, near bottom
+        // Fallback: position at left edge, above bottom
         left: 24,
-        bottom: 140,
+        bottom: 160,
       };
 
-  return (
+  // Use portal to render outside of notebook-input-bar's backdrop-filter context
+  // (backdrop-filter creates a new containing block, breaking position: fixed)
+  return createPortal(
     <div
       className="mention-popup"
       style={style}
@@ -67,6 +72,7 @@ export function MentionPopup<T>({ state, position, onSelect }: Props<T>) {
           </div>
         ))
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

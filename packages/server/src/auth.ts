@@ -386,7 +386,7 @@ export function handleVerify(req: Request, res: Response): void {
 
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    recordFailure(ip);
+    // Don't record failure for missing/invalid token - this is normal after service restart
     res.status(401).json({ ok: false });
     return;
   }
@@ -394,12 +394,11 @@ export function handleVerify(req: Request, res: Response): void {
   const token = authHeader.slice(7);
   const session = validateSessionToken(token);
   if (!session) {
-    recordFailure(ip);
+    // Don't record failure for expired/invalid token - this is normal after service restart
     res.status(401).json({ ok: false });
     return;
   }
 
-  clearFailures(ip);
   res.json({ ok: true, userId: session.userId, email: session.email });
 }
 
@@ -419,7 +418,7 @@ export function handleWsTicket(req: Request, res: Response): void {
 
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    recordFailure(ip);
+    // Don't record failure - token absence is normal after logout/service restart
     res.status(401).json({ error: 'Authorization required.' });
     return;
   }
@@ -427,12 +426,11 @@ export function handleWsTicket(req: Request, res: Response): void {
   const token = authHeader.slice(7);
   const session = validateSessionToken(token);
   if (!session) {
-    recordFailure(ip);
+    // Don't record failure - expired token is normal after service restart
     res.status(401).json({ error: 'Invalid or expired token.' });
     return;
   }
 
-  clearFailures(ip);
   res.json({ ticket: createWsTicket(session.userId) });
 }
 
