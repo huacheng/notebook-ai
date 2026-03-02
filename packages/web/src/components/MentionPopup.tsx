@@ -25,7 +25,7 @@ export function MentionPopup<T>({ state, position, onSelect }: Props<T>) {
       className="mention-popup"
       style={{
         left: position.x,
-        top: position.y + 20,
+        bottom: `calc(100vh - ${position.y}px + 8px)`,
       }}
       ref={listRef}
     >

@@ -397,6 +397,27 @@ function NotebookInputBar() {
           <button className="nb-suggestion-dismiss" onClick={() => clearPendingSuggestions()}>×</button>
         </div>
       )}
+      <div className="nb-cmd-toolbar">
+        {[
+          { cmd: 'task-ai:target', icon: '🎯' },
+          { cmd: 'task-ai:research', icon: '🔍' },
+          { cmd: 'task-ai:read', icon: '📖' },
+          { cmd: 'task-ai:library', icon: '📚' },
+        ].map(({ cmd, icon }) => (
+          <button
+            key={cmd}
+            className="nb-cmd-btn"
+            title={t(`cmd.${cmd}`)}
+            disabled={disabled}
+            onClick={() => {
+              setText((prev) => prev ? `${prev}\n/${cmd} ` : `/${cmd} `);
+              textareaRef.current?.focus();
+            }}
+          >
+            {icon} <span className="nb-cmd-name">/{cmd.split(':')[1]}</span>
+          </button>
+        ))}
+      </div>
       <div className="notebook-input-row">
         <input
           ref={fileInputRef}
