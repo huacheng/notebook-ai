@@ -529,6 +529,11 @@ export function FileSection({
           {/* Entries */}
           {!loading && files.map((f) => {
             const isNbDir = f.type === 'directory' && f.isNotebook;
+            const isNbFile = f.name.endsWith('.notebook.json');
+            // Strip task- prefix and .notebook.json suffix for notebook display names
+            const displayName = (isNbDir || isNbFile)
+              ? f.name.replace('.notebook.json', '').replace(/^task-/, '')
+              : f.name;
             return f.type === 'directory' ? (
             <div key={f.name} className="fp-entry fp-entry-dir" data-tooltip={f.name} onClick={async () => {
               const meta = { isNotebook: isNbDir || undefined, worktreePath: f.worktreePath };
@@ -539,7 +544,7 @@ export function FileSection({
               navigateInto(f.worktreePath || f.name);
             }}>
               {isNbDir ? <FileIcon name={`${f.name}.notebook.json`} /> : <IconFolder />}
-              <span className="fp-name">{f.name}</span>
+              <span className="fp-name">{displayName}</span>
               {isNbDir && <TypeBadge name={`${f.name}.notebook.json`} />}
               {renderItemActions?.(f, subPath) ?? (
                 !isReadOnly && !noDeleteFilter?.(f.name, subPath) && (
@@ -566,7 +571,7 @@ export function FileSection({
               onClick={() => onFileClick?.(subPath, f.name)}
               style={{ cursor: onFileClick ? 'pointer' : undefined }}
             >
-              <span className="fp-name">{f.name}</span>
+              <span className="fp-name">{displayName}</span>
               <FileIcon name={f.name} />
               {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions">

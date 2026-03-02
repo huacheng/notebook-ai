@@ -81,6 +81,198 @@ export function createProjectsRouter(
     res.json(project);
   });
 
+  // Rename project
+  router.patch('/:projectId', (req, res) => {
+    const { title } = req.body;
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'title required' });
+    }
+
+    const project = db.getProject(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project not found' });
+
+    const updated = db.updateProject(req.params.projectId, { title: title.trim() });
+    if (!updated) {
+      return res.status(500).json({ error: 'Failed to update project' });
+    }
+
+    res.json(updated);
+  });
+
+  // List notebooks within project
+  router.get('/:projectId/notebooks', async (req, res) => {
+    try {
+      const project = db.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: 'project not found' });
+
+      const worktreesDir = path.join(project.path, '.worktrees');
+      const notebooks: { id: string | null; name: string; path: string }[] = [];
+
+      // Check if .worktrees directory exists
+      if (existsSync(worktreesDir)) {
+        const entries = await readdir(worktreesDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+
+          const worktreePath = path.join(worktreesDir, entry.name);
+          // Find .notebook.json file in the worktree
+          const worktreeFiles = await readdir(worktreePath);
+          const notebookFile = worktreeFiles.find((f) => f.endsWith('.notebook.json'));
+
+          if (notebookFile) {
+            // Extract name from filename (remove .notebook.json suffix)
+            const name = notebookFile.replace('.notebook.json', '');
+            const notebookPath = path.join(worktreePath, notebookFile);
+            // Look up notebook ID from database
+            const dbNotebook = db.getNotebookByPath(notebookPath);
+            notebooks.push({
+              id: dbNotebook?.id ?? null,
+              name,
+              path: notebookPath,
+            });
+          }
+        }
+      }
+
+      res.json({ notebooks });
+    } catch (err: unknown) {
+      console.error('[projects] Error listing notebooks:', err);
+      res.status(500).json({ error: 'Internal server error.' });
+    }
+  });
+
+  // Rename notebook by path (with worktree directory and branch sync)
+  router.patch('/:projectId/notebooks/rename', async (req, res) => {
+    try {
+      const project = db.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ error: 'project not found' });
+
+      const { notebookPath, title } = req.body as { notebookPath?: string; title?: string };
+      if (!notebookPath || typeof notebookPath !== 'string') {
+        return res.status(400).json({ error: 'notebookPath required' });
+      }
+      if (!title || typeof title !== 'string' || !title.trim()) {
+        return res.status(400).json({ error: 'title required' });
+      }
+
+      // Resolve the full path and validate it's within the project
+      const fullPath = path.isAbsolute(notebookPath)
+        ? notebookPath
+        : path.join(project.path, notebookPath);
+
+      if (!fullPath.startsWith(project.path)) {
+        return res.status(400).json({ error: 'Invalid path' });
+      }
+
+      // Find the .notebook.json file and its parent directory
+      let notebookFilePath: string;
+      let worktreeDir: string | null = null;
+      const stats = await stat(fullPath).catch(() => null);
+      if (!stats) {
+        return res.status(404).json({ error: 'Path not found' });
+      }
+
+      if (stats.isDirectory()) {
+        // Find .notebook.json in the directory
+        const files = await readdir(fullPath);
+        const nbFile = files.find((f) => f.endsWith('.notebook.json'));
+        if (!nbFile) {
+          return res.status(404).json({ error: 'No notebook found in directory' });
+        }
+        notebookFilePath = path.join(fullPath, nbFile);
+        worktreeDir = fullPath;
+      } else if (fullPath.endsWith('.notebook.json')) {
+        notebookFilePath = fullPath;
+        worktreeDir = path.dirname(fullPath);
+      } else {
+        return res.status(400).json({ error: 'Not a notebook path' });
+      }
+
+      // Look up notebook in database
+      const dbNotebook = db.getNotebookByPath(notebookFilePath);
+
+      // Compute new slug and paths
+      const newSlug = titleToSlug(title.trim());
+      const newNotebookFileName = `${newSlug}.notebook.json`;
+
+      // Check if this is a worktree directory (under .worktrees/task-xxx)
+      const worktreesBase = path.join(project.path, '.worktrees');
+      const isWorktree = worktreeDir && worktreeDir.startsWith(worktreesBase);
+      const oldWorktreeName = worktreeDir ? path.basename(worktreeDir) : null;
+      const newWorktreeName = `task-${newSlug}`;
+
+      let newWorktreeDir = worktreeDir;
+      let newNotebookFilePath = path.join(worktreeDir || path.dirname(notebookFilePath), newNotebookFileName);
+
+      // If worktree directory name changes, rename it
+      if (isWorktree && oldWorktreeName && oldWorktreeName !== newWorktreeName) {
+        const newWorktreePath = path.join(worktreesBase, newWorktreeName);
+
+        // Check if target already exists
+        if (existsSync(newWorktreePath)) {
+          return res.status(409).json({ error: `Notebook "${title}" already exists in this project` });
+        }
+
+        // Rename worktree directory using git worktree move
+        const git = new GitManager(project.path);
+        await git.moveWorktree(worktreeDir!, newWorktreePath);
+        newWorktreeDir = newWorktreePath;
+
+        // Update notebook file path to new location
+        newNotebookFilePath = path.join(newWorktreePath, newNotebookFileName);
+
+        // Rename git branch if it follows task/{slug} pattern
+        const oldBranchName = `task/${oldWorktreeName.replace(/^task-/, '')}`;
+        const newBranchName = `task/${newSlug}`;
+        try {
+          await git.renameBranch(oldBranchName, newBranchName);
+        } catch {
+          // Branch might not exist or have different name, ignore
+        }
+      }
+
+      // Rename the .notebook.json file within the (possibly moved) directory
+      const currentNotebookPath = isWorktree && newWorktreeDir !== worktreeDir
+        ? path.join(newWorktreeDir!, path.basename(notebookFilePath))
+        : notebookFilePath;
+
+      if (newNotebookFilePath !== currentNotebookPath) {
+        const { rename } = await import('fs/promises');
+        await rename(currentNotebookPath, newNotebookFilePath);
+      }
+
+      // Update database if notebook exists there
+      if (dbNotebook) {
+        const updates: { title: string; notebook_path: string; workspace_dir?: string; slug?: string } = {
+          title: title.trim(),
+          notebook_path: newNotebookFilePath,
+        };
+        if (isWorktree && newWorktreeDir !== worktreeDir) {
+          updates.workspace_dir = newWorktreeDir!;
+          updates.slug = newSlug;
+        }
+        db.updateNotebook(dbNotebook.id, updates);
+
+        // Update active session if any
+        const activeSession = db.getActiveSession(dbNotebook.id);
+        if (activeSession) {
+          const session = sessionManager.getSession(activeSession.tmux_session);
+          if (session) {
+            session.notebookPath = newNotebookFilePath;
+            if (isWorktree && newWorktreeDir !== worktreeDir) {
+              session.cwd = newWorktreeDir!;
+            }
+          }
+        }
+      }
+
+      res.json({ success: true, newPath: newNotebookFilePath, newWorktreeDir });
+    } catch (err: unknown) {
+      console.error('[projects] Error renaming notebook:', err);
+      res.status(500).json({ error: 'Internal server error.' });
+    }
+  });
+
   // Create notebook within project
   router.post('/:projectId/notebooks', async (req, res) => {
     try {

@@ -133,10 +133,11 @@ export class NotebookDb {
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_notebooks_project_id ON notebooks(project_id)`);
 
     // ── Users & Invite Codes (multi-user support) ─────────────────────────────
+    // First create tables with new schema (or they already exist with old schema)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id            TEXT PRIMARY KEY,
-        username      TEXT NOT NULL UNIQUE,
+        email         TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         status        TEXT DEFAULT 'active',
         created_at    TEXT NOT NULL
@@ -151,9 +152,16 @@ export class NotebookDb {
         expires_at    TEXT
       );
 
-      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
       CREATE INDEX IF NOT EXISTS idx_invite_codes_expires ON invite_codes(expires_at);
     `);
+
+    // Migration: rename username to email if old schema exists (BEFORE creating email index)
+    try {
+      this.db.exec(`ALTER TABLE users RENAME COLUMN username TO email`);
+    } catch (_err: unknown) { /* column already named email or doesn't exist */ }
+
+    // Now create email index (safe after migration)
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
   }
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────
@@ -183,8 +191,8 @@ export class NotebookDb {
     ).all('active') as NotebookRow[];
   }
 
-  updateNotebook(id: string, updates: Partial<Pick<NotebookRow, 'title' | 'slug' | 'notebook_path' | 'status' | 'cell_count' | 'updated_at'>>): NotebookRow | undefined {
-    const ALLOWED = new Set(['title', 'slug', 'notebook_path', 'status', 'cell_count', 'updated_at']);
+  updateNotebook(id: string, updates: Partial<Pick<NotebookRow, 'title' | 'slug' | 'notebook_path' | 'workspace_dir' | 'status' | 'cell_count' | 'updated_at'>>): NotebookRow | undefined {
+    const ALLOWED = new Set(['title', 'slug', 'notebook_path', 'workspace_dir', 'status', 'cell_count', 'updated_at']);
     const fields: string[] = [];
     const values: Record<string, unknown> = { id };
 

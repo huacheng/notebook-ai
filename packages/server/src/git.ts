@@ -128,6 +128,16 @@ export class GitManager {
     await this.git.raw(['worktree', 'remove', path, '--force']);
   }
 
+  /** Move a git worktree to a new path */
+  async moveWorktree(oldPath: string, newPath: string): Promise<void> {
+    await this.git.raw(['worktree', 'move', oldPath, newPath]);
+  }
+
+  /** Rename a git branch */
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    await this.git.raw(['branch', '-m', oldName, newName]);
+  }
+
   /** Stage all files and commit with the given message */
   async commitAll(message: string): Promise<void> {
     await this.git.add('-A');

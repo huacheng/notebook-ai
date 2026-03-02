@@ -3196,6 +3196,12 @@ textarea.cell-input {
   font-family: var(--font-sans);
 }
 
+/* Hide browser's native password reveal button (Edge/Chrome) */
+.login-input::-ms-reveal,
+.login-input::-ms-clear {
+  display: none;
+}
+
 .login-input-wrap {
   position: relative;
   display: flex;
@@ -6680,6 +6686,44 @@ button:focus-visible {
   color: var(--text-secondary);
   font-size: 20px;
   margin-left: var(--space-sm);
+}
+
+.mobile-list-item-wrapper {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.mobile-list-item-wrapper .mobile-list-item {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-list-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.mobile-list-edit-btn:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mobile-list-edit-btn:active {
+  background: rgba(14, 165, 233, 0.15);
 }
 
 /* ── Mobile Footer ───────────────────────────────────────────────────────── */
