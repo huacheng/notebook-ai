@@ -212,6 +212,12 @@ export const messages: Record<Language, Record<string, string>> = {
     'sidebar.deleted': '{0} deleted',
     'sidebar.deleteFailed': 'Delete Failed',
     'sidebar.close': 'Close',
+    'sidebar.rename': 'Rename',
+    'sidebar.renameLabel': 'Rename {0}',
+    'sidebar.renaming': 'Renaming {0}...',
+    'sidebar.renamed': '{0} renamed',
+    'sidebar.renameFailed': 'Rename Failed',
+    'sidebar.newName': 'New name',
 
     // ── RightPanel / Deliverables ─────────────────────────────────────────
     'deliverables.title': 'Deliverables',
@@ -471,6 +477,12 @@ export const messages: Record<Language, Record<string, string>> = {
     'sidebar.deleted': '{0} 已删除',
     'sidebar.deleteFailed': '删除失败',
     'sidebar.close': '关闭',
+    'sidebar.rename': '重命名',
+    'sidebar.renameLabel': '重命名 {0}',
+    'sidebar.renaming': '正在重命名 {0}...',
+    'sidebar.renamed': '{0} 已重命名',
+    'sidebar.renameFailed': '重命名失败',
+    'sidebar.newName': '新名称',
 
     // ── RightPanel / Deliverables ─────────────────────────────────────────
     'deliverables.title': '交付物',
