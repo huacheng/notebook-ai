@@ -9,6 +9,7 @@ import { MentionPopup } from '../MentionPopup';
 import { SlashCommandPlugin } from '../../mention/SlashCommandPlugin';
 import { FileTreePlugin } from '../../mention/FileTreePlugin';
 import { CellRefPlugin } from '../../mention/CellRefPlugin';
+import { createHistoryPlugin, saveToHistory } from '../../mention/HistoryPlugin';
 import type { MentionPlugin } from '../../mention/types';
 
 interface UploadStatus {
@@ -50,8 +51,9 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
-  // Mention system with all three triggers: / @ #
-  const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin] as MentionPlugin<unknown>[], []);
+  // Mention system with all triggers: / @ # and /history
+  const historyPlugin = useMemo(() => createHistoryPlugin(), []);
+  const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin, historyPlugin] as MentionPlugin<unknown>[], [historyPlugin]);
   const mention = useMention(plugins);
   const [caretPos, setCaretPos] = useState({ x: 0, y: 0 });
 
@@ -120,6 +122,8 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   function handleRun() {
     const source = text.trim();
     if ((!source && images.length === 0) || isRunning) return;
+    // Save to prompt history before submitting
+    if (source) saveToHistory(source);
     const imgs = images.length > 0
       ? images.map(({ media_type, data }) => ({ media_type, data }))
       : undefined;

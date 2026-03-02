@@ -6516,6 +6516,35 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.mention-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.mention-history-item:hover,
+.mention-history-item.selected {
+  background: var(--color-primary-light);
+}
+
+.mention-history-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.mention-history-time {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 /* ── Command Toolbar ───────────────────────────────────────────────────────── */
 
 .nb-cmd-toolbar {
