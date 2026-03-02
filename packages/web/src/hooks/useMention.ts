@@ -85,10 +85,11 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
         return true;
 
       case 'Tab':
-      case 'Enter':
-        e.preventDefault();
+      case 'Enter': {
         const item = state.items[state.selectedIndex];
-        if (!item) return true;
+        // If no items match, don't intercept - let Enter key bubble up for form submit
+        if (!item) return false;
+        e.preventDefault();
 
         if (state.plugin.isNavigable?.(item)) {
           // Navigate into directory
@@ -113,6 +114,7 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
           close();
         }
         return true;
+      }
 
       case 'Backspace':
         if (state.query === '' && state.path.length > 0) {
