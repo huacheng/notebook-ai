@@ -25,7 +25,7 @@ arguments:
 
 # /task-ai:highlight — Experience Distillation Engine
 
-Unified protocol for experience and thinking library writes. Defines 7 scopes covering all experience/thinking write operations across the task lifecycle. Also serves as an independent skill for comprehensive distillation (complete) and ad-hoc experience capture (adhoc).
+Unified protocol for experience and thinking library writes. Defines 6 scopes covering all experience/thinking write operations across the task lifecycle. Also serves as an independent skill for comprehensive distillation (complete) and ad-hoc experience capture (adhoc).
 
 ## Usage
 

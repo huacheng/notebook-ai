@@ -2,7 +2,7 @@
 # /task-ai:read implementation
 # Usage: read.sh <file_path> [--depth shallow|deep]
 
-set -uo pipefail
+set -euo pipefail
 
 FILE_PATH="${1:-}"
 DEPTH="shallow"
@@ -41,24 +41,41 @@ CONTENT=$(cat "$FILE_PATH")
 INJECTION_RISK="none"
 FINDINGS="[]"
 
-if grep -qE "eval|btoa" "$FILE_PATH"; then
-    INJECTION_RISK="high"
-    FINDINGS="[\"removed: encoded executable content\"]"
-    CONTENT="[REMOVED: encoded executable content]"
-fi
+# Extended injection detection (10 categories from injection-rules.md)
+INJECTION_PATTERNS=(
+    'eval\s*\('
+    'btoa\s*\('
+    'curl.*\|'
+    'wget.*\|'
+    'LD_PRELOAD='
+    'NODE_OPTIONS='
+    '<system>'
+    'ignore previous'
+    'base64\s+-d'
+    '\\x1b\['
+)
+for pattern in "${INJECTION_PATTERNS[@]}"; do
+    if grep -qE "$pattern" "$FILE_PATH" 2>/dev/null; then
+        INJECTION_RISK="high"
+        FINDINGS="[\"removed: detected injection pattern: $pattern\"]"
+        CONTENT="[REMOVED: potential injection content detected]"
+        break
+    fi
+done
 
-# 4. Library Write Protocol
+# 4. Library Write Protocol (Atomic: .tmp → rename)
 echo "[4/4] Writing to library..."
 mkdir -p "$LIB_PATH/.memory/.references"
 REF_FILE="$LIB_PATH/.memory/.references/$TOPIC.md"
+TMP_FILE="${REF_FILE}.tmp.$$"
 DATE=$(date +%Y-%m-%d)
 
-cat > "$REF_FILE" <<'_TASK_AI_REF_EOF_'
+cat > "$TMP_FILE" <<'_TASK_AI_REF_EOF_'
 ---
 _TASK_AI_REF_EOF_
 
 # Write frontmatter fields separately (variable expansion needed)
-cat >> "$REF_FILE" <<_TASK_AI_REF_EOF_
+cat >> "$TMP_FILE" <<_TASK_AI_REF_EOF_
 topic: $TOPIC
 type: generic
 external: true
@@ -74,7 +91,10 @@ last_verified_at: $DATE
 _TASK_AI_REF_EOF_
 
 # Append content separately to avoid heredoc delimiter collision
-printf '%s\n' "$CONTENT" >> "$REF_FILE"
+printf '%s\n' "$CONTENT" >> "$TMP_FILE"
+
+# Atomic rename
+mv "$TMP_FILE" "$REF_FILE"
 
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") | read | .memory/.references/$TOPIC.md | source:local" >> "$LIB_PATH/.changelog"
 

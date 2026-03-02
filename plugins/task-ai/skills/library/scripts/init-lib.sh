@@ -2,7 +2,7 @@
 # Library Initialization Script
 # Implements: Library Repository Protocol
 
-set -uo pipefail
+set -euo pipefail
 
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 

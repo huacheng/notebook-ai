@@ -3,27 +3,21 @@ import { readFileSync } from 'fs';
 import path from 'path';
 
 describe('Notebook mention integration', () => {
-  it('NotebookInputBar should use useMention hook', () => {
-    const src = readFileSync(
-      path.resolve(__dirname, '../components/Notebook.tsx'),
-      'utf-8',
-    );
+  // After consolidation, InputBar logic lives in shared/InputBar.tsx
+  const src = readFileSync(
+    path.resolve(__dirname, '../components/shared/InputBar.tsx'),
+    'utf-8',
+  );
+
+  it('InputBar should use useMention hook', () => {
     expect(src).toMatch(/useMention/);
   });
 
   it('should render MentionPopup', () => {
-    const src = readFileSync(
-      path.resolve(__dirname, '../components/Notebook.tsx'),
-      'utf-8',
-    );
     expect(src).toMatch(/<MentionPopup/);
   });
 
   it('should include all three plugins', () => {
-    const src = readFileSync(
-      path.resolve(__dirname, '../components/Notebook.tsx'),
-      'utf-8',
-    );
     expect(src).toMatch(/SlashCommandPlugin/);
     expect(src).toMatch(/FileTreePlugin/);
     expect(src).toMatch(/CellRefPlugin/);

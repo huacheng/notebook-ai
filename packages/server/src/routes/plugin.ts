@@ -1,5 +1,5 @@
 import { Router, type IRouter } from 'express';
-import { readFile } from 'fs/promises';
+import { readFile, readdir, writeFile } from 'fs/promises';
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -47,6 +47,74 @@ function execClaude(args: string[]): Promise<{ stdout: string; stderr: string }>
   const env = { ...process.env };
   delete env['CLAUDECODE'];
   return execFile('claude', args, { timeout: 60_000, env });
+}
+
+/**
+ * Compare semver versions. Returns positive if a > b, negative if a < b, 0 if equal.
+ */
+function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map((x) => parseInt(x, 10) || 0);
+  const pb = b.split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] ?? 0;
+    const nb = pb[i] ?? 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+/**
+ * Fix installed_plugins.json after `claude plugin update` to point to the latest cached version.
+ * Workaround for Claude CLI bug that downloads new version but doesn't update version/installPath.
+ */
+async function fixInstalledPluginVersion(pluginKey: string): Promise<void> {
+  const [pluginName, marketplace] = pluginKey.split('@');
+  if (!pluginName || !marketplace) return;
+
+  const base = pluginsDir();
+  const cacheDir = path.join(base, 'cache', marketplace, pluginName);
+  const installedPath = path.join(base, 'installed_plugins.json');
+
+  // Read cached versions
+  let versions: string[];
+  try {
+    versions = await readdir(cacheDir);
+  } catch {
+    return; // No cache directory
+  }
+
+  // Find latest version by reading plugin.json from each
+  let latestVersion: string | null = null;
+  for (const ver of versions) {
+    const pluginJson = await readJson<{ version?: string }>(
+      path.join(cacheDir, ver, 'plugin.json'),
+    );
+    if (pluginJson?.version) {
+      if (!latestVersion || compareSemver(pluginJson.version, latestVersion) > 0) {
+        latestVersion = pluginJson.version;
+      }
+    }
+  }
+
+  if (!latestVersion) return;
+
+  // Read and update installed_plugins.json
+  const installedRaw = await readJson<{ version?: number; plugins?: Record<string, unknown[]> }>(
+    installedPath,
+  );
+  if (!installedRaw || installedRaw.version !== 2 || !installedRaw.plugins) return;
+
+  const entries = installedRaw.plugins[pluginKey] as { version?: string; installPath?: string }[] | undefined;
+  if (!entries || entries.length === 0) return;
+
+  const entry = entries[0];
+  if (entry.version === latestVersion) return; // Already correct
+
+  // Update version and installPath
+  entry.version = latestVersion;
+  entry.installPath = path.join(cacheDir, latestVersion);
+
+  await writeFile(installedPath, JSON.stringify(installedRaw, null, 2));
 }
 
 export function createPluginRouter(): IRouter {
@@ -211,6 +279,8 @@ export function createPluginRouter(): IRouter {
     }
     try {
       await execClaude(['plugin', 'update', pluginKey]);
+      // Workaround: Claude CLI downloads new version but doesn't update version/installPath
+      await fixInstalledPluginVersion(pluginKey);
       res.json({ ok: true });
     } catch (err: unknown) {
       res.status(500).json({ ok: false, error: 'Update plugin failed.' });

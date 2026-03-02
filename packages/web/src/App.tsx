@@ -373,6 +373,7 @@ export default function App() {
   const authLoading = useStore((s) => s.authLoading);
   const checkAuthStatus = useStore((s) => s.checkAuthStatus);
   const login = useStore((s) => s.login);
+  const [showRegister, setShowRegister] = useState(false);
 
   const isMobile = useIsMobile();
 
@@ -393,15 +394,20 @@ export default function App() {
     );
   }
 
-  // Auth required but no token
+  // Auth required but no token — show login or register page
   if (authRequired && !authToken) {
     return (
       <I18nProvider value={t}>
-        <LoginPage
-          onLogin={login}
-          error={authError}
-          loading={authLoading}
-        />
+        {showRegister ? (
+          <RegisterPage onBack={() => setShowRegister(false)} />
+        ) : (
+          <LoginPage
+            onLogin={login}
+            error={authError}
+            loading={authLoading}
+            onRegister={() => setShowRegister(true)}
+          />
+        )}
       </I18nProvider>
     );
   }

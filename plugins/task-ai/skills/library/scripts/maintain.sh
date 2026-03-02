@@ -2,12 +2,12 @@
 # Library Maintain Script
 # Usage: maintain.sh [--rebuild-index] [--rebuild-relations] [--compact]
 
-set -uo pipefail
+set -euo pipefail
 
-# 动态获取脚本所在目录
+# Dynamically resolve script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 允许通过环境变量覆盖脚本路径
+# Allow overriding script paths via environment variables
 REBUILD_INDEX_PY="${REBUILD_INDEX_PY:-$SCRIPT_DIR/rebuild-index.py}"
 REBUILD_RELATIONS_PY="${REBUILD_RELATIONS_PY:-$SCRIPT_DIR/rebuild-relations.py}"
 
@@ -30,9 +30,16 @@ while [[ $# -gt 0 ]]; do
           ARCHIVE_DIR="$LIB_PATH/.changelog-archive"
           mkdir -p "$ARCHIVE_DIR"
           DATE_STR=$(date +%Y-%m)
-          mv "$CHANGELOG" "$ARCHIVE_DIR/$DATE_STR.md"
+          ARCHIVE_FILE="$ARCHIVE_DIR/$DATE_STR.md"
+          # H-MAINTAIN-1: Append to existing archive instead of overwriting
+          if [[ -f "$ARCHIVE_FILE" ]]; then
+              cat "$CHANGELOG" >> "$ARCHIVE_FILE"
+              echo "Changelog appended to existing $ARCHIVE_FILE"
+          else
+              mv "$CHANGELOG" "$ARCHIVE_FILE"
+              echo "Changelog compacted to $ARCHIVE_FILE"
+          fi
           touch "$CHANGELOG"
-          echo "Changelog compacted to $ARCHIVE_DIR/$DATE_STR.md"
       fi
       shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -42,11 +49,11 @@ while [[ $# -gt 0 ]]; do
   echo "[PERF] $CMD took ${ELAPSED}ms"
 done
 
-# Git 提交逻辑：同步图书馆中所有受控文件
+# Git commit logic: sync all tracked files in library
 cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 1; }
 
-# 使用 git add . 配合完善的 .gitignore 是最稳健的策略
-# 确保所有 .md 和索引文件都被跟踪
+# Using git add . with a proper .gitignore is the most robust strategy
+# Ensures all .md and index files are tracked
 git add . 
 
 if ! git diff --cached --quiet; then

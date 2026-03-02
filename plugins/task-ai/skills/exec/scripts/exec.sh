@@ -2,7 +2,7 @@
 # /task-ai:exec implementation
 # Usage: exec.sh <notebook> [--step N]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,9 +31,19 @@ STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
 mkdir -p "$NOTES_DIR"
 
-# 1. Step Discovery
-TOTAL_STEPS=2
-COMPLETED=$(python3 "$STATE_PY" get "$INDEX_JSON" completed_steps)
+# 1. Step Discovery (from .plan.md)
+PLAN_MD="$WORK_DIR/.plan.md"
+if [[ -f "$PLAN_MD" ]]; then
+    TOTAL_STEPS=$(grep -cE '^##\s+Step\s+[0-9]+' "$PLAN_MD" 2>/dev/null || echo "0")
+else
+    echo "[ERROR] .plan.md not found. Run plan first." >&2
+    exit 1
+fi
+if [[ "$TOTAL_STEPS" -eq 0 ]]; then
+    echo "[ERROR] No steps found in .plan.md" >&2
+    exit 1
+fi
+COMPLETED=$(python3 "$STATE_PY" get "$INDEX_JSON" completed_steps 2>/dev/null || echo "0")
 COMPLETED=${COMPLETED:-0}
 
 echo "Executing $NOTEBOOK. Progress: $COMPLETED/$TOTAL_STEPS"

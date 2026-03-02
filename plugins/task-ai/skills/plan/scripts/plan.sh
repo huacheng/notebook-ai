@@ -2,7 +2,7 @@
 # /task-ai:plan implementation
 # Usage: plan.sh <notebook> [--generate]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,10 +33,17 @@ fi
 echo "Planning for task type: $TYPE"
 
 # 2. Generate .plan.md (Scaffold)
+# Archive existing plan with superseded naming convention
 if [[ -f "$WORK_DIR/.plan.md" ]]; then
-    BACKUP="$WORK_DIR/.plan.md.bak"
-    cp "$WORK_DIR/.plan.md" "$BACKUP"
-    echo "[WARN] Existing .plan.md backed up to $BACKUP"
+    SUPERSEDED="$WORK_DIR/.plan-superseded.md"
+    if [[ -f "$SUPERSEDED" ]]; then
+        # Append numeric suffix if superseded file exists
+        i=2
+        while [[ -f "$WORK_DIR/.plan-superseded-$i.md" ]]; do ((i++)); done
+        SUPERSEDED="$WORK_DIR/.plan-superseded-$i.md"
+    fi
+    mv "$WORK_DIR/.plan.md" "$SUPERSEDED"
+    echo "[WARN] Existing .plan.md archived to $SUPERSEDED"
 fi
 cat > "$WORK_DIR/.plan.md" <<EOF
 # Implementation Plan: $NOTEBOOK
@@ -52,7 +59,7 @@ EOF
 
 # 3. Generate VH Stubs (for software types)
 if [[ "$TYPE" == *"software"* ]]; then
-    TEST_DIR="$WORK_DIR/../.test"
+    TEST_DIR="$WORK_DIR/.test"
     mkdir -p "$TEST_DIR"
     DATE=$(date +%Y-%m-%d)
     STUB_FILE="$TEST_DIR/$DATE-vh-stubs.test.js"

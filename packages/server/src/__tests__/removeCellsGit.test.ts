@@ -99,10 +99,18 @@ describe('remove_cells git commit', () => {
     const wss = makeMockWss();
     setupWebSocket(wss as any, db, sm, ns);
 
-    // Simulate WS connection + remove_cells message
+    // Simulate WS connection
     const ws = makeMockWs();
     wss._emit('connection', ws, { url: '/' });
 
+    // Must subscribe first (for permission check)
+    ws._emit('message', JSON.stringify({
+      type: 'subscribe',
+      session_id: session.id,
+    }));
+    await new Promise(r => setTimeout(r, 20));
+
+    // Now send remove_cells
     ws._emit('message', JSON.stringify({
       type: 'remove_cells',
       session_id: session.id,
@@ -136,6 +144,14 @@ describe('remove_cells git commit', () => {
     const ws = makeMockWs();
     wss._emit('connection', ws, { url: '/' });
 
+    // Must subscribe first (for permission check)
+    ws._emit('message', JSON.stringify({
+      type: 'subscribe',
+      session_id: session.id,
+    }));
+    await new Promise(r => setTimeout(r, 20));
+
+    // Now send remove_cells
     ws._emit('message', JSON.stringify({
       type: 'remove_cells',
       session_id: session.id,

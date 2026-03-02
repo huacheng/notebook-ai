@@ -2,7 +2,7 @@
 # /task-ai:auto implementation
 # Usage: auto.sh <notebook> [--start|--stop|--status]
 
-set -uo pipefail
+set -euo pipefail
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
@@ -12,6 +12,7 @@ NOTEBOOK="${1:-}"
 resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
+ACTION="start"  # Default action
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -40,7 +41,23 @@ COMPACTION=0
 
 case "$STATUS" in
   draft)
-    NEXT_STEP="plan"
+    # H-AUTO-2: Check target status before routing
+    TARGET_MD="$WORK_DIR/.target.md"
+    if [[ -f "$TARGET_MD" ]]; then
+        # Check for pending [PROPOSED] markers
+        if grep -q '\[PROPOSED\]' "$TARGET_MD"; then
+            NEXT_STEP="(stop)"
+            echo "[PAUSE] Pending [PROPOSED] items in .target.md — review and confirm before continuing"
+        # Check for research insights
+        elif grep -q '## Research Insights' "$TARGET_MD"; then
+            NEXT_STEP="plan"
+        else
+            NEXT_STEP="research"
+        fi
+    else
+        NEXT_STEP="(stop)"
+        echo "[ERROR] .target.md not found"
+    fi
     ;;
   planning)
     NEXT_STEP="check"

@@ -1,16 +1,35 @@
-import { useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
+
+const DEFAULT_MARKETPLACES: { name: string; repo: string }[] = [
+  { name: 'anthropic-agent-skills', repo: 'anthropics/skills' },
+  { name: 'claude-code-plugins', repo: 'anthropics/claude-code' },
+  { name: 'claude-plugins-official', repo: 'anthropics/claude-plugins-official' },
+  { name: 'moonview', repo: 'huacheng/moonview' },
+];
 
 /**
  * Mobile Plugin Management Sheet.
- * Shows installed plugins and allows basic management.
+ * Uses the same structure and functionality as desktop PluginManager.
  */
 export function MobilePluginSheet() {
+  const t = useT();
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
   const closePluginPanel = useStore((s) => s.closePluginPanel);
   const pluginStatus = useStore((s) => s.pluginStatus);
   const pluginLoading = useStore((s) => s.pluginLoading);
+  const pluginActionKey = useStore((s) => s.pluginActionKey);
+  const pluginOverlay = useStore((s) => s.pluginOverlay);
   const checkPluginStatus = useStore((s) => s.checkPluginStatus);
+  const installPlugin = useStore((s) => s.installPlugin);
+  const uninstallPlugin = useStore((s) => s.uninstallPlugin);
+  const addMarketplace = useStore((s) => s.addMarketplace);
+  const removeMarketplace = useStore((s) => s.removeMarketplace);
+  const updateMarketplace = useStore((s) => s.updateMarketplace);
+  const updatePlugin = useStore((s) => s.updatePlugin);
+
+  const [customRepo, setCustomRepo] = useState('');
 
   // Load plugin status when opened
   useEffect(() => {
@@ -31,58 +50,215 @@ export function MobilePluginSheet() {
     };
   }, [pluginPanelOpen]);
 
+  const existingNames = new Set(pluginStatus?.marketplaces.map((m) => m.name) ?? []);
+
+  // Decode pluginOverlay: "key|arg" -> t(key, arg)
+  const overlayText = pluginOverlay ? (() => {
+    const [key, ...args] = pluginOverlay.split('|');
+    return t(key, ...args);
+  })() : null;
+
+  const handleAddCustom = useCallback(() => {
+    const repo = customRepo.trim();
+    if (!repo) return;
+    if (!window.confirm(t('plugin.confirmAdd', repo))) return;
+    addMarketplace(repo);
+    setCustomRepo('');
+  }, [customRepo, addMarketplace, t]);
+
+  const handleTogglePlugin = useCallback(
+    (key: string, isInstalled: boolean) => {
+      const name = key.split('@')[0];
+      const confirmKey = isInstalled ? 'plugin.confirmUninstall' : 'plugin.confirmInstall';
+      if (!window.confirm(t(confirmKey, name))) return;
+      if (isInstalled) {
+        uninstallPlugin(key);
+      } else {
+        installPlugin(key);
+      }
+    },
+    [installPlugin, uninstallPlugin, t],
+  );
+
+  // Extra marketplaces (not in the default list)
+  const extraMarketplaces = pluginStatus?.marketplaces.filter(
+    (m) => !DEFAULT_MARKETPLACES.some((d) => d.name === m.name),
+  ) ?? [];
+
+  // Group plugins by marketplace
+  const pluginsByMarketplace = new Map<string, typeof pluginStatus extends null ? never : NonNullable<typeof pluginStatus>['plugins']>();
+  for (const p of pluginStatus?.plugins ?? []) {
+    const list = pluginsByMarketplace.get(p.marketplace) ?? [];
+    list.push(p);
+    pluginsByMarketplace.set(p.marketplace, list);
+  }
+
   if (!pluginPanelOpen) return null;
 
-  // Get installed plugins by checking the installed map
-  const installedMap = pluginStatus?.installed ?? {};
-  const installedPlugins = pluginStatus?.plugins.filter((p) => installedMap[p.key]) ?? [];
-
   return (
-    <>
-      {/* Backdrop */}
-      <div className="mobile-sheet-backdrop" onClick={closePluginPanel} />
+    <div className="annotation-modal-overlay" onClick={closePluginPanel}>
+      <div className="pm-container pm-container--mobile" onClick={(e) => e.stopPropagation()}>
+        {overlayText && (
+          <div className="pm-overlay">
+            <div className="pm-overlay-spinner" />
+            <p className="pm-overlay-text">{overlayText}</p>
+          </div>
+        )}
 
-      {/* Sheet */}
-      <div className="mobile-sheet">
-        <div className="mobile-sheet-handle" />
-        <h2 className="mobile-sheet-title">Plugins</h2>
-
-        <div className="mobile-sheet-content">
-          {pluginLoading ? (
-            <div className="mobile-sheet-loading">Loading...</div>
-          ) : installedPlugins.length === 0 ? (
-            <div className="mobile-sheet-empty">
-              <p>No plugins installed</p>
-              <p className="mobile-sheet-hint">
-                Use desktop to manage plugins
-              </p>
-            </div>
-          ) : (
-            <div className="mobile-sheet-options">
-              {installedPlugins.map((plugin) => {
-                const installedInfo = installedMap[plugin.key];
-                const installedVersion = installedInfo?.version || plugin.version;
-                return (
-                  <div key={plugin.key} className="mobile-sheet-plugin">
-                    <span className="mobile-sheet-plugin-name">
-                      {plugin.name || plugin.key.split('@')[0]}
-                    </span>
-                    {installedVersion && (
-                      <span className="mobile-sheet-plugin-version">
-                        v{installedVersion}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <div className="pm-header">
+          <h2 className="pm-title">{t('plugin.title')}</h2>
+          <button className="pm-close" onClick={closePluginPanel} aria-label={t('plugin.close')}>×</button>
         </div>
 
-        <button className="mobile-sheet-cancel" onClick={closePluginPanel}>
-          Close
-        </button>
+        {pluginLoading ? (
+          <div className="pm-loading">
+            <div className="nb-delete-spinner" />
+          </div>
+        ) : (
+          <>
+            {/* Marketplaces section */}
+            <div className="pm-section">
+              <div className="pm-section-header">
+                <h3 className="pm-section-title">{t('plugin.marketplaces')}</h3>
+                <button
+                  className="pm-btn pm-btn--secondary"
+                  onClick={() => updateMarketplace()}
+                  disabled={!!pluginOverlay}
+                >
+                  {t('plugin.updateAll')}
+                </button>
+              </div>
+              <div className="pm-marketplace-list">
+                {DEFAULT_MARKETPLACES.map((dm) => {
+                  const added = existingNames.has(dm.name);
+                  return (
+                    <div key={dm.name} className="pm-marketplace-row">
+                      <span className={`pm-dot ${added ? 'pm-dot--active' : ''}`} />
+                      <span className="pm-marketplace-name">{dm.repo}</span>
+                      {added ? (
+                        <>
+                          <button
+                            className="pm-btn pm-btn--secondary"
+                            onClick={() => updateMarketplace(dm.name)}
+                            disabled={!!pluginOverlay}
+                          >
+                            {t('plugin.update')}
+                          </button>
+                          <button
+                            className="pm-btn pm-btn--danger"
+                            onClick={() => {
+                              if (!window.confirm(t('plugin.confirmRemove', dm.name))) return;
+                              removeMarketplace(dm.name);
+                            }}
+                            disabled={!!pluginOverlay}
+                          >
+                            {t('plugin.remove')}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="pm-btn pm-btn--primary"
+                          onClick={() => {
+                            if (!window.confirm(t('plugin.confirmAdd', dm.repo))) return;
+                            addMarketplace(dm.repo);
+                          }}
+                          disabled={!!pluginOverlay}
+                        >
+                          {t('plugin.add')}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {extraMarketplaces.map((m) => (
+                  <div key={m.name} className="pm-marketplace-row">
+                    <span className="pm-dot pm-dot--active" />
+                    <span className="pm-marketplace-name">{m.name}</span>
+                    <button
+                      className="pm-btn pm-btn--secondary"
+                      onClick={() => updateMarketplace(m.name)}
+                      disabled={!!pluginOverlay}
+                    >
+                      {t('plugin.update')}
+                    </button>
+                    <button
+                      className="pm-btn pm-btn--danger"
+                      onClick={() => {
+                        if (!window.confirm(t('plugin.confirmRemove', m.name))) return;
+                        removeMarketplace(m.name);
+                      }}
+                      disabled={!!pluginOverlay}
+                    >
+                      {t('plugin.remove')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="pm-custom-add">
+                <input
+                  className="pm-input"
+                  type="text"
+                  placeholder="github-user/repo"
+                  value={customRepo}
+                  onChange={(e) => setCustomRepo(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustom()}
+                />
+                <button
+                  className="pm-btn pm-btn--primary"
+                  onClick={handleAddCustom}
+                  disabled={!customRepo.trim() || !!pluginOverlay}
+                >
+                  {t('plugin.add')}
+                </button>
+              </div>
+            </div>
+
+            {/* Plugins section */}
+            <div className="pm-section">
+              <h3 className="pm-section-title">{t('plugin.availablePlugins')}</h3>
+              {pluginsByMarketplace.size === 0 && (
+                <p className="pm-empty">{t('plugin.noPlugins')}</p>
+              )}
+              {[...pluginsByMarketplace.entries()].map(([marketplace, plugins]) => (
+                <div key={marketplace} className="pm-plugin-group">
+                  <div className="pm-plugin-group-header">{marketplace}</div>
+                  {plugins.map((p) => {
+                    const isInstalled = !!(pluginStatus?.installed[p.key]);
+                    const isBusy = pluginActionKey === p.key;
+                    return (
+                      <label key={p.key} className="pm-plugin-row">
+                        <input
+                          type="checkbox"
+                          checked={isInstalled}
+                          disabled={isBusy || !!pluginOverlay}
+                          onChange={() => handleTogglePlugin(p.key, isInstalled)}
+                        />
+                        <span className="pm-plugin-name">{p.name}</span>
+                        {p.version && <span className="pm-plugin-version">v{p.version}</span>}
+                        {p.description && <span className="pm-plugin-desc">{p.description}</span>}
+                        {isInstalled && (
+                          <button
+                            className="pm-btn pm-btn--secondary pm-btn--sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (!window.confirm(t('plugin.confirmUpdate', p.name))) return;
+                              updatePlugin(p.key);
+                            }}
+                            disabled={isBusy || !!pluginOverlay}
+                          >
+                            {t('plugin.update')}
+                          </button>
+                        )}
+                        {isBusy && <span className="pm-plugin-spinner" />}
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
-    </>
+    </div>
   );
 }

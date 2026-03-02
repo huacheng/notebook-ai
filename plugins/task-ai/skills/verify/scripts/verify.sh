@@ -2,7 +2,7 @@
 # /task-ai:verify implementation
 # Usage: verify.sh <notebook> [--checkpoint quick|full|step-N]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,7 +26,7 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-TEST_DIR="$WORK_DIR/../.test"
+TEST_DIR="$WORK_DIR/.test"
 mkdir -p "$TEST_DIR"
 
 echo "Verifying $NOTEBOOK with checkpoint: $CHECKPOINT"

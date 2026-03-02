@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 
+// After consolidation, InputBar logic lives in shared/InputBar.tsx
 const src = readFileSync(
-  path.resolve(__dirname, '../components/Notebook.tsx'),
+  path.resolve(__dirname, '../components/shared/InputBar.tsx'),
   'utf-8',
 );
 

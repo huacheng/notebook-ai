@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
+import { LanguageToggle } from './shared/LanguageToggle';
 
 interface LoginPageProps {
   onLogin: (email: string, password: string) => void;
@@ -69,6 +70,8 @@ export function LoginPage({ onLogin, error, loading, onRegister }: LoginPageProp
 
   return (
     <div className="login-page">
+      {/* Language toggle in top-right corner */}
+      <LanguageToggle variant="pill" className="login-lang-toggle" />
       <div className="login-card">
         <div className="login-logo">NB</div>
         <h1 className="login-title">{t('login.title')}</h1>

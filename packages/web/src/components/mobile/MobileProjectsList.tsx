@@ -1,8 +1,77 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useStore } from '../../store';
 import { MobileHeader } from './MobileHeader';
 import { runRenameFlow, type RenamePhase } from '../renameFlow';
+import { runDeleteFlow, type DeletePhase } from '../deleteFlow';
 import { validateTitle, MAX_TITLE_LENGTH } from '../../utils/validateTitle';
+
+/** Mobile delete confirmation modal */
+function MobileDeleteModal({ name, label = 'Project', onCancel, onConfirm, onDone }: {
+  name: string;
+  label?: string;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+  onDone?: () => void;
+}) {
+  const [phase, setPhase] = useState<DeletePhase>('confirm');
+  const [errorMsg, setErrorMsg] = useState('');
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  const handleConfirm = () => {
+    runDeleteFlow(onConfirm, {
+      setPhase,
+      setErrorMsg,
+      onDone: () => setTimeout(() => onDoneRef.current?.(), 800),
+    });
+  };
+
+  return (
+    <div className="annotation-modal-overlay" onClick={phase === 'confirm' || phase === 'error' ? onCancel : undefined}>
+      <div className="annotation-modal" onClick={e => e.stopPropagation()}>
+        {phase === 'confirm' && (
+          <>
+            <div className="annotation-modal-title">Delete {label}</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              Are you sure you want to delete "{name}"? This cannot be undone.
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Cancel</button>
+              <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={handleConfirm}>Delete</button>
+            </div>
+          </>
+        )}
+        {phase === 'deleting' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Deleting {name}...
+            </p>
+          </div>
+        )}
+        {phase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              {label} deleted!
+            </p>
+          </div>
+        )}
+        {phase === 'error' && (
+          <>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Delete Failed</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              {errorMsg}
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Close</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function MobileRenameModal({ currentName, onCancel, onConfirm, onDone }: {
   currentName: string;
@@ -26,37 +95,101 @@ function MobileRenameModal({ currentName, onCancel, onConfirm, onDone }: {
   };
 
   return (
-    <div className="mobile-modal-overlay" onClick={phase === 'editing' ? onCancel : undefined}>
-      <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+    <div className="annotation-modal-overlay" onClick={phase === 'editing' || phase === 'error' ? onCancel : undefined}>
+      <div className="annotation-modal" onClick={e => e.stopPropagation()}>
         {phase === 'editing' && (
           <>
-            <h3 className="mobile-modal-title">Rename Project</h3>
-            <input
-              autoFocus
-              type="text"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && canSave) handleConfirm(); if (e.key === 'Escape') onCancel(); }}
-              placeholder="New name"
-              maxLength={MAX_TITLE_LENGTH}
-              className="mobile-input"
-            />
-            {nameError && <p className="mobile-error">{nameError}</p>}
-            <div className="mobile-modal-actions">
-              <button className="mobile-btn" onClick={onCancel}>Cancel</button>
-              <button className="mobile-btn-primary" onClick={handleConfirm} disabled={!canSave}>Rename</button>
+            <div className="annotation-modal-title">Rename Project</div>
+            <div style={{ margin: '0 0 var(--space-lg)' }}>
+              <input
+                autoFocus
+                type="text"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && canSave) handleConfirm(); if (e.key === 'Escape') onCancel(); }}
+                placeholder="New name"
+                maxLength={MAX_TITLE_LENGTH}
+                className="annotation-modal-input"
+              />
+              {nameError && <div className="create-form-error">{nameError}</div>}
+            </div>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Cancel</button>
+              <button className="annotation-modal-btn annotation-modal-confirm" onClick={handleConfirm} disabled={!canSave}>Rename</button>
             </div>
           </>
         )}
-        {phase === 'saving' && <div className="mobile-loading">Renaming...</div>}
-        {phase === 'done' && <div className="mobile-success">Renamed!</div>}
+        {phase === 'saving' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Renaming...
+            </p>
+          </div>
+        )}
+        {phase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              Renamed!
+            </p>
+          </div>
+        )}
         {phase === 'error' && (
           <>
-            <p className="mobile-error">{errorMsg}</p>
-            <button className="mobile-btn" onClick={onCancel}>Close</button>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Rename Failed</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              {errorMsg}
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Close</button>
+            </div>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Mobile dropdown menu for project actions */
+function MobileProjectMenu({ projectId, projectSlug, authToken, onClose, onRequestRename, onRequestDelete }: {
+  projectId: string;
+  projectSlug: string;
+  authToken: string | null;
+  onClose: () => void;
+  onRequestRename: () => void;
+  onRequestDelete: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const handleExport = async () => {
+    const url = `/api/projects/${projectId}/files/zip`;
+    const res = await fetch(url, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${projectSlug}.tar.gz`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    onClose();
+  };
+
+  return (
+    <div className="mobile-item-menu" ref={menuRef} onClick={e => e.stopPropagation()}>
+      <button className="mobile-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>Rename</button>
+      <button className="mobile-item-menu-item" onClick={handleExport}>Export</button>
+      <button className="mobile-item-menu-item mobile-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>Delete</button>
     </div>
   );
 }
@@ -72,9 +205,12 @@ export function MobileProjectsList() {
   const setActiveProject = useStore((s) => s.setActiveProject);
   const setMobileView = useStore((s) => s.setMobileView);
   const createProject = useStore((s) => s.createProject);
+  const deleteProject = useStore((s) => s.deleteProject);
   const authToken = useStore((s) => s.authToken);
 
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -97,9 +233,9 @@ export function MobileProjectsList() {
     }
   };
 
-  const handleRenameProject = (e: React.MouseEvent, project: typeof projects[0]) => {
+  const handleMenuClick = (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation();
-    setRenameTarget({ id: project.id, title: project.title });
+    setMenuOpenId(menuOpenId === projectId ? null : projectId);
   };
 
   return (
@@ -134,12 +270,22 @@ export function MobileProjectsList() {
                   <span className="mobile-list-arrow">›</span>
                 </button>
                 <button
-                  className="mobile-list-edit-btn"
-                  onClick={(e) => handleRenameProject(e, project)}
-                  aria-label="Rename project"
+                  className="mobile-list-menu-btn"
+                  onClick={(e) => handleMenuClick(e, project.id)}
+                  aria-label="Project actions"
                 >
-                  ✏️
+                  ⋯
                 </button>
+                {menuOpenId === project.id && (
+                  <MobileProjectMenu
+                    projectId={project.id}
+                    projectSlug={project.slug}
+                    authToken={authToken}
+                    onClose={() => setMenuOpenId(null)}
+                    onRequestRename={() => setRenameTarget({ id: project.id, title: project.title })}
+                    onRequestDelete={() => setDeleteTarget({ id: project.id, title: project.title })}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -174,6 +320,22 @@ export function MobileProjectsList() {
           }}
           onDone={() => {
             setRenameTarget(null);
+            fetchProjects();
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <MobileDeleteModal
+          name={deleteTarget.title}
+          label="Project"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => deleteProject(deleteTarget.id)}
+          onDone={() => {
+            const { closeProjectFileTabs, closeProjectNotebookTabs } = useStore.getState();
+            closeProjectFileTabs(deleteTarget.id);
+            closeProjectNotebookTabs(deleteTarget.id);
+            setDeleteTarget(null);
             fetchProjects();
           }}
         />

@@ -321,6 +321,7 @@ export async function handleRegister(req: Request, res: Response): Promise<void>
 export async function handleLogin(req: Request, res: Response): Promise<void> {
   const ip = getClientIp(req);
   const { blocked, retryAfterSec } = checkRateLimit(ip);
+  console.log(`[AUTH] Login attempt from IP: ${ip}, blocked: ${blocked}, retryAfter: ${retryAfterSec}`);
   if (blocked) {
     res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
     return;

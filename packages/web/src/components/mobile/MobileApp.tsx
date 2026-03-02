@@ -4,6 +4,7 @@ import { MobileProjectsList } from './MobileProjectsList';
 import { MobileNotebooksList } from './MobileNotebooksList';
 import { MobileNotebookView } from './MobileNotebookView';
 import { MobileModelSheet } from './MobileModelSheet';
+import { MobilePluginSheet } from './MobilePluginSheet';
 import { MobileConnectionBanner } from './MobileConnectionBanner';
 import { MobileDrawer } from './MobileDrawer';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -58,6 +59,9 @@ export function MobileApp() {
 
       {/* Model selection sheet */}
       <MobileModelSheet />
+
+      {/* Plugin management sheet */}
+      <MobilePluginSheet />
 
       {/* Drawer overlays for non-notebook views */}
       {mobileView !== 'notebook' && (

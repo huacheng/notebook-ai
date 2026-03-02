@@ -320,6 +320,30 @@ All delegation events are recorded for observability and health tracking:
 
 **Implementation Reference**: `packages/server/src/task-ai/delegation-metrics.ts`
 
+### Event Lifecycle & Size Control
+
+To prevent unbounded growth of `.delegation-events.jsonl`:
+
+| Threshold | Action |
+|-----------|--------|
+| **2000 events** | Archive oldest 1500 events to `.delegation-events-archive/YYYY-MM.jsonl` |
+| **5MB file size** | Force rotation regardless of event count |
+| **Monthly** | Auto-compact during `library maintain --compact` |
+
+**Archive Structure**: `$NB_WORKSPACES_LIBRARY/.delegation-events-archive/YYYY-MM.jsonl`
+
+**Rotation Logic**:
+1. When main file exceeds threshold, read all events
+2. Keep most recent 500 events in main file
+3. Append older events to monthly archive file (create if needed)
+4. Archives are append-only and never modified after creation
+
+**Compaction** (via `library maintain --compact`):
+- Archives older than 6 months are deleted
+- Per-plugin aggregates are preserved in `.plugin-registry.md`
+
+**Implementation Reference**: `packages/server/src/task-ai/delegation-metrics.ts` (rotation), `skills/library/scripts/maintain.sh` (compact)
+
 ## User Preferences
 
 Users can customize delegation behavior via `~/.claude/settings.json`:

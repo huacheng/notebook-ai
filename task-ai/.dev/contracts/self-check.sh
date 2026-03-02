@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 mapfile -t ALL_MD < <(find_all_md)
 
 # Collect all contract scripts (excluding libs)
-mapfile -t CONTRACT_SCRIPTS < <(find "$DEV_ROOT/contracts" -name "*.sh" -o -name "*.py" | grep -v "lib\." | sort)
+mapfile -t CONTRACT_SCRIPTS < <(find "$DEV_ROOT/contracts" -name "*.sh" -o -name "*.py" | grep -v "lib\." | grep -v "json_get\.py" | sort)
 
 # For each .md file, check if any contract script is likely to cover it
 # We do this by examining what each contract scans:

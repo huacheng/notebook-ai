@@ -2,7 +2,7 @@
 # Library Commit Helper
 # Usage: lib-commit.sh <notebook> <type> <description> <file1> [file2...]
 
-set -uo pipefail
+set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
     echo "Usage: $0 <notebook> <type> <description> <file...>"

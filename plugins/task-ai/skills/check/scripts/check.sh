@@ -2,7 +2,7 @@
 # /task-ai:check implementation
 # Usage: check.sh <notebook> [--checkpoint post-plan|mid-exec|post-exec]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-ANALYSIS_DIR="$WORK_DIR/../.analysis"
+ANALYSIS_DIR="$WORK_DIR/.analysis"
 mkdir -p "$ANALYSIS_DIR"
 
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"

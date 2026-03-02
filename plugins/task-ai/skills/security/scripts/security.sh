@@ -2,7 +2,7 @@
 # /task-ai:security implementation
 # Usage: security.sh <notebook> <action> [payload]
 
-set -uo pipefail
+set -euo pipefail
 
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,14 +43,19 @@ verify_cmd() {
         reason="VFP semantics injection"
     fi
 
-    # 3. Two-stage loading
-    if echo "$cmd" | grep -qE "curl.*\|\s*bash|wget.*\|\s*sh"; then
+    # 3. Two-stage loading (download & execute patterns)
+    if echo "$cmd" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
         risk="high"
         reason="Two-stage payload execution"
     fi
+    # 3b. Download-then-execute pattern (curl -o file && run)
+    if echo "$cmd" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
+        risk="high"
+        reason="Download and execute pattern"
+    fi
 
     # 4. Environment manipulation (high risk if overriding critical libs)
-    if echo "$cmd" | grep -qE "LD_PRELOAD=|PYTHONPATH="; then
+    if echo "$cmd" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
         risk="high"
         reason="Environment manipulation"
     fi

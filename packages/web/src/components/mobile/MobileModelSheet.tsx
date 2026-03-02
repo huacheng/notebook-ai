@@ -1,25 +1,25 @@
 import { useEffect } from 'react';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
+import { PROVIDERS } from '../ModelManager';
 
-const MODELS = [
-  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', description: 'Best balance of speed and capability' },
-  { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', description: 'Most capable, best for complex tasks' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Fastest, good for simple tasks' },
-];
+const DEFAULT_MODEL = 'sonnet';
 
 /**
  * Mobile Model Selection Sheet.
- * Bottom sheet style for selecting AI model.
+ * Uses the same PROVIDERS data as desktop ModelManager for consistency.
  */
 export function MobileModelSheet() {
+  const t = useT();
   const modelPanelOpen = useStore((s) => s.modelPanelOpen);
   const closeModelPanel = useStore((s) => s.closeModelPanel);
   const changeModel = useStore((s) => s.changeModel);
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
   const openNotebooks = useStore((s) => s.openNotebooks);
 
-  const activeTab = activeNotebookTabId ? openNotebooks[activeNotebookTabId] : null;
-  const currentModel = activeTab?.notebook?.metadata?.model || MODELS[0].id;
+  const activeNb = activeNotebookTabId ? openNotebooks[activeNotebookTabId] : null;
+  const currentModel = activeNb?.notebook?.metadata?.model ?? DEFAULT_MODEL;
+  const hasNotebook = Object.keys(openNotebooks).length > 0;
 
   // Lock body scroll when open
   useEffect(() => {
@@ -35,41 +35,55 @@ export function MobileModelSheet() {
 
   if (!modelPanelOpen) return null;
 
-  const handleSelect = (modelId: string) => {
+  function handleSelect(engine: string, modelId: string) {
+    if (engine !== 'claude') return;
+    if (modelId === currentModel) return;
     changeModel(modelId);
     closeModelPanel();
-  };
+  }
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="mobile-sheet-backdrop" onClick={closeModelPanel} />
-
-      {/* Sheet */}
-      <div className="mobile-sheet">
-        <div className="mobile-sheet-handle" />
-        <h2 className="mobile-sheet-title">Select Model</h2>
-
-        <div className="mobile-sheet-options">
-          {MODELS.map((model) => (
-            <button
-              key={model.id}
-              className={`mobile-sheet-option ${currentModel === model.id ? 'selected' : ''}`}
-              onClick={() => handleSelect(model.id)}
-            >
-              <span className="mobile-sheet-option-name">{model.name}</span>
-              <span className="mobile-sheet-option-desc">{model.description}</span>
-              {currentModel === model.id && (
-                <span className="mobile-sheet-option-check">✓</span>
-              )}
-            </button>
-          ))}
+    <div className="annotation-modal-overlay" onClick={closeModelPanel}>
+      <div className="mm-container mm-container--mobile" onClick={(e) => e.stopPropagation()}>
+        <div className="mm-header">
+          <h2 className="mm-title">{t('model.title')}</h2>
+          <button className="mm-close" onClick={closeModelPanel} aria-label={t('model.close')}>×</button>
         </div>
 
-        <button className="mobile-sheet-cancel" onClick={closeModelPanel}>
-          Cancel
-        </button>
+        {!hasNotebook ? (
+          <p className="mm-empty">{t('model.emptyHint')}</p>
+        ) : (
+          <div className="mm-body">
+            {PROVIDERS.map((provider) => {
+              const isDisabled = provider.engine !== 'claude';
+              return (
+                <div key={provider.engine} className={`mm-provider-group${isDisabled ? ' mm-provider-group--disabled' : ''}`}>
+                  <div className="mm-provider-header">
+                    {provider.label}
+                    {isDisabled && <span className="mm-coming-soon">{t('model.comingSoon')}</span>}
+                  </div>
+                  {provider.models.map((model) => {
+                    const isCurrent = model.id === currentModel;
+                    return (
+                      <button
+                        key={model.id}
+                        className={`mm-model-row${isCurrent ? ' mm-model-row--active' : ''}${isDisabled ? ' mm-model-row--disabled' : ''}`}
+                        onClick={() => handleSelect(provider.engine, model.id)}
+                        disabled={isDisabled}
+                      >
+                        <span className="mm-model-label">{model.label}</span>
+                        <span className={`mm-tier mm-tier--${model.tier}`}>{model.tier}</span>
+                        <span className="mm-model-desc">{t(model.descKey)}</span>
+                        {isCurrent && <span className="mm-current-badge">{t('model.current')}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
+import { LanguageToggle } from './shared/LanguageToggle';
 
 interface RegisterPageProps {
   onBack: () => void;
@@ -60,6 +61,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
   if (success) {
     return (
       <div className="login-page">
+        <LanguageToggle variant="pill" className="login-lang-toggle" />
         <div className="login-card">
           <div className="login-logo">NB</div>
           <h1 className="login-title">{t('register.title')}</h1>
@@ -74,6 +76,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
 
   return (
     <div className="login-page">
+      <LanguageToggle variant="pill" className="login-lang-toggle" />
       <div className="login-card">
         <div className="login-logo">NB</div>
         <h1 className="login-title">{t('register.title')}</h1>

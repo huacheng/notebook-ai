@@ -2,7 +2,7 @@
 # /task-ai:init implementation
 # Usage: init.sh <project_name> <notebook_name> [--title "Title"] [--tags "t1,t2"] [--worktree]
 
-set -uo pipefail
+set -euo pipefail
 
 PROJECT_NAME="${1:-}"
 NOTEBOOK_NAME="${2:-}"
@@ -45,16 +45,38 @@ if git branch --list "$BRANCH_NAME" | grep -qF "$BRANCH_NAME"; then
     exit 1
 fi
 
+# Cleanup function for rollback on failure
+CLEANUP_BRANCH=""
+CLEANUP_WORKTREE=""
+CLEANUP_DIR=""
+cleanup() {
+    if [[ -n "$CLEANUP_WORKTREE" && -d "$CLEANUP_WORKTREE" ]]; then
+        git worktree remove "$CLEANUP_WORKTREE" 2>/dev/null || true
+    fi
+    if [[ -n "$CLEANUP_BRANCH" ]]; then
+        git checkout - 2>/dev/null || true
+        git branch -d "$CLEANUP_BRANCH" 2>/dev/null || true
+    fi
+    if [[ -n "$CLEANUP_DIR" && -d "$CLEANUP_DIR" ]]; then
+        rm -rf "$CLEANUP_DIR"
+    fi
+}
+trap cleanup ERR
+
 # 3. Git Operations
 git branch "$BRANCH_NAME" || { echo "[ERROR] Failed to create branch $BRANCH_NAME" >&2; exit 1; }
+CLEANUP_BRANCH="$BRANCH_NAME"
+
 if [[ $USE_WORKTREE -eq 1 ]]; then
     WORKTREE_PATH=".worktrees/task-$NOTEBOOK_NAME"
-    git worktree add "$WORKTREE_PATH" "$BRANCH_NAME" || { echo "[ERROR] Failed to create worktree" >&2; git branch -d "$BRANCH_NAME"; exit 1; }
+    git worktree add "$WORKTREE_PATH" "$BRANCH_NAME" || { echo "[ERROR] Failed to create worktree" >&2; exit 1; }
+    CLEANUP_WORKTREE="$WORKTREE_PATH"
     WORKING_DIR="$WORKTREE_PATH/.working"
 else
-    git checkout "$BRANCH_NAME" || { echo "[ERROR] Failed to checkout $BRANCH_NAME" >&2; git branch -d "$BRANCH_NAME"; exit 1; }
+    git checkout "$BRANCH_NAME" || { echo "[ERROR] Failed to checkout $BRANCH_NAME" >&2; exit 1; }
     WORKING_DIR="$TARGET_DIR/.working"
 fi
+CLEANUP_DIR="$WORKING_DIR"
 
 # 4. Directory Creation
 mkdir -p "$WORKING_DIR"
@@ -102,5 +124,11 @@ EOF
 # 7. Git Commit
 git add "$WORKING_DIR/.index.json" "$WORKING_DIR/.target.md"
 git commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook"
+
+# Success - disable cleanup trap
+trap - ERR
+CLEANUP_BRANCH=""
+CLEANUP_WORKTREE=""
+CLEANUP_DIR=""
 
 echo "Initialized $NOTEBOOK_NAME under $PROJECT_NAME."
