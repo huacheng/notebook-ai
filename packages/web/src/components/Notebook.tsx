@@ -11,6 +11,7 @@ import { MentionPopup } from './MentionPopup';
 import { SlashCommandPlugin } from '../mention/SlashCommandPlugin';
 import { FileTreePlugin } from '../mention/FileTreePlugin';
 import { CellRefPlugin } from '../mention/CellRefPlugin';
+import type { MentionPlugin } from '../mention/types';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -237,7 +238,7 @@ function NotebookInputBar() {
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Mention system
-  const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin], []);
+  const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin] as MentionPlugin<unknown>[], []);
   const mention = useMention(plugins);
   const [caretPos, setCaretPos] = useState({ x: 0, y: 0 });
 

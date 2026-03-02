@@ -11,12 +11,12 @@ const INITIAL_STATE: MentionState = {
   path: [],
 };
 
-export function useMention<T>(plugins: MentionPlugin<T>[]) {
-  const [state, setState] = useState<MentionState<T>>(INITIAL_STATE as MentionState<T>);
+export function useMention(plugins: MentionPlugin<unknown>[]) {
+  const [state, setState] = useState<MentionState<unknown>>(INITIAL_STATE);
   const fetchingRef = useRef(false);
 
   const close = useCallback(() => {
-    setState(INITIAL_STATE as MentionState<T>);
+    setState(INITIAL_STATE);
   }, []);
 
   const handleChange = useCallback(async (
@@ -42,9 +42,9 @@ export function useMention<T>(plugins: MentionPlugin<T>[]) {
           const items = await plugin.fetchItems(query);
           setState({
             open: true,
-            plugin: plugin as MentionPlugin<unknown> as MentionPlugin<T>,
+            plugin,
             query,
-            items: items as T[],
+            items,
             selectedIndex: 0,
             triggerPos: triggerIdx,
             path: [],
@@ -96,7 +96,7 @@ export function useMention<T>(plugins: MentionPlugin<T>[]) {
           state.plugin.onNavigate?.(item).then(children => {
             setState(s => ({
               ...s,
-              items: children as T[],
+              items: children,
               selectedIndex: 0,
               path: [...s.path, item],
               query: '',
@@ -121,19 +121,19 @@ export function useMention<T>(plugins: MentionPlugin<T>[]) {
           const newPath = state.path.slice(0, -1);
           const parent = newPath[newPath.length - 1];
           if (parent && state.plugin.onNavigate) {
-            state.plugin.onNavigate(parent).then(items => {
+            state.plugin.onNavigate(parent).then(newItems => {
               setState(s => ({
                 ...s,
-                items: items as T[],
+                items: newItems,
                 selectedIndex: 0,
                 path: newPath,
               }));
             });
           } else {
-            state.plugin.fetchItems('').then(items => {
+            state.plugin.fetchItems('').then(newItems => {
               setState(s => ({
                 ...s,
-                items: items as T[],
+                items: newItems,
                 selectedIndex: 0,
                 path: [],
               }));
@@ -162,7 +162,7 @@ export function useMention<T>(plugins: MentionPlugin<T>[]) {
       state.plugin.onNavigate?.(item).then(children => {
         setState(s => ({
           ...s,
-          items: children as T[],
+          items: children,
           selectedIndex: 0,
           path: [...s.path, item],
           query: '',
