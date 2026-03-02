@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, type RefObject } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo, type RefObject } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { Cell } from './Cell';
@@ -6,6 +6,11 @@ import { SliceView } from './SliceView';
 import { loadDraft, saveDraft, clearDraft } from '../utils/promptDraft';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { extractImagesFromClipboard, MAX_IMAGES, type PastedImage } from '../utils/pasteImages';
+import { useMention } from '../hooks/useMention';
+import { MentionPopup } from './MentionPopup';
+import { SlashCommandPlugin } from '../mention/SlashCommandPlugin';
+import { FileTreePlugin } from '../mention/FileTreePlugin';
+import { CellRefPlugin } from '../mention/CellRefPlugin';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -212,6 +217,7 @@ function NotebookInputBar() {
   const t = useT();
   const submitPrompt = useStore((s) => s.submitPrompt);
   const sessionId = useStore((s) => s.sessionId);
+  const authToken = useStore((s) => s.authToken);
   const notebook = useStore((s) => s.notebook);
   const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
   const editMode = useStore((s) => s.editMode);
@@ -229,6 +235,11 @@ function NotebookInputBar() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Mention system
+  const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin], []);
+  const mention = useMention(plugins);
+  const [caretPos, setCaretPos] = useState({ x: 0, y: 0 });
 
   // Auto-resize textarea
   const resize = useCallback(() => {
@@ -300,6 +311,8 @@ function NotebookInputBar() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Let mention system handle keys first (arrow up/down, enter, escape)
+    if (mention.handleKeyDown(e, () => text, setText)) return;
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleRun();
@@ -322,7 +335,9 @@ function NotebookInputBar() {
     try {
       const formData = new FormData();
       for (const file of Array.from(files)) formData.append('files', file);
-      const res = await fetch(`/api/notebooks/${sessionId}/files`, { method: 'POST', body: formData });
+      const headers: Record<string, string> = {};
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      const res = await fetch(`/api/notebooks/${sessionId}/files`, { method: 'POST', body: formData, headers });
 
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -394,12 +409,21 @@ function NotebookInputBar() {
           ref={textareaRef}
           className="nb-input-textarea"
           value={text}
-          onChange={(e) => { setText(e.target.value); resize(); }}
+          onChange={(e) => {
+            setText(e.target.value);
+            resize();
+            const pos = e.target.selectionStart ?? 0;
+            mention.handleChange(e.target.value, pos);
+            // Update caret position for popup
+            const rect = e.target.getBoundingClientRect();
+            setCaretPos({ x: rect.left + 10, y: rect.top });
+          }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onDrop={(e) => {
             e.preventDefault();
-            const dropped = e.dataTransfer.getData('text/plain');
+            const MAX_DROP = 10000;
+            const dropped = e.dataTransfer.getData('text/plain').slice(0, MAX_DROP);
             if (dropped) setText((prev) => prev ? `${prev}\n${dropped}` : dropped);
           }}
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
@@ -427,6 +451,11 @@ function NotebookInputBar() {
           </button>
         </div>
       </div>
+      <MentionPopup
+        state={mention.state}
+        position={caretPos}
+        onSelect={(i) => mention.selectItem(i, () => text, setText)}
+      />
     </div>
   );
 }
