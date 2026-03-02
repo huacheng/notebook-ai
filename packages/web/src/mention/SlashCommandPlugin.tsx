@@ -1,11 +1,13 @@
 import type { MentionPlugin, Command } from './types';
 import { useStore } from '../store';
+import { createT } from '../i18n';
 
 export const SlashCommandPlugin: MentionPlugin<Command> = {
   trigger: '/',
 
   fetchItems: async (query: string) => {
-    const { commands, commandsLoaded, setCommands, authToken } = useStore.getState();
+    const { commands, commandsLoaded, setCommands, authToken, language } = useStore.getState();
+    const t = createT(language);
 
     let cmds = commands;
     if (!commandsLoaded) {
@@ -24,18 +26,23 @@ export const SlashCommandPlugin: MentionPlugin<Command> = {
     }
 
     const q = query.toLowerCase();
-    return cmds.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.label.toLowerCase().includes(q)
-    );
+    return cmds.filter(c => {
+      const label = t(`cmd.${c.name}`);
+      return c.name.toLowerCase().includes(q) || label.toLowerCase().includes(q);
+    });
   },
 
-  renderItem: (cmd: Command, selected: boolean) => (
-    <div className={`mention-cmd ${selected ? 'selected' : ''}`}>
-      <span className="mention-cmd-name">/{cmd.name}</span>
-      <span className="mention-cmd-label">{cmd.label}</span>
-    </div>
-  ),
+  renderItem: (cmd: Command, selected: boolean) => {
+    const { language } = useStore.getState();
+    const t = createT(language);
+    const label = t(`cmd.${cmd.name}`);
+    return (
+      <div className={`mention-cmd ${selected ? 'selected' : ''}`}>
+        <span className="mention-cmd-name">/{cmd.name}</span>
+        <span className="mention-cmd-label">{label}</span>
+      </div>
+    );
+  },
 
   onSelect: (cmd: Command) => `/${cmd.name} `,
 };

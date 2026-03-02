@@ -212,6 +212,23 @@ export const messages: Record<Language, Record<string, string>> = {
     'welcome.sidebarHint': 'Or use the sidebar on the left to create and select a project',
     'welcome.creating': 'Creating...',
 
+    // ── Commands (Mention Popup) ─────────────────────────────────────────
+    'cmd.task-ai:target': 'Define task objectives and requirements in .target.md',
+    'cmd.task-ai:research': 'Deep research for objective refinement and feasibility',
+    'cmd.task-ai:read': 'Read documents and synthesize into .references/ files',
+    'cmd.task-ai:plan': 'Generate implementation plan from requirements',
+    'cmd.task-ai:check': 'Check plan feasibility at key checkpoints',
+    'cmd.task-ai:verify': 'Run domain-adapted tests and verification',
+    'cmd.task-ai:exec': 'Execute the implementation plan step by step',
+    'cmd.task-ai:auto': 'Autonomous loop: plan → check → exec cycle',
+    'cmd.task-ai:merge': 'Merge completed task branch to main',
+    'cmd.task-ai:list': 'Query task status, progress, and dependencies',
+    'cmd.task-ai:library': 'Search cross-task knowledge library',
+    'cmd.commit': 'Create a git commit with staged changes',
+    'cmd.commit-push-pr': 'Commit, push to remote, and open a pull request',
+    'cmd.simplify': 'Review and simplify code for clarity and efficiency',
+    'cmd.code-review:code-review': 'Code review a pull request against standards',
+
     // ── NotebookCreationPanel ─────────────────────────────────────────────
     'nbCreate.title': 'New Notebook',
     'nbCreate.subtitle': 'Create a new notebook or import an existing one',
@@ -432,6 +449,23 @@ export const messages: Record<Language, Record<string, string>> = {
     'welcome.createProject': '创建项目',
     'welcome.sidebarHint': '或使用左侧边栏创建和选择项目',
     'welcome.creating': '创建中...',
+
+    // ── Commands (Mention Popup) ─────────────────────────────────────────
+    'cmd.task-ai:target': '在 .target.md 中定义任务目标和需求',
+    'cmd.task-ai:research': '深度调研，细化目标与可行性分析',
+    'cmd.task-ai:read': '阅读文档并合成到 .references/ 文件',
+    'cmd.task-ai:plan': '根据需求生成实现计划',
+    'cmd.task-ai:check': '在关键检查点验证计划可行性',
+    'cmd.task-ai:verify': '运行领域适配的测试和验证',
+    'cmd.task-ai:exec': '逐步执行实现计划',
+    'cmd.task-ai:auto': '自动循环：plan → check → exec',
+    'cmd.task-ai:merge': '将完成的任务分支合并到 main',
+    'cmd.task-ai:list': '查询任务状态、进度和依赖关系',
+    'cmd.task-ai:library': '搜索跨任务知识库',
+    'cmd.commit': '使用暂存的更改创建 git commit',
+    'cmd.commit-push-pr': '提交、推送到远程并创建 PR',
+    'cmd.simplify': '审查并简化代码，提升清晰度和效率',
+    'cmd.code-review:code-review': '按标准进行代码审查',
 
     // ── NotebookCreationPanel ─────────────────────────────────────────────
     'nbCreate.title': '新建 Notebook',

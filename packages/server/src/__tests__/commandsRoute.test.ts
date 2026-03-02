@@ -13,7 +13,7 @@ describe('/api/commands route', () => {
     expect(src).toMatch(/task-ai:target/);
     expect(src).toMatch(/task-ai:research/);
     expect(src).toMatch(/task-ai:read/);
-    expect(src).toMatch(/task-ai:library search/);
+    expect(src).toMatch(/task-ai:library/);
   });
 
   it('index.ts should register /api/commands route', () => {
