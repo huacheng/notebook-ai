@@ -6293,3 +6293,80 @@ button:focus-visible {
   font-size: 15px;
   color: var(--text-secondary);
 }
+
+/* ── Mention Popup ──────────────────────────────────────────────────────────── */
+
+.mention-popup {
+  position: fixed;
+  min-width: 200px;
+  max-width: 400px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.mention-path {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.mention-empty {
+  padding: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.mention-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mention-item:hover,
+.mention-item.selected {
+  background: var(--color-primary-light);
+}
+
+.mention-cmd-name {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.mention-cmd-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.mention-file-icon {
+  flex-shrink: 0;
+}
+
+.mention-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-cell-idx {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.mention-cell-preview {
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
