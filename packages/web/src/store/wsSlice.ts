@@ -1,6 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { WSServerMessage } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
+import type { Command } from '../mention/types';
+import DOMPurify from 'dompurify';
 import { applyToSession } from './wsRouting';
 import {
   appendOutputToNotebook,
@@ -24,6 +26,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'submitToolResult'
   | 'urlCapturing' | 'captureUrl'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
+  | 'commands' | 'commandsLoaded' | 'setCommands'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -31,6 +34,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   restartPhase: 'idle',
   restartError: '',
   lastEventIndex: {},
+  commands: [] as Command[],
+  commandsLoaded: false,
 
   async connectWebSocket() {
     // Clean up any pending (CONNECTING) WS from a previous call
@@ -63,7 +68,15 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error('ticket fetch failed');
+        if (!res.ok) {
+          // D3: If auth fails (401/403), clear token and stop — don't enter reconnect loop
+          if (res.status === 401 || res.status === 403) {
+            sessionStorage.removeItem('nb-auth-token');
+            set({ wsStatus: 'disconnected', authToken: null });
+            return;
+          }
+          throw new Error('ticket fetch failed');
+        }
         const { ticket } = await res.json() as { ticket: string };
         wsUrl = `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
       } catch {
@@ -109,7 +122,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       // Only promote to store if this is still the current pending WS
       if (_pendingWs !== ws) { ws.close(); return; }
       _pendingWs = null;
-      set({ ws, wsStatus: 'connected' });
+      // D3-3: Clear stale stream buffers on reconnect (stream context is invalidated)
+      set({ ws, wsStatus: 'connected', streamBuffer: {} });
       // Re-subscribe to all open notebook sessions on reconnect
       const { openNotebooks, sessionId, lastEventIndex } = get();
       const subscribedIds = new Set(
@@ -145,22 +159,26 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     };
 
     ws.onmessage = (event: MessageEvent) => {
+      // D2: guard against non-string data (e.g. Blob/ArrayBuffer from binary frames)
+      if (typeof event.data !== 'string') return;
       let parsed: WSServerMessage;
       try {
-        parsed = JSON.parse(event.data as string) as WSServerMessage;
+        parsed = JSON.parse(event.data) as WSServerMessage;
       } catch {
         return;
       }
+      // Server augments messages with event_index and session_id at transport layer
+      const envelope = parsed as WSServerMessage & { event_index?: number; session_id?: string };
       // Track event_index for resume-after
-      const eventIndex = (parsed as any).event_index;
-      const eventSessionId = (parsed as any).session_id;
+      const eventIndex = envelope.event_index;
+      const eventSessionId = envelope.session_id;
       if (typeof eventIndex === 'number' && typeof eventSessionId === 'string') {
         set((state) => ({
           lastEventIndex: { ...state.lastEventIndex, [eventSessionId]: eventIndex },
         }));
       }
       const store = get();
-      const msgSessionId = (parsed as any).session_id as string | undefined;
+      const msgSessionId = envelope.session_id;
       switch (parsed.type) {
         case 'cell_output':
           if (msgSessionId) {
@@ -198,9 +216,9 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           store.flushStreamBuffer(parsed.cell_id);
           if (msgSessionId) {
             set((state) => applyToSession(state, msgSessionId, (nb) =>
-              setCellStatusInNotebook(nb, parsed.cell_id, (parsed as any).status ?? 'completed')));
+              setCellStatusInNotebook(nb, parsed.cell_id, parsed.status ?? 'completed')));
           } else {
-            store.setCellStatus(parsed.cell_id, (parsed as any).status ?? 'completed');
+            store.setCellStatus(parsed.cell_id, parsed.status ?? 'completed');
           }
           break;
         case 'git_diff':
@@ -220,7 +238,9 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           const date = new Date().toISOString().slice(0, 10);
           const filename = `${slug || 'notebook'}-${date}.html`;
 
-          const blob = new Blob([parsed.html], { type: 'text/html' });
+          // D2: sanitize exported HTML to prevent XSS when user opens the file
+          const cleanHtml = DOMPurify.sanitize(parsed.html, { WHOLE_DOCUMENT: true, FORCE_BODY: true });
+          const blob = new Blob([cleanHtml], { type: 'text/html' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -261,32 +281,28 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             sessionId: null,
             activeNotebookId: null,
             workspaceDir: null,
-            sessionNotice: '此 Notebook 已在另一个标签页中打开，请先关闭它。',
+            sessionNotice: 'This notebook is already open in another tab. Please close it first.',
           });
           break;
         case 'cells_removed':
-          set((s: any) => {
-            const pending = s.pendingDeletes as Set<string>;
-            return {
-              notebook: s.notebook ? {
-                ...s.notebook,
-                cells: s.notebook.cells.filter((c: any) => !pending.has(c.id)),
-              } : null,
-              editMode: false,
-              pendingDeletes: new Set<string>(),
-              editSavePhase: 'idle',
-              editSaveError: '',
-            };
-          });
+          set((s) => ({
+            notebook: s.notebook ? {
+              ...s.notebook,
+              cells: s.notebook.cells.filter((c) => !s.pendingDeletes.has(c.id)),
+            } : null,
+            editMode: false,
+            pendingDeletes: new Set<string>(),
+            editSavePhase: 'idle' as const,
+            editSaveError: '',
+          }));
           break;
         case 'cells_loaded': {
-          const { cells, offset } = parsed as any;
-          store.prependCells(cells, offset);
+          store.prependCells(parsed.cells, parsed.offset);
           set({ loadingOlderCells: false });
           break;
         }
         case 'cells_remove_failed':
-          set({ editSavePhase: 'error', editSaveError: (parsed as any).error ?? 'Unknown error' });
+          set({ editSavePhase: 'error', editSaveError: parsed.error ?? 'Unknown error' });
           break;
         case 'session_restarted':
           set({ restartPhase: 'done' });
@@ -304,10 +320,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             return {
               notebook: {
                 ...state.notebook,
-                cells: state.notebook.cells.map((c: any) => ({
+                cells: state.notebook.cells.map((c) => ({
                   ...c,
-                  ...(c.outputs ? { outputs: [] } : {}),
-                  status: 'pending',
+                  ...('outputs' in c ? { outputs: [] } : {}),
+                  status: 'pending' as const,
                 })),
               },
             };
@@ -315,14 +331,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         case 'rerun_failed':
           // Surface rerun error via restartPhase/restartError (shared UI)
-          set({ restartPhase: 'error', restartError: (parsed as any).error ?? 'Rerun failed' });
+          set({ restartPhase: 'error', restartError: parsed.error ?? 'Rerun failed' });
           break;
         case 'cell_interrupted':
           // No-op: the actual cell completion comes via execution_complete
           break;
         case 'model_changed': {
-          const newModel = (parsed as any).model as string;
-          const changedSessionId = (parsed as any).session_id as string;
+          const newModel = parsed.model;
+          const changedSessionId = parsed.session_id;
           set((state) => {
             // Update state.notebook if it matches
             const updatedNotebook = state.notebook
@@ -349,13 +365,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         }
         case 'system_message':
           // Log system messages (e.g. context compaction) for future UI display
-          console.log(`[ws] system: ${(parsed as any).subtype} — ${(parsed as any).message}`);
+          console.log(`[ws] system: ${parsed.subtype} — ${parsed.message}`);
           break;
         case 'git_changed':
           window.dispatchEvent(new CustomEvent('nb:git-changed', { detail: parsed }));
           break;
         case 'files_changed': {
-          const deleted = handleFilesPush(parsed as any);
+          const deleted = handleFilesPush(parsed);
           if (deleted.length > 0) {
             store.closeDeletedFileTabs(deleted);
           }
@@ -388,13 +404,12 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         case 'url_capture_result': {
           set({ urlCapturing: false });
-          const ucr = parsed as any;
-          if (ucr.error) {
-            console.error('[ws] url_capture error:', ucr.error);
-          } else if (ucr.file_path) {
+          if (parsed.error) {
+            console.error('[ws] url_capture error:', parsed.error);
+          } else if (parsed.file_path) {
             const sid = get().sessionId;
             if (sid) {
-              get().openFileTab({ path: ucr.file_path, source: 'workspace', sessionId: sid });
+              get().openFileTab({ path: parsed.file_path, source: 'workspace', sessionId: sid });
             }
           }
           break;
@@ -462,6 +477,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'unsubscribe', session_id: sessionId }));
     }
+    // D4-3: Clean up lastEventIndex entry to prevent unbounded growth
+    set((state) => {
+      const { [sessionId]: _, ...rest } = state.lastEventIndex;
+      return { lastEventIndex: rest };
+    });
   },
 
   executeCell(cellId) {
@@ -588,4 +608,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   clearPendingSuggestions() {
     set({ pendingSuggestions: null });
   },
+
+  // ── Commands (slash command caching) ────────────────────────────────
+  setCommands: (commands: Command[]) => set({ commands, commandsLoaded: true }),
 });

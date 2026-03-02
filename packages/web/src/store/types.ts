@@ -10,6 +10,7 @@ import type {
 } from '@notebook-ai/shared';
 import type { ProjectListItem } from './projectSlice';
 import type { PluginStatusResponse } from '../api/plugin';
+import type { Command } from '../mention/types';
 
 /**
  * Full combined store interface.
@@ -88,6 +89,11 @@ export interface NotebookStore {
   restartPhase: 'idle' | 'restarting' | 'done' | 'error';
   restartError: string;
   lastEventIndex: Record<string, number>;
+
+  // ── Commands state (slash command caching) ────────────────────────────
+  commands: Command[];
+  commandsLoaded: boolean;
+  setCommands: (commands: Command[]) => void;
 
   // ── Auth actions ───────────────────────────────────────────────────────
   checkAuthStatus(): Promise<void>;
