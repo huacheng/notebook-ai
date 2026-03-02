@@ -94,7 +94,9 @@ html,
 body,
 #root {
   height: 100%;
-  min-height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 body {
@@ -134,6 +136,7 @@ textarea.cell-input {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -198,20 +201,6 @@ textarea.cell-input {
 
 .toolbar-right {
   justify-content: flex-end;
-}
-
-/* Tab switcher floats absolutely centered so it stays in the middle
-   regardless of how wide the left/right sections are. */
-.toolbar-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
-  pointer-events: none;
-}
-
-.toolbar-center > * {
-  pointer-events: auto;
 }
 
 .toolbar-brand {
@@ -386,35 +375,6 @@ textarea.cell-input {
   cursor: not-allowed;
 }
 
-/* ── Toolbar URL input ─────────────────────────────────────── */
-.toolbar-url-input {
-  height: 26px;
-  width: 320px;
-  padding: 0 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-sm);
-  color: var(--toolbar-text);
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  outline: none;
-  transition: border-color 0.15s;
-}
-.toolbar-url-input::placeholder { color: rgba(250, 250, 249, 0.4); }
-.toolbar-url-input:focus { border-color: var(--color-primary); }
-.toolbar-url-input:disabled { opacity: 0.5; }
-.toolbar-url-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  vertical-align: middle;
-  margin-left: 6px;
-}
-
 /* ── Language toggle button ────────────────────────────────── */
 .toolbar-lang-btn {
   font-weight: 600;
@@ -468,7 +428,6 @@ textarea.cell-input {
 .sidebar-bottom {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   min-height: 0;
 }
 
@@ -1204,6 +1163,15 @@ textarea.cell-input {
   border-color: var(--color-primary);
 }
 .notebook-load-more:disabled { opacity: 0.6; cursor: wait; }
+
+/* D4: Invisible sentinel for scroll-triggered lazy loading */
+.notebook-load-more-sentinel {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-sm);
+}
 
 .notebook-empty {
   text-align: center;
@@ -3267,6 +3235,56 @@ textarea.cell-input {
   cursor: not-allowed;
 }
 
+/* Login page language toggle — positioned top-right */
+.login-lang-toggle {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  z-index: 10;
+}
+
+/* ── Shared Language Toggle Component ────────────────────────────────────── */
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.lang-toggle--compact {
+  /* For mobile header / toolbar — inherits mobile-lang-btn styling via className */
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  min-width: 32px;
+  height: var(--mobile-touch-target, 36px);
+  color: inherit;
+}
+
+.lang-toggle--compact:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.lang-toggle--pill {
+  /* For login/register pages */
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius-lg);
+  padding: 8px 16px;
+  min-width: 48px;
+  backdrop-filter: blur(8px);
+}
+
+.lang-toggle--pill:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
 .login-footer {
   margin-top: 24px;
   text-align: center;
@@ -4273,6 +4291,29 @@ button:focus-visible {
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: pm-spin 0.7s linear infinite;
+}
+
+/* Mobile variant — modal-style container */
+.pm-container--mobile {
+  background: var(--bg-cell);
+  border-radius: var(--radius-lg);
+  width: calc(100vw - 32px);
+  max-width: 480px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  box-shadow: var(--shadow-dropdown);
+}
+
+.pm-container--mobile .pm-overlay {
+  position: absolute;
+  border-radius: var(--radius-lg);
+}
+
+.pm-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
 }
 
 /* ── Signal bars (ping/pong latency) ─────────────────── */
@@ -5327,14 +5368,14 @@ button:focus-visible {
 .project-item-menu {
   position: absolute;
   right: var(--space-sm);
+  top: 100%;
   margin-top: 2px;
   background: var(--bg-cell);
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 100;
   min-width: 100px;
-  overflow: hidden;
 }
 
 .project-item-menu-item {
@@ -6373,6 +6414,17 @@ button:focus-visible {
   background: var(--bg-cell);
 }
 
+/* Mobile variant — modal-style container */
+.mm-container--mobile {
+  background: var(--bg-cell);
+  border-radius: var(--radius-lg);
+  width: calc(100vw - 32px);
+  max-width: 400px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  box-shadow: var(--shadow-dropdown);
+}
+
 /* ── Model-switch full-screen overlay ────────────────────── */
 .model-switch-overlay {
   position: fixed;
@@ -6518,6 +6570,50 @@ button:focus-visible {
   color: inherit;
 }
 
+/* Mobile variant — fixed bottom input bar */
+.notebook-input-bar--mobile {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 0;
+  z-index: 100;
+}
+
+.notebook-input-bar--mobile .notebook-input-row {
+  margin-bottom: var(--space-xs);
+}
+
+.notebook-input-bar--mobile .nb-input-textarea {
+  font-size: 14px;
+  min-height: 36px;
+  max-height: 100px;
+  resize: none;
+}
+
+.notebook-input-bar--mobile .nb-cmd-toolbar {
+  border-radius: var(--radius-md);
+}
+
+.notebook-input-bar--mobile .nb-cmd-btns {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.notebook-input-bar--mobile .nb-cmd-btns::-webkit-scrollbar {
+  display: none;
+}
+
+.notebook-input-bar--mobile .nb-cmd-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    MOBILE UI STYLES
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -6582,7 +6678,9 @@ button:focus-visible {
 .mobile-back-btn,
 .mobile-menu-btn,
 .mobile-settings-btn,
-.mobile-header-btn {
+.mobile-header-btn,
+.mobile-plugin-btn,
+.mobile-lang-btn {
   width: var(--mobile-touch-target);
   height: var(--mobile-touch-target);
   display: flex;
@@ -6596,11 +6694,100 @@ button:focus-visible {
   transition: background 0.15s ease;
 }
 
+.mobile-lang-btn {
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  min-width: 32px;
+}
+
 .mobile-back-btn:hover,
 .mobile-menu-btn:hover,
 .mobile-settings-btn:hover,
-.mobile-header-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+.mobile-header-btn:hover,
+.mobile-plugin-btn:hover,
+.mobile-lang-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Mobile Notebook Actions Sheet ──────────────────────────────────────── */
+.mobile-interrupt-btn {
+  background: var(--color-error) !important;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.mobile-actions-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-cell);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.mobile-actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border-default);
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+}
+
+.mobile-actions-header button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.mobile-actions-list {
+  padding: var(--space-sm);
+}
+
+.mobile-action-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.mobile-action-item:hover:not(:disabled) {
+  background: var(--bg-cell-hover);
+}
+
+.mobile-action-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mobile-action-icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+}
+
+.mobile-action-label {
+  flex: 1;
 }
 
 .mobile-conn-dot {
@@ -6701,7 +6888,9 @@ button:focus-visible {
   min-width: 0;
 }
 
-.mobile-list-edit-btn {
+/* D5: Keep old class for backwards compat, but add menu-btn as the new standard */
+.mobile-list-edit-btn,
+.mobile-list-menu-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6716,14 +6905,56 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
-.mobile-list-edit-btn:hover {
+.mobile-list-edit-btn:hover,
+.mobile-list-menu-btn:hover {
   background: var(--color-primary-light);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
-.mobile-list-edit-btn:active {
+.mobile-list-edit-btn:active,
+.mobile-list-menu-btn:active {
   background: rgba(14, 165, 233, 0.15);
+}
+
+/* D5: Mobile dropdown menu (consistent with desktop project-item-menu) */
+.mobile-item-menu {
+  position: absolute;
+  right: var(--space-sm);
+  top: 100%;
+  margin-top: 4px;
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 50;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.mobile-item-menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.mobile-item-menu-item:active {
+  background: var(--bg-cell-hover);
+}
+
+.mobile-item-menu-item--danger {
+  color: var(--color-error);
+}
+
+.mobile-item-menu-item--danger:active {
+  background: var(--bg-error);
 }
 
 /* ── Mobile Footer ───────────────────────────────────────────────────────── */
@@ -6936,6 +7167,7 @@ button:focus-visible {
 
 /* ── Mobile Notebook Content ─────────────────────────────────────────────── */
 .mobile-notebook-content {
+  position: relative;
   padding-bottom: calc(var(--mobile-input-bar-height) + var(--space-lg));
 }
 
@@ -6943,6 +7175,36 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+/* Mobile scroll-to-bottom floating button */
+.mobile-scroll-to-bottom {
+  position: absolute;
+  bottom: calc(var(--mobile-input-bar-height) + var(--space-xl));
+  right: var(--space-md);
+  z-index: 25;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s, color 0.2s, transform 0.2s;
+  opacity: 0.85;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.mobile-scroll-to-bottom:active {
+  transform: scale(0.95);
+  opacity: 1;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 /* ── Mobile Connection Banner ────────────────────────────────────────────── */
@@ -7124,6 +7386,74 @@ button:focus-visible {
 }
 
 .mobile-sheet-plugin-version {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-output);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* D5: Mobile model/plugin modals - consistent with annotation-modal */
+.mobile-model-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  width: 100%;
+  padding: var(--space-md);
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: left;
+}
+
+.mobile-model-option:hover {
+  background: var(--bg-cell-hover);
+}
+
+.mobile-model-option.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.mobile-model-option-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.mobile-model-option-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.mobile-model-option-check {
+  position: absolute;
+  right: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.mobile-plugin-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.mobile-plugin-item-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.mobile-plugin-item-version {
   font-size: 12px;
   color: var(--text-secondary);
   background: var(--bg-output);

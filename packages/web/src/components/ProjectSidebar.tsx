@@ -52,9 +52,10 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
 
 
 
-function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete, onRequestRename }: {
+function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete, onRequestRename, anchorRect }: {
   projectId: string; projectSlug: string; authToken: string | null;
   onClose: () => void; onRequestDelete: () => void; onRequestRename: () => void;
+  anchorRect?: DOMRect;
 }) {
   const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -82,8 +83,15 @@ function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequest
     onClose();
   };
 
+  // Use fixed positioning when anchorRect is provided
+  const style: React.CSSProperties = anchorRect ? {
+    position: 'fixed',
+    top: anchorRect.bottom + 4,
+    right: window.innerWidth - anchorRect.right,
+  } : {};
+
   return (
-    <div className="project-item-menu" ref={menuRef} onClick={e => e.stopPropagation()}>
+    <div className="project-item-menu" ref={menuRef} onClick={e => e.stopPropagation()} style={style}>
       <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>
       <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>
       <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>{t('sidebar.delete')}</button>
@@ -99,6 +107,7 @@ function ProjectList() {
   const [newTitle, setNewTitle] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
   const [createPhase, setCreatePhase] = useState<CreatePhase>('idle');
@@ -151,7 +160,16 @@ function ProjectList() {
               <span className="project-list-item-title">{p.title}</span>
               <button
                 className="project-item-menu-btn"
-                onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (menuOpenId === p.id) {
+                    setMenuOpenId(null);
+                    setMenuAnchorRect(null);
+                  } else {
+                    setMenuOpenId(p.id);
+                    setMenuAnchorRect((e.target as HTMLElement).getBoundingClientRect());
+                  }
+                }}
                 title={t('sidebar.projectActions')}
               >⋯</button>
             </div>
@@ -163,7 +181,8 @@ function ProjectList() {
                 projectId={p.id}
                 projectSlug={p.slug}
                 authToken={authToken}
-                onClose={() => setMenuOpenId(null)}
+                anchorRect={menuAnchorRect ?? undefined}
+                onClose={() => { setMenuOpenId(null); setMenuAnchorRect(null); }}
                 onRequestDelete={() => setDeleteTarget({ id: p.id, title: p.title })}
                 onRequestRename={() => setRenameTarget({ id: p.id, title: p.title })}
               />
@@ -382,14 +401,13 @@ function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone 
                 onKeyDown={handleKeyDown}
                 placeholder={t('sidebar.newName')}
                 maxLength={MAX_TITLE_LENGTH}
-                className={nameError ? 'input-error' : ''}
-                style={{ width: '100%', padding: 'var(--space-sm) var(--space-md)', fontSize: 'var(--font-size-sm)' }}
+                className={`annotation-modal-input${nameError ? ' input-error' : ''}`}
               />
               {nameError && <div className="create-form-error">{nameError}</div>}
             </div>
             <div className="annotation-modal-actions">
               <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>{t('sidebar.cancel')}</button>
-              <button className="annotation-modal-btn" onClick={handleConfirm} disabled={!canSave}>{t('sidebar.rename')}</button>
+              <button className="annotation-modal-btn annotation-modal-confirm" onClick={handleConfirm} disabled={!canSave}>{t('sidebar.rename')}</button>
             </div>
           </>
         )}
@@ -425,9 +443,10 @@ function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone 
   );
 }
 
-function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted, onRequestRename }: {
+function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted, onRequestRename, anchorRect }: {
   projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean;
   onClose: () => void; onDeleted?: () => void; onRequestRename?: () => void;
+  anchorRect?: DOMRect;
 }) {
   const t = useT();
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
@@ -460,9 +479,16 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
 
   const displayName = relPath.split('/').pop() || relPath;
 
+  // Use fixed positioning when anchorRect is provided
+  const style: React.CSSProperties = anchorRect ? {
+    position: 'fixed',
+    top: anchorRect.bottom + 4,
+    right: window.innerWidth - anchorRect.right,
+  } : {};
+
   return (
     <>
-      <div className="project-item-menu" ref={menuRef}>
+      <div className="project-item-menu" ref={menuRef} style={style}>
         {onRequestRename && <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>}
         {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
         <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>{t('sidebar.delete')}</button>
@@ -498,6 +524,7 @@ function FileBrowser() {
   const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
   const [nbCreateError, setNbCreateError] = useState('');
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
+  const [nbMenuAnchorRect, setNbMenuAnchorRect] = useState<DOMRect | null>(null);
   const [nbRenameTarget, setNbRenameTarget] = useState<{ path: string; name: string } | null>(null);
   const [currentSubPath, setCurrentSubPath] = useState('.');
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
@@ -660,7 +687,15 @@ function FileBrowser() {
       <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
         <button
           className="fp-action"
-          onClick={() => setNbMenuPath(nbMenuPath === relPath ? null : relPath)}
+          onClick={(e) => {
+            if (nbMenuPath === relPath) {
+              setNbMenuPath(null);
+              setNbMenuAnchorRect(null);
+            } else {
+              setNbMenuPath(relPath);
+              setNbMenuAnchorRect((e.target as HTMLElement).getBoundingClientRect());
+            }
+          }}
           title={t('sidebar.notebookActions')}
         >⋯</button>
         {nbMenuPath === relPath && activeProjectId && (
@@ -670,14 +705,15 @@ function FileBrowser() {
             baseUrl={`/api/projects/${activeProjectId}`}
             authToken={authToken}
             showExport={isNbDir}
-            onClose={() => setNbMenuPath(null)}
+            anchorRect={nbMenuAnchorRect ?? undefined}
+            onClose={() => { setNbMenuPath(null); setNbMenuAnchorRect(null); }}
             onDeleted={() => setFileRefreshKey(k => k + 1)}
             onRequestRename={() => setNbRenameTarget({ path: relPath, name: displayName })}
           />
         )}
       </div>
     );
-  }, [nbMenuPath, activeProjectId, authToken]);
+  }, [nbMenuPath, nbMenuAnchorRect, activeProjectId, authToken]);
 
   return (
     <div className="file-browser">

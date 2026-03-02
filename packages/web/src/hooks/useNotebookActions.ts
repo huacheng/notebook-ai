@@ -298,7 +298,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
 async function openNotebookViaWs(
   ws: WebSocket,
   notebookPath: string,
-  lazy = true
+  lazy = false // D4: Default to non-lazy for proper pagination support
 ): Promise<NotebookOpenResult> {
   const requestId = crypto.randomUUID();
 

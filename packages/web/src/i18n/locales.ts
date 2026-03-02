@@ -9,8 +9,6 @@ export const messages: Record<Language, Record<string, string>> = {
     'toolbar.openNotebookFirst': 'Open a notebook first, then select a model',
     'toolbar.logout': 'Logout',
     'toolbar.signOut': 'Sign out',
-    'toolbar.urlPlaceholder': 'Paste url here to view in Fileviewer',
-    'toolbar.urlTitle': 'Paste URL, Ctrl+Enter to screenshot',
 
     // ── Connection ───────────────────────────────────────────────────────
     'conn.connected': 'Connected',
@@ -21,6 +19,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'conn.latency': 'Latency: {0}ms',
 
     // ── StatusBar ────────────────────────────────────────────────────────
+    'status.actions': 'Actions',
     'status.edit': 'Edit',
     'status.editTitle': 'Edit mode — select cells to delete',
     'status.done': 'Done',
@@ -274,8 +273,6 @@ export const messages: Record<Language, Record<string, string>> = {
     'toolbar.openNotebookFirst': '请先打开一个 notebook，然后选择模型',
     'toolbar.logout': '退出',
     'toolbar.signOut': '退出登录',
-    'toolbar.urlPlaceholder': '粘贴 URL 在文件查看器中查看',
-    'toolbar.urlTitle': '粘贴 URL，Ctrl+Enter 截图',
 
     // ── Connection ───────────────────────────────────────────────────────
     'conn.connected': '已连接',
@@ -286,6 +283,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'conn.latency': '延迟: {0}ms',
 
     // ── StatusBar ────────────────────────────────────────────────────────
+    'status.actions': '操作',
     'status.edit': '编辑',
     'status.editTitle': '编辑模式 — 选择要删除的 cell',
     'status.done': '完成',

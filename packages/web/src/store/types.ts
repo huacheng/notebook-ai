@@ -218,10 +218,6 @@ export interface NotebookStore {
   openMobileFileViewer(path: string, source: 'workspace' | 'library' | 'deliverables'): void;
   closeMobileFileViewer(): void;
 
-  // ── URL Capture ────────────────────────────────────────────────────────
-  urlCapturing: boolean;
-  captureUrl(url: string): void;
-
   // ── SuggestNextStep ──────────────────────────────────────────────────
   pendingSuggestions: { cellId: string; suggestions: string[] } | null;
   setPendingSuggestions(s: { cellId: string; suggestions: string[] }): void;

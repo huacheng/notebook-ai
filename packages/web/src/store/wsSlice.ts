@@ -25,7 +25,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
   | 'interruptCell'
   | 'submitToolResult'
-  | 'urlCapturing' | 'captureUrl'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
   | 'commands' | 'commandsLoaded' | 'setCommands'
 >> = (set, get) => ({
@@ -457,18 +456,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'git_diff_error':
           window.dispatchEvent(new CustomEvent('nb:git-diff-error', { detail: parsed }));
           break;
-        case 'url_capture_result': {
-          set({ urlCapturing: false });
-          if (parsed.error) {
-            console.error('[ws] url_capture error:', parsed.error);
-          } else if (parsed.file_path) {
-            const sid = get().sessionId;
-            if (sid) {
-              get().openFileTab({ path: parsed.file_path, source: 'workspace', sessionId: sid });
-            }
-          }
-          break;
-        }
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };
@@ -641,16 +628,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         content,
       }));
     }
-  },
-
-  // ── URL Capture ──────────────────────────────────────────────────────
-  urlCapturing: false,
-
-  captureUrl(url: string) {
-    const { ws, sessionId } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    set({ urlCapturing: true });
-    ws.send(JSON.stringify({ type: 'url_capture', session_id: sessionId, url }));
   },
 
   // ── SuggestNextStep ──────────────────────────────────────────────────

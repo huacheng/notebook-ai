@@ -1,5 +1,6 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 import { MobileHeader } from './MobileHeader';
 import { MobileDrawer } from './MobileDrawer';
 import { MobileInputBar } from './MobileInputBar';
@@ -7,36 +8,154 @@ import { MobileFileViewer } from './MobileFileViewer';
 import { MobileSplitView } from './MobileSplitView';
 import { MobileModelSheet } from './MobileModelSheet';
 import { MobilePluginSheet } from './MobilePluginSheet';
+import { MobileNotebookActions } from './MobileNotebookActions';
 import { Cell } from '../Cell';
+import { FileSection } from '../FileSection';
 import { useOrientation } from '../../hooks/useOrientation';
+import { useWatcher } from '../../hooks/useWatcher';
+import { getDeliverablesPath } from '../../utils/deliverablesPath';
+import { shouldShowScrollBtn } from '../../utils/scrollToBottom';
 
 /**
  * Mobile Notebook View (Level 3)
  * The main notebook interaction interface for mobile.
  */
 export function MobileNotebookView() {
+  const t = useT();
   const orientation = useOrientation();
-  const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
-  const openNotebooks = useStore((s) => s.openNotebooks);
   const setMobileView = useStore((s) => s.setMobileView);
   const leftDrawerOpen = useStore((s) => s.leftDrawerOpen);
   const rightDrawerOpen = useStore((s) => s.rightDrawerOpen);
   const closeDrawers = useStore((s) => s.closeDrawers);
   const mobileFileViewerOpen = useStore((s) => s.mobileFileViewerOpen);
+  const openMobileFileViewer = useStore((s) => s.openMobileFileViewer);
+
+  // Use main notebook state (same as desktop) for consistency with lazy loading
+  const notebook = useStore((s) => s.notebook);
+  const cellsOffset = useStore((s) => s.cellsOffset);
+  const loadingOlderCells = useStore((s) => s.loadingOlderCells);
+  const cells = notebook?.cells ?? [];
+
+  // File section state (same as desktop for consistency)
+  const activeProjectId = useStore((s) => s.activeProjectId);
+  const activeProjectPath = useStore((s) => s.activeProjectPath);
+  const workspaceDir = useStore((s) => s.workspaceDir);
+  const sessionId = useStore((s) => s.sessionId);
+  const authToken = useStore((s) => s.authToken);
+
+  // Refresh keys for file sections
+  const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState(0);
+  const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
+  const [delivRefreshKey, setDelivRefreshKey] = useState(0);
+
+  // Calculate deliverables path
+  const delivPath = getDeliverablesPath(workspaceDir, activeProjectPath);
+
+  // WS-based file change detection (same as desktop)
+  useWatcher('files', { projectId: activeProjectId, dirPath: workspaceDir ?? undefined });
+  useWatcher('files', { projectId: activeProjectId, dirPath: delivPath });
+
+  // Listen for file change events
+  useEffect(() => {
+    const handler = () => {
+      setWorkspaceRefreshKey(k => k + 1);
+      setDelivRefreshKey(k => k + 1);
+    };
+    window.addEventListener('nb:files-changed', handler);
+    return () => window.removeEventListener('nb:files-changed', handler);
+  }, []);
+
+  // Library change listener
+  useEffect(() => {
+    const handler = () => setLibraryRefreshKey(k => k + 1);
+    window.addEventListener('nb:library-changed', handler);
+    return () => window.removeEventListener('nb:library-changed', handler);
+  }, []);
+
+  // File click handlers
+  const handleWorkspaceFileClick = (subPath: string, name: string) => {
+    const relPath = subPath === '.' ? name : `${subPath}/${name}`;
+    openMobileFileViewer(relPath, 'workspace');
+    closeDrawers();
+  };
+
+  const handleLibraryFileClick = (subPath: string, name: string) => {
+    const relPath = subPath === '.' ? name : `${subPath}/${name}`;
+    openMobileFileViewer(relPath, 'library');
+    closeDrawers();
+  };
+
+  const handleDelivFileClick = (subPath: string, name: string) => {
+    const relPath = subPath === '.' ? name : `${subPath}/${name}`;
+    openMobileFileViewer(relPath, 'deliverables');
+    closeDrawers();
+  };
 
   const contentRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevHeightRef = useRef(0);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  const activeTab = activeNotebookTabId ? openNotebooks[activeNotebookTabId] : null;
-  const notebook = activeTab?.notebook;
-
-  // Auto-scroll to bottom when new cells are added
+  // Auto-scroll to bottom when new cells are added (not on prepend)
   useEffect(() => {
-    if (contentRef.current && notebook?.cells) {
-      // Scroll to bottom after new content
+    if (contentRef.current && cells.length > 0) {
       const el = contentRef.current;
-      el.scrollTop = el.scrollHeight;
+      // Only auto-scroll if we're near the bottom already
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+      if (isNearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
-  }, [notebook?.cells?.length]);
+  }, [cells.length]);
+
+  // Scroll position preservation after prepending older cells
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const prevHeight = prevHeightRef.current;
+    if (prevHeight > 0 && el.scrollHeight > prevHeight) {
+      el.scrollTop += el.scrollHeight - prevHeight;
+    }
+    prevHeightRef.current = el.scrollHeight;
+  }, [cells.length, cellsOffset]);
+
+  // Scroll-to-bottom button visibility (same logic as desktop)
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      setShowScrollBtn(shouldShowScrollBtn(el.scrollTop, el.scrollHeight, el.clientHeight));
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    // Initial check
+    handleScroll();
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Load more cells handler (same as desktop, but BATCH=2)
+  const handleLoadMore = useCallback(() => {
+    const { ws, sessionId, loadingOlderCells: isLoading } = useStore.getState();
+    if (isLoading || !ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    const BATCH = 2;
+    const newOffset = Math.max(0, cellsOffset - BATCH);
+    const limit = cellsOffset - newOffset;
+    if (limit <= 0) return;
+    ws.send(JSON.stringify({ type: 'load_cells', session_id: sessionId, offset: newOffset, limit }));
+    useStore.setState({ loadingOlderCells: true });
+  }, [cellsOffset]);
+
+  // IntersectionObserver: auto-load older cells when sentinel becomes visible
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || cellsOffset <= 0) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) handleLoadMore(); },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [cellsOffset, handleLoadMore]);
 
   const handleBack = () => {
     setMobileView('notebooks');
@@ -74,6 +193,8 @@ export function MobileNotebookView() {
         showRightMenu
         rightContent={
           <>
+            {/* Notebook actions (Edit, Restart, Rerun, Save, Export, Slice) */}
+            <MobileNotebookActions />
             {/* Plugin button */}
             <button
               className="mobile-header-btn"
@@ -106,21 +227,32 @@ export function MobileNotebookView() {
       <MobileDrawer open={leftDrawerOpen} side="left" onClose={closeDrawers}>
         <div className="mobile-drawer-content">
           <div className="mobile-drawer-header">
-            <h2>Workspace</h2>
+            <h2>{t('sidebar.workspace')}</h2>
           </div>
-          <div className="mobile-drawer-section">
-            <p className="mobile-drawer-placeholder">
-              Files will appear here
-            </p>
+          <div className="mobile-drawer-section mobile-drawer-file-section">
+            {activeProjectId ? (
+              <FileSection
+                baseUrl={`/api/projects/${activeProjectId}`}
+                authToken={authToken}
+                onFileClick={handleWorkspaceFileClick}
+                refreshKey={workspaceRefreshKey}
+              />
+            ) : (
+              <p className="mobile-drawer-placeholder">{t('sidebar.noProject')}</p>
+            )}
           </div>
           <div className="mobile-drawer-divider" />
           <div className="mobile-drawer-header">
-            <h2>Library</h2>
+            <h2>{t('sidebar.library')}</h2>
           </div>
-          <div className="mobile-drawer-section">
-            <p className="mobile-drawer-placeholder">
-              Library items will appear here
-            </p>
+          <div className="mobile-drawer-section mobile-drawer-file-section">
+            <FileSection
+              baseUrl="/api/library"
+              authToken={authToken}
+              onFileClick={handleLibraryFileClick}
+              refreshKey={libraryRefreshKey}
+              workspaceDir={workspaceDir}
+            />
           </div>
         </div>
       </MobileDrawer>
@@ -129,15 +261,24 @@ export function MobileNotebookView() {
       <MobileDrawer open={rightDrawerOpen} side="right" onClose={closeDrawers}>
         <div className="mobile-drawer-content">
           <div className="mobile-drawer-header">
-            <h2>Deliverables</h2>
+            <h2>{t('deliverables.title')}</h2>
             <button className="mobile-drawer-close" onClick={closeDrawers}>
               ×
             </button>
           </div>
-          <div className="mobile-drawer-section">
-            <p className="mobile-drawer-placeholder">
-              Deliverables will appear here
-            </p>
+          <div className="mobile-drawer-section mobile-drawer-file-section">
+            {activeProjectId ? (
+              <FileSection
+                baseUrl={`/api/projects/${activeProjectId}`}
+                authToken={authToken}
+                onFileClick={handleDelivFileClick}
+                initialPath={delivPath}
+                refreshKey={delivRefreshKey}
+                showDownloadAll
+              />
+            ) : (
+              <p className="mobile-drawer-placeholder">{t('deliverables.noProject')}</p>
+            )}
           </div>
         </div>
       </MobileDrawer>
@@ -145,14 +286,31 @@ export function MobileNotebookView() {
       {/* Notebook content */}
       <main className="mobile-content mobile-notebook-content" ref={contentRef}>
         <div className="mobile-cells">
-          {notebook.cells.map((cell, index) => (
+          {/* Invisible sentinel for scroll-triggered lazy loading */}
+          {cellsOffset > 0 && (
+            <div ref={sentinelRef} className="notebook-load-more-sentinel">
+              {loadingOlderCells && <div className="nb-delete-spinner" style={{ width: 16, height: 16 }} />}
+            </div>
+          )}
+          {cells.map((cell, index) => (
             <Cell
               key={cell.id}
               cell={cell}
-              index={index}
+              index={cellsOffset + index}
             />
           ))}
+          <div ref={bottomRef} />
         </div>
+        {/* Scroll-to-bottom floating button (same as desktop) */}
+        {showScrollBtn && (
+          <button
+            className="mobile-scroll-to-bottom"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            aria-label={t('notebook.scrollToBottom')}
+          >
+            ↓
+          </button>
+        )}
       </main>
 
       {/* Input bar */}

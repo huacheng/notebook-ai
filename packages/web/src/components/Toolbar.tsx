@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { findModelById } from './ModelManager';
+import { LanguageToggle } from './shared/LanguageToggle';
 
 // ── Connection status badge ─────────────────────────────────────────────────
 
@@ -139,57 +139,10 @@ function ModelButton() {
   );
 }
 
-// ── Language toggle ──────────────────────────────────────────────────────────
+// ── Language toggle (uses shared component) ─────────────────────────────────
 
 function LangToggle() {
-  const language = useStore((s) => s.language);
-  const setLanguage = useStore((s) => s.setLanguage);
-  return (
-    <button
-      className="toolbar-btn toolbar-lang-btn"
-      onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
-      title={language === 'en' ? 'Switch to Chinese' : '切换到英文'}
-    >
-      {language === 'en' ? '中' : 'EN'}
-    </button>
-  );
-}
-
-// ── URL capture input ────────────────────────────────────────────────────────
-
-function ToolbarUrlInput() {
-  const t = useT();
-  const captureUrl = useStore((s) => s.captureUrl);
-  const urlCapturing = useStore((s) => s.urlCapturing);
-  const wsStatus = useStore((s) => s.wsStatus);
-  const connected = wsStatus === 'connected';
-  const [urlInput, setUrlInput] = useState('');
-
-  return (
-    <>
-      <input
-        className="toolbar-url-input"
-        placeholder={t('toolbar.urlPlaceholder')}
-        value={urlInput}
-        onChange={(e) => setUrlInput(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && urlInput.trim()) {
-            e.preventDefault();
-            // D2: Validate URL scheme before sending to backend (defense-in-depth)
-            try {
-              const parsed = new URL(urlInput.trim());
-              if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
-            } catch { return; }
-            captureUrl(urlInput.trim());
-            setUrlInput('');
-          }
-        }}
-        disabled={!connected || urlCapturing}
-        title={t('toolbar.urlTitle')}
-      />
-      {urlCapturing && <span className="toolbar-url-spinner" />}
-    </>
-  );
+  return <LanguageToggle variant="compact" className="toolbar-btn toolbar-lang-btn" />;
 }
 
 // ── Main Toolbar ────────────────────────────────────────────────────────────
@@ -202,10 +155,6 @@ export function Toolbar() {
           <span className="toolbar-logo" aria-label="Notebook AI">NoteBook AI</span>
           <span className="toolbar-version">v{__APP_VERSION__}</span>
         </span>
-      </div>
-
-      <div className="toolbar-center">
-        <ToolbarUrlInput />
       </div>
 
       <div className="toolbar-right">
