@@ -16,6 +16,7 @@ import { createSessionsRouter } from './routes/sessions.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createGitRouter } from './routes/git.js';
 import { createPluginRouter } from './routes/plugin.js';
+import commandsRouter from './routes/commands.js';
 import { setupWebSocket } from './ws-handler.js';
 import { authMiddleware } from './auth.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
@@ -24,7 +25,7 @@ import { GitWatcher, FileWatcher } from './watcher.js';
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
 app.use(express.json());
 
@@ -86,6 +87,7 @@ app.use('/api/sessions', createSessionsRouter(sessionManager, db));
 app.use('/api/projects', createProjectsRouter(db, sessionManager, notebookStore, workspaceRoot));
 app.use('/api/projects', createGitRouter(db));
 app.use('/api/plugin', createPluginRouter());
+app.use('/api/commands', commandsRouter);
 
 // ── Watchers (push-based change detection) ──────────────────────────────────
 
@@ -155,6 +157,33 @@ async function importExistingNotebooks(): Promise<void> {
     console.log(`[import] Imported ${imported} notebook(s) from disk.`);
   }
 }
+
+// ── Graceful shutdown (D3-1) ──────────────────────────────────────────────────
+
+function gracefulShutdown(signal: string) {
+  console.log(`[shutdown] Received ${signal}, shutting down gracefully…`);
+  server.close(() => {
+    console.log('[shutdown] HTTP server closed.');
+    sessionManager.closeAllSessions().then(() => {
+      console.log('[shutdown] All sessions closed.');
+      db.close();
+      console.log('[shutdown] Database closed.');
+      process.exit(0);
+    }).catch((err: unknown) => {
+      console.error('[shutdown] Error closing sessions:', err);
+      db.close();
+      process.exit(1);
+    });
+  });
+  // Force exit after 10s if graceful shutdown stalls
+  setTimeout(() => {
+    console.error('[shutdown] Forced exit after timeout.');
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ── Start ────────────────────────────────────────────────────────────────────
 
