@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useT } from '../i18n';
 import { FileSection } from './FileSection';
 import { runDeleteFlow } from './deleteFlow';
+import { runRenameFlow, type RenamePhase } from './renameFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
 import { validateTitle, MAX_TITLE_LENGTH } from '../utils/validateTitle';
 import { useWatcher } from '../hooks/useWatcher';
@@ -284,6 +285,103 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
         {phase === 'error' && (
           <>
             <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>{t('sidebar.deleteFailed')}</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              {errorMsg}
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>{t('sidebar.close')}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone }: {
+  currentName: string;
+  label?: string;
+  onCancel: () => void;
+  onConfirm: (newName: string) => Promise<void>;
+  onDone?: () => void;
+}) {
+  const t = useT();
+  const [phase, setPhase] = useState<RenamePhase>('editing');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [newName, setNewName] = useState(currentName);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    inputRef.current?.select();
+  }, []);
+
+  const nameError = useMemo(() => validateTitle(newName), [newName]);
+  const canSave = newName.trim().length > 0 && newName.trim() !== currentName && !nameError;
+
+  const handleConfirm = () => {
+    if (!canSave || phase === 'saving') return;
+    runRenameFlow(
+      () => onConfirm(newName.trim()),
+      {
+        setPhase,
+        setErrorMsg,
+        onDone: () => setTimeout(() => onDoneRef.current?.(), 800),
+      },
+    );
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && canSave) handleConfirm();
+    if (e.key === 'Escape') onCancel();
+  };
+
+  return (
+    <div className="annotation-modal-overlay" onClick={phase === 'editing' || phase === 'error' ? onCancel : undefined}>
+      <div className="annotation-modal" onClick={e => e.stopPropagation()}>
+        {phase === 'editing' && (
+          <>
+            <div className="annotation-modal-title">{t('sidebar.renameLabel', label)}</div>
+            <div style={{ margin: '0 0 var(--space-lg)' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t('sidebar.newName')}
+                maxLength={MAX_TITLE_LENGTH}
+                className={nameError ? 'input-error' : ''}
+                style={{ width: '100%', padding: 'var(--space-sm) var(--space-md)', fontSize: 'var(--font-size-sm)' }}
+              />
+              {nameError && <div className="create-form-error">{nameError}</div>}
+            </div>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>{t('sidebar.cancel')}</button>
+              <button className="annotation-modal-btn" onClick={handleConfirm} disabled={!canSave}>{t('sidebar.rename')}</button>
+            </div>
+          </>
+        )}
+        {phase === 'saving' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              {t('sidebar.renaming', currentName)}
+            </p>
+          </div>
+        )}
+        {phase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              {t('sidebar.renamed', label)}
+            </p>
+          </div>
+        )}
+        {phase === 'error' && (
+          <>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>{t('sidebar.renameFailed')}</div>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
               {errorMsg}
             </p>
