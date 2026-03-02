@@ -3,7 +3,7 @@ import json
 import sys
 import argparse
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "stage-done", "complete", "blocked", "cancelled"}
 
@@ -24,6 +24,7 @@ def get_lock(index_path):
             stale_path = f"{lock_path}.stale.{os.getpid()}"
             try:
                 os.rename(lock_path, stale_path)
+                os.remove(stale_path)
             except OSError:
                 pass
             # Retry acquisition
@@ -55,7 +56,7 @@ def read_state(index_path):
             sys.exit(1)
 
 def write_state(index_path, state):
-    state['updated'] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    state['updated'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     tmp_path = index_path + ".tmp"
     with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(state, f, indent=2)

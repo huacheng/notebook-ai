@@ -67,7 +67,7 @@ Unified protocol for experience and thinking library writes. Defines 7 scopes co
 
 ## Scope Definitions
 
-highlight defines 7 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.6 are **independent executions** (run as standalone skill invocations).
+highlight defines 6 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.6 are **independent executions** (run as standalone skill invocations).
 
 ---
 

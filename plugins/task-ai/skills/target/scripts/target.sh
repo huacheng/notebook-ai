@@ -3,7 +3,7 @@
 # Usage: target.sh [objective_content]
 
 set -uo pipefail
-trap 'rm -f "${LOCK_FILE:-}" "${TMP_FILE:-}"' EXIT INT TERM
+trap 'rm -f "${TMP_FILE:-}"' EXIT INT TERM
 
 OBJECTIVE="${1:-}"
 

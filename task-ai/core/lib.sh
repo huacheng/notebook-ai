@@ -58,7 +58,7 @@ resolve_workdir() {
     fi
     local nb_root="${NB_WORKSPACES_ROOT:-$(pwd)}"
     local nb_dir
-    nb_dir=$(find "$nb_root" -name "$notebook" -type d | head -n 1)
+    nb_dir=$(find "$nb_root" -maxdepth 3 -name "$notebook" -type d -print -quit 2>/dev/null)
     if [[ -z "$nb_dir" ]]; then
       echo "[ERROR] Notebook directory '$notebook' not found under $nb_root" >&2
       exit 1

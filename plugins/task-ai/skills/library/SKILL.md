@@ -245,7 +245,7 @@ Run `--rebuild-index` → `--compact` → `--check-staleness` in sequence. Also 
 
 | Source file | Writer | Completeness | `quality_status` on write |
 |-------------|--------|--------------|--------------------------|
-| `<nb>-complete.md` | `report` | complete | `verified` (automatic) |
+| `<nb>-complete.md` | `highlight` | complete | `verified` (automatic) |
 | `<nb>-impl.md` | `exec` | partial | `provisional` |
 | `<nb>-verify.md` | `verify` | partial | `provisional` |
 | `<nb>-eval.md` | `check` | partial | `provisional` |

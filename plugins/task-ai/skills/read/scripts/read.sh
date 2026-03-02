@@ -53,8 +53,12 @@ mkdir -p "$LIB_PATH/.memory/.references"
 REF_FILE="$LIB_PATH/.memory/.references/$TOPIC.md"
 DATE=$(date +%Y-%m-%d)
 
-cat > "$REF_FILE" <<EOF
+cat > "$REF_FILE" <<'_TASK_AI_REF_EOF_'
 ---
+_TASK_AI_REF_EOF_
+
+# Write frontmatter fields separately (variable expansion needed)
+cat >> "$REF_FILE" <<_TASK_AI_REF_EOF_
 topic: $TOPIC
 type: generic
 external: true
@@ -67,8 +71,10 @@ injection_findings: $FINDINGS
 last_verified_at: $DATE
 ---
 # $TOPIC
-$CONTENT
-EOF
+_TASK_AI_REF_EOF_
+
+# Append content separately to avoid heredoc delimiter collision
+printf '%s\n' "$CONTENT" >> "$REF_FILE"
 
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") | read | .memory/.references/$TOPIC.md | source:local" >> "$LIB_PATH/.changelog"
 

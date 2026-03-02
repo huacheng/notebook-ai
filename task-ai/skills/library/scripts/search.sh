@@ -12,7 +12,7 @@ shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --type)  TYPE_FILTER="$2"; shift 2 ;;
-    --limit) LIMIT="$2"; shift 2 ;;
+    --limit) LIMIT="$2"; [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=10; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -34,7 +34,7 @@ MATCHES=$(grep -Fi "$QUERY" "$MASTER_INDEX" || true)
 
 # Apply --type filter on the Type column (column 2) if specified
 if [[ -n "$TYPE_FILTER" && -n "$MATCHES" ]]; then
-    MATCHES=$(echo "$MATCHES" | awk -F '|' -v t="$TYPE_FILTER" 'tolower($3) ~ tolower(t)' || true)
+    MATCHES=$(echo "$MATCHES" | awk -F '|' -v t="$TYPE_FILTER" 'index(tolower($3), tolower(t))' || true)
 fi
 
 # Apply limit

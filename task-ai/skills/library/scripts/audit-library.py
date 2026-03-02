@@ -47,7 +47,7 @@ def audit_library():
                 last_ver = fm.get('last_verified_at')
                 if last_ver:
                     # Support both YYYY-MM-DD and other standard formats if needed
-                    last_ver_date = datetime.strptime(last_ver, '%Y-%m-%d')
+                    last_ver_date = datetime.strptime(last_ver[:10], '%Y-%m-%d')
                     age = (now - last_ver_date).days
                     if age > staleness_threshold:
                         print(f"[STALE] {rel_path}: {age} days since last verification")
