@@ -82,6 +82,14 @@ export interface NotebookStore {
   rightPanelOpen: boolean;
   rightPanelSplitRatio: number;
 
+  // ── Mobile state ─────────────────────────────────────────────────────
+  mobileView: 'projects' | 'notebooks' | 'notebook';
+  leftDrawerOpen: boolean;
+  rightDrawerOpen: boolean;
+  mobileFileViewerOpen: boolean;
+  mobileFileViewerPath: string | null;
+  mobileFileViewerSource: 'workspace' | 'library' | 'deliverables' | null;
+
   // ── WebSocket state ────────────────────────────────────────────────────
   ws: WebSocket | null;
   wsStatus: 'disconnected' | 'connecting' | 'connected';
@@ -193,6 +201,14 @@ export interface NotebookStore {
   toggleRightPanel(): void;
   setRightPanelOpen(open: boolean): void;
   setRightPanelSplitRatio(ratio: number): void;
+
+  // ── Mobile actions ───────────────────────────────────────────────────
+  setMobileView(view: 'projects' | 'notebooks' | 'notebook'): void;
+  toggleLeftDrawer(): void;
+  toggleRightDrawer(): void;
+  closeDrawers(): void;
+  openMobileFileViewer(path: string, source: 'workspace' | 'library' | 'deliverables'): void;
+  closeMobileFileViewer(): void;
 
   // ── URL Capture ────────────────────────────────────────────────────────
   urlCapturing: boolean;

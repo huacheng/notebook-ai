@@ -12,7 +12,9 @@ import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { PluginManager } from './components/PluginManager';
 import { ModelManager } from './components/ModelManager';
+import { MobileApp } from './components/mobile/MobileApp';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useIsMobile } from './hooks/useIsMobile';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
 import { computeSplitEntryWidth } from './utils/splitView';
@@ -372,6 +374,8 @@ export default function App() {
   const checkAuthStatus = useStore((s) => s.checkAuthStatus);
   const login = useStore((s) => s.login);
 
+  const isMobile = useIsMobile();
+
   // Check if auth is required on mount
   useEffect(() => {
     checkAuthStatus();
@@ -402,5 +406,15 @@ export default function App() {
     );
   }
 
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <I18nProvider value={t}>
+        <MobileApp />
+      </I18nProvider>
+    );
+  }
+
+  // Desktop layout
   return <AuthenticatedApp />;
 }
