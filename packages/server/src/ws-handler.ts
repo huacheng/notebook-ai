@@ -499,7 +499,8 @@ export function setupWebSocket(
             }
 
             // D3: Stream file content in chunks to avoid loading entire file into memory
-            const CHUNK_SIZE = 16384;
+            // Use 16383 (multiple of 3) so base64 chunks don't have padding except the last one
+            const CHUNK_SIZE = 16383;
             const isBinary = format.endsWith('-binary') || format === 'image';
             const stream = createReadStream(safePath, { highWaterMark: CHUNK_SIZE });
 

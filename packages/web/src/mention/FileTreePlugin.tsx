@@ -4,7 +4,7 @@ import { useStore } from '../store';
 async function fetchFiles(sessionId: string, authToken: string | null, subPath: string): Promise<FileEntry[]> {
   const headers: Record<string, string> = {};
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-  const url = `/api/sessions/${encodeURIComponent(sessionId)}/files?path=${encodeURIComponent(subPath)}`;
+  const url = `/api/notebooks/${encodeURIComponent(sessionId)}/files?path=${encodeURIComponent(subPath)}`;
   const res = await fetch(url, { headers });
   if (!res.ok) return [];
   const data = await res.json();

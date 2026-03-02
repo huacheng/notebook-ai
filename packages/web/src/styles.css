@@ -1525,26 +1525,26 @@ textarea.cell-input {
 .notebook-input-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
 .nb-input-textarea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 100px;
+  min-height: 80px;
   max-height: 200px;
   padding: var(--space-sm) var(--space-md);
   background: #ffffff;
   border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   line-height: 1.75;
   resize: none;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .nb-input-textarea:focus {
@@ -1563,25 +1563,24 @@ textarea.cell-input {
   cursor: not-allowed;
 }
 
-/* ── Action row: [+] [▶] at bottom-left ─────────────────── */
-.notebook-input-actions {
+.nb-input-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .nb-attach-btn {
   flex-shrink: 0;
-  height: 30px;
-  width: 30px;
+  height: 24px;
+  width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: transparent;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
   padding: 0;
@@ -1600,12 +1599,12 @@ textarea.cell-input {
 
 .nb-run-btn {
   flex-shrink: 0;
-  height: 30px;
-  padding: 0 var(--space-lg);
+  height: 24px;
+  padding: 0 var(--space-md);
   background: var(--color-primary);
   color: #fff;
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
   font-weight: 600;
   transition: background 0.15s ease;
   display: flex;
@@ -6375,8 +6374,18 @@ button:focus-visible {
 
 .nb-cmd-toolbar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px var(--space-md);
+  background: var(--bg-cell-hover);
+  border: 1.5px solid var(--border-default);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.nb-cmd-btns {
+  display: flex;
   gap: 6px;
-  padding: 6px 0;
   flex-wrap: wrap;
 }
 

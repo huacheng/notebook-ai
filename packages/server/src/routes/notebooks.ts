@@ -24,7 +24,7 @@ import {
 } from '../workspace.js';
 import { exportToFolder } from '../export.js';
 import { generateSlice } from '../slice-generator.js';
-import { validateWorkspacePath } from '../workspace-files.js';
+import { validateWorkspacePath, listWorkspaceFiles } from '../workspace-files.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -601,6 +601,34 @@ export function createNotebooksRouter(
     } catch (err) {
       await rm(tmpBase, { recursive: true, force: true }).catch(() => {});
       res.status(500).json({ error: 'Internal server error.' });
+    }
+  });
+
+  /**
+   * GET /api/notebooks/:sessionId/files
+   * Lists files in the session's workspace directory.
+   */
+  router.get('/:sessionId/files', async (req: Request, res: Response) => {
+    const { sessionId } = req.params as { sessionId: string };
+    const session = sessionManager.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: `Session "${sessionId}" not found.` });
+      return;
+    }
+
+    const subPath = (req.query.path as string) || '.';
+    try {
+      const result = await listWorkspaceFiles(session.cwd, subPath);
+      const prefix = subPath === '.' ? '' : subPath.replace(/\/$/, '') + '/';
+      res.json({
+        files: result.files.map((f) => ({
+          name: f.name,
+          path: prefix + f.name,
+          isDir: f.type === 'directory',
+        })),
+      });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to list files' });
     }
   });
 

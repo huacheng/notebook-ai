@@ -68,9 +68,11 @@ export const messages: Record<Language, Record<string, string>> = {
     'input.suggestions': 'Suggestions:',
     'input.editModePlaceholder': 'Exit edit mode to send prompts',
     'input.placeholder': 'Enter a prompt… (Ctrl+Enter to run)',
+    'input.placeholderWithHints': '/commands @files #cells, enter a prompt…',
     'input.attachFile': 'Attach file to prompt',
     'input.run': 'Run (Ctrl+Enter)',
     'input.noSession': 'No active session — open a notebook first.',
+    'input.shortcuts': '/ commands  @ files  # cells',
 
     // ── Notebook ─────────────────────────────────────────────────────────
     'notebook.loading': 'Loading…',
@@ -223,7 +225,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'cmd.task-ai:auto': 'Autonomous loop: plan → check → exec cycle',
     'cmd.task-ai:merge': 'Merge completed task branch to main',
     'cmd.task-ai:list': 'Query task status, progress, and dependencies',
-    'cmd.task-ai:library': 'Search cross-task knowledge library',
+    'cmd.task-ai:library search': 'Search cross-task knowledge library',
     'cmd.commit': 'Create a git commit with staged changes',
     'cmd.commit-push-pr': 'Commit, push to remote, and open a pull request',
     'cmd.simplify': 'Review and simplify code for clarity and efficiency',
@@ -306,9 +308,11 @@ export const messages: Record<Language, Record<string, string>> = {
     'input.suggestions': '建议:',
     'input.editModePlaceholder': '退出编辑模式后才能发送 prompt',
     'input.placeholder': '输入 prompt… (Ctrl+Enter 运行)',
+    'input.placeholderWithHints': '/命令 @文件 #Notebook单元格，输入 prompt…',
     'input.attachFile': '附加文件到 prompt',
     'input.run': '运行 (Ctrl+Enter)',
     'input.noSession': '无活动会话 — 请先打开一个 notebook。',
+    'input.shortcuts': '/ 命令  @ 文件  # 单元格',
 
     // ── Notebook ─────────────────────────────────────────────────────────
     'notebook.loading': '加载中…',
@@ -461,7 +465,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'cmd.task-ai:auto': '自动循环：plan → check → exec',
     'cmd.task-ai:merge': '将完成的任务分支合并到 main',
     'cmd.task-ai:list': '查询任务状态、进度和依赖关系',
-    'cmd.task-ai:library': '搜索跨任务知识库',
+    'cmd.task-ai:library search': '搜索跨任务知识库',
     'cmd.commit': '使用暂存的更改创建 git commit',
     'cmd.commit-push-pr': '提交、推送到远程并创建 PR',
     'cmd.simplify': '审查并简化代码，提升清晰度和效率',

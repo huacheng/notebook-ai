@@ -6,6 +6,7 @@ import { SliceView } from './SliceView';
 import { loadDraft, saveDraft, clearDraft } from '../utils/promptDraft';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { extractImagesFromClipboard, MAX_IMAGES, type PastedImage } from '../utils/pasteImages';
+import { getCaretCoordinates } from '../utils/getCaretCoordinates';
 import { useMention } from '../hooks/useMention';
 import { MentionPopup } from './MentionPopup';
 import { SlashCommandPlugin } from '../mention/SlashCommandPlugin';
@@ -397,27 +398,6 @@ function NotebookInputBar() {
           <button className="nb-suggestion-dismiss" onClick={() => clearPendingSuggestions()}>×</button>
         </div>
       )}
-      <div className="nb-cmd-toolbar">
-        {[
-          { cmd: 'task-ai:target', icon: '🎯' },
-          { cmd: 'task-ai:research', icon: '🔍' },
-          { cmd: 'task-ai:read', icon: '📖' },
-          { cmd: 'task-ai:library', icon: '📚' },
-        ].map(({ cmd, icon }) => (
-          <button
-            key={cmd}
-            className="nb-cmd-btn"
-            title={t(`cmd.${cmd}`)}
-            disabled={disabled}
-            onClick={() => {
-              setText((prev) => prev ? `${prev}\n/${cmd} ` : `/${cmd} `);
-              textareaRef.current?.focus();
-            }}
-          >
-            {icon} <span className="nb-cmd-name">/{cmd.split(':')[1]}</span>
-          </button>
-        ))}
-      </div>
       <div className="notebook-input-row">
         <input
           ref={fileInputRef}
@@ -436,9 +416,9 @@ function NotebookInputBar() {
             resize();
             const pos = e.target.selectionStart ?? 0;
             mention.handleChange(e.target.value, pos);
-            // Update caret position for popup
-            const rect = e.target.getBoundingClientRect();
-            setCaretPos({ x: rect.left + 10, y: rect.top });
+            // Update caret position for popup (follow cursor)
+            const coords = getCaretCoordinates(e.target, pos);
+            setCaretPos({ x: coords.left, y: coords.top });
           }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
@@ -450,11 +430,35 @@ function NotebookInputBar() {
           }}
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
           disabled={disabled}
-          placeholder={editMode ? t('input.editModePlaceholder') : t('input.placeholder')}
+          placeholder={editMode ? t('input.editModePlaceholder') : t('input.placeholderWithHints')}
           rows={3}
           spellCheck={false}
         />
-        <div className="notebook-input-actions">
+      </div>
+      <div className="nb-cmd-toolbar">
+        <div className="nb-cmd-btns">
+          {[
+            { cmd: 'task-ai:target', icon: '🎯' },
+            { cmd: 'task-ai:research', icon: '🔍' },
+            { cmd: 'task-ai:read', icon: '📖' },
+            { cmd: 'task-ai:library search', icon: '📚' },
+            { cmd: 'task-ai:auto', icon: '🤖' },
+          ].map(({ cmd, icon }) => (
+            <button
+              key={cmd}
+              className="nb-cmd-btn"
+              title={t(`cmd.${cmd}`)}
+              disabled={disabled}
+              onClick={() => {
+                setText((prev) => prev ? `${prev}\n/${cmd} ` : `/${cmd} `);
+                textareaRef.current?.focus();
+              }}
+            >
+              {icon} <span className="nb-cmd-name">/{cmd.split(':')[1]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="nb-input-actions">
           <button
             className="nb-attach-btn"
             title={t('input.attachFile')}
