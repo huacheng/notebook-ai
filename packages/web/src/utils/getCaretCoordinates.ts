@@ -1,91 +1,75 @@
 /**
  * Get the pixel coordinates of the caret (cursor) inside a textarea.
- * Uses a hidden mirror div to measure the text position.
+ * Returns viewport-relative coordinates.
  */
 
-const MIRROR_STYLE_PROPS = [
-  'boxSizing',
-  'width',
-  'height',
-  'overflowX',
-  'overflowY',
-  'borderTopWidth',
-  'borderRightWidth',
-  'borderBottomWidth',
-  'borderLeftWidth',
-  'paddingTop',
-  'paddingRight',
-  'paddingBottom',
-  'paddingLeft',
-  'fontStyle',
-  'fontVariant',
-  'fontWeight',
-  'fontStretch',
-  'fontSize',
-  'fontSizeAdjust',
-  'lineHeight',
-  'fontFamily',
-  'textAlign',
-  'textTransform',
-  'textIndent',
-  'textDecoration',
-  'letterSpacing',
-  'wordSpacing',
-  'tabSize',
-  'whiteSpace',
-  'wordWrap',
-  'wordBreak',
+const properties = [
+  'direction', 'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+  'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+  'borderStyle', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+  'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
+  'fontSizeAdjust', 'lineHeight', 'fontFamily', 'textAlign', 'textTransform',
+  'textIndent', 'textDecoration', 'letterSpacing', 'wordSpacing', 'tabSize',
+  'MozTabSize', 'whiteSpace', 'wordWrap', 'wordBreak',
 ] as const;
 
-let mirrorDiv: HTMLDivElement | null = null;
+let div: HTMLDivElement | null = null;
 
 export function getCaretCoordinates(
   element: HTMLTextAreaElement,
   position: number,
 ): { top: number; left: number } {
-  // Create mirror div if needed
-  if (!mirrorDiv) {
-    mirrorDiv = document.createElement('div');
-    mirrorDiv.id = 'textarea-caret-mirror';
-    document.body.appendChild(mirrorDiv);
+  // Lazy create mirror div
+  if (!div) {
+    div = document.createElement('div');
+    div.id = 'input-textarea-caret-position-mirror-div';
+    document.body.appendChild(div);
   }
 
-  const style = mirrorDiv.style;
-  const computed = window.getComputedStyle(element);
+  const style = div.style;
+  const computed = getComputedStyle(element);
 
-  // Position off-screen
-  style.position = 'absolute';
-  style.visibility = 'hidden';
+  // Default styles
   style.whiteSpace = 'pre-wrap';
   style.wordWrap = 'break-word';
-
-  // Copy styles from textarea
-  for (const prop of MIRROR_STYLE_PROPS) {
-    style.setProperty(prop.replace(/([A-Z])/g, '-$1').toLowerCase(), computed.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase()));
-  }
-
-  // Handle scrollbar width
+  style.position = 'absolute';
+  style.visibility = 'hidden';
   style.overflow = 'hidden';
 
-  // Set content up to caret position
-  mirrorDiv.textContent = element.value.substring(0, position);
+  // Transfer the element's properties to the div
+  properties.forEach((prop) => {
+    style[prop as any] = computed[prop as any];
+  });
 
-  // Create span marker at caret position
+  // Firefox doesn't have a proper scrollbar width property
+  style.width = `${element.offsetWidth}px`;
+  style.height = 'auto';
+
+  // Transfer content
+  div.textContent = element.value.substring(0, position);
+
+  // Create a span to mark the caret position
   const span = document.createElement('span');
-  span.textContent = element.value.substring(position) || '.';
-  mirrorDiv.appendChild(span);
+  // Use zero-width space if at end, otherwise use the remaining text
+  span.textContent = element.value.substring(position) || '\u200b';
+  div.appendChild(span);
 
-  // Get element's position
+  // Get textarea's bounding rect
   const rect = element.getBoundingClientRect();
 
-  // Calculate coordinates relative to viewport
+  // Compute caret coordinates relative to viewport
+  const borderTop = parseInt(computed.borderTopWidth, 10) || 0;
+  const paddingTop = parseInt(computed.paddingTop, 10) || 0;
+  const borderLeft = parseInt(computed.borderLeftWidth, 10) || 0;
+  const paddingLeft = parseInt(computed.paddingLeft, 10) || 0;
+
   const coordinates = {
-    top: rect.top + span.offsetTop - element.scrollTop,
-    left: rect.left + span.offsetLeft - element.scrollLeft,
+    top: rect.top + borderTop + paddingTop + span.offsetTop - element.scrollTop,
+    left: rect.left + borderLeft + paddingLeft + span.offsetLeft - element.scrollLeft,
   };
 
-  // Clean up
-  mirrorDiv.textContent = '';
+  // Cleanup
+  div.innerHTML = '';
 
   return coordinates;
 }

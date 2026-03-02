@@ -20,17 +20,19 @@ export function MentionPopup<T>({ state, position, onSelect }: Props<T>) {
 
   const plugin = state.plugin as MentionPlugin<T>;
 
-  // Position popup above the textarea, aligned to cursor x-position
-  // Use fixed positioning with bottom offset from input bar
+  // Position popup above the cursor position
+  // Use fixed positioning - popup appears above the caret
+  const popupHeight = 240; // max-height from CSS
+  const lineHeight = 24; // approximate line height
   const style: React.CSSProperties = position.x > 0 && position.y > 0
     ? {
-        left: Math.max(8, position.x),
-        bottom: `calc(100vh - ${position.y}px + 4px)`,
+        left: Math.max(8, Math.min(position.x, window.innerWidth - 220)),
+        top: Math.max(8, position.y - popupHeight - lineHeight),
       }
     : {
-        // Fallback: position at left edge, above input bar
+        // Fallback: position at left edge, near bottom
         left: 24,
-        bottom: 120,
+        bottom: 140,
       };
 
   return (
