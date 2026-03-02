@@ -21,7 +21,7 @@ export const FileTreePlugin: MentionPlugin<FileEntry> = {
   fetchItems: async (query: string) => {
     const { sessionId, authToken } = useStore.getState();
     if (!sessionId) return [];
-    const files = await fetchFiles(sessionId, authToken, '/');
+    const files = await fetchFiles(sessionId, authToken, '.');
     const q = query.toLowerCase();
     return files.filter(f => f.name.toLowerCase().includes(q));
   },
