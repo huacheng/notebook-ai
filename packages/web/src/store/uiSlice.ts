@@ -27,7 +27,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'clearSessionNotice' | 'setLatency'
   | 'setWsReconnectExhausted'
   | 'openFiles' | 'activeFileTabId' | 'fileViewerMaximized'
-  | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'setFileTabLoading'
+  | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'closeDeletedFileTabs' | 'setFileTabLoading'
   | 'toggleFileViewerMaximized'
   | 'leftSidebarSplitRatio' | 'setLeftSidebarSplitRatio'
   | 'rightPanelOpen' | 'rightPanelSplitRatio'
@@ -146,11 +146,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     });
   },
 
-  closeDeletedFileTabs(deletedPaths) {
+  closeDeletedFileTabs(deletedPaths: string[]) {
     set(s => {
       const remaining: typeof s.openFiles = {};
       for (const [tabId, file] of Object.entries(s.openFiles)) {
-        const hit = deletedPaths.some(dp =>
+        const hit = deletedPaths.some((dp: string) =>
           file.path === dp || file.path.startsWith(dp + '/')
         );
         if (!hit) remaining[tabId] = file;

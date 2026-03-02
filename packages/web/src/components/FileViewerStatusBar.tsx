@@ -1,4 +1,4 @@
-export type FileFormat = 'text' | 'html' | 'pdf-binary' | 'docx-binary' | 'xlsx-binary' | 'pptx-binary' | 'unsupported';
+export type FileFormat = 'text' | 'html' | 'pdf-binary' | 'docx-binary' | 'xlsx-binary' | 'pptx-binary' | 'image' | 'unsupported';
 
 interface FileViewerStatusBarProps {
   filename: string;
