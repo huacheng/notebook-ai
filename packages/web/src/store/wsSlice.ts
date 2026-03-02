@@ -364,10 +364,22 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           });
           break;
         }
-        case 'system_message':
-          // Log system messages (e.g. context compaction) for future UI display
-          console.log(`[ws] system: ${parsed.subtype} — ${parsed.message}`);
+        case 'system_message': {
+          // Handle local_command_output as cell output (e.g. /context command)
+          if (parsed.subtype === 'local_command_output' && parsed.cell_id && parsed.message) {
+            const output = { type: 'text' as const, content: parsed.message, timestamp: new Date().toISOString() };
+            if (msgSessionId) {
+              set((state) => applyToSession(state, msgSessionId, (nb) =>
+                appendOutputToNotebook(nb, parsed.cell_id!, output)));
+            } else {
+              store.appendCellOutput(parsed.cell_id, output);
+            }
+          } else {
+            // Log other system messages (e.g. context compaction) for future UI display
+            console.log(`[ws] system: ${parsed.subtype} — ${parsed.message}`);
+          }
           break;
+        }
         case 'git_changed':
           window.dispatchEvent(new CustomEvent('nb:git-changed', { detail: parsed }));
           break;

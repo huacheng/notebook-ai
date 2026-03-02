@@ -808,17 +808,18 @@ export class SessionManager {
 
       case 'system': {
         // Capture Claude session_id from system.init for --resume support.
-        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string; message?: string };
+        // Claude CLI uses 'content' for local_command_output, 'message' for others
+        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string; message?: string; content?: string };
         if (sysMsg.subtype === 'init' && sysMsg.session_id) {
           session.claudeSessionId = sysMsg.session_id;
           console.log(`[session ${session.id}] Captured Claude session_id: ${sysMsg.session_id}`);
         }
-        // Forward non-init/hook system messages to frontend (e.g. context compaction)
+        // Forward non-init/hook system messages to frontend (e.g. context compaction, local_command_output)
         if (sysMsg.subtype && sysMsg.subtype !== 'init' && sysMsg.subtype !== 'hook_started' && sysMsg.subtype !== 'hook_completed') {
           this.broadcast(session, {
             type: 'system_message',
             subtype: sysMsg.subtype,
-            message: sysMsg.message ?? '',
+            message: sysMsg.content ?? sysMsg.message ?? '',
             cell_id: findRunningCellId(session.notebook),
           } as any);
         }
