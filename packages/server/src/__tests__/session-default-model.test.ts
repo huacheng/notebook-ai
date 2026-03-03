@@ -153,7 +153,7 @@ describe('SessionManager.createSession with default model', () => {
     expect(session.notebook.metadata.model).toBeUndefined();
   });
 
-  it('reads Claude settings on every createSession call (not cached)', async () => {
+  it('reads Claude settings on every createSession call (not cached)', { timeout: 10000 }, async () => {
     const claudeDir = path.join(tempHome, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
 

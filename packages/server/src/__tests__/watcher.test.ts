@@ -77,20 +77,32 @@ describe('GitWatcher', () => {
 
 // ── FileWatcher ───────────────────────────────────────────────────────────────
 
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
 describe('FileWatcher', () => {
   let watcher: FileWatcher;
+  let testDir1: string;
+  let testDir2: string;
 
   beforeEach(() => {
     watcher = new FileWatcher();
+    // Create isolated temp directories for testing
+    testDir1 = mkdtempSync(join(tmpdir(), 'watcher-test1-'));
+    testDir2 = mkdtempSync(join(tmpdir(), 'watcher-test2-'));
   });
 
   afterEach(() => {
     watcher.destroy();
+    // Clean up temp directories
+    try { rmSync(testDir1, { recursive: true }); } catch { /* ignore */ }
+    try { rmSync(testDir2, { recursive: true }); } catch { /* ignore */ }
   });
 
   it('subscribe returns an unsubscribe function', () => {
     const cb = vi.fn();
-    const unsub = watcher.subscribe('/tmp', cb);
+    const unsub = watcher.subscribe(testDir1, cb);
     expect(typeof unsub).toBe('function');
     unsub();
   });
@@ -98,24 +110,24 @@ describe('FileWatcher', () => {
   it('refcount: multiple subscribers share one fs.watch', () => {
     const cb1 = vi.fn();
     const cb2 = vi.fn();
-    watcher.subscribe('/tmp', cb1);
-    watcher.subscribe('/tmp', cb2);
+    watcher.subscribe(testDir1, cb1);
+    watcher.subscribe(testDir1, cb2);
 
-    const entry = (watcher as any).watchers.get('/tmp');
+    const entry = (watcher as any).watchers.get(testDir1);
     expect(entry.callbacks.size).toBe(2);
   });
 
   it('refcount: last unsubscribe removes entry', () => {
     const cb = vi.fn();
-    const unsub = watcher.subscribe('/tmp', cb);
+    const unsub = watcher.subscribe(testDir1, cb);
 
     unsub();
-    expect((watcher as any).watchers.has('/tmp')).toBe(false);
+    expect((watcher as any).watchers.has(testDir1)).toBe(false);
   });
 
   it('destroy cleans up all watchers', () => {
-    watcher.subscribe('/tmp', vi.fn());
-    watcher.subscribe('/var', vi.fn());
+    watcher.subscribe(testDir1, vi.fn());
+    watcher.subscribe(testDir2, vi.fn());
     expect((watcher as any).watchers.size).toBe(2);
 
     watcher.destroy();
