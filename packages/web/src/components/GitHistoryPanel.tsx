@@ -339,18 +339,33 @@ const CommitItem = memo(function CommitItem({
       return;
     }
     setDiffFile(filePath);
+  }, []);
+
+  // Load diff when diffFile changes (moved out of callback to avoid React batching issues)
+  useEffect(() => {
+    if (!diffFile) return;
+    const file = diffFile; // Capture for type narrowing in nested functions
     setLoadingDiff(true);
+    setDiffContent('');
+    let cancelled = false;
+
     const ws = useStore.getState().ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
       const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
       function onResponse(e: Event) {
         const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setDiffContent(d.diff); setLoadingDiff(false); } }
+        if (d.request_id === requestId) {
+          cleanup();
+          if (!cancelled) { setDiffContent(d.diff); setLoadingDiff(false); }
+        }
       }
       function onError(e: Event) {
         const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setDiffContent('Failed to load diff'); setLoadingDiff(false); } }
+        if (d.request_id === requestId) {
+          cleanup();
+          if (!cancelled) { setDiffContent('Failed to load diff'); setLoadingDiff(false); }
+        }
       }
       function cleanup() {
         clearTimeout(timeout);
@@ -358,17 +373,25 @@ const CommitItem = memo(function CommitItem({
         window.removeEventListener('nb:git-diff-error', onError);
       }
       function fallbackRest() {
-        fetchGitDiff(projectId, token, commit.hash, filePath)
-          .then((d) => { if (mountedRef.current) setDiffContent(d); }).catch(() => { if (mountedRef.current) setDiffContent('Failed to load diff'); }).finally(() => { if (mountedRef.current) setLoadingDiff(false); });
+        fetchGitDiff(projectId, token, commit.hash, file)
+          .then((d) => { if (!cancelled) setDiffContent(d); })
+          .catch(() => { if (!cancelled) setDiffContent('Failed to load diff'); })
+          .finally(() => { if (!cancelled) setLoadingDiff(false); });
       }
       window.addEventListener('nb:git-diff-response', onResponse);
       window.addEventListener('nb:git-diff-error', onError);
-      ws.send(JSON.stringify({ type: 'git_diff_request', request_id: requestId, project_id: projectId, commit: commit.hash, file: filePath }));
+      ws.send(JSON.stringify({ type: 'git_diff_request', request_id: requestId, project_id: projectId, commit: commit.hash, file }));
+
+      return () => { cancelled = true; cleanup(); };
     } else {
-      fetchGitDiff(projectId, token, commit.hash, filePath)
-        .then((d) => setDiffContent(d)).catch(() => setDiffContent('Failed to load diff')).finally(() => setLoadingDiff(false));
+      fetchGitDiff(projectId, token, commit.hash, file)
+        .then((d) => { if (!cancelled) setDiffContent(d); })
+        .catch(() => { if (!cancelled) setDiffContent('Failed to load diff'); })
+        .finally(() => { if (!cancelled) setLoadingDiff(false); });
+
+      return () => { cancelled = true; };
     }
-  }, [projectId, token, commit.hash]);
+  }, [diffFile, projectId, token, commit.hash]);
 
   return (
     <div>
