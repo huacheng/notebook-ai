@@ -100,6 +100,14 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       const body = await res.json().catch(() => ({ error: 'Delete failed' }));
       throw new Error(body.error || `Delete failed (${res.status})`);
     }
+    // Decrement notebook_count for the project
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, notebook_count: Math.max(0, p.notebook_count - 1) }
+          : p
+      ),
+    }));
     // File listing in FileSection will auto-refresh
   },
 
@@ -149,6 +157,15 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
         metadata: { ...notebook.metadata, title, updated: new Date().toISOString() },
       }),
     });
+
+    // Increment notebook_count for the project
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, notebook_count: p.notebook_count + 1 }
+          : p
+      ),
+    }));
   },
 
   setActiveProject: (id: string, path: string) => {
@@ -190,6 +207,14 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       throw new Error(body.error || `Create failed (${res.status})`);
     }
     const data = await res.json();
+    // Increment notebook_count for the project
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, notebook_count: p.notebook_count + 1 }
+          : p
+      ),
+    }));
     return { sessionId: data.sessionId, notebookPath: data.notebookPath };
   },
 });
