@@ -51,6 +51,47 @@ if [ -f .env ]; then
   set -a; source .env; set +a
 fi
 
+# ── Auto-generate HTTPS cert with all local IPs ─────────────────────────────
+CERT_DIR="packages/web"
+CERT_FILE="$CERT_DIR/localhost.pem"
+KEY_FILE="$CERT_DIR/localhost-key.pem"
+
+# Collect all local IPs
+ALL_IPS=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+
+# Check if cert needs regeneration (missing or doesn't include all IPs)
+NEED_REGEN=false
+if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
+  NEED_REGEN=true
+  echo "==> HTTPS certificate not found, generating..."
+else
+  # Check if current cert includes all local IPs
+  CERT_INFO=$(openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null)
+  for ip in $ALL_IPS; do
+    if ! echo "$CERT_INFO" | grep -q "$ip"; then
+      NEED_REGEN=true
+      echo "==> HTTPS certificate missing IP $ip, regenerating..."
+      break
+    fi
+  done
+fi
+
+if $NEED_REGEN; then
+  SAN_ENTRIES="DNS:localhost,IP:127.0.0.1"
+  for ip in $ALL_IPS; do
+    SAN_ENTRIES="$SAN_ENTRIES,IP:$ip"
+  done
+
+  openssl req -x509 -newkey rsa:2048 \
+    -keyout "$KEY_FILE" -out "$CERT_FILE" \
+    -days 365 -nodes \
+    -subj "/CN=localhost" \
+    -addext "subjectAltName=$SAN_ENTRIES" \
+    2>/dev/null
+
+  echo "==> HTTPS certificate generated for: localhost 127.0.0.1 $ALL_IPS"
+fi
+
 if $PROD_MODE; then
   echo "==> Building production version..."
   pnpm run build
