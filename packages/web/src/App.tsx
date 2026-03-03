@@ -125,6 +125,7 @@ function AuthenticatedApp() {
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
   const setRightPanelWidth = useStore((s) => s.setRightPanelWidth);
   const lastCompletedCellId = useStore((s) => s.lastCompletedCellId);
+  const lastAskQuestionCellId = useStore((s) => s.lastAskQuestionCellId);
 
   // Notification system
   const { notify, requestPermission, preloadSound } = useNotification();
@@ -152,6 +153,17 @@ function AuthenticatedApp() {
       }
     }
   }, [lastCompletedCellId, notify, t]);
+
+  // Notify when AskUserQuestion requires user input (only if tab is hidden, with debounce)
+  useEffect(() => {
+    if (lastAskQuestionCellId && document.hidden) {
+      const now = Date.now();
+      if (now - lastNotifyTimeRef.current > NOTIFY_DEBOUNCE_MS) {
+        notify(t('notification.inputRequired'), t('notification.claudeNeedsInput'));
+        lastNotifyTimeRef.current = now;
+      }
+    }
+  }, [lastAskQuestionCellId, notify, t]);
 
   // D3-3 fix: Removed duplicate visibilitychange listener - notify() handles this internally
 

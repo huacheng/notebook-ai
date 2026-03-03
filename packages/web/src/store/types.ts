@@ -102,6 +102,7 @@ export interface NotebookStore {
   restartError: string;
   lastEventIndex: Record<string, number>;
   lastCompletedCellId: string | null;
+  lastAskQuestionCellId: string | null;
 
   // ── Commands state (slash command caching) ────────────────────────────
   commands: Command[];

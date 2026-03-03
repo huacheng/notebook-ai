@@ -78,6 +78,8 @@ export const messages: Record<Language, Record<string, string>> = {
     // ── Notification ─────────────────────────────────────────────────────
     'notification.taskComplete': 'Task Complete',
     'notification.claudeFinished': 'Claude has finished responding',
+    'notification.inputRequired': 'Input Required',
+    'notification.claudeNeedsInput': 'Claude needs your input',
 
     // ── Notebook ─────────────────────────────────────────────────────────
     'notebook.loading': 'Loading…',
@@ -350,6 +352,8 @@ export const messages: Record<Language, Record<string, string>> = {
     // ── Notification ─────────────────────────────────────────────────────
     'notification.taskComplete': '任务完成',
     'notification.claudeFinished': 'Claude 已完成响应',
+    'notification.inputRequired': '需要输入',
+    'notification.claudeNeedsInput': 'Claude 需要你的输入',
 
     // ── Notebook ─────────────────────────────────────────────────────────
     'notebook.loading': '加载中…',

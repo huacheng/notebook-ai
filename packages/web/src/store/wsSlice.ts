@@ -19,7 +19,7 @@ let _pendingWs: WebSocket | null = null;
 
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
-  | 'lastEventIndex' | 'updateLastEventIndex' | 'lastCompletedCellId'
+  | 'lastEventIndex' | 'updateLastEventIndex' | 'lastCompletedCellId' | 'lastAskQuestionCellId'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
@@ -35,6 +35,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   restartError: '',
   lastEventIndex: {},
   lastCompletedCellId: null,
+  lastAskQuestionCellId: null,
   commands: [] as Command[],
   commandsLoaded: false,
 
@@ -201,6 +202,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
                 }
               }
             } catch { /* ignore parse errors */ }
+          }
+          // Detect AskUserQuestion tool_use → trigger notification
+          if (parsed.output.type === 'tool_use' && parsed.output.name === 'AskUserQuestion') {
+            set({ lastAskQuestionCellId: parsed.cell_id });
           }
           break;
         case 'cell_stream':
@@ -550,9 +555,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (!cell || cell.type !== 'prompt') return;
 
     set((state) => {
-      if (!state.notebook) return { lastCompletedCellId: null };
+      if (!state.notebook) return { lastCompletedCellId: null, lastAskQuestionCellId: null };
       return {
         lastCompletedCellId: null,
+        lastAskQuestionCellId: null,
         notebook: {
           ...state.notebook,
           cells: state.notebook.cells.map((c) =>
