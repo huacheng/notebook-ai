@@ -21,7 +21,7 @@ import {
   findCellByToolUseId,
 } from './notebook-mutations.js';
 const MEMORY_SYSTEM_PROMPT =
-  'At the start of each session, read the MEMORY.md file in your ' +
+  'At the start of each session, read the .MEMORY.md file in your ' +
   'working directory. It contains important context, including the ' +
   'shared library directory path. When summarizing this conversation, ' +
   'always preserve the shared library directory information.';

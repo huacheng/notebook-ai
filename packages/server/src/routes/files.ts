@@ -7,10 +7,21 @@ import { createReadStream } from 'fs';
 import { spawn } from 'child_process';
 import type { SessionManager } from '../session.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
-import { ensureLibraryDir } from '../workspace.js';
+import { ensureLibraryDir, MEMORY_FILENAME } from '../workspace.js';
 
 function isPathTraversal(err: unknown): boolean {
   return err instanceof Error && err.message === 'Path outside workspace';
+}
+
+/** Check if a workspace path refers to a protected system file (read-only). */
+function isProtectedWorkspacePath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const basename = normalized.split('/').pop() || '';
+  // .MEMORY.md is protected at any level
+  if (basename === MEMORY_FILENAME) return true;
+  // Root-level .notebook.json files are also protected
+  if (normalized.endsWith('.notebook.json') && !normalized.includes('/')) return true;
+  return false;
 }
 
 export function createFilesRouter(sessionManager: SessionManager): IRouter {
@@ -70,10 +81,13 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       const results: string[] = [];
       try {
         for (const file of uploaded) {
-          const destPath = await validateWorkspacePath(
-            path.join(subPath, path.basename(file.originalname)),
-            session.cwd,
-          );
+          const relativePath = path.join(subPath, path.basename(file.originalname));
+          if (isProtectedWorkspacePath(relativePath)) {
+            await unlink(file.path).catch(() => {});
+            res.status(403).json({ error: `Cannot overwrite protected file: ${path.basename(file.originalname)}` });
+            return;
+          }
+          const destPath = await validateWorkspacePath(relativePath, session.cwd);
           await copyFile(file.path, destPath);
           // Also copy to shared library (non-fatal).
           try {
@@ -165,11 +179,17 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
       return;
     }
 
+    const relativePath = path.join(subPath, name);
+    if (isProtectedWorkspacePath(relativePath)) {
+      res.status(403).json({ error: `Cannot create protected file name: ${name}` });
+      return;
+    }
+
     const session = sessionManager.getSession(sessionId);
     if (!session) { res.status(404).json({ error: `Session "${sessionId}" not found.` }); return; }
 
     try {
-      const targetPath = await validateWorkspacePath(path.join(subPath, name), session.cwd);
+      const targetPath = await validateWorkspacePath(relativePath, session.cwd);
       await writeFile(targetPath, '', { flag: 'wx' });
       res.json({ ok: true });
     } catch (err) {
@@ -215,6 +235,11 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
 
     if (!filePath || filePath === '.') {
       res.status(400).json({ error: 'Cannot delete workspace root.' });
+      return;
+    }
+
+    if (isProtectedWorkspacePath(filePath)) {
+      res.status(403).json({ error: 'Cannot delete protected system file.' });
       return;
     }
 

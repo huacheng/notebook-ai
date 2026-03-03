@@ -20,11 +20,11 @@ afterEach(async () => {
 });
 
 describe('initWorkspaceMemory', () => {
-  it('creates MEMORY.md in the workspace directory', async () => {
+  it('creates .MEMORY.md in the workspace directory', async () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
 
-    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(workspaceDir, '.MEMORY.md'), 'utf-8');
     expect(content).toContain('# MEMORY');
   });
 
@@ -33,7 +33,7 @@ describe('initWorkspaceMemory', () => {
     await initWorkspaceMemory(workspaceDir);
 
     const expectedRel = path.relative(workspaceDir, path.join(tmpRoot, '.library'));
-    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(workspaceDir, '.MEMORY.md'), 'utf-8');
     expect(content).toContain(expectedRel);
   });
 
@@ -41,7 +41,7 @@ describe('initWorkspaceMemory', () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
 
-    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(workspaceDir, '.MEMORY.md'), 'utf-8');
     expect(content).toMatch(/read.*write|write.*read/i);
   });
 
@@ -49,7 +49,7 @@ describe('initWorkspaceMemory', () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
 
-    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(workspaceDir, '.MEMORY.md'), 'utf-8');
     expect(content).toContain('.deliverables');
     expect(content).toContain(path.join(workspaceDir, '.deliverables'));
   });
@@ -62,7 +62,7 @@ describe('initWorkspaceMemory', () => {
 
     await initWorkspaceMemory(worktree, projectPath);
 
-    const content = await readFile(path.join(worktree, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(worktree, '.MEMORY.md'), 'utf-8');
     // notebook-level deliverables
     expect(content).toContain(path.join(worktree, '.deliverables'));
     // project-level deliverables
@@ -73,15 +73,15 @@ describe('initWorkspaceMemory', () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
 
-    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(workspaceDir, '.MEMORY.md'), 'utf-8');
     expect(content).not.toContain('Project Deliverables');
   });
 
-  it('overwrites an existing MEMORY.md without throwing', async () => {
+  it('overwrites an existing .MEMORY.md without throwing', async () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
     await initWorkspaceMemory(workspaceDir); // second call must not throw
-    const content = await readFile(path.join(workspaceDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(workspaceDir, '.MEMORY.md'), 'utf-8');
     expect(content).toContain('# MEMORY');
   });
 
@@ -89,7 +89,7 @@ describe('initWorkspaceMemory', () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     const nonExistentDir = path.join(tmpRoot, 'does-not-exist');
     await initWorkspaceMemory(nonExistentDir);
-    const content = await readFile(path.join(nonExistentDir, 'MEMORY.md'), 'utf-8');
+    const content = await readFile(path.join(nonExistentDir, '.MEMORY.md'), 'utf-8');
     expect(content).toContain('# MEMORY');
   });
 });

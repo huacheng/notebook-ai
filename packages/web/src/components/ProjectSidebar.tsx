@@ -731,10 +731,13 @@ function FileBrowser() {
         onSubPathChange={setCurrentSubPath}
         refreshKey={fileRefreshKey}
         noDeleteFilter={(name, subPath) => {
-          // Hide delete for .index.json (project metadata) and .working directory
-          // Covers root-level .working and worktree paths like .worktrees/task-xxx/.working
+          // Hide delete for protected system files:
+          // - .index.json (project metadata)
+          // - .working directory
+          // - .MEMORY.md (notebook environment config, read-only)
           return name === '.index.json'
             || name === '.working'
+            || name === '.MEMORY.md'
             || subPath === '.working'
             || subPath.startsWith('.working/')
             || subPath.endsWith('/.working')

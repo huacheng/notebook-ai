@@ -5,6 +5,9 @@ import { writeFile } from 'fs/promises';
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'nb-workspaces');
 
+/** Protected system file - read-only for users/Claude, writable only by backend init */
+export const MEMORY_FILENAME = '.MEMORY.md';
+
 export function getWorkspaceRoot(): string {
   return process.env['NB_WORKSPACE_DIR'] ?? DEFAULT_WORKSPACE_ROOT;
 }
@@ -80,9 +83,10 @@ export function uniqueSlug(baseSlug: string, userId?: string | null): string {
 }
 
 /**
- * Writes a MEMORY.md file into the workspace directory, recording the
+ * Writes the .MEMORY.md file into the workspace directory, recording the
  * shared library directory path relative to the workspace.
- * Safe to call multiple times — overwrites any existing MEMORY.md.
+ * Safe to call multiple times — overwrites any existing .MEMORY.md.
+ * This file is protected: users/Claude cannot modify it via API.
  */
 export async function initWorkspaceMemory(workspaceDir: string, projectPath?: string): Promise<void> {
   mkdirSync(workspaceDir, { recursive: true });
@@ -115,5 +119,5 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
       `This is the project-level deliverables directory shared across all notebooks in the project.\n`;
   }
 
-  await writeFile(path.join(workspaceDir, 'MEMORY.md'), content, 'utf-8');
+  await writeFile(path.join(workspaceDir, MEMORY_FILENAME), content, 'utf-8');
 }
