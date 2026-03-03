@@ -71,6 +71,21 @@ export const PromptImageSchema = z.object({
 });
 export type PromptImage = z.infer<typeof PromptImageSchema>;
 
+// ── Prompt Queue ────────────────────────────────────────────────────────────
+export const QueuedPromptSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  images: z.array(PromptImageSchema).optional(),
+  createdAt: z.string(),
+});
+export type QueuedPrompt = z.infer<typeof QueuedPromptSchema>;
+
+export const PromptQueueFileSchema = z.object({
+  version: z.number().int().nonnegative(),
+  items: z.array(QueuedPromptSchema),
+});
+export type PromptQueueFile = z.infer<typeof PromptQueueFileSchema>;
+
 export const PromptCellSchema = BaseCellSchema.extend({
   type: z.literal('prompt'),
   source: z.string(),
