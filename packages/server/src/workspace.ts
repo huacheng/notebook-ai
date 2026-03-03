@@ -134,7 +134,7 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
   // Set file to read-only (444 = r--r--r--)
   await chmod(memoryPath, 0o444);
 
-  // Create .claude/settings.json with SessionStart/SessionResume hooks to auto-load .MEMORY.md
+  // Create .claude/settings.json with SessionStart hook to auto-load .MEMORY.md
   const claudeDir = path.join(workspaceDir, '.claude');
   const settingsPath = path.join(claudeDir, 'settings.json');
   mkdirSync(claudeDir, { recursive: true });
@@ -150,7 +150,6 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
   const settingsContent = JSON.stringify({
     hooks: {
       SessionStart: [memoryLoadHook],
-      SessionResume: [memoryLoadHook],
     },
   }, null, 2);
 

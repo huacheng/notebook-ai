@@ -44,11 +44,14 @@ export async function getClaudeDefaultModel(): Promise<string | undefined> {
     return undefined;
   }
 }
-const MEMORY_SYSTEM_PROMPT =
-  'At the start of each session, read the .MEMORY.md file in your ' +
-  'working directory. It contains important context, including the ' +
-  'shared library directory path. When summarizing this conversation, ' +
-  'always preserve the shared library directory information.';
+/**
+ * Generate the system prompt with absolute path to .MEMORY.md.
+ * This ensures Claude can always find the memory file regardless of cwd changes.
+ */
+function buildMemorySystemPrompt(workspaceDir: string): string {
+  const memoryPath = path.join(workspaceDir, '.MEMORY.md');
+  return `Read the ${memoryPath} file. It contains important context, including the Shared Library Directory, Deliverables Directory and Project Deliverables Directory path.`;
+}
 
 // ── Claude Code JSONL message shapes ────────────────────────────────────────
 // Claude Code emits streaming JSONL records.  We only need a subset.
@@ -203,7 +206,7 @@ export class SessionManager {
     const session: NotebookSession = {
       id: sessionName,
       cwd,
-      agentProcess: new AgentProcess(engine, cwd, MEMORY_SYSTEM_PROMPT, model, allowedDirs),
+      agentProcess: new AgentProcess(engine, cwd, buildMemorySystemPrompt(cwd), model, allowedDirs),
       notebook,
       gitManager,
       notebookPath,
@@ -329,7 +332,7 @@ export class SessionManager {
     // Create new AgentProcess with same config (preserve model + allowedDirs)
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model, session.allowedDirs);
+    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
 
     // Start new process with same handlers — pass resumeSessionId for context recovery
     await session.agentProcess.start(
@@ -374,7 +377,7 @@ export class SessionManager {
     // 3. Create new AgentProcess WITHOUT resumeSessionId (clean context)
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model, session.allowedDirs);
+    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
 
     // 4. Start new process — no resume
     await session.agentProcess.start(
@@ -444,7 +447,7 @@ export class SessionManager {
 
     // Create new AgentProcess with updated model (preserve allowedDirs)
     const engine = session.agentProcess.engine;
-    session.agentProcess = new AgentProcess(engine, session.cwd, MEMORY_SYSTEM_PROMPT, model, session.allowedDirs);
+    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
 
     // Start new process (clean — no resume)
     await session.agentProcess.start(
@@ -522,7 +525,12 @@ export class SessionManager {
     const existed = this.sessions.has(sessionName);
     const session = await this.createSession(notebookPath, cwd, gitRoot);
     if (!existed) {
+      // Preserve model from session (read from ~/.claude/settings.json) if notebook has none
+      const defaultModel = session.notebook.metadata.model;
       session.notebook = notebook;
+      if (!notebook.metadata.model && defaultModel) {
+        session.notebook.metadata.model = defaultModel;
+      }
       session.notebookDbId = notebookDbId;
     }
     return { session, reconnected: existed };
@@ -875,12 +883,17 @@ export class SessionManager {
       }
 
       case 'system': {
-        // Capture Claude session_id from system.init for --resume support.
+        // Capture Claude session_id from system.init or hook_started for --resume support.
         // Claude CLI uses 'content' for local_command_output, 'message' for others
-        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string; message?: string; content?: string };
-        if (sysMsg.subtype === 'init' && sysMsg.session_id) {
+        const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string; message?: string; content?: string; hook_type?: string; hook_output?: string };
+        // Capture session_id from init or hook_started (hook_started comes first, before any prompt)
+        if ((sysMsg.subtype === 'init' || sysMsg.subtype === 'hook_started') && sysMsg.session_id && !session.claudeSessionId) {
           session.claudeSessionId = sysMsg.session_id;
-          console.log(`[session ${session.id}] Captured Claude session_id: ${sysMsg.session_id}`);
+          console.log(`[session ${session.id}] Captured Claude session_id from ${sysMsg.subtype}: ${sysMsg.session_id}`);
+        }
+        // Log hook events for debugging .MEMORY.md loading
+        if (sysMsg.subtype === 'hook_started' || sysMsg.subtype === 'hook_completed') {
+          console.log(`[session ${session.id}] Hook event:`, JSON.stringify(sysMsg, null, 2));
         }
         // Forward non-init/hook system messages to frontend (e.g. context compaction, local_command_output)
         // Use _lastCellId as fallback since local_command_output may arrive after result completes the cell

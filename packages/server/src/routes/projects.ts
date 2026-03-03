@@ -261,9 +261,18 @@ export function createProjectsRouter(
             session.notebookPath = newNotebookFilePath;
             if (isWorktree && newWorktreeDir !== worktreeDir) {
               session.cwd = newWorktreeDir!;
+              // Restart agentProcess to apply new system prompt with updated path
+              // skipResume: true because the old session context has stale paths
+              await sessionManager.restartSession(session.id, { skipResume: true });
             }
           }
         }
+      }
+
+      // Update .claude/settings.json with new absolute path for .MEMORY.md
+      // This regenerates the settings file with correct paths after directory rename
+      if (isWorktree && newWorktreeDir && newWorktreeDir !== worktreeDir) {
+        await initWorkspaceMemory(newWorktreeDir, project.path);
       }
 
       res.json({ success: true, newPath: newNotebookFilePath, newWorktreeDir });
