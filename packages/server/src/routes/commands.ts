@@ -19,6 +19,7 @@ const COMMANDS: Command[] = [
   { name: 'task-ai:auto', label: 'Autonomous loop: plan → check → exec cycle' },
   { name: 'task-ai:merge', label: 'Merge completed task branch to main' },
   { name: 'task-ai:list', label: 'Query task status, progress, and dependencies' },
+  { name: 'task-ai:highlight', label: 'Distill experiences and insights into knowledge library' },
   { name: 'task-ai:library search', label: 'Search cross-task knowledge library' },
   // git & commit
   { name: 'commit', label: 'Create a git commit with staged changes' },
