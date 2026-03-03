@@ -36,7 +36,7 @@ describe('updateAgent', () => {
       version: 1,
       metadata: { title: 'Test', created: '2025-01-01', agent: 'claude', git_repo: false },
       cells: [],
-      slice: { generated: false, sections: [] },
+      slide: { generated: false, sections: [] },
       annotations: [],
       assets: { intermediate_files: [] },
     };
@@ -50,7 +50,7 @@ describe('updateAgent', () => {
       version: 1,
       metadata: { title: 'Test', created: '2025-01-01', updated: '2025-01-01', agent: 'claude', git_repo: false },
       cells: [],
-      slice: { generated: false, sections: [] },
+      slide: { generated: false, sections: [] },
       annotations: [],
       assets: { intermediate_files: [] },
     };
@@ -80,7 +80,7 @@ function makeNotebook(cellIds: string[]) {
       execution_count: i + 1,
       status: 'completed' as const,
     })),
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
     annotations: [],
     assets: { intermediate_files: [] },
   };
@@ -154,7 +154,7 @@ function makeNotebookWithProject(projectId?: string) {
       ...(projectId !== undefined ? { project_id: projectId } : {}),
     },
     cells: [],
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
     annotations: [],
     assets: { intermediate_files: [] },
   };

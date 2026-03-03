@@ -1036,7 +1036,7 @@ textarea.cell-input {
   border-color: var(--color-error);
 }
 
-.notebook-statusbar-slice-btn.active {
+.notebook-statusbar-slide-btn.active {
   background: var(--color-primary-light);
   color: var(--color-primary);
   border-color: var(--color-primary);
@@ -2266,27 +2266,27 @@ textarea.cell-input {
 }
 
 /* ============================================================
-   Slice view
+   Slide view
    ============================================================ */
-.slice-empty {
+.slide-empty {
   text-align: center;
   padding: 3rem 1rem;
   color: var(--text-secondary);
 }
 
-.slice-empty-hint {
+.slide-empty-hint {
   font-size: var(--font-size-sm);
   margin-top: var(--space-sm);
   color: #94a3b8;
 }
 
-.slice-view {
+.slide-view {
   display: flex;
   flex-direction: column;
   gap: var(--space-xl);
 }
 
-.slice-section {
+.slide-section {
   background: var(--bg-cell);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -2294,7 +2294,7 @@ textarea.cell-input {
   box-shadow: var(--shadow-cell);
 }
 
-.slice-section-refs {
+.slide-section-refs {
   margin-top: var(--space-md);
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
@@ -2304,7 +2304,7 @@ textarea.cell-input {
   flex-wrap: wrap;
 }
 
-.slice-cell-ref {
+.slide-cell-ref {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   background: #f1f5f9;
@@ -2313,36 +2313,36 @@ textarea.cell-input {
   border: 1px solid var(--border-default);
 }
 
-.slice-toolbar {
+.slide-toolbar {
   display: flex;
   align-items: center;
   gap: var(--space-md);
 }
 
-.slice-section-count {
+.slide-section-count {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
 
-.slice-section-header {
+.slide-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-sm);
 }
 
-.slice-section-order {
+.slide-section-order {
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-primary);
 }
 
-.slice-section-actions {
+.slide-section-actions {
   display: flex;
   gap: var(--space-xs);
 }
 
-.slice-section-title {
+.slide-section-title {
   cursor: pointer;
   border-radius: var(--radius-sm);
   padding: var(--space-xs) var(--space-sm);
@@ -2350,11 +2350,11 @@ textarea.cell-input {
   transition: background 0.12s;
 }
 
-.slice-section-title:hover {
+.slide-section-title:hover {
   background: var(--bg-cell-hover);
 }
 
-.slice-title-input {
+.slide-title-input {
   width: 100%;
   font-family: var(--font-display);
   font-size: 1.1rem;
@@ -2369,7 +2369,7 @@ textarea.cell-input {
   margin-bottom: var(--space-md);
 }
 
-.slice-section-content {
+.slide-section-content {
   cursor: pointer;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2379,17 +2379,17 @@ textarea.cell-input {
   transition: background 0.12s;
 }
 
-.slice-section-content:hover {
+.slide-section-content:hover {
   background: var(--bg-cell-hover);
 }
 
-.slice-content-edit-wrapper {
+.slide-content-edit-wrapper {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
 }
 
-.slice-content-textarea {
+.slide-content-textarea {
   width: 100%;
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
@@ -2404,7 +2404,7 @@ textarea.cell-input {
   resize: vertical;
 }
 
-.slice-content-done-btn {
+.slide-content-done-btn {
   align-self: flex-end;
   padding: 4px 16px;
   background: var(--color-primary);
@@ -2415,7 +2415,7 @@ textarea.cell-input {
   transition: background 0.15s;
 }
 
-.slice-content-done-btn:hover {
+.slide-content-done-btn:hover {
   background: var(--color-primary-dark);
 }
 

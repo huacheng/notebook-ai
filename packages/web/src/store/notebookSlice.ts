@@ -5,7 +5,7 @@ import type {
   CellOutput,
   PromptCell,
   MarkdownCell,
-  SliceSection,
+  SlideSection,
 } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 import {
@@ -67,20 +67,20 @@ function makeCell(type: CellType): Cell {
 }
 
 export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'notebook' | 'sliceLoading' | 'notebookLoading'
+  | 'notebook' | 'slideLoading' | 'notebookLoading'
   | 'cellsOffset' | 'loadingOlderCells'
   | 'setNotebook' | 'updateTitle' | 'updateAgent' | 'addCell' | 'submitPrompt' | 'removeCell' | 'moveCell'
   | 'updateCellSource' | 'setCellStatus' | 'appendCellOutput' | 'updateToolResult'
   | 'setCellGitDiff'
   | 'prependCells' | 'setCellsOffset'
-  | 'generateSlice' | 'updateSliceSections'
+  | 'generateSlide' | 'updateSlideSections'
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
   | 'openNotebookTab' | 'closeNotebookTab' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab'
   | 'appendStreamDelta' | 'flushStreamBuffer'
   | 'loadingCellIds' | 'requestCellLoad' | 'replaceCellStub'
 >> = (set, get) => ({
   notebook: null,
-  sliceLoading: false,
+  slideLoading: false,
   notebookLoading: false,
   cellsOffset: 0,
   loadingOlderCells: false,
@@ -283,32 +283,32 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     set({ cellsOffset: offset });
   },
 
-  async generateSlice() {
+  async generateSlide() {
     const { sessionId } = get();
     if (!sessionId) return;
 
-    set({ sliceLoading: true });
+    set({ slideLoading: true });
     try {
       const headers: Record<string, string> = {};
       const token = get().authToken;
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch(
-        `/api/notebooks/${encodeURIComponent(sessionId)}/generate-slice`,
+        `/api/notebooks/${encodeURIComponent(sessionId)}/generate-slide`,
         { method: 'POST', headers },
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('[store] generateSlice failed:', body);
+        console.error('[store] generateSlide failed:', body);
         return;
       }
-      const { sections } = (await res.json()) as { sections: SliceSection[] };
+      const { sections } = (await res.json()) as { sections: SlideSection[] };
       set((state) => {
         if (!state.notebook) return {};
         return {
           notebook: {
             ...state.notebook,
-            slice: {
+            slide: {
               generated: true,
               sections,
               updated_at: new Date().toISOString(),
@@ -317,20 +317,20 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         };
       });
     } catch (err) {
-      console.error('[store] generateSlice error:', err);
+      console.error('[store] generateSlide error:', err);
     } finally {
-      set({ sliceLoading: false });
+      set({ slideLoading: false });
     }
   },
 
-  updateSliceSections(sections: SliceSection[]) {
+  updateSlideSections(sections: SlideSection[]) {
     set((state) => {
       if (!state.notebook) return {};
       return {
         notebook: {
           ...state.notebook,
-          slice: {
-            ...state.notebook.slice,
+          slide: {
+            ...state.notebook.slide,
             sections,
             updated_at: new Date().toISOString(),
           },
@@ -340,7 +340,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
 
     const { ws } = get();
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'slice_update', session_id: get().sessionId ?? '', sections }));
+      ws.send(JSON.stringify({ type: 'slide_update', session_id: get().sessionId ?? '', sections }));
     }
   },
 

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { Notebook, SliceSection, CellOutput } from '@notebook-ai/shared';
+import type { Notebook, SlideSection, CellOutput } from '@notebook-ai/shared';
 
 /**
  * Summarises a single cell output into a short text description.
@@ -18,7 +18,7 @@ function summariseOutput(output: CellOutput): string {
     case 'error':
       return `[Error] ${output.message.slice(0, 120)}`;
     case 'thinking':
-      return ''; // Omit thinking blocks from slice summaries
+      return ''; // Omit thinking blocks from slide summaries
     case 'chart':
       return `[Chart: ${output.chart_type}]`;
     default:
@@ -39,15 +39,15 @@ function extractTitle(source: string, maxLen = 50): string {
 }
 
 /**
- * Generates an array of SliceSection objects from a notebook.
+ * Generates an array of SlideSection objects from a notebook.
  *
  * - Creates a title section from notebook metadata
  * - For each prompt cell: extracts title from source, summarises outputs
  * - For each markdown cell: uses source as content
  * - Skips visualization cells (they have no meaningful text representation)
  */
-export function generateSlice(notebook: Notebook): SliceSection[] {
-  const sections: SliceSection[] = [];
+export function generateSlide(notebook: Notebook): SlideSection[] {
+  const sections: SlideSection[] = [];
   let order = 0;
 
   // Title section from notebook metadata
@@ -109,7 +109,7 @@ export function generateSlice(notebook: Notebook): SliceSection[] {
       }
 
       case 'visualization': {
-        // Skip visualization cells in the slice
+        // Skip visualization cells in the slide
         break;
       }
     }

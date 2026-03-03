@@ -11,7 +11,7 @@ import type {
   ChartOutput,
   ThinkingOutput,
   Annotation,
-  SliceSection,
+  SlideSection,
   ExportOptions,
 } from '@notebook-ai/shared';
 
@@ -267,20 +267,20 @@ function renderCell(cell: Cell, annotations: Annotation[], includeAnnotations: b
   }
 }
 
-// ── Slice view renderer ───────────────────────────────────────────────────────
+// ── Slide view renderer ───────────────────────────────────────────────────────
 
-function renderSliceSection(section: SliceSection, index: number): string {
+function renderSlideSection(section: SlideSection, index: number): string {
   return `
-<div class="slice-section" data-section-id="${escapeHtml(section.id)}" data-order="${section.order}">
-  <div class="slice-section-header">
-    <span class="slice-section-number">${index + 1}</span>
-    <h2 class="slice-section-title">${escapeHtml(section.title)}</h2>
+<div class="slide-section" data-section-id="${escapeHtml(section.id)}" data-order="${section.order}">
+  <div class="slide-section-header">
+    <span class="slide-section-number">${index + 1}</span>
+    <h2 class="slide-section-title">${escapeHtml(section.title)}</h2>
   </div>
-  <div class="slice-section-content">
-    <pre class="slice-content-text">${escapeHtml(section.content)}</pre>
+  <div class="slide-section-content">
+    <pre class="slide-content-text">${escapeHtml(section.content)}</pre>
   </div>
   ${section.cell_refs.length > 0
-    ? `<div class="slice-cell-refs"><strong>References:</strong> ${section.cell_refs.map((r) => `<code>${escapeHtml(r)}</code>`).join(', ')}</div>`
+    ? `<div class="slide-cell-refs"><strong>References:</strong> ${section.cell_refs.map((r) => `<code>${escapeHtml(r)}</code>`).join(', ')}</div>`
     : ''}
 </div>`.trim();
 }
@@ -639,31 +639,31 @@ pre, code {
 del { color: #ef4444; }
 ins { color: #22c55e; text-decoration: none; }
 
-/* ── Slice view ── */
-#slice-view {
+/* ── Slide view ── */
+#slide-view {
   max-width: 900px;
   margin: 24px auto;
   padding: 0 16px 64px;
 }
-.slice-empty {
+.slide-empty {
   text-align: center;
   color: #9ca3af;
   margin-top: 64px;
   font-size: 1rem;
 }
-.slice-sections {
+.slide-sections {
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
-.slice-section {
+.slide-section {
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
-.slice-section-header {
+.slide-section-header {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -671,7 +671,7 @@ ins { color: #22c55e; text-decoration: none; }
   background: #1e1e2e;
   color: #cdd6f4;
 }
-.slice-section-number {
+.slide-section-number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -684,15 +684,15 @@ ins { color: #22c55e; text-decoration: none; }
   font-size: 0.85rem;
   flex-shrink: 0;
 }
-.slice-section-title {
+.slide-section-title {
   font-size: 1rem;
   font-weight: 600;
   color: #cdd6f4;
 }
-.slice-section-content {
+.slide-section-content {
   padding: 16px 20px;
 }
-.slice-content-text {
+.slide-content-text {
   white-space: pre-wrap;
   word-break: break-word;
   color: #374151;
@@ -700,7 +700,7 @@ ins { color: #22c55e; text-decoration: none; }
   font-family: inherit;
   font-size: 0.9rem;
 }
-.slice-cell-refs {
+.slide-cell-refs {
   padding: 8px 20px 14px;
   color: #9ca3af;
   font-size: 0.75rem;
@@ -764,7 +764,7 @@ ins { color: #22c55e; text-decoration: none; }
 @media print {
   .toolbar, .tab-bar, .replay-panel { display: none !important; }
   .tab-content { display: block !important; }
-  #slice-view { page-break-before: always; }
+  #slide-view { page-break-before: always; }
   .cell { break-inside: avoid; }
 }
 `.trim();
@@ -995,7 +995,7 @@ export interface ExportBundle {
 
 function resolveOpts(options?: Partial<ExportOptions>) {
   return {
-    include_slice: options?.include_slice ?? true,
+    include_slide: options?.include_slide ?? true,
     include_replay: options?.include_replay ?? true,
     include_annotations: options?.include_annotations ?? true,
     minify: options?.minify ?? false,
@@ -1069,14 +1069,14 @@ function buildBundle(
     .map((cell) => renderCell(cell, notebook.annotations, opts.include_annotations))
     .join('\n\n');
 
-  let sliceHtml: string;
-  if (opts.include_slice && notebook.slice.generated && notebook.slice.sections.length > 0) {
-    const sorted = [...notebook.slice.sections].sort((a, b) => a.order - b.order);
-    sliceHtml = `<div class="slice-sections">${sorted.map(renderSliceSection).join('\n\n')}</div>`;
-  } else if (opts.include_slice) {
-    sliceHtml = `<p class="slice-empty">No slice sections generated yet.</p>`;
+  let slideHtml: string;
+  if (opts.include_slide && notebook.slide.generated && notebook.slide.sections.length > 0) {
+    const sorted = [...notebook.slide.sections].sort((a, b) => a.order - b.order);
+    slideHtml = `<div class="slide-sections">${sorted.map(renderSlideSection).join('\n\n')}</div>`;
+  } else if (opts.include_slide) {
+    slideHtml = `<p class="slide-empty">No slide sections generated yet.</p>`;
   } else {
-    sliceHtml = `<p class="slice-empty">Slice view disabled.</p>`;
+    slideHtml = `<p class="slide-empty">Slide view disabled.</p>`;
   }
 
   const notebookJson = JSON.stringify(notebook);
@@ -1125,14 +1125,14 @@ ${headBlock}
 
 <nav class="tab-bar">
   <button class="tab active" data-target="notebook">Notebook</button>
-  ${opts.include_slice ? '<button class="tab" data-target="slice">Slice</button>' : ''}
+  ${opts.include_slide ? '<button class="tab" data-target="slide">Slide</button>' : ''}
 </nav>
 
 <div id="notebook-view" class="tab-content active">
 ${cellsHtml || '<p style="text-align:center;color:#9ca3af;margin-top:48px">No cells.</p>'}
 </div>
 
-${opts.include_slice ? `<div id="slice-view" class="tab-content" style="display:none">\n${sliceHtml}\n</div>` : ''}
+${opts.include_slide ? `<div id="slide-view" class="tab-content" style="display:none">\n${slideHtml}\n</div>` : ''}
 
 ${replayPanelHtml}
 

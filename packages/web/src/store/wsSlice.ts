@@ -252,14 +252,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           URL.revokeObjectURL(url);
           break;
         }
-        case 'slice_update':
+        case 'slide_update':
           set((state) => {
             if (!state.notebook) return {};
             return {
               notebook: {
                 ...state.notebook,
-                slice: {
-                  ...state.notebook.slice,
+                slide: {
+                  ...state.notebook.slide,
                   generated: true,
                   sections: parsed.sections,
                   updated_at: new Date().toISOString(),
@@ -596,7 +596,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           type: 'export_html',
           session_id: get().sessionId ?? '',
           options: {
-            include_slice: true,
+            include_slide: true,
             include_replay: true,
             include_annotations: true,
           },

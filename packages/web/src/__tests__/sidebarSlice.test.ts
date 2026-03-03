@@ -37,7 +37,7 @@ describe('createNewNotebook blank metadata', () => {
           version: 1,
           metadata: { title: 'Test', created: '2025-01-01', agent: 'claude', git_repo: false },
           cells: [],
-          slice: { generated: false, sections: [] },
+          slide: { generated: false, sections: [] },
           annotations: [],
           assets: { intermediate_files: [] },
         },

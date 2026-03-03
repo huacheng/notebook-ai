@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateSlice } from '../slice-generator.js';
+import { generateSlide } from '../slide-generator.js';
 import { NotebookSchema } from '@notebook-ai/shared';
 import type { Notebook } from '@notebook-ai/shared';
 
@@ -16,7 +16,7 @@ function makeNotebook(overrides: Partial<Notebook> = {}): Notebook {
       git_repo: false,
     },
     cells: [],
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
     annotations: [],
     assets: { intermediate_files: [] },
     ...overrides,
@@ -25,10 +25,10 @@ function makeNotebook(overrides: Partial<Notebook> = {}): Notebook {
 
 // ── Empty notebook ───────────────────────────────────────────────────────────
 
-describe('generateSlice with empty notebook', () => {
+describe('generateSlide with empty notebook', () => {
   it('returns only the title section', () => {
     const nb = makeNotebook();
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
 
     expect(sections).toHaveLength(1);
     expect(sections[0].title).toBe('Test Notebook');
@@ -38,21 +38,21 @@ describe('generateSlice with empty notebook', () => {
 
   it('includes created date in title section content', () => {
     const nb = makeNotebook();
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
 
     expect(sections[0].content).toContain('2025-01-01T00:00:00.000Z');
   });
 
   it('includes working directory in title section content', () => {
     const nb = makeNotebook();
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
 
     expect(sections[0].content).toContain('/home/user/project');
   });
 
   it('title section has a UUID id', () => {
     const nb = makeNotebook();
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
 
     expect(sections[0].id).toBeDefined();
     expect(sections[0].id.length).toBeGreaterThan(0);
@@ -61,7 +61,7 @@ describe('generateSlice with empty notebook', () => {
 
 // ── Prompt cells ─────────────────────────────────────────────────────────────
 
-describe('generateSlice with prompt cells', () => {
+describe('generateSlide with prompt cells', () => {
   it('generates a section for each prompt cell', () => {
     const nb = makeNotebook({
       cells: [
@@ -88,7 +88,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     // title section + 2 prompt sections
     expect(sections).toHaveLength(3);
     expect(sections[1].title).toBe('Explain TypeScript generics');
@@ -109,7 +109,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].cell_refs).toEqual(['abc-123']);
   });
 
@@ -127,7 +127,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).toBe('Short answer.');
   });
 
@@ -146,7 +146,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content.length).toBeLessThan(300);
     expect(sections[1].content).toMatch(/\.\.\.$/);
   });
@@ -167,7 +167,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).toContain('[Tool: read_file]');
   });
 
@@ -192,7 +192,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).toContain('[Tool: bash]');
     expect(sections[1].content).toContain('file1.txt');
   });
@@ -213,7 +213,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).toContain('[Error]');
     expect(sections[1].content).toContain('Command failed');
   });
@@ -234,7 +234,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).toContain('[Chart: bar]');
   });
 
@@ -255,7 +255,7 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).not.toContain('Let me think');
     expect(sections[1].content).toContain('The answer is 42.');
   });
@@ -274,14 +274,14 @@ describe('generateSlice with prompt cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].content).toBe('(no output yet)');
   });
 });
 
 // ── Markdown cells ───────────────────────────────────────────────────────────
 
-describe('generateSlice with markdown cells', () => {
+describe('generateSlide with markdown cells', () => {
   it('uses markdown source as content', () => {
     const nb = makeNotebook({
       cells: [
@@ -295,7 +295,7 @@ describe('generateSlice with markdown cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections).toHaveLength(2);
     expect(sections[1].content).toBe(
       '# Architecture Overview\n\nThis is a description.',
@@ -316,7 +316,7 @@ describe('generateSlice with markdown cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].title).toBe('Design Decisions');
   });
 
@@ -333,7 +333,7 @@ describe('generateSlice with markdown cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].title).toBe('Some plain text');
   });
 
@@ -350,7 +350,7 @@ describe('generateSlice with markdown cells', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     // Only title section, empty markdown skipped
     expect(sections).toHaveLength(1);
   });
@@ -388,7 +388,7 @@ describe('section ordering', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections).toHaveLength(4); // title + 3 cells
     expect(sections[0].order).toBe(0);
     expect(sections[1].order).toBe(1);
@@ -426,7 +426,7 @@ describe('section ordering', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     // title + 2 prompt sections (visualization is skipped)
     expect(sections).toHaveLength(3);
     expect(sections[0].order).toBe(0); // title
@@ -440,7 +440,7 @@ describe('section ordering', () => {
 describe('cell_refs', () => {
   it('title section has empty cell_refs', () => {
     const nb = makeNotebook();
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[0].cell_refs).toEqual([]);
   });
 
@@ -458,7 +458,7 @@ describe('cell_refs', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].cell_refs).toEqual(['unique-id-123']);
   });
 
@@ -475,7 +475,7 @@ describe('cell_refs', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     expect(sections[1].cell_refs).toEqual(['md-unique-456']);
   });
 });
@@ -501,7 +501,7 @@ describe('output summarization', () => {
       ],
     });
 
-    const sections = generateSlice(nb);
+    const sections = generateSlide(nb);
     const content = sections[1].content;
     expect(content).toContain('First output');
     expect(content).toContain('[Tool: bash]');

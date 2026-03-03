@@ -11,7 +11,7 @@ const makeNotebook = (...cells: any[]): Notebook => ({
   cells,
   metadata: { title: 'test', created: '', git_repo: false, agent: 'claude' as const },
   version: 1,
-  slice: { generated: false, sections: [] },
+  slide: { generated: false, sections: [] },
   annotations: [],
   assets: { intermediate_files: [] },
 } as Notebook);

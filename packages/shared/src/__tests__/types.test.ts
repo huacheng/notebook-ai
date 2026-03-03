@@ -28,7 +28,7 @@ function validNotebook() {
       git_repo: false,
     },
     cells: [],
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
     annotations: [],
     assets: { intermediate_files: [] },
   };
@@ -122,7 +122,7 @@ describe('NotebookSchema', () => {
     if (result.success) {
       expect(result.data.version).toBe(1);
       expect(result.data.cells).toEqual([]);
-      expect(result.data.slice).toEqual({ generated: false, sections: [] });
+      expect(result.data.slide).toEqual({ generated: false, sections: [] });
       expect(result.data.annotations).toEqual([]);
       expect(result.data.assets).toEqual({ intermediate_files: [] });
       expect(result.data.metadata.git_repo).toBe(false);
@@ -385,7 +385,7 @@ describe('WSClientMessageSchema', () => {
       type: 'export_html',
       session_id: 'sess-1',
       options: {
-        include_slice: false,
+        include_slide: false,
         include_replay: false,
         include_annotations: false,
       },
@@ -393,9 +393,9 @@ describe('WSClientMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('parses slice_update', () => {
+  it('parses slide_update', () => {
     const result = WSClientMessageSchema.safeParse({
-      type: 'slice_update',
+      type: 'slide_update',
       session_id: 'sess-1',
       sections: [
         {
@@ -515,9 +515,9 @@ describe('WSServerMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('parses slice_update', () => {
+  it('parses slide_update', () => {
     const result = WSServerMessageSchema.safeParse({
-      type: 'slice_update',
+      type: 'slide_update',
       session_id: 'sess-1',
       sections: [],
     });

@@ -16,7 +16,7 @@ function makeBlankNotebook(): Notebook {
       agent: 'claude',
     },
     cells: [],
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
     annotations: [],
     assets: { intermediate_files: [] },
   };

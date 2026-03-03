@@ -70,7 +70,7 @@ import { captureUrl } from './url-capture.js';
 
 const execFileAsync = promisify(execFileCb);
 const EXEC_TIMEOUT = 10000;
-const DEFAULT_GIT_LOG_LIMIT = 5;
+const DEFAULT_GIT_LOG_LIMIT = 20;
 
 /**
  * Compute git log for a repo path. Shared by git_log_request handler and git_changed push.
@@ -163,6 +163,93 @@ export function setupWebSocket(
 
   /** Session ownership: session_id → userId (prevents cross-user access). */
   const sessionOwningUser = new Map<string, string>();
+
+  // ── File open subscriptions for live updates ─────────────────────────────────
+  interface FileOpenClient {
+    ws: WebSocket;
+    sessionId: string;
+    source: 'workspace' | 'library' | 'deliverables';
+    projectId?: string;
+    basedir: string;
+  }
+  /** filePath → Set of clients that have this file open */
+  const fileOpenSubscriptions = new Map<string, Map<string, FileOpenClient>>();
+  /** filePath → unsubscribe function for FileWatcher */
+  const fileWatcherUnsubscribers = new Map<string, () => void>();
+
+  /** Push updated file content to all clients watching this file */
+  async function pushFileUpdate(filePath: string): Promise<void> {
+    const clients = fileOpenSubscriptions.get(filePath);
+    if (!clients || clients.size === 0) return;
+
+    try {
+      const stat = await fs.stat(filePath);
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
+      if (stat.size > MAX_FILE_SIZE) return; // Skip large files
+
+      const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+      const TEXT_EXTS = new Set(['md', 'txt', 'json', 'yaml', 'yml', 'sh', 'py', 'js', 'ts',
+        'tsx', 'jsx', 'css', 'htm', 'html', 'csv', 'xml', 'toml', 'ini', 'env', 'log']);
+      const BINARY_FORMAT: Record<string, string> = {
+        pdf: 'pdf-binary', docx: 'docx-binary', xlsx: 'xlsx-binary', pptx: 'pptx-binary',
+      };
+      const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
+
+      let format: string;
+      if (TEXT_EXTS.has(ext)) format = 'text';
+      else if (BINARY_FORMAT[ext]) format = BINARY_FORMAT[ext];
+      else if (IMAGE_EXTS.has(ext)) format = 'image';
+      else format = 'unsupported';
+
+      if (format === 'unsupported') return;
+
+      const isBinary = format.endsWith('-binary') || format === 'image';
+      const COMPRESS_THRESHOLD = 100 * 1024;
+      const CHUNK_SIZE = 512 * 1024;
+      const useCompression = stat.size >= COMPRESS_THRESHOLD;
+
+      // Push to all clients watching this file
+      for (const [, client] of clients) {
+        if (client.ws.readyState !== client.ws.OPEN) continue;
+
+        const session_id = client.sessionId;
+        sendToClient(client.ws, { type: 'file-changed-meta', session_id, path: filePath, mtime: stat.mtimeMs, format });
+
+        const stream = createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
+        let chunkIndex = 0;
+
+        await new Promise<void>((resolve, reject) => {
+          stream.on('data', (chunk: Buffer | string) => {
+            const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            if (useCompression) {
+              const compressed = Buffer.from(lz4.compress(chunkBuffer));
+              sendToClient(client.ws, {
+                type: 'file-changed-chunk-compressed',
+                session_id,
+                path: filePath,
+                data: compressed.toString('base64'),
+                encoding: isBinary ? 'base64' : 'utf8',
+                compression: 'lz4',
+                chunk_index: chunkIndex++,
+              });
+            } else {
+              if (isBinary) {
+                sendToClient(client.ws, { type: 'file-changed-chunk', session_id, path: filePath, data: chunkBuffer.toString('base64'), encoding: 'base64' });
+              } else {
+                sendToClient(client.ws, { type: 'file-changed-chunk', session_id, path: filePath, data: chunkBuffer.toString('utf-8'), encoding: 'utf8' });
+              }
+            }
+          });
+          stream.on('end', resolve);
+          stream.on('error', reject);
+        });
+
+        sendToClient(client.ws, { type: 'file-changed-end', session_id, path: filePath, mtime: stat.mtimeMs });
+      }
+    } catch (err) {
+      console.error('[ws] pushFileUpdate error:', err);
+    }
+  }
 
   wss.on('connection', (ws: WebSocket, req) => {
     const url = new URL(req.url ?? '/', `http://localhost`);
@@ -482,15 +569,15 @@ export function setupWebSocket(
           break;
         }
 
-        case 'slice_update': {
+        case 'slide_update': {
           const { session_id } = msg;
           if (!checkSessionPermission(session_id)) break;
           const session = sessionManager.getSession(session_id);
           if (session) {
             session.notebook = {
               ...session.notebook,
-              slice: {
-                ...session.notebook.slice,
+              slide: {
+                ...session.notebook.slide,
                 sections: msg.sections,
                 updated_at: new Date().toISOString(),
               },
@@ -631,6 +718,38 @@ export function setupWebSocket(
             });
 
             sendToClient(ws, { type: 'file-open-end', session_id, mtime: stat.mtimeMs });
+
+            // Subscribe to file changes for live updates
+            if (fileWatcher) {
+              let clients = fileOpenSubscriptions.get(safePath);
+              if (!clients) {
+                clients = new Map();
+                fileOpenSubscriptions.set(safePath, clients);
+              }
+              clients.set(clientId, { ws, sessionId: session_id, source: source as 'workspace' | 'library' | 'deliverables', projectId: project_id, basedir });
+
+              // Start file watcher if this is the first client
+              if (!fileWatcherUnsubscribers.has(safePath)) {
+                const dirPath = path.dirname(safePath);
+                const fileName = path.basename(safePath);
+                const unsub = fileWatcher.subscribe(dirPath, async () => {
+                  // Check if this specific file changed
+                  try {
+                    await fs.access(safePath);
+                    await pushFileUpdate(safePath);
+                  } catch {
+                    // File deleted - notify clients
+                    const fileClients = fileOpenSubscriptions.get(safePath);
+                    if (fileClients) {
+                      for (const [, client] of fileClients) {
+                        sendToClient(client.ws, { type: 'file-deleted', session_id: client.sessionId, path: filePath });
+                      }
+                    }
+                  }
+                });
+                fileWatcherUnsubscribers.set(safePath, unsub);
+              }
+            }
           } catch (err) {
             sendToClient(ws, { type: 'file-open-error', session_id, error: sanitizeErrorForClient(err) });
           }
@@ -1157,6 +1276,20 @@ export function setupWebSocket(
         try { unsub(); } catch (e) { console.error('[ws] cleanup: watcher unsub failed:', e); }
       }
       watchSubscriptions.clear();
+
+      // Clean up file open subscriptions
+      for (const [filePath, clients] of fileOpenSubscriptions) {
+        clients.delete(clientId);
+        if (clients.size === 0) {
+          fileOpenSubscriptions.delete(filePath);
+          // Stop file watcher if no clients left
+          const unsub = fileWatcherUnsubscribers.get(filePath);
+          if (unsub) {
+            try { unsub(); } catch (e) { console.error('[ws] cleanup: file watcher unsub failed:', e); }
+            fileWatcherUnsubscribers.delete(filePath);
+          }
+        }
+      }
     }
 
     ws.on('close', () => {

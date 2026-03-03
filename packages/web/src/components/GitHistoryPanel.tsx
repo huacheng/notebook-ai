@@ -471,7 +471,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
               request_id: requestId,
               project_id: projectId,
               page: p,
-              limit: 5,
+              limit: 20,
               all: all || undefined,
               stats: undefined,
             }));
@@ -532,9 +532,9 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
       if (detail.commits && !search && !allBranches && !selectedBranch) {
         const pushed = detail.commits as CommitInfo[];
         setCommits(pushed);
-        setHasMore(pushed.length >= (detail.limit ?? 5));
+        setHasMore(pushed.length >= (detail.limit ?? 20));
         setPage(1);
-        persistCache(pushed, pushed.length >= (detail.limit ?? 5));
+        persistCache(pushed, pushed.length >= (detail.limit ?? 20));
         return;
       }
       // Filters active or no commits in push — request fresh data

@@ -21,7 +21,7 @@ describe('WS session permission enforcement (P1-1)', () => {
     'tool_result_response',
     'remove_cells',
     'update_cell_source',
-    'slice_update',
+    'slide_update',
     'load_notebook',
     'file-save',
     'file-open',

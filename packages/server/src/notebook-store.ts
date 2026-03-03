@@ -109,7 +109,7 @@ export class NotebookStore {
         git_repo: false,
       },
       cells: [],
-      slice: { generated: false, sections: [] },
+      slide: { generated: false, sections: [] },
       annotations: [],
       assets: { intermediate_files: [] },
     });

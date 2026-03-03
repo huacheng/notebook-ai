@@ -98,9 +98,9 @@ export const CellSchema = z.discriminatedUnion('type', [
   VisualizationCellSchema,
 ]);
 
-// ─── Slice (类 PPTX 总结演示) ───
+// ─── Slide (类 PPTX 总结演示) ───
 
-export const SliceSectionSchema = z.object({
+export const SlideSectionSchema = z.object({
   id: z.string(),
   title: z.string(),
   content: z.string(),
@@ -108,9 +108,9 @@ export const SliceSectionSchema = z.object({
   order: z.number().int().default(0),
 });
 
-export const SliceSchema = z.object({
+export const SlideSchema = z.object({
   generated: z.boolean().default(false),
-  sections: z.array(SliceSectionSchema).default([]),
+  sections: z.array(SlideSectionSchema).default([]),
   updated_at: z.string().optional(),
 });
 
@@ -201,7 +201,7 @@ export const NotebookSchema = z.object({
   version: z.number().int().default(1),
   metadata: NotebookMetadataSchema,
   cells: z.array(CellSchema).default([]),
-  slice: SliceSchema.default({ generated: false, sections: [] }),
+  slide: SlideSchema.default({ generated: false, sections: [] }),
   annotations: z.array(AnnotationSchema).default([]),
   assets: AssetsSchema.default({ intermediate_files: [] }),
 });
@@ -268,16 +268,16 @@ export const ExportHtmlSchema = z.object({
   type: z.literal('export_html'),
   session_id: z.string(),
   options: z.object({
-    include_slice: z.boolean().default(true),
+    include_slide: z.boolean().default(true),
     include_replay: z.boolean().default(true),
     include_annotations: z.boolean().default(true),
   }).default({}),
 });
 
-export const SliceUpdateSchema = z.object({
-  type: z.literal('slice_update'),
+export const SlideUpdateSchema = z.object({
+  type: z.literal('slide_update'),
   session_id: z.string(),
-  sections: z.array(SliceSectionSchema),
+  sections: z.array(SlideSectionSchema),
 });
 
 export const PingSchema = z.object({
@@ -440,7 +440,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SaveNotebookSchema,
   LoadNotebookSchema,
   ExportHtmlSchema,
-  SliceUpdateSchema,
+  SlideUpdateSchema,
   PingSchema,
   UpdateCellSourceSchema,
   FileOpenSchema,
@@ -800,7 +800,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   GitDiffMessageSchema,
   ExportCompleteSchema,
   ErrorMessageSchema,
-  SliceUpdateSchema,
+  SlideUpdateSchema,
   ToolResultMessageSchema,
   SessionAlreadyOpenSchema,
   DeviceConnectedSchema,
@@ -867,7 +867,7 @@ export const CreateNotebookRequestSchema = z.object({
 // ─── Export Options ───
 
 export const ExportOptionsSchema = z.object({
-  include_slice: z.boolean().default(true),
+  include_slide: z.boolean().default(true),
   include_replay: z.boolean().default(true),
   include_annotations: z.boolean().default(true),
   minify: z.boolean().default(false),
@@ -889,8 +889,8 @@ export type VisualizationCell = z.infer<typeof VisualizationCellSchema>;
 export type Cell = z.infer<typeof CellSchema>;
 export type CellType = Cell['type'];
 
-export type SliceSection = z.infer<typeof SliceSectionSchema>;
-export type Slice = z.infer<typeof SliceSchema>;
+export type SlideSection = z.infer<typeof SlideSectionSchema>;
+export type Slide = z.infer<typeof SlideSchema>;
 
 export type InsertAnnotation = z.infer<typeof InsertAnnotationSchema>;
 export type DeleteAnnotation = z.infer<typeof DeleteAnnotationSchema>;
@@ -909,7 +909,7 @@ export type CellOutputMessage = z.infer<typeof CellOutputMessageSchema>;
 export type CellStreamMessage = z.infer<typeof CellStreamMessageSchema>;
 export type ExecutionComplete = z.infer<typeof ExecutionCompleteSchema>;
 export type GitDiffMessage = z.infer<typeof GitDiffMessageSchema>;
-export type SliceUpdate = z.infer<typeof SliceUpdateSchema>;
+export type SlideUpdate = z.infer<typeof SlideUpdateSchema>;
 export type SaveNotebook = z.infer<typeof SaveNotebookSchema>;
 export type LoadNotebook = z.infer<typeof LoadNotebookSchema>;
 export type ExportHtml = z.infer<typeof ExportHtmlSchema>;

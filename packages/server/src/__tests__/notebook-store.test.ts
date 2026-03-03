@@ -28,8 +28,8 @@ describe('createNew', () => {
     expect(nb.metadata.git_repo).toBe(false);
     expect(nb.cells).toEqual([]);
     expect(nb.annotations).toEqual([]);
-    expect(nb.slice.generated).toBe(false);
-    expect(nb.slice.sections).toEqual([]);
+    expect(nb.slide.generated).toBe(false);
+    expect(nb.slide.sections).toEqual([]);
     expect(nb.assets.intermediate_files).toEqual([]);
   });
 

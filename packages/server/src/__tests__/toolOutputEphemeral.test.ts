@@ -51,7 +51,7 @@ function createMockNotebook(): Notebook {
         updated_at: new Date().toISOString(),
       },
     ],
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
   };
 }
 

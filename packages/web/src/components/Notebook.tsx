@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, type RefObject } from 'react'
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { Cell } from './Cell';
-import { SliceView } from './SliceView';
+import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
 
@@ -34,7 +34,7 @@ function NotebookStatusBar() {
 
   const listTitle = notebookList.find((n) => n.id === activeNotebookId)?.title;
   const title = listTitle ?? notebook?.metadata.title ?? 'Untitled Notebook';
-  const inSlice = activeTab === 'slice';
+  const inSlide = activeTab === 'slide';
 
   const [showCommitModal, setShowCommitModal] = useState(false);
   const [showRerunModal, setShowRerunModal] = useState(false);
@@ -66,7 +66,7 @@ function NotebookStatusBar() {
           <button
             className="notebook-statusbar-btn notebook-statusbar-edit-btn"
             onClick={() => setEditMode(true)}
-            disabled={!connected || isRunning || inSlice}
+            disabled={!connected || isRunning || inSlide}
             title={t('status.editTitle')}
           >
             {t('status.edit')}
@@ -123,12 +123,12 @@ function NotebookStatusBar() {
           {t('status.export')}
         </button>
         <button
-          className={`notebook-statusbar-btn notebook-statusbar-slice-btn${inSlice ? ' active' : ''}`}
-          onClick={() => setActiveTab(inSlice ? 'notebook' : 'slice')}
+          className={`notebook-statusbar-btn notebook-statusbar-slide-btn${inSlide ? ' active' : ''}`}
+          onClick={() => setActiveTab(inSlide ? 'notebook' : 'slide')}
           disabled={editMode}
-          title={inSlice ? t('status.sliceBackTitle') : t('status.sliceOpenTitle')}
+          title={inSlide ? t('status.slideBackTitle') : t('status.slideOpenTitle')}
         >
-          {inSlice ? t('status.sliceBack') : t('status.sliceOpen')}
+          {inSlide ? t('status.slideBack') : t('status.slideOpen')}
         </button>
       </div>
 
@@ -461,7 +461,7 @@ export function Notebook() {
         </>
       )}
 
-      {activeTab === 'slice' && <SliceView />}
+      {activeTab === 'slide' && <SlideView />}
     </div>
   );
 }

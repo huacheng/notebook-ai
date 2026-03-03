@@ -292,7 +292,7 @@ describe('Cell Lazy Load - Client', () => {
           source: stub.source_preview || '',
           outputs: [],
         })),
-        slice: { generated: false, sections: [] },
+        slide: { generated: false, sections: [] },
       };
 
       expect(notebook.cells.length).toBe(2);
@@ -317,7 +317,7 @@ describe('Cell Lazy Load - Client', () => {
           source: stub.source_preview || '',
           outputs: [],
         })),
-        slice: { generated: false, sections: [] },
+        slide: { generated: false, sections: [] },
       };
 
       expect(notebook.cells.length).toBe(0);

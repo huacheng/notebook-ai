@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '../store';
-import type { SliceSection } from '@notebook-ai/shared';
+import type { SlideSection } from '@notebook-ai/shared';
 
 // ── Section card ─────────────────────────────────────────────────────────────
 
-function SliceSectionCard({
+function SlideSectionCard({
   section,
   onUpdate,
   onDelete,
@@ -12,8 +12,8 @@ function SliceSectionCard({
   isFirst,
   isLast,
 }: {
-  section: SliceSection;
-  onUpdate: (id: string, patch: Partial<Pick<SliceSection, 'title' | 'content'>>) => void;
+  section: SlideSection;
+  onUpdate: (id: string, patch: Partial<Pick<SlideSection, 'title' | 'content'>>) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
   isFirst: boolean;
@@ -36,12 +36,12 @@ function SliceSectionCard({
   }
 
   return (
-    <div className="slice-section">
+    <div className="slide-section">
       {/* Header bar with order, move, and delete controls */}
-      <div className="slice-section-header">
-        <span className="slice-section-order">#{section.order + 1}</span>
+      <div className="slide-section-header">
+        <span className="slide-section-order">#{section.order + 1}</span>
 
-        <div className="slice-section-actions">
+        <div className="slide-section-actions">
           <button
             className="cell-btn"
             onClick={() => onMove(section.id, 'up')}
@@ -71,7 +71,7 @@ function SliceSectionCard({
       {/* Editable title */}
       {editingTitle ? (
         <input
-          className="slice-title-input"
+          className="slide-title-input"
           value={draftTitle}
           onChange={(e) => setDraftTitle(e.target.value)}
           onBlur={commitTitle}
@@ -86,7 +86,7 @@ function SliceSectionCard({
         />
       ) : (
         <h3
-          className="slice-section-title"
+          className="slide-section-title"
           onClick={() => {
             setDraftTitle(section.title);
             setEditingTitle(true);
@@ -99,9 +99,9 @@ function SliceSectionCard({
 
       {/* Editable content */}
       {editingContent ? (
-        <div className="slice-content-edit-wrapper">
+        <div className="slide-content-edit-wrapper">
           <textarea
-            className="slice-content-textarea"
+            className="slide-content-textarea"
             value={draftContent}
             onChange={(e) => setDraftContent(e.target.value)}
             onBlur={commitContent}
@@ -114,13 +114,13 @@ function SliceSectionCard({
             autoFocus
             rows={6}
           />
-          <button className="slice-content-done-btn" onClick={commitContent}>
+          <button className="slide-content-done-btn" onClick={commitContent}>
             Done
           </button>
         </div>
       ) : (
         <div
-          className="slice-section-content"
+          className="slide-section-content"
           onClick={() => {
             setDraftContent(section.content);
             setEditingContent(true);
@@ -133,10 +133,10 @@ function SliceSectionCard({
 
       {/* Cell references */}
       {section.cell_refs.length > 0 && (
-        <div className="slice-section-refs">
+        <div className="slide-section-refs">
           <span>Cells:</span>
           {section.cell_refs.map((ref) => (
-            <span key={ref} className="slice-cell-ref">
+            <span key={ref} className="slide-cell-ref">
               {ref.slice(0, 8)}
             </span>
           ))}
@@ -146,25 +146,25 @@ function SliceSectionCard({
   );
 }
 
-// ── Main SliceView ───────────────────────────────────────────────────────────
+// ── Main SlideView ───────────────────────────────────────────────────────────
 
-export function SliceView() {
+export function SlideView() {
   const notebook = useStore((s) => s.notebook);
-  const sliceLoading = useStore((s) => s.sliceLoading);
-  const generateSlice = useStore((s) => s.generateSlice);
-  const updateSliceSections = useStore((s) => s.updateSliceSections);
+  const slideLoading = useStore((s) => s.slideLoading);
+  const generateSlide = useStore((s) => s.generateSlide);
+  const updateSlideSections = useStore((s) => s.updateSlideSections);
 
-  const sections = notebook?.slice.sections ?? [];
-  const generated = notebook?.slice.generated ?? false;
+  const sections = notebook?.slide.sections ?? [];
+  const generated = notebook?.slide.generated ?? false;
 
   const handleUpdate = useCallback(
-    (id: string, patch: Partial<Pick<SliceSection, 'title' | 'content'>>) => {
+    (id: string, patch: Partial<Pick<SlideSection, 'title' | 'content'>>) => {
       const updated = sections.map((s) =>
         s.id === id ? { ...s, ...patch } : s,
       );
-      updateSliceSections(updated);
+      updateSlideSections(updated);
     },
-    [sections, updateSliceSections],
+    [sections, updateSlideSections],
   );
 
   const handleDelete = useCallback(
@@ -172,9 +172,9 @@ export function SliceView() {
       const updated = sections
         .filter((s) => s.id !== id)
         .map((s, i) => ({ ...s, order: i }));
-      updateSliceSections(updated);
+      updateSlideSections(updated);
     },
-    [sections, updateSliceSections],
+    [sections, updateSlideSections],
   );
 
   const handleMove = useCallback(
@@ -188,53 +188,53 @@ export function SliceView() {
       [updated[idx], updated[swapIdx]] = [updated[swapIdx], updated[idx]];
       // Re-index order values
       const reindexed = updated.map((s, i) => ({ ...s, order: i }));
-      updateSliceSections(reindexed);
+      updateSlideSections(reindexed);
     },
-    [sections, updateSliceSections],
+    [sections, updateSlideSections],
   );
 
   // No notebook loaded
   if (!notebook) {
     return (
-      <div className="slice-empty">
+      <div className="slide-empty">
         <p>No notebook loaded.</p>
       </div>
     );
   }
 
-  // Slice not yet generated
+  // Slide not yet generated
   if (!generated || sections.length === 0) {
     return (
-      <div className="slice-empty">
-        <p>No slice generated yet.</p>
-        <p className="slice-empty-hint">
+      <div className="slide-empty">
+        <p>No slide generated yet.</p>
+        <p className="slide-empty-hint">
           Click the button below to generate a presentation summary from your notebook cells.
         </p>
         <div style={{ marginTop: '16px' }}>
           <button
             className="content-btn"
-            onClick={() => generateSlice()}
-            disabled={sliceLoading}
+            onClick={() => generateSlide()}
+            disabled={slideLoading}
           >
-            {sliceLoading ? 'Generating...' : 'Generate Slice'}
+            {slideLoading ? 'Generating...' : 'Generate Slide'}
           </button>
         </div>
       </div>
     );
   }
 
-  // Slice generated — show sections
+  // Slide generated — show sections
   return (
-    <div className="slice-view">
-      <div className="slice-toolbar">
+    <div className="slide-view">
+      <div className="slide-toolbar">
         <button
           className="content-btn"
-          onClick={() => generateSlice()}
-          disabled={sliceLoading}
+          onClick={() => generateSlide()}
+          disabled={slideLoading}
         >
-          {sliceLoading ? 'Regenerating...' : 'Re-generate Slice'}
+          {slideLoading ? 'Regenerating...' : 'Re-generate Slide'}
         </button>
-        <span className="slice-section-count">
+        <span className="slide-section-count">
           {sections.length} section{sections.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -242,7 +242,7 @@ export function SliceView() {
       {[...sections]
         .sort((a, b) => a.order - b.order)
         .map((section, idx) => (
-          <SliceSectionCard
+          <SlideSectionCard
             key={section.id}
             section={section}
             onUpdate={handleUpdate}

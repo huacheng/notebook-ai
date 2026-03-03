@@ -323,7 +323,7 @@ async function openNotebookViaWs(
               source: stub.source_preview || '',
               outputs: [],
             })),
-            slice: d.metadata.slice || { generated: false, sections: [] },
+            slide: d.metadata.slide || { generated: false, sections: [] },
           };
           resolve({
             notebookId: d.notebook_id,

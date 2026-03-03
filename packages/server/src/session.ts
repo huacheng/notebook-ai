@@ -177,7 +177,7 @@ export class SessionManager {
         ...(model ? { model } : {}),  // Include model if read from file
       },
       cells: [],
-      slice: { generated: false, sections: [] },
+      slide: { generated: false, sections: [] },
       annotations: [],
       assets: { intermediate_files: [] },
     });

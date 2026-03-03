@@ -4,7 +4,7 @@ import { useT } from '../../i18n';
 
 /**
  * Mobile Notebook Actions Sheet.
- * Bottom sheet menu for notebook operations (Edit, Restart, Rerun, Save, Export, Slice).
+ * Bottom sheet menu for notebook operations (Edit, Restart, Rerun, Save, Export, Slide).
  */
 export function MobileNotebookActions() {
   const t = useT();
@@ -29,7 +29,7 @@ export function MobileNotebookActions() {
   const connected = wsStatus === 'connected';
   const isRestarting = restartPhase === 'restarting' || restartPhase === 'done';
   const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
-  const inSlice = activeTab === 'slice';
+  const inSlide = activeTab === 'slide';
 
   function handleExport() {
     if (!sessionId) return;
@@ -66,8 +66,8 @@ export function MobileNotebookActions() {
     setOpen(false);
   }
 
-  function handleSliceToggle() {
-    setActiveTab(inSlice ? 'notebook' : 'slice');
+  function handleSlideToggle() {
+    setActiveTab(inSlide ? 'notebook' : 'slide');
     setOpen(false);
   }
 
@@ -76,7 +76,7 @@ export function MobileNotebookActions() {
       label: editMode ? t('status.done') + (pendingDeletes.size > 0 ? ` (${pendingDeletes.size})` : '') : t('status.edit'),
       icon: editMode ? '✓' : '✏️',
       onClick: handleEditToggle,
-      disabled: !connected || isRunning || inSlice,
+      disabled: !connected || isRunning || inSlide,
     },
     {
       label: isRestarting ? '...' : t('status.restart'),
@@ -103,9 +103,9 @@ export function MobileNotebookActions() {
       disabled: !sessionId || editMode,
     },
     {
-      label: inSlice ? t('status.sliceBack') : t('status.sliceOpen'),
+      label: inSlide ? t('status.slideBack') : t('status.slideOpen'),
       icon: '📄',
-      onClick: handleSliceToggle,
+      onClick: handleSlideToggle,
       disabled: editMode,
     },
   ];

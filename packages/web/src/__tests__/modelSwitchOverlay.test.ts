@@ -10,7 +10,7 @@ function makeNotebookEntry(sessionId: string, model = 'sonnet') {
       version: 1,
       metadata: { title: 'T', created: '', model },
       cells: [],
-      slice: { generated: false, sections: [] },
+      slide: { generated: false, sections: [] },
       annotations: [],
       assets: { intermediate_files: [] },
     } as any,

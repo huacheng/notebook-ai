@@ -38,10 +38,10 @@ export const messages: Record<Language, Record<string, string>> = {
     'status.export': 'Export',
     'status.exportTitle': 'Export notebook as bundle',
     'status.noActiveSession': 'No active session',
-    'status.sliceOpen': 'Slice ▸',
-    'status.sliceBack': '◂ Notebook',
-    'status.sliceOpenTitle': 'Open Slice view',
-    'status.sliceBackTitle': 'Back to Notebook',
+    'status.slideOpen': 'Slide ▸',
+    'status.slideBack': '◂ Notebook',
+    'status.slideOpenTitle': 'Open Slide view',
+    'status.slideBackTitle': 'Back to Notebook',
 
     // ── Modals ───────────────────────────────────────────────────────────
     'modal.deleteCells': 'Delete {0} cell(s)?',
@@ -303,10 +303,10 @@ export const messages: Record<Language, Record<string, string>> = {
     'status.export': '导出',
     'status.exportTitle': '导出 notebook 包',
     'status.noActiveSession': '无活动会话',
-    'status.sliceOpen': '切片 ▸',
-    'status.sliceBack': '◂ Notebook',
-    'status.sliceOpenTitle': '打开切片视图',
-    'status.sliceBackTitle': '返回 Notebook',
+    'status.slideOpen': '幻灯片 ▸',
+    'status.slideBack': '◂ Notebook',
+    'status.slideOpenTitle': '打开幻灯片视图',
+    'status.slideBackTitle': '返回 Notebook',
 
     // ── Modals ───────────────────────────────────────────────────────────
     'modal.deleteCells': '删除 {0} 个 cell？',

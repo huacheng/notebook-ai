@@ -4,7 +4,7 @@ import type {
   CellType,
   CellStatus,
   CellOutput,
-  SliceSection,
+  SlideSection,
   NotebookListItem,
   PromptImage,
 } from '@notebook-ai/shared';
@@ -27,7 +27,7 @@ export interface NotebookStore {
 
   // ── Notebook state ─────────────────────────────────────────────────────
   notebook: Notebook | null;
-  sliceLoading: boolean;
+  slideLoading: boolean;
   notebookLoading: boolean;
   cellsOffset: number;
   loadingOlderCells: boolean;
@@ -40,7 +40,7 @@ export interface NotebookStore {
   workspaceDir: string | null;
 
   // ── UI state ───────────────────────────────────────────────────────────
-  activeTab: 'notebook' | 'slice' | 'git';
+  activeTab: 'notebook' | 'slide' | 'git';
   gitTabOpen: boolean;
   sessionNotice: string | null;
   latency: number | null;
@@ -141,12 +141,12 @@ export interface NotebookStore {
   prependCells(cells: Cell[], newOffset: number): void;
   setCellsOffset(offset: number): void;
 
-  // ── Slice actions ──────────────────────────────────────────────────────
-  generateSlice(): Promise<void>;
-  updateSliceSections(sections: SliceSection[]): void;
+  // ── Slide actions ──────────────────────────────────────────────────────
+  generateSlide(): Promise<void>;
+  updateSlideSections(sections: SlideSection[]): void;
 
   // ── UI actions ─────────────────────────────────────────────────────────
-  setActiveTab(tab: 'notebook' | 'slice' | 'git'): void;
+  setActiveTab(tab: 'notebook' | 'slide' | 'git'): void;
   openGitTab(): void;
   closeGitTab(): void;
   clearSessionNotice(): void;

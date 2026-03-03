@@ -167,7 +167,7 @@ describe('editMode guards', () => {
     state.setEditMode(true);
     state.togglePendingDelete('cell-1');
 
-    state.setActiveTab('slice');
+    state.setActiveTab('slide');
 
     expect(state.editMode).toBe(false);
     expect(state.pendingDeletes.size).toBe(0);

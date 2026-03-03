@@ -16,7 +16,7 @@ function makeNotebook(overrides: Partial<Notebook> = {}): Notebook {
       git_repo: false,
     },
     cells: [],
-    slice: { generated: false, sections: [] },
+    slide: { generated: false, sections: [] },
     annotations: [],
     assets: { intermediate_files: [] },
     ...overrides,
@@ -290,12 +290,12 @@ describe('exportToHtml with cells', () => {
   });
 });
 
-// ── Slice options ────────────────────────────────────────────────────────────
+// ── Slide options ────────────────────────────────────────────────────────────
 
-describe('exportToHtml include_slice option', () => {
-  it('includes slice view by default', async () => {
+describe('exportToHtml include_slide option', () => {
+  it('includes slide view by default', async () => {
     const nb = makeNotebook({
-      slice: {
+      slide: {
         generated: true,
         sections: [
           {
@@ -311,22 +311,22 @@ describe('exportToHtml include_slice option', () => {
 
     const html = await exportToHtml(nb);
 
-    expect(html).toContain('slice-view');
+    expect(html).toContain('slide-view');
     expect(html).toContain('Introduction');
     expect(html).toContain('This is the intro.');
-    expect(html).toContain('Slice');
+    expect(html).toContain('Slide');
   });
 
-  it('shows "No slice sections" when generated is false', async () => {
+  it('shows "No slide sections" when generated is false', async () => {
     const nb = makeNotebook();
     const html = await exportToHtml(nb);
 
-    expect(html).toContain('No slice sections generated yet');
+    expect(html).toContain('No slide sections generated yet');
   });
 
-  it('excludes slice view element when include_slice is false', async () => {
+  it('excludes slide view element when include_slide is false', async () => {
     const nb = makeNotebook({
-      slice: {
+      slide: {
         generated: true,
         sections: [
           {
@@ -340,14 +340,14 @@ describe('exportToHtml include_slice option', () => {
       },
     });
 
-    const html = await exportToHtml(nb, { include_slice: false });
+    const html = await exportToHtml(nb, { include_slide: false });
 
-    // The slice-view div element should not be present
-    expect(html).not.toContain('id="slice-view"');
-    // Slice tab button should not be present
-    expect(html).not.toContain('data-target="slice"');
+    // The slide-view div element should not be present
+    expect(html).not.toContain('id="slide-view"');
+    // Slide tab button should not be present
+    expect(html).not.toContain('data-target="slide"');
     // The rendered slice section content should not appear in the HTML structure
-    expect(html).not.toMatch(/<div class="slice-sections">/);
+    expect(html).not.toMatch(/<div class="slide-sections">/);
   });
 });
 

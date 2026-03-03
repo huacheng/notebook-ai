@@ -198,6 +198,89 @@ export function useFileStream(
           setState((prev) => ({ ...prev, status: 'error', error: (msg as unknown as { error: string }).error }));
           break;
         }
+
+        // ── Live push update handlers ─────────────────────────────────
+        // Server pushes file changes when the file is modified on the backend
+
+        case 'file-changed-meta': {
+          const { path: changedPath, mtime, format } = msg as unknown as { path: string; mtime: number; format: FileFormat };
+          // Only process if this is the file we're watching
+          if (changedPath !== filePath) break;
+          // Reset chunks for incoming update
+          contentChunksRef.current = [];
+          b64ChunksRef.current = [];
+          formatRef.current = format;
+          skipStreamRef.current = false;
+          // Set loading status to indicate refresh in progress
+          setState((prev) => ({ ...prev, status: 'loading', mtime, format }));
+          break;
+        }
+
+        case 'file-changed-chunk': {
+          const { path: changedPath, data, encoding } = msg as unknown as { path: string; data: string; encoding: 'utf8' | 'base64' };
+          if (changedPath !== filePath) break;
+          if (encoding === 'base64') {
+            b64ChunksRef.current.push(data);
+          } else {
+            contentChunksRef.current.push(data);
+          }
+          scheduleFlush();
+          break;
+        }
+
+        case 'file-changed-chunk-compressed': {
+          const { path: changedPath, data, encoding } = msg as unknown as {
+            path: string;
+            data: string;
+            encoding: 'utf8' | 'base64';
+          };
+          if (changedPath !== filePath) break;
+          try {
+            const compressedBytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+            const decompressed = lz4.decompress(compressedBytes);
+            if (encoding === 'base64') {
+              const b64 = btoa(String.fromCharCode(...decompressed));
+              b64ChunksRef.current.push(b64);
+            } else {
+              const text = new TextDecoder().decode(decompressed);
+              contentChunksRef.current.push(text);
+            }
+          } catch (e) {
+            console.error('[useFileStream] Failed to decompress file-changed chunk:', e);
+          }
+          break;
+        }
+
+        case 'file-changed-end': {
+          const { path: changedPath, mtime } = msg as unknown as { path: string; mtime: number };
+          if (changedPath !== filePath) break;
+          if (throttleRef.current !== null) { clearTimeout(throttleRef.current); throttleRef.current = null; }
+          const fmt = formatRef.current;
+          if (fmt?.endsWith('-binary') || fmt === 'image') {
+            const b64 = b64ChunksRef.current.join('');
+            b64ToUint8Array(b64).then((buffer) => {
+              if (stale) return;
+              cacheSet(cacheKey, { content: b64, mtime, format: fmt });
+              setState({ status: 'complete', format: fmt, content: '', binaryBuffer: buffer, mtime, error: null });
+            }).catch((err) => {
+              if (stale) return;
+              setState((prev) => ({ ...prev, status: 'error', error: `Failed to decode binary data: ${String(err)}` }));
+            });
+          } else {
+            const newContent = contentChunksRef.current.join('');
+            cacheSet(cacheKey, { content: newContent, mtime, format: fmt });
+            setState({ status: 'complete', format: fmt ?? 'text', content: newContent, binaryBuffer: null, mtime, error: null });
+          }
+          break;
+        }
+
+        case 'file-deleted': {
+          const { path: deletedPath } = msg as unknown as { path: string };
+          if (deletedPath !== filePath) break;
+          setState((prev) => ({ ...prev, status: 'error', error: 'File has been deleted' }));
+          cacheRemove(cacheKey);
+          break;
+        }
       }
     }
 

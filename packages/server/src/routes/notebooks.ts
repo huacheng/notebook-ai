@@ -23,7 +23,7 @@ import {
   getWorkspaceRoot,
 } from '../workspace.js';
 import { exportToFolder } from '../export.js';
-import { generateSlice } from '../slice-generator.js';
+import { generateSlide } from '../slide-generator.js';
 import { validateWorkspacePath, listWorkspaceFiles } from '../workspace-files.js';
 
 const execFileAsync = promisify(execFile);
@@ -384,7 +384,13 @@ export function createNotebooksRouter(
         }
       } else {
         const session = await sessionManager.createSession(row.notebook_path, row.workspace_dir);
+        // Preserve model from session (read from ~/.claude/settings.json) if notebook has none
+        const defaultModel = session.notebook.metadata.model;
         session.notebook = notebook;
+        if (!notebook.metadata.model && defaultModel) {
+          session.notebook.metadata.model = defaultModel;
+          notebook.metadata.model = defaultModel; // Also update local ref for response
+        }
         session.notebookDbId = notebookId;
         sessionId = session.id;
 
@@ -535,10 +541,10 @@ export function createNotebooksRouter(
   });
 
   /**
-   * POST /api/notebooks/:sessionId/generate-slice
-   * Generates slice sections from the session's notebook.
+   * POST /api/notebooks/:sessionId/generate-slide
+   * Generates slide sections from the session's notebook.
    */
-  router.post('/:sessionId/generate-slice', (_req: Request, res: Response) => {
+  router.post('/:sessionId/generate-slide', (_req: Request, res: Response) => {
     const { sessionId } = _req.params as { sessionId: string };
 
     const session = sessionManager.getSession(sessionId);
@@ -548,11 +554,11 @@ export function createNotebooksRouter(
     }
 
     try {
-      const sections = generateSlice(session.notebook);
+      const sections = generateSlide(session.notebook);
 
       session.notebook = {
         ...session.notebook,
-        slice: {
+        slide: {
           generated: true,
           sections,
           updated_at: new Date().toISOString(),
@@ -560,7 +566,7 @@ export function createNotebooksRouter(
       };
 
       sessionManager.broadcastToSession(sessionId, {
-        type: 'slice_update',
+        type: 'slide_update',
         sections,
       });
 

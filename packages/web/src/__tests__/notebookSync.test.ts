@@ -8,7 +8,7 @@ const dummyNotebook = (title: string) => ({
   version: 1,
   metadata: { title, created: '', agent: 'claude' as const, git_repo: false },
   cells: [],
-  slice: { generated: false, sections: [] },
+  slide: { generated: false, sections: [] },
   annotations: [],
   assets: { intermediate_files: [] },
 } as any);

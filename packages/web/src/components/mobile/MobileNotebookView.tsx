@@ -193,7 +193,7 @@ export function MobileNotebookView() {
         showRightMenu
         rightContent={
           <>
-            {/* Notebook actions (Edit, Restart, Rerun, Save, Export, Slice) */}
+            {/* Notebook actions (Edit, Restart, Rerun, Save, Export, Slide) */}
             <MobileNotebookActions />
             {/* Plugin button */}
             <button
