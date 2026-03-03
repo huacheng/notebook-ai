@@ -19,7 +19,11 @@ interface FailRecord {
   lockedUntil: number; // epoch ms
 }
 
-const failMap = new Map<string, FailRecord>();
+// Separate rate limit maps for different concerns:
+// - loginFailMap: for /login and /register (brute-force protection)
+// - tokenFailMap: for /verify and /ws-ticket (token probing protection, much lighter)
+const loginFailMap = new Map<string, FailRecord>();
+const tokenFailMap = new Map<string, FailRecord>();
 
 /** Base lockout in ms after first failure. Doubles each subsequent failure. */
 export const BASE_LOCKOUT_MS = 60_000;
@@ -27,6 +31,11 @@ export const BASE_LOCKOUT_MS = 60_000;
 export const BASE_LOCKOUT_SEC = BASE_LOCKOUT_MS / 1000;
 /** Max lockout cap: 30 minutes. */
 export const MAX_LOCKOUT_MS = 30 * 60_000;
+
+/** Token verification lockout: much shorter (5 seconds base, 1 minute max).
+ *  Token expiry is normal — shouldn't block login. */
+const TOKEN_BASE_LOCKOUT_MS = 5_000;
+const TOKEN_MAX_LOCKOUT_MS = 60_000;
 
 export function getClientIp(req: Request): string {
   if (TRUST_PROXY) {
@@ -36,8 +45,9 @@ export function getClientIp(req: Request): string {
   return req.socket.remoteAddress ?? 'unknown';
 }
 
-function checkRateLimit(ip: string): { blocked: boolean; retryAfterSec: number } {
-  const rec = failMap.get(ip);
+function checkRateLimit(ip: string, forToken = false): { blocked: boolean; retryAfterSec: number } {
+  const map = forToken ? tokenFailMap : loginFailMap;
+  const rec = map.get(ip);
   if (!rec || rec.count === 0) return { blocked: false, retryAfterSec: 0 };
   const now = Date.now();
   if (now < rec.lockedUntil) {
@@ -47,24 +57,31 @@ function checkRateLimit(ip: string): { blocked: boolean; retryAfterSec: number }
   return { blocked: false, retryAfterSec: 0 };
 }
 
-function recordFailure(ip: string): number {
-  const rec = failMap.get(ip) ?? { count: 0, lockedUntil: 0 };
+function recordFailure(ip: string, forToken = false): number {
+  const map = forToken ? tokenFailMap : loginFailMap;
+  const baseLockout = forToken ? TOKEN_BASE_LOCKOUT_MS : BASE_LOCKOUT_MS;
+  const maxLockout = forToken ? TOKEN_MAX_LOCKOUT_MS : MAX_LOCKOUT_MS;
+  const rec = map.get(ip) ?? { count: 0, lockedUntil: 0 };
   rec.count++;
-  const lockout = Math.min(BASE_LOCKOUT_MS * Math.pow(2, rec.count - 1), MAX_LOCKOUT_MS);
+  const lockout = Math.min(baseLockout * Math.pow(2, rec.count - 1), maxLockout);
   rec.lockedUntil = Date.now() + lockout;
-  failMap.set(ip, rec);
+  map.set(ip, rec);
   return Math.ceil(lockout / 1000);
 }
 
-function clearFailures(ip: string): void {
-  failMap.delete(ip);
+function clearFailures(ip: string, forToken = false): void {
+  const map = forToken ? tokenFailMap : loginFailMap;
+  map.delete(ip);
 }
 
 // Cleanup stale entries every 10 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, rec] of failMap) {
-    if (now > rec.lockedUntil + MAX_LOCKOUT_MS) failMap.delete(ip);
+  for (const [ip, rec] of loginFailMap) {
+    if (now > rec.lockedUntil + MAX_LOCKOUT_MS) loginFailMap.delete(ip);
+  }
+  for (const [ip, rec] of tokenFailMap) {
+    if (now > rec.lockedUntil + TOKEN_MAX_LOCKOUT_MS) tokenFailMap.delete(ip);
   }
 }, 10 * 60_000);
 
@@ -378,7 +395,9 @@ export async function handleLogin(req: Request, res: Response): Promise<void> {
  */
 export function handleVerify(req: Request, res: Response): void {
   const ip = getClientIp(req);
-  const { blocked, retryAfterSec } = checkRateLimit(ip);
+  // Token verification uses separate rate limit (forToken=true)
+  // Token expiry is normal — shouldn't affect login rate limit
+  const { blocked, retryAfterSec } = checkRateLimit(ip, true);
   if (blocked) {
     res.status(429).json({ ok: false, retryAfter: retryAfterSec });
     return;
@@ -386,8 +405,8 @@ export function handleVerify(req: Request, res: Response): void {
 
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // Missing header is normal (logout/service restart), but still record to prevent probing
-    recordFailure(ip);
+    // Missing header is normal (logout/service restart), record in token map
+    recordFailure(ip, true);
     res.status(401).json({ ok: false });
     return;
   }
@@ -395,12 +414,14 @@ export function handleVerify(req: Request, res: Response): void {
   const token = authHeader.slice(7);
   const session = validateSessionToken(token);
   if (!session) {
-    // Invalid/expired token - record failure to prevent brute force
-    recordFailure(ip);
+    // Invalid/expired token - record in token map (not login map)
+    recordFailure(ip, true);
     res.status(401).json({ ok: false });
     return;
   }
 
+  // Success — clear token failures
+  clearFailures(ip, true);
   res.json({ ok: true, userId: session.userId, email: session.email });
 }
 
@@ -412,7 +433,8 @@ export function handleVerify(req: Request, res: Response): void {
  */
 export function handleWsTicket(req: Request, res: Response): void {
   const ip = getClientIp(req);
-  const { blocked, retryAfterSec } = checkRateLimit(ip);
+  // WS ticket uses separate token rate limit (forToken=true)
+  const { blocked, retryAfterSec } = checkRateLimit(ip, true);
   if (blocked) {
     res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
     return;
@@ -420,8 +442,8 @@ export function handleWsTicket(req: Request, res: Response): void {
 
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // Missing header - record failure to prevent probing
-    recordFailure(ip);
+    // Missing header - record in token map
+    recordFailure(ip, true);
     res.status(401).json({ error: 'Authorization required.' });
     return;
   }
@@ -429,12 +451,14 @@ export function handleWsTicket(req: Request, res: Response): void {
   const token = authHeader.slice(7);
   const session = validateSessionToken(token);
   if (!session) {
-    // Invalid/expired token - record failure to prevent brute force
-    recordFailure(ip);
+    // Invalid/expired token - record in token map (not login map)
+    recordFailure(ip, true);
     res.status(401).json({ error: 'Invalid or expired token.' });
     return;
   }
 
+  // Success — clear token failures
+  clearFailures(ip, true);
   res.json({ ticket: createWsTicket(session.userId) });
 }
 
