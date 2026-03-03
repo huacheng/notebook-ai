@@ -17,7 +17,6 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
-import { computeSplitEntryWidth } from './utils/splitView';
 import { I18nProvider, createT } from './i18n';
 import './styles.css';
 
@@ -121,7 +120,6 @@ function AuthenticatedApp() {
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
 
-  const sidebarWidth = useStore((s) => s.sidebarWidth);
   const rightPanelWidth = useStore((s) => s.rightPanelWidth);
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
   const setRightPanelWidth = useStore((s) => s.setRightPanelWidth);
@@ -132,8 +130,7 @@ function AuthenticatedApp() {
   const notebookSplitRef = useRef<HTMLDivElement | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
 
-  // Saved panel widths for split-view restore
-  const savedSidebarRef = useRef<number | null>(null);
+  // Saved right panel width for split-view restore
   const savedRightRef = useRef<number | null>(null);
 
   // ── Column divider drag ──────────────────────────────────────────────
@@ -182,21 +179,16 @@ function AuthenticatedApp() {
   const inSplitView = hasActiveFile && hasNotebook
     && !pluginPanelOpen && !modelPanelOpen && !fileViewerMaximized;
 
-  // ── Auto-shrink panels on split-view transition ────────────────────
+  // ── Auto-collapse right panel on split-view transition ────────────────────
+  // Left sidebar keeps its width; right panel fully collapses to 24px.
   const prevSplitRef = useRef(false);
   useEffect(() => {
     if (inSplitView && !prevSplitRef.current) {
-      // Entering split view — save widths and shrink
-      savedSidebarRef.current = sidebarWidth;
+      // Entering split view — save right panel width and collapse it
       savedRightRef.current = rightPanelWidth;
-      setSidebarWidth(computeSplitEntryWidth(sidebarWidth));
-      setRightPanelWidth(computeSplitEntryWidth(rightPanelWidth));
+      setRightPanelWidth(24); // fully collapsed
     } else if (!inSplitView && prevSplitRef.current) {
-      // Exiting split view — restore saved widths
-      if (savedSidebarRef.current !== null) {
-        setSidebarWidth(savedSidebarRef.current);
-        savedSidebarRef.current = null;
-      }
+      // Exiting split view — restore right panel width
       if (savedRightRef.current !== null) {
         setRightPanelWidth(savedRightRef.current);
         savedRightRef.current = null;
