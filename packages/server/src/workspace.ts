@@ -1,7 +1,7 @@
 import path from 'path';
 import os from 'os';
-import { mkdirSync, existsSync } from 'fs';
-import { writeFile } from 'fs/promises';
+import { mkdirSync, existsSync, constants } from 'fs';
+import { writeFile, chmod, access } from 'fs/promises';
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'nb-workspaces');
 
@@ -119,5 +119,18 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
       `This is the project-level deliverables directory shared across all notebooks in the project.\n`;
   }
 
-  await writeFile(path.join(workspaceDir, MEMORY_FILENAME), content, 'utf-8');
+  const memoryPath = path.join(workspaceDir, MEMORY_FILENAME);
+
+  // If file exists and is read-only, temporarily make it writable
+  try {
+    await access(memoryPath, constants.F_OK);
+    await chmod(memoryPath, 0o644); // Make writable before overwriting
+  } catch {
+    // File doesn't exist yet, that's fine
+  }
+
+  await writeFile(memoryPath, content, 'utf-8');
+
+  // Set file to read-only (444 = r--r--r--)
+  await chmod(memoryPath, 0o444);
 }

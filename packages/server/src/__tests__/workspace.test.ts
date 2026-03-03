@@ -92,6 +92,15 @@ describe('initWorkspaceMemory', () => {
     const content = await readFile(path.join(nonExistentDir, '.MEMORY.md'), 'utf-8');
     expect(content).toContain('# MEMORY');
   });
+
+  it('sets .MEMORY.md to read-only (chmod 444)', async () => {
+    const { stat } = await import('fs/promises');
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(workspaceDir);
+    const fileStat = await stat(path.join(workspaceDir, '.MEMORY.md'));
+    // 0o444 = 292 decimal, check that file is read-only
+    expect(fileStat.mode & 0o777).toBe(0o444);
+  });
 });
 
 // ── titleToSlug Unicode support tests ─────────────────────────────────────
