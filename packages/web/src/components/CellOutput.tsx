@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { CellOutput as CellOutputItem } from '@notebook-ai/shared';
 import { StreamingText, StreamingThinking } from './StreamingCellOutput';
 import { InteractiveOptions } from './InteractiveOptions';
-import { isAskUserQuestion } from '../utils/interactiveOptions';
+import { isAskUserQuestion, isClaudeCodeAutoResponse } from '../utils/interactiveOptions';
 import type { AskQuestion } from '../utils/interactiveOptions';
 import { useStore } from '../store';
 import { formatTime, formatTokens, estimateTokens, getStatusLabelKey } from '../utils/runningStatus';
@@ -184,19 +184,33 @@ function ToolsGroup({ items }: { items: ToolItem[] }) {
 
 // ── Interactive options wrapper ──────────────────────────────────────────────
 
-function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
+function InteractiveOptionsWrapper({ item, cellId }: { item: ToolItem; cellId?: string }) {
   const submitToolResult = useStore((s) => s.submitToolResult);
+  const updateToolResultLocal = useStore((s) => s.updateToolResultLocal);
+  const submitPrompt = useStore((s) => s.submitPrompt);
   const sessionId = useStore((s) => s.sessionId);
   const questions = (item.input as { questions?: AskQuestion[] })?.questions ?? [];
-  // If item.result exists, the question has already been answered (persisted in notebook)
-  const isAnswered = item.result !== undefined;
+
+  // If item.result exists AND it's not the Claude Code auto-response, the question has been answered
+  const isAutoResponse = isClaudeCodeAutoResponse(item.result, item.is_error);
+  const isAnswered = item.result !== undefined && !isAutoResponse;
 
   return (
     <InteractiveOptions
       questions={questions}
       initialAnswered={isAnswered}
       onSelect={(answer) => {
-        if (sessionId && item.tool_use_id) {
+        if (!sessionId) return;
+
+        if (isAutoResponse) {
+          // D1/D3: Persist user's actual choice to notebook (replaces "Answer questions?")
+          if (cellId && item.tool_use_id) {
+            updateToolResultLocal(sessionId, cellId, item.tool_use_id, answer);
+          }
+          // Claude Code auto-responded - send a follow-up prompt with the user's choice
+          submitPrompt(`用户选择了: ${answer}`);
+        } else if (item.tool_use_id) {
+          // Normal case - send tool_result
           submitToolResult(sessionId, item.tool_use_id, answer);
         }
       }}
@@ -342,7 +356,7 @@ export function CellOutput({ outputs, cellId, cellStatus, source = '' }: CellOut
         </div>
       )}
       {interactiveItems.map((item) => (
-        <InteractiveOptionsWrapper key={item.tool_use_id} item={item} />
+        <InteractiveOptionsWrapper key={item.tool_use_id} item={item} cellId={cellId} />
       ))}
       {content.length > 0 && (
         <div className="output-cell">

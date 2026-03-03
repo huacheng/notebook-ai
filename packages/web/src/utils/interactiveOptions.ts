@@ -2,6 +2,23 @@
  * Utilities for detecting and formatting AskUserQuestion tool_use outputs.
  */
 
+/**
+ * Claude Code CLI auto-response string when AskUserQuestion is used in stream-json mode.
+ * The CLI cannot wait for user input and returns this error instead.
+ */
+export const CLAUDE_CODE_AUTO_RESPONSE = 'Answer questions?';
+
+/**
+ * Detect whether a tool result is Claude Code's automatic error response.
+ * This happens when AskUserQuestion is used with Claude Code in stream-json mode.
+ */
+export function isClaudeCodeAutoResponse(
+  result: string | undefined,
+  isError: boolean | undefined,
+): boolean {
+  return result === CLAUDE_CODE_AUTO_RESPONSE && isError === true;
+}
+
 interface ToolUseItem {
   type: 'tool_use';
   name: string;

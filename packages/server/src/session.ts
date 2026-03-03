@@ -472,6 +472,17 @@ export class SessionManager {
     session.agentProcess.sendToolResult(toolUseId, content);
   }
 
+  /**
+   * Update a tool result in the notebook without sending to Claude CLI.
+   * Used for AskUserQuestion workaround: persist user's actual choice.
+   */
+  async updateToolResultLocal(sessionId: string, cellId: string, toolUseId: string, content: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+    session.notebook = attachToolResult(session.notebook, cellId, toolUseId, content, false);
+    await this.autoSave(session);
+  }
+
   async interruptCell(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);

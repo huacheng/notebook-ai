@@ -35,7 +35,7 @@ export class AgentProcess {
         '--input-format', 'stream-json',
         '--output-format', 'stream-json',
         '--verbose',
-        '--dangerously-skip-permissions',
+        '--permission-mode', 'bypassPermissions',
         '--tools', 'default',
       );
       if (this.model) {

@@ -24,7 +24,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
   | 'interruptCell'
-  | 'submitToolResult'
+  | 'submitToolResult' | 'updateToolResultLocal'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
   | 'commands' | 'commandsLoaded' | 'setCommands'
 >> = (set, get) => ({
@@ -633,6 +633,21 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       ws.send(JSON.stringify({
         type: 'tool_result_response',
         session_id: sessionId,
+        tool_use_id: toolUseId,
+        content,
+      }));
+    }
+  },
+
+  // Update tool result in notebook only (no send to Claude CLI)
+  // Used for AskUserQuestion workaround: persist user's actual choice
+  updateToolResultLocal(sessionId: string, cellId: string, toolUseId: string, content: string) {
+    const { ws } = get();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'update_tool_result',
+        session_id: sessionId,
+        cell_id: cellId,
         tool_use_id: toolUseId,
         content,
       }));

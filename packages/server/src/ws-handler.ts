@@ -874,6 +874,21 @@ export function setupWebSocket(
           break;
         }
 
+        // Update tool result in notebook only (does NOT send to Claude CLI)
+        // Used for AskUserQuestion workaround: persist user choice without re-sending
+        case 'update_tool_result' as any: {
+          const { session_id, cell_id, tool_use_id, content } = msg as any;
+          if (!checkSessionPermission(session_id)) break;
+          try {
+            await sessionManager.updateToolResultLocal(session_id, cell_id, tool_use_id, content);
+            // Broadcast to other clients so they see the update
+            sessionManager.broadcastToSession(session_id, { type: 'tool_result', cell_id, tool_use_id, content, is_error: false });
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
+          }
+          break;
+        }
+
         case 'change_model': {
           const { session_id, model } = msg;
           if (!checkSessionPermission(session_id)) break;

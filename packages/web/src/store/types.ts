@@ -238,4 +238,5 @@ export interface NotebookStore {
   rerunNotebook(): void;
   interruptCell(): void;
   submitToolResult(sessionId: string, toolUseId: string, content: string): void;
+  updateToolResultLocal(sessionId: string, cellId: string, toolUseId: string, content: string): void;
 }
