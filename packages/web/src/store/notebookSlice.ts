@@ -19,6 +19,10 @@ import {
 // losing edits when quickly switching between cells.
 const _sourceSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// D3: Cell load timeout timers to prevent stuck loading states
+const _cellLoadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+const CELL_LOAD_TIMEOUT = 30_000; // 30s timeout for cell load requests
+
 function makeCell(type: CellType): Cell {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -450,6 +454,21 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       loadingCellIds: new Set([...state.loadingCellIds, cellId]),
     }));
 
+    // D3: Set timeout to clean up stuck loading state
+    const timeoutId = setTimeout(() => {
+      _cellLoadTimeouts.delete(cellId);
+      set(state => {
+        const newLoadingIds = new Set(state.loadingCellIds);
+        if (newLoadingIds.has(cellId)) {
+          newLoadingIds.delete(cellId);
+          console.warn(`[cell-load] Timeout loading cell ${cellId}`);
+          return { loadingCellIds: newLoadingIds };
+        }
+        return {};
+      });
+    }, CELL_LOAD_TIMEOUT);
+    _cellLoadTimeouts.set(cellId, timeoutId);
+
     // Send cell_load request
     ws.send(JSON.stringify({
       type: 'cell_load',
@@ -460,6 +479,13 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   },
 
   replaceCellStub: (cellId: string, fullCell: Cell) => {
+    // D3: Clear timeout timer on successful response
+    const timeoutId = _cellLoadTimeouts.get(cellId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      _cellLoadTimeouts.delete(cellId);
+    }
+
     set(state => {
       const newLoadingIds = new Set(state.loadingCellIds);
       newLoadingIds.delete(cellId);
