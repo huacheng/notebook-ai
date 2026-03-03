@@ -188,10 +188,13 @@ function InteractiveOptionsWrapper({ item }: { item: ToolItem }) {
   const submitToolResult = useStore((s) => s.submitToolResult);
   const sessionId = useStore((s) => s.sessionId);
   const questions = (item.input as { questions?: AskQuestion[] })?.questions ?? [];
+  // If item.result exists, the question has already been answered (persisted in notebook)
+  const isAnswered = item.result !== undefined;
 
   return (
     <InteractiveOptions
       questions={questions}
+      initialAnswered={isAnswered}
       onSelect={(answer) => {
         if (sessionId && item.tool_use_id) {
           submitToolResult(sessionId, item.tool_use_id, answer);

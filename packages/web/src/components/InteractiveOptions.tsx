@@ -5,11 +5,12 @@ import { formatAnswer } from '../utils/interactiveOptions';
 interface InteractiveOptionsProps {
   questions: AskQuestion[];
   onSelect: (answer: string) => void;
+  initialAnswered?: boolean;
 }
 
-export function InteractiveOptions({ questions, onSelect }: InteractiveOptionsProps) {
+export function InteractiveOptions({ questions, onSelect, initialAnswered = false }: InteractiveOptionsProps) {
   const [selections, setSelections] = useState<string[][]>(() => questions.map(() => []));
-  const [answered, setAnswered] = useState(false);
+  const [answered, setAnswered] = useState(initialAnswered);
   const [otherTexts, setOtherTexts] = useState<string[]>(() => questions.map(() => ''));
   const [declineReason, setDeclineReason] = useState('');
   const otherRefs = useRef<(HTMLInputElement | null)[]>([]);
