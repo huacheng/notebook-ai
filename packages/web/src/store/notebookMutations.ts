@@ -36,13 +36,11 @@ export function updateToolResultInNotebook(
   let changed = false;
   const cells = nb.cells.map((c) => {
     if (c.id !== cellId || c.type !== 'prompt') return c;
-    let matched = false;
     const outputs = c.outputs.map((out) => {
-      if (matched || out.type !== 'tool_use') return out;
-      const byId = out.tool_use_id === toolUseId;
-      const unresolved = !byId && out.result === undefined;
-      if (byId || unresolved) {
-        matched = true;
+      if (out.type !== 'tool_use') return out;
+      // D1-fix: Precise matching by tool_use_id only — removed unresolved fallback
+      // that could incorrectly match the first pending tool_use
+      if (out.tool_use_id === toolUseId) {
         changed = true;
         return { ...out, result: content, is_error: isError };
       }

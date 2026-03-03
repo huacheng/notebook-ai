@@ -465,6 +465,12 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'git_diff_error':
           window.dispatchEvent(new CustomEvent('nb:git-diff-error', { detail: parsed }));
           break;
+        case 'autosave_error': {
+          // D3-fix: Show autosave failure notification to user
+          const errorMsg = (parsed as { error?: string }).error ?? 'Failed to save notebook';
+          set({ sessionNotice: `⚠️ ${errorMsg}` });
+          break;
+        }
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };

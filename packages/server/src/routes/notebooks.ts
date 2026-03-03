@@ -25,6 +25,12 @@ import {
 import { exportToFolder } from '../export.js';
 import { generateSlide } from '../slide-generator.js';
 import { validateWorkspacePath, listWorkspaceFiles } from '../workspace-files.js';
+import {
+  MAX_UPLOAD_SIZE,
+  ALLOWED_UPLOAD_EXTENSIONS,
+  MAX_UPLOAD_FILES,
+  CELL_PAGE_SIZE,
+} from '../constants.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -97,9 +103,23 @@ export function createNotebooksRouter(
 ): IRouter {
   const router = Router();
 
+  // D6: Use centralized constants (imported at top)
   const upload = multer({
     dest: path.join(os.tmpdir(), 'nb-uploads'),
-    limits: { fileSize: 100 * 1024 * 1024, files: 20 },
+    limits: { fileSize: MAX_UPLOAD_SIZE, files: MAX_UPLOAD_FILES },
+    fileFilter: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      // Check for .notebook.json first (compound extension)
+      if (file.originalname.toLowerCase().endsWith('.notebook.json')) {
+        cb(null, true);
+        return;
+      }
+      if (ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only .zip and .notebook.json files are allowed'));
+      }
+    },
   });
 
   // ── REST: Notebooks (legacy file-based) ─────────────────────────────────
@@ -407,7 +427,7 @@ export function createNotebooksRouter(
 
       db.updateNotebook(notebookId, { updated_at: new Date().toISOString() });
 
-      const CELL_PAGE_SIZE = 2;
+      // D6: Use centralized CELL_PAGE_SIZE constant
       const totalCells = notebook.cells.length;
       const paginatedNotebook = totalCells > CELL_PAGE_SIZE
         ? { ...notebook, cells: notebook.cells.slice(-CELL_PAGE_SIZE) }

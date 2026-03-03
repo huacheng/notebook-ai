@@ -426,6 +426,13 @@ export const UrlCaptureResultSchema = z.object({
   error: z.string().optional(),
 });
 
+// D3: autosave error notification
+export const AutosaveErrorSchema = z.object({
+  type: z.literal('autosave_error'),
+  session_id: z.string().optional(),
+  error: z.string(),
+});
+
 // ─── SuggestNextStep ───
 
 export const SuggestNextStepSchema = z.object({
@@ -838,6 +845,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   GitDiffResponseSchema,
   GitDiffErrorSchema,
   UrlCaptureResultSchema,
+  AutosaveErrorSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───

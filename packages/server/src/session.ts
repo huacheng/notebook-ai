@@ -652,9 +652,19 @@ export class SessionManager {
 
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */
   private async autoSave(session: NotebookSession): Promise<void> {
-    await writeFile(session.notebookPath, JSON.stringify(session.notebook, null, 2), 'utf-8');
-    if (session.notebookDbId) {
-      this.onAutoSave?.(session.notebookDbId, session.notebook.cells.length);
+    try {
+      await writeFile(session.notebookPath, JSON.stringify(session.notebook, null, 2), 'utf-8');
+      if (session.notebookDbId) {
+        this.onAutoSave?.(session.notebookDbId, session.notebook.cells.length);
+      }
+    } catch (err) {
+      console.error(`[session ${session.id}] auto-save failed:`, err);
+      // D3-fix: Notify frontend of save failure so user knows data may not be persisted
+      this.broadcast(session, {
+        type: 'autosave_error',
+        error: 'Failed to save notebook. Please save manually.',
+      });
+      throw err; // Re-throw so caller can handle if needed
     }
   }
 
