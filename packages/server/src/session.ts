@@ -84,6 +84,8 @@ interface NotebookSession {
   _pendingPostComplete: Promise<void>;
   /** Last cell ID that was running — used for local_command_output that arrives after result. */
   _lastCellId?: string;
+  /** D1: Track tool_use_ids that should be persisted (AskUserQuestion only). */
+  _persistedToolUseIds: Set<string>;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -180,6 +182,7 @@ export class SessionManager {
       _pendingPostComplete: Promise.resolve(),
       eventBuffer: new EventBuffer(),
       allowedDirs,
+      _persistedToolUseIds: new Set(),
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -687,7 +690,16 @@ export class SessionManager {
           }
 
           if (output) {
-            session.notebook = appendCellOutput(session.notebook, cellId, output);
+            // D1: Only persist AskUserQuestion tool calls (user choices must survive reload)
+            const shouldPersist = output.type !== 'tool_use' ||
+              (output.type === 'tool_use' && output.name === 'AskUserQuestion');
+            if (shouldPersist) {
+              session.notebook = appendCellOutput(session.notebook, cellId, output);
+            }
+            // D1: Track persisted tool_use_ids for tool_result matching
+            if (output.type === 'tool_use' && shouldPersist) {
+              session._persistedToolUseIds.add((output as { tool_use_id: string }).tool_use_id);
+            }
             this.broadcast(session, {
               type: 'cell_output',
               cell_id: cellId,
@@ -786,7 +798,11 @@ export class SessionManager {
 
           const isError = block.is_error ?? false;
 
-          session.notebook = attachToolResult(session.notebook, cellId, block.tool_use_id, content, isError);
+          // D1: Only persist if corresponding tool_use was persisted (AskUserQuestion)
+          if (session._persistedToolUseIds.has(block.tool_use_id)) {
+            session.notebook = attachToolResult(session.notebook, cellId, block.tool_use_id, content, isError);
+            session._persistedToolUseIds.delete(block.tool_use_id); // cleanup
+          }
 
           this.broadcast(session, {
             type: 'tool_result',

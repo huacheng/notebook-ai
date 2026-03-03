@@ -1,5 +1,5 @@
 /**
- * Tool result race condition — TDD Red phase.
+ * Tool result race condition tests.
  *
  * Bug: When Claude CLI emits `result` before the last `tool_result`,
  * findRunningCellId() returns null (cell already completed) and the
@@ -7,6 +7,9 @@
  *
  * Fix: Track _currentCellId on the session so tool_result can still
  * find the correct cell after completion.
+ *
+ * D1: Ephemeral tool outputs — regular tool_result (Read/Bash/etc.) is NOT
+ * persisted to notebook, only broadcast. These tests verify broadcast works.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -76,7 +79,7 @@ describe('tool_result after result (race condition)', () => {
     return session;
   }
 
-  it('tool_result arriving after result still attaches to the cell', async () => {
+  it('tool_result arriving after result still broadcasts to cell (ephemeral)', async () => {
     const session = await createSessionWithToolUse();
     const messages: any[] = [];
     session.listeners.add((msg: any) => messages.push(msg));
@@ -99,22 +102,25 @@ describe('tool_result after result (race condition)', () => {
       },
     });
 
-    // The tool_use output should now have a result — NOT undefined
+    // D1: Regular tool_result is NOT persisted to notebook (ephemeral)
     const cell = session.notebook.cells[0];
     expect(cell.type).toBe('prompt');
     const toolOutput = (cell as any).outputs[0];
     expect(toolOutput.type).toBe('tool_use');
-    expect(toolOutput.result).toBe('my-hostname');
+    expect(toolOutput.result).toBeUndefined();  // NOT persisted
 
-    // A tool_result WS message should have been broadcast
+    // A tool_result WS message should still have been broadcast
     const toolResultMsg = messages.find((m: any) => m.type === 'tool_result');
     expect(toolResultMsg).toBeDefined();
     expect(toolResultMsg.tool_use_id).toBe('tu-1');
     expect(toolResultMsg.content).toBe('my-hostname');
+    expect(toolResultMsg.cell_id).toBe('c1');  // Routed to correct cell
   });
 
-  it('tool_result still works normally when cell is running', async () => {
+  it('tool_result broadcasts correctly when cell is running (ephemeral)', async () => {
     const session = await createSessionWithToolUse();
+    const messages: any[] = [];
+    session.listeners.add((msg: any) => messages.push(msg));
 
     // tool_result arrives while cell is still running (normal case)
     onMessage({
@@ -128,14 +134,22 @@ describe('tool_result after result (race condition)', () => {
       },
     });
 
+    // D1: Regular tool_result is NOT persisted to notebook (ephemeral)
     const cell = session.notebook.cells[0] as any;
     const toolOutput = cell.outputs[0];
     expect(toolOutput.type).toBe('tool_use');
-    expect(toolOutput.result).toBe('normal-result');
+    expect(toolOutput.result).toBeUndefined();  // NOT persisted
+
+    // But it should be broadcast
+    const toolResultMsg = messages.find((m: any) => m.type === 'tool_result');
+    expect(toolResultMsg).toBeDefined();
+    expect(toolResultMsg.content).toBe('normal-result');
   });
 
-  it('late tool_result routes to correct cell by tool_use_id, not running cell', async () => {
+  it('late tool_result broadcast routes to correct cell by tool_use_id', async () => {
     const session = await createSessionWithToolUse();
+    const messages: any[] = [];
+    session.listeners.add((msg: any) => messages.push(msg));
 
     // Complete cell c1
     onMessage({ type: 'result', result: 'done', is_error: false });
@@ -164,8 +178,7 @@ describe('tool_result after result (race condition)', () => {
       ],
     };
 
-    // A stale tool_result for tu-1 should NOT corrupt c2
-    // (it should go to c1, not c2)
+    // A stale tool_result for tu-1 should be broadcast with correct cell_id
     onMessage({
       type: 'user',
       message: {
@@ -177,12 +190,19 @@ describe('tool_result after result (race condition)', () => {
       },
     });
 
-    // tu-1 result goes to c1 (matched by tool_use_id)
+    // D1: Regular tool_result is NOT persisted (ephemeral)
     const c1Tool = (session.notebook.cells[0] as any).outputs[0];
-    expect(c1Tool.result).toBe('late-result-for-c1');
+    expect(c1Tool.result).toBeUndefined();  // NOT persisted
 
-    // c2's tool should still be pending
     const c2Tool = (session.notebook.cells[1] as any).outputs[0];
-    expect(c2Tool.result).toBeUndefined();
+    expect(c2Tool.result).toBeUndefined();  // NOT persisted
+
+    // But broadcast should route to correct cell (c1, not c2)
+    const toolResultMsg = messages.find((m: any) =>
+      m.type === 'tool_result' && m.tool_use_id === 'tu-1'
+    );
+    expect(toolResultMsg).toBeDefined();
+    expect(toolResultMsg.cell_id).toBe('c1');  // Routed to c1, not c2
+    expect(toolResultMsg.content).toBe('late-result-for-c1');
   });
 });
