@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useStore } from '../../store';
+import { truncatePrompt } from '../../utils/promptQueue';
 
 /**
  * MobilePromptQueue - displays queued prompts on mobile with swipe-to-delete.
@@ -13,9 +14,6 @@ export function MobilePromptQueue() {
   const touchItemId = useRef<string | null>(null);
 
   if (promptQueue.length === 0) return null;
-
-  const truncate = (text: string, maxLen = 60) =>
-    text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
 
   const handleTouchStart = (e: React.TouchEvent, id: string) => {
     touchStartX.current = e.touches[0].clientX;
@@ -47,7 +45,7 @@ export function MobilePromptQueue() {
             onTouchStart={(e) => handleTouchStart(e, item.id)}
             onTouchEnd={handleTouchEnd}
           >
-            <span className="mobile-prompt-queue-text">{truncate(item.source)}</span>
+            <span className="mobile-prompt-queue-text">{truncatePrompt(item.source, 60)}</span>
             <button
               className="mobile-prompt-queue-delete"
               onClick={() => removeQueueItem(item.id)}

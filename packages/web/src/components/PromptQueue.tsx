@@ -1,4 +1,5 @@
 import { useStore } from '../store';
+import { truncatePrompt } from '../utils/promptQueue';
 
 /**
  * PromptQueue - displays queued prompts waiting to be executed.
@@ -10,9 +11,6 @@ export function PromptQueue() {
   const reorderQueue = useStore((s) => s.reorderQueue);
 
   if (promptQueue.length === 0) return null;
-
-  const truncate = (text: string, maxLen = 80) =>
-    text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
@@ -49,7 +47,7 @@ export function PromptQueue() {
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDrop(e, item.id)}
           >
-            <span className="prompt-queue-text">{truncate(item.source)}</span>
+            <span className="prompt-queue-text">{truncatePrompt(item.source)}</span>
             <button
               className="prompt-queue-delete"
               onClick={() => removeQueueItem(item.id)}

@@ -38,6 +38,9 @@ export const MAX_QUEUE_IMAGES = 10;
 /** Maximum total size of images across all queued prompts (30 MB) */
 export const MAX_QUEUE_IMAGES_SIZE = 30 * 1024 * 1024;
 
+/** Base64 to bytes conversion ratio (base64 encoding adds ~33% overhead) */
+export const BASE64_TO_BYTES_RATIO = 0.75;
+
 // ── Claude settings model helper ─────────────────────────────────────────────
 
 /**
@@ -539,6 +542,9 @@ export class SessionManager {
     // D3: Await any pending post-completion work (git commit + autoSave) before closing
     await session._pendingPostComplete.catch(() => {});
 
+    // D3-5: Flush pending queue writes before closing
+    await session._saveQueue.flush();
+
     session.agentProcess.stop();
     session.listeners.clear();
     session.eventBuffer.clear();
@@ -638,7 +644,7 @@ export class SessionManager {
     if (prompt.images && prompt.images.length > 0) {
       // Check individual image sizes
       for (const img of prompt.images) {
-        const imgSize = img.data.length * 0.75; // base64 to bytes approximation
+        const imgSize = img.data.length * BASE64_TO_BYTES_RATIO; // base64 to bytes approximation
         if (imgSize > MAX_IMAGE_SIZE) {
           return { success: false, error: `Image exceeds ${MAX_IMAGE_SIZE / 1024 / 1024}MB limit`, code: 'IMAGE_TOO_LARGE' };
         }
@@ -646,11 +652,11 @@ export class SessionManager {
 
       // Count total images in queue
       let totalImages = prompt.images.length;
-      let totalImagesSize = prompt.images.reduce((sum, img) => sum + img.data.length * 0.75, 0);
+      let totalImagesSize = prompt.images.reduce((sum, img) => sum + img.data.length * BASE64_TO_BYTES_RATIO, 0);
       for (const p of session._promptQueue) {
         if (p.images) {
           totalImages += p.images.length;
-          totalImagesSize += p.images.reduce((sum, img) => sum + img.data.length * 0.75, 0);
+          totalImagesSize += p.images.reduce((sum, img) => sum + img.data.length * BASE64_TO_BYTES_RATIO, 0);
         }
       }
 

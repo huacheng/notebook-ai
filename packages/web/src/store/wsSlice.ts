@@ -700,15 +700,19 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   queueVersion: 0,
 
   queuePrompt(source: string, images?) {
-    const { ws, sessionId, queueVersion } = get();
+    const { ws, sessionId, queueVersion, promptQueue } = get();
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
 
-    const prompt = {
+    const prompt: QueuedPrompt = {
       id: crypto.randomUUID(),
       source,
       images,
       createdAt: new Date().toISOString(),
     };
+
+    // D1-1: Optimistic update - add to local state before server confirms
+    set({ promptQueue: [...promptQueue, prompt], queueVersion: queueVersion + 1 });
+
     ws.send(JSON.stringify({
       type: 'queue_prompt',
       session_id: sessionId,
@@ -718,8 +722,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   removeQueueItem(id: string) {
-    const { ws, sessionId, queueVersion } = get();
+    const { ws, sessionId, queueVersion, promptQueue } = get();
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+
+    // D1-1: Optimistic update - remove from local state before server confirms
+    set({
+      promptQueue: promptQueue.filter((p) => p.id !== id),
+      queueVersion: queueVersion + 1,
+    });
 
     ws.send(JSON.stringify({
       type: 'queue_remove',
@@ -730,8 +740,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   reorderQueue(newOrder: string[]) {
-    const { ws, sessionId, queueVersion } = get();
+    const { ws, sessionId, queueVersion, promptQueue } = get();
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+
+    // D1-1: Optimistic update - reorder local state before server confirms
+    const idToPrompt = new Map(promptQueue.map((p) => [p.id, p]));
+    const reordered = newOrder.map((id) => idToPrompt.get(id)).filter(Boolean) as QueuedPrompt[];
+    set({ promptQueue: reordered, queueVersion: queueVersion + 1 });
 
     ws.send(JSON.stringify({
       type: 'queue_reorder',

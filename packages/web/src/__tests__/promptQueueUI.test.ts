@@ -50,9 +50,9 @@ describe('PromptQueue component file', () => {
     expect(src).toContain('reorderQueue');
   });
 
-  it('should truncate long prompts', () => {
+  it('should use shared truncatePrompt utility', () => {
     const src = queueSrc();
-    // Should have logic to truncate at ~80 chars
-    expect(src).toMatch(/slice|substring|truncate/i);
+    // Should import and use the shared utility
+    expect(src).toContain('truncatePrompt');
   });
 });

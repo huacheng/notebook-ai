@@ -54,4 +54,9 @@ describe('MobilePromptQueue component file', () => {
     const src = queueSrc();
     expect(src).toContain('promptQueue.length');
   });
+
+  it('should use shared truncatePrompt utility', () => {
+    const src = queueSrc();
+    expect(src).toContain('truncatePrompt');
+  });
 });
