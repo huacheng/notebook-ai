@@ -46,11 +46,6 @@ echo "==> Ports $PORTS are free."
 
 cd "$(dirname "$0")"
 
-# Load .env if present
-if [ -f .env ]; then
-  set -a; source .env; set +a
-fi
-
 # ── Auto-generate HTTPS cert with all local IPs ─────────────────────────────
 CERT_DIR="packages/web"
 CERT_FILE="$CERT_DIR/localhost.pem"
@@ -98,7 +93,7 @@ if $PROD_MODE; then
 
   echo "==> Starting production server..."
   # Backend serves API on 3002, frontend static files served by a simple server on 3000
-  PORT=3002 NB_AUTH_TOKEN="${NB_AUTH_TOKEN:-test123}" nohup node packages/server/dist/index.js > /tmp/notebook-prod-backend.log 2>&1 &
+  PORT=3002 nohup node packages/server/dist/index.js > /tmp/notebook-prod-backend.log 2>&1 &
 
   # Serve frontend static files (using npx serve or python)
   if command -v serve &>/dev/null; then
@@ -111,7 +106,7 @@ if $PROD_MODE; then
   MODE_MSG="Production"
 else
   echo "==> Starting notebook-ai dev server..."
-  PORT=3002 NB_AUTH_TOKEN="${NB_AUTH_TOKEN:-test123}" nohup pnpm dev > /tmp/notebook-dev.log 2>&1 &
+  PORT=3002 nohup pnpm dev > /tmp/notebook-dev.log 2>&1 &
   LOG_FILE="/tmp/notebook-dev.log"
   MODE_MSG="Development"
 fi
