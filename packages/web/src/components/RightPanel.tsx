@@ -52,7 +52,6 @@ export function RightPanel() {
           initialPath={delivPath}
           refreshKey={refreshKey}
           onFileClick={(subPath, name) => {
-            if (!useStore.getState().activeNotebookTabId) return;
             const relPath = subPath === '.' ? name : `${subPath}/${name}`;
             openFileTab({ path: relPath, source: 'deliverables', sessionId: sessionId ?? '', projectId: activeProjectId ?? undefined });
           }}

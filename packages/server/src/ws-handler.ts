@@ -320,6 +320,10 @@ export function setupWebSocket(
 
       // D2: permission check — session-mutating commands must come from a user who owns the session
       function checkSessionPermission(sid: string): boolean {
+        // Allow pseudo-sessions for library and project file access (no subscription required)
+        if (sid === '__library__' || sid.startsWith('__project_')) {
+          return true;
+        }
         const owningUser = sessionOwningUser.get(sid);
         if (owningUser && owningUser !== currentUserId) {
           sendToClient(ws, { type: 'error', session_id: sid, message: 'Access denied: session belongs to another user.' });

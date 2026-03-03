@@ -896,7 +896,6 @@ export function ProjectSidebar() {
             return subPath === '.memory' || subPath.startsWith('.memory/');
           }}
           onFileClick={(subPath, name) => {
-            if (!useStore.getState().activeNotebookTabId) return;
             const relPath = subPath === '.' ? name : `${subPath}/${name}`;
             openFileTab({ path: relPath, source: 'library', sessionId: sessionId ?? '' });
           }}
