@@ -612,10 +612,8 @@ function FileBrowser() {
         useStore.setState({ notebookLoading: false });
       }
     } else {
-      const { sessionId, activeProjectId: projId, activeNotebookTabId } = useStore.getState();
+      const { sessionId, activeProjectId: projId } = useStore.getState();
       if (!projId) return;
-      // FileViewer is a split companion — only open when a notebook tab is active
-      if (!activeNotebookTabId) return;
       const relPath = subPath === '.' ? filename : `${subPath}/${filename}`;
       openFileTab({ path: relPath, source: 'workspace', sessionId: sessionId ?? '', projectId: projId });
     }
