@@ -14,7 +14,7 @@ import { renderAsync } from 'docx-preview';
 import * as XLSX from 'xlsx';
 import type { FileFormat } from '../hooks/useFileStream';
 import type { FileAnnotations, FileAnnotation } from '../types/fileAnnotations';
-import { uid, buildSendPayload, collectAnnotationIds, filterSendable, applyEdit, computeSourceCursor } from '../types/fileAnnotations';
+import { uid, buildSendPayload, collectAnnotationIds, filterSendable, applyEdit, computeSourceCursor, truncateSelectedText, truncateAnnotationContent } from '../types/fileAnnotations';
 import { FileSelectionFloat } from './FileSelectionFloat';
 import { FileAnnotationCard } from './FileAnnotationCard';
 import { FileAnnotationDropdown } from './FileAnnotationDropdown';
@@ -337,14 +337,16 @@ export function FileViewerRender({
 
   const addAnnotation = useCallback((type: FileAnnotation['type'], selectedText: string, defaultContent?: string) => {
     const id = uid();
-    const truncated = selectedText.slice(0, 80);
+    // D6: Use centralized constants for field length limits
+    const truncated = truncateSelectedText(selectedText);
     const ann: FileAnnotation = {
       id,
       type,
       file_path: filePath,
       absolute_path: absolutePath,
       selected_text: truncated,
-      content: defaultContent,
+      // D2: Truncate content to prevent oversized annotations
+      content: truncateAnnotationContent(defaultContent),
       cursor: float ? computeSourceCursor(truncated, float.renderedOffset, float.renderedTextLen, content) : 0,
       author: 'user',
       timestamp: new Date().toISOString(),
@@ -372,7 +374,9 @@ export function FileViewerRender({
 
   const editAnnotation = useCallback((id: string, newContent: string) => {
     const newId = uid();
-    onAnnotationsChange({ items: applyEdit(annotations.items, id, newContent, newId), updatedAt: Date.now() });
+    // D2: Truncate content to prevent oversized annotations
+    const truncatedContent = truncateAnnotationContent(newContent) ?? '';
+    onAnnotationsChange({ items: applyEdit(annotations.items, id, truncatedContent, newId), updatedAt: Date.now() });
     setHighlights((prev) => rekeyHighlight(prev, id, newId));
     if (activeHighlightId === id) setActiveHighlightId(newId);
   }, [annotations, onAnnotationsChange, activeHighlightId]);

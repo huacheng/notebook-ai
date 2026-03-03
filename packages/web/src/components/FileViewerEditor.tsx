@@ -4,6 +4,9 @@ import DOMPurify from 'dompurify';
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 
+// D2: Maximum content size that can be saved (1MB)
+const MAX_EDITOR_CONTENT_SIZE = 1024 * 1024;
+
 interface FileViewerEditorProps {
   content: string;
   format: 'text' | 'html';
@@ -45,9 +48,14 @@ export function FileViewerEditor({ content, format, sessionId, filePath, source,
 
   const handleSave = useCallback(() => {
     if (!editor || !ws) return;
+    const savedContent = format === 'html' ? editor.getHTML() : editor.getText();
+    // D2: Validate content size before sending
+    if (savedContent.length > MAX_EDITOR_CONTENT_SIZE) {
+      alert(`Content too large (${(savedContent.length / 1024).toFixed(0)}KB, max 1MB)`);
+      return;
+    }
     setSaving(true);
     setSaveStatus('idle');
-    const savedContent = format === 'html' ? editor.getHTML() : editor.getText();
     const msg: Record<string, string> = {
       type: 'file-save',
       session_id: sessionId,

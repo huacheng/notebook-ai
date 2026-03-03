@@ -1,5 +1,23 @@
 // FileAnnotation types — 4-mode annotation for file viewer
 
+// D6: Extracted constants for annotation field limits
+/** Maximum length for selected_text field (anchor snapshot) */
+export const MAX_SELECTED_TEXT_LENGTH = 80;
+
+/** Maximum length for annotation content field (D2 security limit) */
+export const MAX_ANNOTATION_CONTENT_LENGTH = 10000;
+
+/** Truncate selected text to MAX_SELECTED_TEXT_LENGTH */
+export function truncateSelectedText(text: string): string {
+  return text.slice(0, MAX_SELECTED_TEXT_LENGTH);
+}
+
+/** Truncate annotation content to MAX_ANNOTATION_CONTENT_LENGTH */
+export function truncateAnnotationContent(content: string | undefined): string | undefined {
+  if (content === undefined) return undefined;
+  return content.slice(0, MAX_ANNOTATION_CONTENT_LENGTH);
+}
+
 export interface FileAnnotation {
   id: string;                   // uid()
   type: 'insert' | 'delete' | 'replace' | 'comment';
