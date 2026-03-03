@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { WSServerMessage } from '@notebook-ai/shared';
+import type { WSServerMessage, QueuedPrompt } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 import type { Command } from '../mention/types';
 import DOMPurify from 'dompurify';
@@ -27,6 +27,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'submitToolResult' | 'updateToolResultLocal'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
   | 'commands' | 'commandsLoaded' | 'setCommands'
+  | 'promptQueue' | 'queueVersion' | 'queuePrompt' | 'removeQueueItem' | 'reorderQueue'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -479,6 +480,16 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           set({ sessionNotice: `⚠️ ${errorMsg}` });
           break;
         }
+        case 'queue_state': {
+          const queueMsg = parsed as { items: QueuedPrompt[]; version: number };
+          set({ promptQueue: queueMsg.items, queueVersion: queueMsg.version });
+          break;
+        }
+        case 'queue_error': {
+          const queueErr = parsed as { error?: string };
+          set({ sessionNotice: `⚠️ Queue error: ${queueErr.error ?? 'Unknown error'}` });
+          break;
+        }
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };
@@ -683,4 +694,50 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   // ── Commands (slash command caching) ────────────────────────────────
   setCommands: (commands: Command[]) => set({ commands, commandsLoaded: true }),
+
+  // ── Prompt Queue ───────────────────────────────────────────────────────
+  promptQueue: [] as QueuedPrompt[],
+  queueVersion: 0,
+
+  queuePrompt(source: string, images?) {
+    const { ws, sessionId, queueVersion } = get();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+
+    const prompt = {
+      id: crypto.randomUUID(),
+      source,
+      images,
+      createdAt: new Date().toISOString(),
+    };
+    ws.send(JSON.stringify({
+      type: 'queue_prompt',
+      session_id: sessionId,
+      prompt,
+      version: queueVersion,
+    }));
+  },
+
+  removeQueueItem(id: string) {
+    const { ws, sessionId, queueVersion } = get();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+
+    ws.send(JSON.stringify({
+      type: 'queue_remove',
+      session_id: sessionId,
+      id,
+      version: queueVersion,
+    }));
+  },
+
+  reorderQueue(newOrder: string[]) {
+    const { ws, sessionId, queueVersion } = get();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+
+    ws.send(JSON.stringify({
+      type: 'queue_reorder',
+      session_id: sessionId,
+      order: newOrder,
+      version: queueVersion,
+    }));
+  },
 });

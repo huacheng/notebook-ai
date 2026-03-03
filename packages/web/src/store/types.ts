@@ -7,6 +7,7 @@ import type {
   SlideSection,
   NotebookListItem,
   PromptImage,
+  QueuedPrompt,
 } from '@notebook-ai/shared';
 import type { ProjectListItem } from './projectSlice';
 import type { PluginStatusResponse } from '../api/plugin';
@@ -225,6 +226,13 @@ export interface NotebookStore {
   pendingSuggestions: { cellId: string; suggestions: string[] } | null;
   setPendingSuggestions(s: { cellId: string; suggestions: string[] }): void;
   clearPendingSuggestions(): void;
+
+  // ── Prompt Queue ───────────────────────────────────────────────────────
+  promptQueue: QueuedPrompt[];
+  queueVersion: number;
+  queuePrompt(source: string, images?: PromptImage[]): void;
+  removeQueueItem(id: string): void;
+  reorderQueue(newOrder: string[]): void;
 
   // ── WebSocket actions ──────────────────────────────────────────────────
   connectWebSocket(): Promise<void>;

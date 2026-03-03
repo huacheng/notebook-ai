@@ -4,6 +4,7 @@ import { useT } from '../../i18n';
 import { MobileHeader } from './MobileHeader';
 import { MobileDrawer } from './MobileDrawer';
 import { MobileInputBar } from './MobileInputBar';
+import { MobilePromptQueue } from './MobilePromptQueue';
 import { MobileFileViewer } from './MobileFileViewer';
 import { MobileSplitView } from './MobileSplitView';
 import { MobileModelSheet } from './MobileModelSheet';
@@ -313,6 +314,9 @@ export function MobileNotebookView() {
           </button>
         )}
       </main>
+
+      {/* Prompt queue */}
+      <MobilePromptQueue />
 
       {/* Input bar */}
       <MobileInputBar />

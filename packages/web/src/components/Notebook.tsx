@@ -5,6 +5,7 @@ import { Cell } from './Cell';
 import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
+import { PromptQueue } from './PromptQueue';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -456,6 +457,7 @@ export function Notebook() {
             <div ref={bottomRef} />
           </div>
 
+          <PromptQueue />
           <NotebookInputBar />
           <ScrollToBottomButton bottomRef={bottomRef} />
         </>

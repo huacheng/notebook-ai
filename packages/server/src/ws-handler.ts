@@ -455,6 +455,17 @@ export function setupWebSocket(
                 console.log(`[ws] Replayed ${missed.length} events for session ${session_id} (resume_after=${msg.resume_after})`);
               }
             }
+
+            // Send current queue state on subscribe/reconnect
+            const queueState = sessionManager.getQueueState(session_id);
+            if (queueState) {
+              sendToClient(ws, {
+                type: 'queue_state',
+                session_id,
+                items: queueState.items,
+                version: queueState.version,
+              });
+            }
           }
           break;
         }
@@ -1245,6 +1256,53 @@ export function setupWebSocket(
             sendToClient(ws, { type: 'git_diff_response', request_id, diff: stdout });
           } catch (err) {
             sendToClient(ws, { type: 'git_diff_error', request_id, error: sanitizeErrorForClient(err) });
+          }
+          break;
+        }
+
+        // ─── Prompt Queue ───────────────────────────────────────────────────────
+
+        case 'queue_prompt': {
+          const { session_id, prompt, version } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          const result = sessionManager.addToQueue(session_id, prompt, version);
+          if (!result.success) {
+            sendToClient(ws, {
+              type: 'queue_error',
+              session_id,
+              error: result.error,
+              code: result.code,
+            });
+          }
+          break;
+        }
+
+        case 'queue_remove': {
+          const { session_id, id, version } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          const result = sessionManager.removeFromQueue(session_id, id, version);
+          if (!result.success) {
+            sendToClient(ws, {
+              type: 'queue_error',
+              session_id,
+              error: result.error,
+              code: result.code,
+            });
+          }
+          break;
+        }
+
+        case 'queue_reorder': {
+          const { session_id, order, version } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          const result = sessionManager.reorderQueue(session_id, order, version);
+          if (!result.success) {
+            sendToClient(ws, {
+              type: 'queue_error',
+              session_id,
+              error: result.error,
+              code: result.code,
+            });
           }
           break;
         }

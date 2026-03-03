@@ -10,7 +10,9 @@ import {
   type WSServerMessage,
   type CellOutput,
   type PromptImage,
+  type QueuedPrompt,
 } from '@notebook-ai/shared';
+import { loadQueueFromFile, saveQueueToFile, createDebouncedSaver } from './queue-file.js';
 import { EventBuffer } from './event-buffer.js';
 import {
   updateCellStatus,
@@ -21,6 +23,20 @@ import {
   findRunningCellId,
   findCellByToolUseId,
 } from './notebook-mutations.js';
+
+// ── Prompt Queue Limits ───────────────────────────────────────────────────────
+
+/** Maximum number of prompts in the queue */
+export const MAX_QUEUE_LENGTH = 30;
+
+/** Maximum size for a single image (5 MB) */
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+/** Maximum number of images across all queued prompts */
+export const MAX_QUEUE_IMAGES = 10;
+
+/** Maximum total size of images across all queued prompts (30 MB) */
+export const MAX_QUEUE_IMAGES_SIZE = 30 * 1024 * 1024;
 
 // ── Claude settings model helper ─────────────────────────────────────────────
 
@@ -113,6 +129,12 @@ interface NotebookSession {
   _lastCellId?: string;
   /** D1: Track tool_use_ids that should be persisted (AskUserQuestion only). */
   _persistedToolUseIds: Set<string>;
+  /** Prompt queue: pending prompts waiting for execution. */
+  _promptQueue: QueuedPrompt[];
+  /** Prompt queue version for optimistic locking (concurrency control). */
+  _queueVersion: number;
+  /** Debounced queue file saver. */
+  _saveQueue: ((items: QueuedPrompt[], version: number) => void) & { flush: () => Promise<void> };
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -203,6 +225,18 @@ export class SessionManager {
       allowedDirs = resolved.length > 0 ? resolved : undefined;
     } catch (_err: unknown) { /* parent doesn't exist or not readable — skip */ }
 
+    // Load prompt queue from independent file
+    const queuePath = path.join(cwd, '.prompt-queue.json');
+    const queueData = await loadQueueFromFile(queuePath);
+
+    // Create debounced queue saver (500ms debounce)
+    const saveQueue = createDebouncedSaver(
+      async (items: QueuedPrompt[], version: number) => {
+        await saveQueueToFile(queuePath, items, version);
+      },
+      500,
+    );
+
     const session: NotebookSession = {
       id: sessionName,
       cwd,
@@ -217,6 +251,9 @@ export class SessionManager {
       eventBuffer: new EventBuffer(),
       allowedDirs,
       _persistedToolUseIds: new Set(),
+      _promptQueue: queueData.items,
+      _queueVersion: queueData.version,
+      _saveQueue: saveQueue,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -565,6 +602,151 @@ export class SessionManager {
     this.broadcast(session, msg);
   }
 
+  // ── Prompt Queue Management ─────────────────────────────────────────────────
+
+  /**
+   * Get current queue state for a session.
+   */
+  getQueueState(sessionId: string): { items: QueuedPrompt[]; version: number } | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return { items: session._promptQueue, version: session._queueVersion };
+  }
+
+  /**
+   * Add a prompt to the queue. Returns error string if version mismatch or other failure.
+   */
+  addToQueue(
+    sessionId: string,
+    prompt: QueuedPrompt,
+    clientVersion: number,
+  ): { success: true } | { success: false; error: string; code: string } {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { success: false, error: 'Session not found', code: 'SESSION_NOT_FOUND' };
+
+    // Version check for optimistic locking
+    if (clientVersion !== session._queueVersion) {
+      return { success: false, error: 'Version mismatch', code: 'VERSION_MISMATCH' };
+    }
+
+    // Queue length limit
+    if (session._promptQueue.length >= MAX_QUEUE_LENGTH) {
+      return { success: false, error: `Queue is full (max ${MAX_QUEUE_LENGTH} items)`, code: 'QUEUE_FULL' };
+    }
+
+    // Image limits
+    if (prompt.images && prompt.images.length > 0) {
+      // Check individual image sizes
+      for (const img of prompt.images) {
+        const imgSize = img.data.length * 0.75; // base64 to bytes approximation
+        if (imgSize > MAX_IMAGE_SIZE) {
+          return { success: false, error: `Image exceeds ${MAX_IMAGE_SIZE / 1024 / 1024}MB limit`, code: 'IMAGE_TOO_LARGE' };
+        }
+      }
+
+      // Count total images in queue
+      let totalImages = prompt.images.length;
+      let totalImagesSize = prompt.images.reduce((sum, img) => sum + img.data.length * 0.75, 0);
+      for (const p of session._promptQueue) {
+        if (p.images) {
+          totalImages += p.images.length;
+          totalImagesSize += p.images.reduce((sum, img) => sum + img.data.length * 0.75, 0);
+        }
+      }
+
+      if (totalImages > MAX_QUEUE_IMAGES) {
+        return { success: false, error: `Too many images in queue (max ${MAX_QUEUE_IMAGES})`, code: 'TOO_MANY_IMAGES' };
+      }
+
+      if (totalImagesSize > MAX_QUEUE_IMAGES_SIZE) {
+        return { success: false, error: `Total images size exceeds ${MAX_QUEUE_IMAGES_SIZE / 1024 / 1024}MB limit`, code: 'IMAGES_SIZE_EXCEEDED' };
+      }
+    }
+
+    session._promptQueue.push(prompt);
+    session._queueVersion++;
+    session._saveQueue(session._promptQueue, session._queueVersion);
+
+    // Broadcast updated queue state
+    this.broadcast(session, {
+      type: 'queue_state',
+      items: session._promptQueue,
+      version: session._queueVersion,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Remove a prompt from the queue by ID.
+   */
+  removeFromQueue(
+    sessionId: string,
+    promptId: string,
+    clientVersion: number,
+  ): { success: true } | { success: false; error: string; code: string } {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { success: false, error: 'Session not found', code: 'SESSION_NOT_FOUND' };
+
+    if (clientVersion !== session._queueVersion) {
+      return { success: false, error: 'Version mismatch', code: 'VERSION_MISMATCH' };
+    }
+
+    const index = session._promptQueue.findIndex((p) => p.id === promptId);
+    if (index === -1) {
+      return { success: false, error: 'Prompt not found in queue', code: 'PROMPT_NOT_FOUND' };
+    }
+
+    session._promptQueue.splice(index, 1);
+    session._queueVersion++;
+    session._saveQueue(session._promptQueue, session._queueVersion);
+
+    this.broadcast(session, {
+      type: 'queue_state',
+      items: session._promptQueue,
+      version: session._queueVersion,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Reorder the queue by providing new order of IDs.
+   */
+  reorderQueue(
+    sessionId: string,
+    newOrder: string[],
+    clientVersion: number,
+  ): { success: true } | { success: false; error: string; code: string } {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { success: false, error: 'Session not found', code: 'SESSION_NOT_FOUND' };
+
+    if (clientVersion !== session._queueVersion) {
+      return { success: false, error: 'Version mismatch', code: 'VERSION_MISMATCH' };
+    }
+
+    // Validate that newOrder contains exactly the same IDs
+    const currentIds = new Set(session._promptQueue.map((p) => p.id));
+    const newIds = new Set(newOrder);
+    if (currentIds.size !== newIds.size || ![...currentIds].every((id) => newIds.has(id))) {
+      return { success: false, error: 'Invalid order: IDs do not match', code: 'INVALID_ORDER' };
+    }
+
+    // Reorder
+    const idToPrompt = new Map(session._promptQueue.map((p) => [p.id, p]));
+    session._promptQueue = newOrder.map((id) => idToPrompt.get(id)!);
+    session._queueVersion++;
+    session._saveQueue(session._promptQueue, session._queueVersion);
+
+    this.broadcast(session, {
+      type: 'queue_state',
+      items: session._promptQueue,
+      version: session._queueVersion,
+    });
+
+    return { success: true };
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────
 
   // Accept any object — session_id is injected here so call sites stay clean.
@@ -648,6 +830,57 @@ export class SessionManager {
     } else if (session._rerunQueue) {
       delete session._rerunQueue;
     }
+
+    // Process prompt queue: if not interrupted and queue has items, execute next
+    if (status !== 'interrupted') {
+      setTimeout(() => this.processNextQueueItem(session), 0);
+    }
+  }
+
+  /**
+   * Process the next item in the prompt queue.
+   * Dequeues and executes the first prompt if no cell is currently running.
+   */
+  private processNextQueueItem(session: NotebookSession): void {
+    // Skip if a cell is already running
+    const runningId = findRunningCellId(session.notebook);
+    if (runningId) return;
+
+    // Skip if queue is empty
+    if (session._promptQueue.length === 0) return;
+
+    // Dequeue first item
+    const prompt = session._promptQueue.shift()!;
+    session._queueVersion++;
+    session._saveQueue(session._promptQueue, session._queueVersion);
+
+    // Broadcast updated queue state
+    this.broadcast(session, {
+      type: 'queue_state',
+      items: session._promptQueue,
+      version: session._queueVersion,
+    });
+
+    // Create and execute new cell
+    const cellId = crypto.randomUUID();
+    const newCell = {
+      id: cellId,
+      type: 'prompt' as const,
+      source: prompt.source,
+      status: 'idle' as const,
+      execution_count: 0,
+      outputs: [] as CellOutput[],
+      created_at: new Date().toISOString(),
+    };
+    session.notebook = {
+      ...session.notebook,
+      cells: [...session.notebook.cells, newCell],
+    };
+
+    // Execute the cell
+    this.executeCell(session.id, cellId, prompt.source, prompt.images).catch((err) => {
+      console.error(`[session ${session.id}] Queue execute failed:`, err);
+    });
   }
 
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */

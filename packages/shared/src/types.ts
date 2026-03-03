@@ -455,6 +455,29 @@ export const SuggestNextStepSchema = z.object({
   context: z.string().optional(),
 });
 
+// ─── Prompt Queue Messages ───
+
+export const QueuePromptSchema = z.object({
+  type: z.literal('queue_prompt'),
+  session_id: z.string(),
+  prompt: QueuedPromptSchema,
+  version: z.number().int().nonnegative(),
+});
+
+export const QueueRemoveSchema = z.object({
+  type: z.literal('queue_remove'),
+  session_id: z.string(),
+  id: z.string(),
+  version: z.number().int().nonnegative(),
+});
+
+export const QueueReorderSchema = z.object({
+  type: z.literal('queue_reorder'),
+  session_id: z.string(),
+  order: z.array(z.string()),
+  version: z.number().int().nonnegative(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -481,6 +504,9 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   GitCommitFilesRequestSchema,
   GitDiffRequestSchema,
   UrlCaptureRequestSchema,
+  QueuePromptSchema,
+  QueueRemoveSchema,
+  QueueReorderSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
   z.object({
@@ -815,6 +841,22 @@ export const FilesChangedSchema = z.object({
   }).optional(),
 });
 
+// ─── Prompt Queue Server Messages ───
+
+export const QueueStateSchema = z.object({
+  type: z.literal('queue_state'),
+  session_id: z.string(),
+  items: z.array(QueuedPromptSchema),
+  version: z.number().int().nonnegative(),
+});
+
+export const QueueErrorSchema = z.object({
+  type: z.literal('queue_error'),
+  session_id: z.string(),
+  error: z.string(),
+  code: z.string(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellStreamMessageSchema,
@@ -861,6 +903,8 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   GitDiffErrorSchema,
   UrlCaptureResultSchema,
   AutosaveErrorSchema,
+  QueueStateSchema,
+  QueueErrorSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
