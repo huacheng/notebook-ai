@@ -6,6 +6,20 @@ export const NOTIFICATION_SOUND = '/sounds/notification.mp3';
 /** Title blink interval in ms */
 export const TITLE_BLINK_INTERVAL = 1000;
 
+/** Notification settings interface */
+export interface NotificationSettings {
+  soundEnabled: boolean;
+  systemNotificationEnabled: boolean;
+  titleBlinkEnabled: boolean;
+}
+
+/** Default notification settings */
+export const defaultNotificationSettings: NotificationSettings = {
+  soundEnabled: true,
+  systemNotificationEnabled: true,
+  titleBlinkEnabled: true,
+};
+
 export function useNotification() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blinkIntervalRef = useRef<number | null>(null);
