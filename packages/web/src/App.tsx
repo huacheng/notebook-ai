@@ -15,6 +15,7 @@ import { ModelManager } from './components/ModelManager';
 import { MobileApp } from './components/mobile/MobileApp';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useNotification } from './hooks/useNotification';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
 import { I18nProvider, createT } from './i18n';
@@ -123,6 +124,36 @@ function AuthenticatedApp() {
   const rightPanelWidth = useStore((s) => s.rightPanelWidth);
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
   const setRightPanelWidth = useStore((s) => s.setRightPanelWidth);
+  const lastCompletedCellId = useStore((s) => s.lastCompletedCellId);
+
+  // Notification system
+  const { notify, requestPermission, stopTitleBlink } = useNotification();
+
+  // Request notification permission on first user interaction
+  useEffect(() => {
+    const handleInteraction = () => {
+      requestPermission();
+      document.removeEventListener('click', handleInteraction);
+    };
+    document.addEventListener('click', handleInteraction);
+    return () => document.removeEventListener('click', handleInteraction);
+  }, [requestPermission]);
+
+  // Notify when cell execution completes (only if tab is hidden)
+  useEffect(() => {
+    if (lastCompletedCellId && document.hidden) {
+      notify('Task Complete', 'Claude has finished responding');
+    }
+  }, [lastCompletedCellId, notify]);
+
+  // Stop title blink when tab becomes visible
+  useEffect(() => {
+    const handleVisible = () => {
+      if (!document.hidden) stopTitleBlink();
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [stopTitleBlink]);
 
   const contentRef = useRef<HTMLElement | null>(null);
   const savedScrollRef = useRef<number>(0);

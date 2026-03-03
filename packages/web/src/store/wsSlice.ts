@@ -19,7 +19,7 @@ let _pendingWs: WebSocket | null = null;
 
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
-  | 'lastEventIndex' | 'updateLastEventIndex'
+  | 'lastEventIndex' | 'updateLastEventIndex' | 'lastCompletedCellId'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
   | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
@@ -34,6 +34,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   restartPhase: 'idle',
   restartError: '',
   lastEventIndex: {},
+  lastCompletedCellId: null,
   commands: [] as Command[],
   commandsLoaded: false,
 
@@ -221,6 +222,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           } else {
             store.setCellStatus(parsed.cell_id, parsed.status ?? 'completed');
           }
+          // Set lastCompletedCellId for notification system
+          set({ lastCompletedCellId: parsed.cell_id });
           break;
         case 'git_diff':
           if (msgSessionId) {
@@ -547,8 +550,9 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (!cell || cell.type !== 'prompt') return;
 
     set((state) => {
-      if (!state.notebook) return {};
+      if (!state.notebook) return { lastCompletedCellId: null };
       return {
+        lastCompletedCellId: null,
         notebook: {
           ...state.notebook,
           cells: state.notebook.cells.map((c) =>

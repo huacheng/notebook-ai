@@ -101,6 +101,7 @@ export interface NotebookStore {
   restartPhase: 'idle' | 'restarting' | 'done' | 'error';
   restartError: string;
   lastEventIndex: Record<string, number>;
+  lastCompletedCellId: string | null;
 
   // ── Commands state (slash command caching) ────────────────────────────
   commands: Command[];
