@@ -371,6 +371,7 @@ export default function App() {
   const authToken = useStore((s) => s.authToken);
   const authError = useStore((s) => s.authError);
   const authLoading = useStore((s) => s.authLoading);
+  const authVerifying = useStore((s) => s.authVerifying);
   const checkAuthStatus = useStore((s) => s.checkAuthStatus);
   const login = useStore((s) => s.login);
   const [showRegister, setShowRegister] = useState(false);
@@ -382,8 +383,8 @@ export default function App() {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  // Still checking auth status
-  if (authRequired === null) {
+  // Still checking auth status or verifying token
+  if (authRequired === null || authVerifying) {
     return (
       <I18nProvider value={t}>
         <div className="app-loading">

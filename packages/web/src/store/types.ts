@@ -23,6 +23,7 @@ export interface NotebookStore {
   authError: string | null;
   authRetryAfter: number;
   authLoading: boolean;
+  authVerifying: boolean; // True until token validation completes
 
   // ── Notebook state ─────────────────────────────────────────────────────
   notebook: Notebook | null;

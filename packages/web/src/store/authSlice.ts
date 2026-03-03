@@ -2,7 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { NotebookStore } from './types';
 
 export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'authToken' | 'authRequired' | 'authError' | 'authRetryAfter' | 'authLoading'
+  | 'authToken' | 'authRequired' | 'authError' | 'authRetryAfter' | 'authLoading' | 'authVerifying'
   | 'checkAuthStatus' | 'login' | 'logout' | 'register' | 'clearAuthError'
 >> = (set, get) => ({
   authToken: sessionStorage.getItem('nb-auth-token'),
@@ -10,8 +10,10 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
   authError: null,
   authRetryAfter: 0,
   authLoading: false,
+  authVerifying: true, // True until token validation completes
 
   async checkAuthStatus() {
+    set({ authVerifying: true });
     try {
       const res = await fetch('/api/auth/status');
       const data = (await res.json()) as { authEnabled: boolean };
@@ -33,6 +35,9 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       }
     } catch {
       set({ authRequired: false });
+    } finally {
+      // Token validation complete — safe to render authenticated components
+      set({ authVerifying: false });
     }
   },
 
@@ -51,7 +56,8 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       }
       const data = (await res.json()) as { token: string };
       sessionStorage.setItem('nb-auth-token', data.token);
-      set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false });
+      // Login success — token is validated, no need to verify again
+      set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
     } catch {
       set({ authError: 'Failed to connect to server.', authLoading: false });
     }
