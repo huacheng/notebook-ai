@@ -1,10 +1,13 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 
 /** Audio notification sound path */
 export const NOTIFICATION_SOUND = '/sounds/notification.mp3';
 
 /** Title blink interval in ms */
 export const TITLE_BLINK_INTERVAL = 1000;
+
+/** Notification debounce interval in ms (to avoid spam on rapid completions) */
+export const NOTIFY_DEBOUNCE_MS = 5000;
 
 /** Notification settings interface */
 export interface NotificationSettings {
@@ -93,6 +96,21 @@ export function useNotification(settings: NotificationSettings = defaultNotifica
       document.addEventListener('visibilitychange', handleVisible);
     }
   }, [settings, playSound, showSystemNotification, startTitleBlink, stopTitleBlink]);
+
+  // D3-4 fix: Cleanup visibilitychange listener on unmount
+  useEffect(() => {
+    return () => {
+      if (visibilityHandlerRef.current) {
+        document.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+        visibilityHandlerRef.current = null;
+      }
+      // Also stop any ongoing title blink
+      if (blinkIntervalRef.current) {
+        clearInterval(blinkIntervalRef.current);
+        blinkIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   return { playSound, notify, requestPermission, stopTitleBlink, preloadSound };
 }

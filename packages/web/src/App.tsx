@@ -15,7 +15,7 @@ import { ModelManager } from './components/ModelManager';
 import { MobileApp } from './components/mobile/MobileApp';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useIsMobile } from './hooks/useIsMobile';
-import { useNotification } from './hooks/useNotification';
+import { useNotification, NOTIFY_DEBOUNCE_MS } from './hooks/useNotification';
 import { useStore } from './store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from './utils/localCache';
 import { I18nProvider, createT } from './i18n';
@@ -127,9 +127,8 @@ function AuthenticatedApp() {
   const lastCompletedCellId = useStore((s) => s.lastCompletedCellId);
 
   // Notification system
-  const { notify, requestPermission, stopTitleBlink, preloadSound } = useNotification();
+  const { notify, requestPermission, preloadSound } = useNotification();
   const lastNotifyTimeRef = useRef(0);
-  const NOTIFY_DEBOUNCE_MS = 5000; // 5s debounce to avoid notification spam
 
   // Request notification permission and preload audio on first user interaction
   useEffect(() => {
@@ -154,14 +153,7 @@ function AuthenticatedApp() {
     }
   }, [lastCompletedCellId, notify, t]);
 
-  // Stop title blink when tab becomes visible
-  useEffect(() => {
-    const handleVisible = () => {
-      if (!document.hidden) stopTitleBlink();
-    };
-    document.addEventListener('visibilitychange', handleVisible);
-    return () => document.removeEventListener('visibilitychange', handleVisible);
-  }, [stopTitleBlink]);
+  // D3-3 fix: Removed duplicate visibilitychange listener - notify() handles this internally
 
   const contentRef = useRef<HTMLElement | null>(null);
   const savedScrollRef = useRef<number>(0);

@@ -67,6 +67,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<MySpeechRecognitionInstance | null>(null);
+  const restartingRef = useRef(false); // D1-3 fix: track restart state to avoid isListening flicker
 
   const isSupported = !!SpeechRecognition;
 
@@ -119,14 +120,18 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       // D3-2 fix: auto-restart on no-speech timeout in continuous mode
       if (event.error === 'no-speech' && continuous) {
         // Silent timeout - restart recognition automatically
+        restartingRef.current = true; // D1-3 fix: mark as restarting
         try {
           recognition.stop();
           setTimeout(() => {
+            restartingRef.current = false;
             if (recognitionRef.current === recognition) {
               recognition.start();
             }
           }, 100);
-        } catch { /* ignore restart errors */ }
+        } catch {
+          restartingRef.current = false;
+        }
         return;
       }
 
@@ -139,7 +144,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // D1-3 fix: don't set isListening=false if we're restarting due to no-speech
+      if (!restartingRef.current) {
+        setIsListening(false);
+      }
       setInterimTranscript('');
     };
 
