@@ -8,6 +8,7 @@ import type { LaneNode, Connection } from '../utils/gitGraph';
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { GIT_DEFAULT_ALL_BRANCHES } from '../utils/gitDefaults';
 import { useWatcher } from '../hooks/useWatcher';
+import { useWsRequest } from '../hooks/useWsRequest';
 
 // ---------------------------------------------------------------------------
 // localStorage cache for git history
@@ -255,9 +256,6 @@ const DiffView = memo(function DiffView({ diff }: { diff: string }) {
 // CommitItem
 // ---------------------------------------------------------------------------
 
-/** WebSocket request timeout in milliseconds */
-const WS_TIMEOUT = 120_000;
-
 const CommitItem = memo(function CommitItem({
   commit, projectId, token, laneNode, maxLanes,
 }: {
@@ -268,71 +266,38 @@ const CommitItem = memo(function CommitItem({
   maxLanes: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [files, setFiles] = useState<CommitFile[]>(commit.files);
-  const [loadingFiles, setLoadingFiles] = useState(false);
   const [diffFile, setDiffFile] = useState<string | null>(null);
-  const [diffContent, setDiffContent] = useState<string>('');
-  const [loadingDiff, setLoadingDiff] = useState(false);
   const [copied, setCopied] = useState(false);
   const diffFileRef = useRef(diffFile);
   diffFileRef.current = diffFile;
-  const filesLoadedRef = useRef(commit.files.length > 0);
-  // Track mount state to avoid setState on unmounted component
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Load files when first expanded (moved out of state setter to avoid React batching issues)
-  useEffect(() => {
-    if (!expanded || filesLoadedRef.current) return;
-    filesLoadedRef.current = true;
-    setLoadingFiles(true);
-    let cancelled = false;
+  // Load commit files via WebSocket with REST fallback
+  const { data: files, loading: loadingFiles } = useWsRequest<CommitFile[]>({
+    enabled: expanded,
+    createWsMessage: () => ({ type: 'git_commit_files_request', project_id: projectId, commit: commit.hash }),
+    responseEvent: 'nb:git-commit-files-response',
+    errorEvent: 'nb:git-commit-files-error',
+    extractData: (d) => d.files as CommitFile[],
+    restFallback: () => fetchGitCommitFiles(projectId, token, commit.hash),
+    initialValue: commit.files,
+    errorValue: [],
+    allowRetry: true,
+    preloaded: commit.files.length > 0,
+    deps: [projectId, commit.hash],
+  });
 
-    const ws = useStore.getState().ws;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const requestId = crypto.randomUUID();
-      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, WS_TIMEOUT);
-      function onResponse(e: Event) {
-        const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) {
-          cleanup();
-          if (!cancelled) { setFiles(d.files); setLoadingFiles(false); }
-        }
-      }
-      function onError(e: Event) {
-        const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) {
-          cleanup();
-          // Reset ref on error so user can retry by collapsing and re-expanding
-          filesLoadedRef.current = false;
-          if (!cancelled) { setFiles([]); setLoadingFiles(false); }
-        }
-      }
-      function cleanup() {
-        clearTimeout(timeout);
-        window.removeEventListener('nb:git-commit-files-response', onResponse);
-        window.removeEventListener('nb:git-commit-files-error', onError);
-      }
-      function fallbackRest() {
-        fetchGitCommitFiles(projectId, token, commit.hash)
-          .then((f) => { if (!cancelled) setFiles(f); })
-          .catch(() => { filesLoadedRef.current = false; if (!cancelled) setFiles([]); })
-          .finally(() => { if (!cancelled) setLoadingFiles(false); });
-      }
-      window.addEventListener('nb:git-commit-files-response', onResponse);
-      window.addEventListener('nb:git-commit-files-error', onError);
-      ws.send(JSON.stringify({ type: 'git_commit_files_request', request_id: requestId, project_id: projectId, commit: commit.hash }));
-
-      return () => { cancelled = true; cleanup(); };
-    } else {
-      fetchGitCommitFiles(projectId, token, commit.hash)
-        .then((f) => { if (!cancelled) setFiles(f); })
-        .catch(() => { filesLoadedRef.current = false; if (!cancelled) setFiles([]); })
-        .finally(() => { if (!cancelled) setLoadingFiles(false); });
-
-      return () => { cancelled = true; };
-    }
-  }, [expanded, projectId, token, commit.hash]);
+  // Load diff via WebSocket with REST fallback
+  const { data: diffContent, loading: loadingDiff } = useWsRequest<string>({
+    enabled: !!diffFile,
+    createWsMessage: () => ({ type: 'git_diff_request', project_id: projectId, commit: commit.hash, file: diffFile }),
+    responseEvent: 'nb:git-diff-response',
+    errorEvent: 'nb:git-diff-error',
+    extractData: (d) => d.diff as string,
+    restFallback: () => fetchGitDiff(projectId, token, commit.hash, diffFile ?? undefined),
+    initialValue: '',
+    errorValue: 'Failed to load diff',
+    deps: [diffFile, projectId, commit.hash],
+  });
 
   const handleToggle = useCallback(() => {
     setExpanded((prev) => !prev);
@@ -345,58 +310,6 @@ const CommitItem = memo(function CommitItem({
     }
     setDiffFile(filePath);
   }, []);
-
-  // Load diff when diffFile changes (moved out of callback to avoid React batching issues)
-  useEffect(() => {
-    if (!diffFile) return;
-    const file = diffFile; // Capture for type narrowing in nested functions
-    setLoadingDiff(true);
-    setDiffContent('');
-    let cancelled = false;
-
-    const ws = useStore.getState().ws;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const requestId = crypto.randomUUID();
-      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, WS_TIMEOUT);
-      function onResponse(e: Event) {
-        const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) {
-          cleanup();
-          if (!cancelled) { setDiffContent(d.diff); setLoadingDiff(false); }
-        }
-      }
-      function onError(e: Event) {
-        const d = (e as CustomEvent).detail;
-        if (d.request_id === requestId) {
-          cleanup();
-          if (!cancelled) { setDiffContent('Failed to load diff'); setLoadingDiff(false); }
-        }
-      }
-      function cleanup() {
-        clearTimeout(timeout);
-        window.removeEventListener('nb:git-diff-response', onResponse);
-        window.removeEventListener('nb:git-diff-error', onError);
-      }
-      function fallbackRest() {
-        fetchGitDiff(projectId, token, commit.hash, file)
-          .then((d) => { if (!cancelled) setDiffContent(d); })
-          .catch(() => { if (!cancelled) setDiffContent('Failed to load diff'); })
-          .finally(() => { if (!cancelled) setLoadingDiff(false); });
-      }
-      window.addEventListener('nb:git-diff-response', onResponse);
-      window.addEventListener('nb:git-diff-error', onError);
-      ws.send(JSON.stringify({ type: 'git_diff_request', request_id: requestId, project_id: projectId, commit: commit.hash, file }));
-
-      return () => { cancelled = true; cleanup(); };
-    } else {
-      fetchGitDiff(projectId, token, commit.hash, file)
-        .then((d) => { if (!cancelled) setDiffContent(d); })
-        .catch(() => { if (!cancelled) setDiffContent('Failed to load diff'); })
-        .finally(() => { if (!cancelled) setLoadingDiff(false); });
-
-      return () => { cancelled = true; };
-    }
-  }, [diffFile, projectId, token, commit.hash]);
 
   return (
     <div>
