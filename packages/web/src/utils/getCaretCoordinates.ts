@@ -33,6 +33,8 @@ export function getCaretCoordinates(
   style.whiteSpace = 'pre-wrap';
   style.wordWrap = 'break-word';
   style.position = 'absolute';
+  style.top = '0';
+  style.left = '0';
   style.visibility = 'hidden';
   style.overflow = 'hidden';
 
