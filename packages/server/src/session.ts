@@ -122,6 +122,16 @@ export class SessionManager {
     const gitManager = new GitManager(gitRoot ?? cwd);
     await gitManager.ensureRepo();
 
+    // Determine agent engine and model from notebook file metadata (read first)
+    let engine: AgentEngine = 'claude';
+    let model: string | undefined;
+    try {
+      const raw = await readFile(notebookPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed?.metadata?.agent === 'gemini') engine = 'gemini';
+      if (parsed?.metadata?.model) model = parsed.metadata.model;
+    } catch (_err: unknown) { /* file doesn't exist yet — default claude */ }
+
     const notebook: Notebook = NotebookSchema.parse({
       version: 1,
       metadata: {
@@ -131,22 +141,13 @@ export class SessionManager {
         cwd,
         git_repo: true,
         tmux_session: sessionName,
+        ...(model ? { model } : {}),  // Include model if read from file
       },
       cells: [],
       slice: { generated: false, sections: [] },
       annotations: [],
       assets: { intermediate_files: [] },
     });
-
-    // Determine agent engine and model from notebook file metadata
-    let engine: AgentEngine = 'claude';
-    let model: string | undefined;
-    try {
-      const raw = await readFile(notebookPath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (parsed?.metadata?.agent === 'gemini') engine = 'gemini';
-      if (parsed?.metadata?.model) model = parsed.metadata.model;
-    } catch (_err: unknown) { /* file doesn't exist yet — default claude */ }
 
     // Compute allowedDirs: sibling worktree directories under the same project
     // D2-8: resolve symlinks via realpath to prevent symlink escaping
