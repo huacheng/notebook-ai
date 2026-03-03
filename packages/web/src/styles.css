@@ -187,6 +187,7 @@ textarea.cell-input {
   z-index: 100;
   gap: var(--space-md);
   backdrop-filter: blur(12px);
+  overflow: hidden;
 }
 
 .toolbar-left,
@@ -3261,6 +3262,11 @@ textarea.cell-input {
 
 .lang-toggle--compact:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+/* Desktop toolbar: constrain lang toggle to match other toolbar buttons */
+.toolbar .lang-toggle--compact {
+  height: 24px;
 }
 
 .lang-toggle--pill {
@@ -6583,7 +6589,18 @@ button:focus-visible {
 .nb-cmd-btns {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nb-cmd-btns::-webkit-scrollbar {
+  display: none;
+}
+
+.nb-cmd-btns .nb-cmd-btn {
+  flex-shrink: 0;
 }
 
 .nb-cmd-btn {
