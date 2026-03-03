@@ -25,6 +25,7 @@ describe('SlashCommandPlugin', () => {
       path.resolve(__dirname, '../mention/SlashCommandPlugin.tsx'),
       'utf-8',
     );
-    expect(src).toMatch(/onSelect.*`\/\$\{/);
+    // Match multiline: onSelect function body contains template literal with /${
+    expect(src).toMatch(/onSelect[\s\S]*`\/\$\{/);
   });
 });

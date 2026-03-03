@@ -255,6 +255,9 @@ const DiffView = memo(function DiffView({ diff }: { diff: string }) {
 // CommitItem
 // ---------------------------------------------------------------------------
 
+/** WebSocket request timeout in milliseconds */
+const WS_TIMEOUT = 120_000;
+
 const CommitItem = memo(function CommitItem({
   commit, projectId, token, laneNode, maxLanes,
 }: {
@@ -288,7 +291,7 @@ const CommitItem = memo(function CommitItem({
     const ws = useStore.getState().ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
-      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
+      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, WS_TIMEOUT);
       function onResponse(e: Event) {
         const d = (e as CustomEvent).detail;
         if (d.request_id === requestId) {
@@ -300,6 +303,8 @@ const CommitItem = memo(function CommitItem({
         const d = (e as CustomEvent).detail;
         if (d.request_id === requestId) {
           cleanup();
+          // Reset ref on error so user can retry by collapsing and re-expanding
+          filesLoadedRef.current = false;
           if (!cancelled) { setFiles([]); setLoadingFiles(false); }
         }
       }
@@ -311,7 +316,7 @@ const CommitItem = memo(function CommitItem({
       function fallbackRest() {
         fetchGitCommitFiles(projectId, token, commit.hash)
           .then((f) => { if (!cancelled) setFiles(f); })
-          .catch(() => { if (!cancelled) setFiles([]); })
+          .catch(() => { filesLoadedRef.current = false; if (!cancelled) setFiles([]); })
           .finally(() => { if (!cancelled) setLoadingFiles(false); });
       }
       window.addEventListener('nb:git-commit-files-response', onResponse);
@@ -322,7 +327,7 @@ const CommitItem = memo(function CommitItem({
     } else {
       fetchGitCommitFiles(projectId, token, commit.hash)
         .then((f) => { if (!cancelled) setFiles(f); })
-        .catch(() => { if (!cancelled) setFiles([]); })
+        .catch(() => { filesLoadedRef.current = false; if (!cancelled) setFiles([]); })
         .finally(() => { if (!cancelled) setLoadingFiles(false); });
 
       return () => { cancelled = true; };
@@ -352,7 +357,7 @@ const CommitItem = memo(function CommitItem({
     const ws = useStore.getState().ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
-      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
+      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, WS_TIMEOUT);
       function onResponse(e: Event) {
         const d = (e as CustomEvent).detail;
         if (d.request_id === requestId) {
