@@ -342,6 +342,7 @@ export function createProjectsRouter(
         taskStatus: 'draft',
       });
     } catch (err: unknown) {
+      console.error('[projects] Create notebook error:', err);
       res.status(500).json({ error: 'Internal server error.' });
     }
   });
