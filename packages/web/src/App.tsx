@@ -127,24 +127,32 @@ function AuthenticatedApp() {
   const lastCompletedCellId = useStore((s) => s.lastCompletedCellId);
 
   // Notification system
-  const { notify, requestPermission, stopTitleBlink } = useNotification();
+  const { notify, requestPermission, stopTitleBlink, preloadSound } = useNotification();
+  const lastNotifyTimeRef = useRef(0);
+  const NOTIFY_DEBOUNCE_MS = 5000; // 5s debounce to avoid notification spam
 
-  // Request notification permission on first user interaction
+  // Request notification permission and preload audio on first user interaction
   useEffect(() => {
     const handleInteraction = () => {
       requestPermission();
+      preloadSound(); // D4-1 fix: preload audio to avoid first notification delay
       document.removeEventListener('click', handleInteraction);
     };
     document.addEventListener('click', handleInteraction);
     return () => document.removeEventListener('click', handleInteraction);
-  }, [requestPermission]);
+  }, [requestPermission, preloadSound]);
 
-  // Notify when cell execution completes (only if tab is hidden)
+  // Notify when cell execution completes (only if tab is hidden, with debounce)
   useEffect(() => {
     if (lastCompletedCellId && document.hidden) {
-      notify('Task Complete', 'Claude has finished responding');
+      const now = Date.now();
+      // D1-2 fix: debounce notifications to avoid spam on rapid completions
+      if (now - lastNotifyTimeRef.current > NOTIFY_DEBOUNCE_MS) {
+        notify(t('notification.taskComplete'), t('notification.claudeFinished'));
+        lastNotifyTimeRef.current = now;
+      }
     }
-  }, [lastCompletedCellId, notify]);
+  }, [lastCompletedCellId, notify, t]);
 
   // Stop title blink when tab becomes visible
   useEffect(() => {

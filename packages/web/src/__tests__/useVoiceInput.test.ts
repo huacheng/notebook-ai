@@ -86,4 +86,19 @@ describe('useVoiceInput hook', () => {
     const src = getSrc();
     expect(src).toContain('interimResults');
   });
+
+  // D1-1 fix: clear transcript on start
+  it('should clear transcript on start (D1-1 fix)', () => {
+    const src = getSrc();
+    // Check that start() clears transcript
+    expect(src).toContain("setTranscript('')");
+  });
+
+  // D3-2 fix: handle no-speech timeout
+  it('should handle no-speech error in continuous mode (D3-2 fix)', () => {
+    const src = getSrc();
+    expect(src).toContain("event.error === 'no-speech'");
+    // Should auto-restart in continuous mode
+    expect(src).toContain('no-speech');
+  });
 });

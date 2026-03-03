@@ -40,4 +40,24 @@ describe('App notification wiring', () => {
   it('should subscribe to lastCompletedCellId changes', () => {
     expect(appSrc()).toContain('lastCompletedCellId');
   });
+
+  // D1-2 fix: notification debounce
+  it('should have notification debounce (D1-2 fix)', () => {
+    const src = appSrc();
+    expect(src).toContain('NOTIFY_DEBOUNCE_MS');
+    expect(src).toContain('lastNotifyTimeRef');
+  });
+
+  // D4-1 fix: preload audio
+  it('should preload audio on first interaction (D4-1 fix)', () => {
+    const src = appSrc();
+    expect(src).toContain('preloadSound');
+  });
+
+  // D6-1 fix: i18n strings
+  it('should use i18n for notification messages (D6-1 fix)', () => {
+    const src = appSrc();
+    expect(src).toContain("t('notification.taskComplete')");
+    expect(src).toContain("t('notification.claudeFinished')");
+  });
 });

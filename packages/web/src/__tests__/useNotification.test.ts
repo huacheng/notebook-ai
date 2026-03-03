@@ -63,4 +63,40 @@ describe('useNotification hook', () => {
     expect(src).toContain('new Notification(');
     expect(src).toContain('Notification.permission');
   });
+
+  // D4-1 fix: preload audio
+  it('should export preloadSound function', () => {
+    const src = getSrc();
+    expect(src).toContain('preloadSound');
+    expect(src).toMatch(/return\s*\{[^}]*preloadSound/);
+  });
+
+  // D3-1 fix: prevent listener leak
+  it('should use visibilityHandlerRef to prevent listener leak', () => {
+    const src = getSrc();
+    expect(src).toContain('visibilityHandlerRef');
+    // Check that it prevents duplicate listeners
+    expect(src).toContain('!visibilityHandlerRef.current');
+  });
+
+  // D5-1 fix: settings parameter
+  it('should accept settings parameter', () => {
+    const src = getSrc();
+    expect(src).toMatch(/useNotification\(settings.*NotificationSettings/);
+  });
+
+  it('should respect settings.soundEnabled', () => {
+    const src = getSrc();
+    expect(src).toContain('settings.soundEnabled');
+  });
+
+  it('should respect settings.systemNotificationEnabled', () => {
+    const src = getSrc();
+    expect(src).toContain('settings.systemNotificationEnabled');
+  });
+
+  it('should respect settings.titleBlinkEnabled', () => {
+    const src = getSrc();
+    expect(src).toContain('settings.titleBlinkEnabled');
+  });
 });

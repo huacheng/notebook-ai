@@ -81,6 +81,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       recognitionRef.current.stop();
     }
 
+    // D1-1 fix: Clear accumulated transcript on new session
+    setTranscript('');
+    setInterimTranscript('');
+
     const recognition = new SpeechRecognition();
     recognition.lang = lang;
     recognition.continuous = continuous;
@@ -112,6 +116,20 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     };
 
     recognition.onerror = (event: MySpeechRecognitionErrorEvent) => {
+      // D3-2 fix: auto-restart on no-speech timeout in continuous mode
+      if (event.error === 'no-speech' && continuous) {
+        // Silent timeout - restart recognition automatically
+        try {
+          recognition.stop();
+          setTimeout(() => {
+            if (recognitionRef.current === recognition) {
+              recognition.start();
+            }
+          }, 100);
+        } catch { /* ignore restart errors */ }
+        return;
+      }
+
       const errMsg = event.error === 'not-allowed'
         ? 'Microphone access denied'
         : `Speech recognition error: ${event.error}`;

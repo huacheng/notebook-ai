@@ -75,6 +75,10 @@ export const messages: Record<Language, Record<string, string>> = {
     'input.noSession': 'No active session — open a notebook first.',
     'input.shortcuts': '/ commands  @ files  # cells',
 
+    // ── Notification ─────────────────────────────────────────────────────
+    'notification.taskComplete': 'Task Complete',
+    'notification.claudeFinished': 'Claude has finished responding',
+
     // ── Notebook ─────────────────────────────────────────────────────────
     'notebook.loading': 'Loading…',
     'notebook.olderCells': '↑ {0} older cells',
@@ -342,6 +346,10 @@ export const messages: Record<Language, Record<string, string>> = {
     'input.run': '运行 (Ctrl+Enter)',
     'input.noSession': '无活动会话 — 请先打开一个 notebook。',
     'input.shortcuts': '/ 命令  @ 文件  # 单元格',
+
+    // ── Notification ─────────────────────────────────────────────────────
+    'notification.taskComplete': '任务完成',
+    'notification.claudeFinished': 'Claude 已完成响应',
 
     // ── Notebook ─────────────────────────────────────────────────────────
     'notebook.loading': '加载中…',

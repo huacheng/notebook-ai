@@ -20,10 +20,19 @@ export const defaultNotificationSettings: NotificationSettings = {
   titleBlinkEnabled: true,
 };
 
-export function useNotification() {
+export function useNotification(settings: NotificationSettings = defaultNotificationSettings) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blinkIntervalRef = useRef<number | null>(null);
   const originalTitleRef = useRef<string>(document.title);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
+
+  /** Preload notification sound (call on first user interaction) */
+  const preloadSound = useCallback(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(NOTIFICATION_SOUND);
+      audioRef.current.load();
+    }
+  }, []);
 
   /** Play notification sound */
   const playSound = useCallback(() => {
@@ -69,19 +78,21 @@ export function useNotification() {
 
   /** Combined notify: sound + system notification + title blink if hidden */
   const notify = useCallback((title: string, body?: string) => {
-    playSound();
-    showSystemNotification(title, body);
-    if (document.hidden) {
+    if (settings.soundEnabled) playSound();
+    if (settings.systemNotificationEnabled) showSystemNotification(title, body);
+    if (settings.titleBlinkEnabled && document.hidden && !visibilityHandlerRef.current) {
       startTitleBlink(`✅ ${title}`);
       const handleVisible = () => {
         if (!document.hidden) {
           stopTitleBlink();
           document.removeEventListener('visibilitychange', handleVisible);
+          visibilityHandlerRef.current = null;
         }
       };
+      visibilityHandlerRef.current = handleVisible;
       document.addEventListener('visibilitychange', handleVisible);
     }
-  }, [playSound, showSystemNotification, startTitleBlink, stopTitleBlink]);
+  }, [settings, playSound, showSystemNotification, startTitleBlink, stopTitleBlink]);
 
-  return { playSound, notify, requestPermission, stopTitleBlink };
+  return { playSound, notify, requestPermission, stopTitleBlink, preloadSound };
 }
