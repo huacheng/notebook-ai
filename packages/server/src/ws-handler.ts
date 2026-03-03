@@ -56,7 +56,7 @@ import {
   type Notebook,
 } from '@notebook-ai/shared';
 import type { SessionManager } from './session.js';
-import type { NotebookDb } from './db.js';
+import { type NotebookDb, DEFAULT_ANNOTATION_MAX_AGE_DAYS } from './db.js';
 import { NotebookStore } from './notebook-store.js';
 import { openNotebookByPath } from './routes/notebooks.js';
 import { authEnabled, consumeWsTicket } from './auth.js';
@@ -69,8 +69,20 @@ import { computeFileCacheKey, computeProjectFileList } from './project-file-list
 import { captureUrl } from './url-capture.js';
 
 const execFileAsync = promisify(execFileCb);
-const EXEC_TIMEOUT = 10000;
-const DEFAULT_GIT_LOG_LIMIT = 20;
+
+// ── D6: Exported constants ────────────────────────────────────────────────────
+
+/** Timeout in ms for git and other exec commands */
+export const EXEC_TIMEOUT = 10000;
+
+/** Default number of commits per page for git log pagination */
+export const DEFAULT_GIT_LOG_LIMIT = 20;
+
+/** Maximum number of concurrent devices per user */
+export const MAX_DEVICES_PER_USER = 5;
+
+/** Maximum file size (50MB) for WS file streaming */
+export const MAX_WS_FILE_SIZE = 50 * 1024 * 1024;
 
 /**
  * Compute git log for a repo path. Shared by git_log_request handler and git_changed push.
@@ -147,10 +159,9 @@ export function setupWebSocket(
   fileWatcher?: FileWatcher,
 ): void {
   // Purge stale file annotations on startup
-  db.cleanupOldFileAnnotations(7);
+  db.cleanupOldFileAnnotations(DEFAULT_ANNOTATION_MAX_AGE_DAYS);
 
   // ── Multi-device collaboration data structures ──────────────────────────────
-  const MAX_DEVICES_PER_USER = 5;
 
   /** Per-user connection tracking (for 5-device limit enforcement). */
   const userConnections = new Map<string, Set<WebSocket>>();
@@ -184,8 +195,7 @@ export function setupWebSocket(
 
     try {
       const stat = await fs.stat(filePath);
-      const MAX_FILE_SIZE = 50 * 1024 * 1024;
-      if (stat.size > MAX_FILE_SIZE) return; // Skip large files
+      if (stat.size > MAX_WS_FILE_SIZE) return; // Skip large files
 
       const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
       const TEXT_EXTS = new Set(['md', 'txt', 'json', 'yaml', 'yml', 'sh', 'py', 'js', 'ts',
@@ -647,10 +657,9 @@ export function setupWebSocket(
             const safePath = await validateWorkspacePath(filePath, basedir);
             const stat = await fs.stat(safePath);
 
-            // D2: reject files exceeding 50 MB to prevent memory exhaustion
-            const MAX_FILE_SIZE = 50 * 1024 * 1024;
-            if (stat.size > MAX_FILE_SIZE) {
-              sendToClient(ws, { type: 'file-open-error', session_id, error: `File too large (${(stat.size / 1024 / 1024).toFixed(1)} MB, max 50 MB)` });
+            // D2: reject files exceeding max size to prevent memory exhaustion
+            if (stat.size > MAX_WS_FILE_SIZE) {
+              sendToClient(ws, { type: 'file-open-error', session_id, error: `File too large (${(stat.size / 1024 / 1024).toFixed(1)} MB, max ${MAX_WS_FILE_SIZE / 1024 / 1024} MB)` });
               break;
             }
 

@@ -67,11 +67,12 @@ describe('file-open live update push', () => {
   });
 
   it('should skip push for files larger than 50MB', () => {
+    // D6: MAX_WS_FILE_SIZE is now exported at module level
+    expect(src).toContain('export const MAX_WS_FILE_SIZE = 50 * 1024 * 1024');
+    // pushFileUpdate should use the exported constant
     const pushFn = src.indexOf('async function pushFileUpdate');
     const pushEnd = src.indexOf('\n  async function', pushFn + 1);
     const block = src.slice(pushFn, pushEnd > 0 ? pushEnd : pushFn + 2000);
-
-    expect(block).toContain('MAX_FILE_SIZE');
-    expect(block).toContain('50 * 1024 * 1024');
+    expect(block).toContain('MAX_WS_FILE_SIZE');
   });
 });

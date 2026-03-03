@@ -1,5 +1,19 @@
 import simpleGit, { SimpleGit } from 'simple-git';
 
+// ── D6: Exported constants ────────────────────────────────────────────────────
+
+/** SHA-1 hash of the empty git tree object (for diffing the first commit) */
+export const GIT_EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+/** Default number of commits to fetch in getLog() */
+export const DEFAULT_GIT_LOG_COUNT = 20;
+
+/** Default git user email for auto-initialized repos */
+export const DEFAULT_GIT_USER_EMAIL = 'notebook-ai@localhost';
+
+/** Default git user name for auto-initialized repos */
+export const DEFAULT_GIT_USER_NAME = 'Notebook AI';
+
 export class GitManager {
   private git: SimpleGit;
   readonly repoRoot: string;
@@ -26,8 +40,8 @@ export class GitManager {
       await this.git.init();
       // Set a default identity so commits don't fail in environments without
       // a global git config.
-      await this.git.addConfig('user.email', 'notebook-ai@localhost');
-      await this.git.addConfig('user.name', 'Notebook AI');
+      await this.git.addConfig('user.email', DEFAULT_GIT_USER_EMAIL);
+      await this.git.addConfig('user.name', DEFAULT_GIT_USER_NAME);
       console.log('[git] Initialized new git repository.');
 
       // Stage all workspace files created during notebook setup and make the
@@ -74,7 +88,7 @@ export class GitManager {
     } catch {
       // If there is no previous commit (i.e. this is the very first commit),
       // diff against the empty tree.
-      const emptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+      const emptyTree = GIT_EMPTY_TREE_HASH;
       diff = await this.git.diff([emptyTree, 'HEAD']);
     }
 
@@ -96,13 +110,13 @@ export class GitManager {
       return await this.git.diff([`${commitHash}~1`, commitHash]);
     } catch {
       // First commit — diff against empty tree.
-      const emptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+      const emptyTree = GIT_EMPTY_TREE_HASH;
       return this.git.diff([emptyTree, commitHash]);
     }
   }
 
   /** Get recent commit log */
-  async getLog(maxCount = 20): Promise<Array<{ hash: string; message: string; date: string }>> {
+  async getLog(maxCount = DEFAULT_GIT_LOG_COUNT): Promise<Array<{ hash: string; message: string; date: string }>> {
     const log = await this.git.log({ maxCount });
     return log.all.map((entry) => ({
       hash: entry.hash,

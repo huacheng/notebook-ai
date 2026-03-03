@@ -4,6 +4,9 @@ import type { PromptImage } from '@notebook-ai/shared';
 
 export type AgentEngine = 'claude' | 'gemini';
 
+/** D6: Timeout in ms waiting for agent process to start */
+export const AGENT_START_TIMEOUT_MS = 20_000;
+
 /**
  * AgentProcess wraps a persistent agent subprocess (Claude Code or Gemini CLI).
  * It stays alive in memory and waits for prompts via stdin.
@@ -195,7 +198,7 @@ export class AgentProcess {
     return this.proc !== null && this.proc.exitCode === null && !this.proc.killed;
   }
 
-  private _waitForFirstOutput(timeoutMs = 20_000): Promise<void> {
+  private _waitForFirstOutput(timeoutMs = AGENT_START_TIMEOUT_MS): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
       const timer = setTimeout(() => {
