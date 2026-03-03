@@ -5,6 +5,7 @@ const INITIAL_STATE: MentionState = {
   open: false,
   plugin: null,
   query: '',
+  originalQuery: '',
   items: [],
   selectedIndex: 0,
   triggerPos: -1,
@@ -40,20 +41,26 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
         fetchingRef.current = true;
         try {
           const items = await plugin.fetchItems(query);
+          // If plugin returns empty array, continue to next plugin with same trigger
+          if (items.length === 0) {
+            fetchingRef.current = false;
+            continue;
+          }
           setState({
             open: true,
             plugin,
             query,
+            originalQuery: query,
             items,
             selectedIndex: 0,
             triggerPos: triggerIdx,
             path: [],
           });
+          return;
         } finally {
           fetchingRef.current = false;
         }
       }
-      return;
     }
 
     // No trigger found - close if open
@@ -105,11 +112,11 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
             fetchingRef.current = false;
           });
         } else {
-          // Select item - replace trigger+query with result
+          // Select item - replace trigger+originalQuery with result
           const text = getText();
           const insertText = state.plugin.onSelect(item);
           const before = text.slice(0, state.triggerPos);
-          const after = text.slice(state.triggerPos + 1 + state.query.length);
+          const after = text.slice(state.triggerPos + 1 + state.originalQuery.length);
           setText(before + insertText + after);
           close();
         }
@@ -174,7 +181,7 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
       const text = getText();
       const insertText = state.plugin.onSelect(item);
       const before = text.slice(0, state.triggerPos);
-      const after = text.slice(state.triggerPos + 1 + state.query.length);
+      const after = text.slice(state.triggerPos + 1 + state.originalQuery.length);
       setText(before + insertText + after);
       close();
     }

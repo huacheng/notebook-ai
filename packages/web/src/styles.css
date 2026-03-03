@@ -6468,11 +6468,11 @@ button:focus-visible {
 }
 
 .mention-item {
-  padding: 8px 12px;
+  padding: 6px 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .mention-item:hover,
@@ -6480,15 +6480,28 @@ button:focus-visible {
   background: var(--color-primary-light);
 }
 
+.mention-cmd {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  overflow: hidden;
+}
+
 .mention-cmd-name {
   font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-primary);
+  flex-shrink: 0;
 }
 
 .mention-cmd-label {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mention-file-icon {
@@ -6506,6 +6519,15 @@ button:focus-visible {
   font-weight: 500;
   color: var(--color-primary);
   flex-shrink: 0;
+}
+
+.mention-cmd-name.mention-history-text {
+  font-family: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .mention-cell-preview {

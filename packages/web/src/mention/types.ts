@@ -19,6 +19,7 @@ export interface MentionState<T = unknown> {
   open: boolean;
   plugin: MentionPlugin<T> | null;
   query: string;
+  originalQuery: string;  // Preserved for replacement after navigation
   items: T[];
   selectedIndex: number;
   triggerPos: number;

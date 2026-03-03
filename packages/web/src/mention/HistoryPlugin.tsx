@@ -8,6 +8,12 @@ export interface HistoryItem {
   timestamp: number;
 }
 
+// Entry point vs actual history item
+type HistoryEntry =
+  | { type: 'entry'; count: number }
+  | { type: 'item'; text: string; timestamp: number }
+  | { type: 'empty' };
+
 /** Get command history from localStorage */
 export function getHistory(): HistoryItem[] {
   try {
@@ -44,31 +50,64 @@ export function clearHistory(): void {
 
 /**
  * HistoryPlugin - Shows command history when user types /history
- * Trigger: /history (matches when query starts with "history")
+ * Tab to enter history list, select to insert
  */
-export function createHistoryPlugin(): MentionPlugin<HistoryItem> {
+export function createHistoryPlugin(): MentionPlugin<HistoryEntry> {
   return {
     trigger: '/',
-    fetchItems: async (query: string): Promise<HistoryItem[]> => {
-      // Only activate for /history command
-      if (!query.toLowerCase().startsWith('history')) {
+    fetchItems: async (query: string): Promise<HistoryEntry[]> => {
+      // Only activate for exact /history command
+      if (query.toLowerCase() !== 'history') {
         return [];
       }
-      // Get history and filter by remaining query (after "history")
-      const filterQuery = query.slice(7).toLowerCase().trim();
       const history = getHistory();
-      if (!filterQuery) return history;
-      return history.filter((h) => h.text.toLowerCase().includes(filterQuery));
+      // Show entry point
+      return [{ type: 'entry', count: history.length }];
     },
-    renderItem: (item: HistoryItem, selected: boolean) => (
-      <div className={`mention-history-item ${selected ? 'selected' : ''}`}>
-        <span className="mention-history-text">{item.text}</span>
-        <span className="mention-history-time">
-          {formatRelativeTime(item.timestamp)}
-        </span>
-      </div>
-    ),
-    onSelect: (item: HistoryItem): string => item.text,
+    renderItem: (item: HistoryEntry, selected: boolean) => {
+      if (item.type === 'entry') {
+        return (
+          <div className={`mention-cmd ${selected ? 'selected' : ''}`}>
+            <span className="mention-cmd-name">/history</span>
+            <span className="mention-cmd-label">{item.count} items →</span>
+          </div>
+        );
+      }
+      if (item.type === 'empty') {
+        return (
+          <div className={`mention-cmd ${selected ? 'selected' : ''}`}>
+            <span className="mention-cmd-label">(no history yet)</span>
+          </div>
+        );
+      }
+      return (
+        <div className={`mention-cmd ${selected ? 'selected' : ''}`}>
+          <span className="mention-cmd-name mention-history-text">{item.text}</span>
+          <span className="mention-cmd-label">{formatRelativeTime(item.timestamp)}</span>
+        </div>
+      );
+    },
+    onSelect: (item: HistoryEntry): string => {
+      if (item.type === 'item') {
+        return item.text;
+      }
+      // Entry or empty - don't insert anything
+      return '/history';
+    },
+    isNavigable: (item: HistoryEntry): boolean => {
+      return item.type === 'entry';
+    },
+    onNavigate: async (): Promise<HistoryEntry[]> => {
+      const history = getHistory();
+      if (history.length === 0) {
+        return [{ type: 'empty' }];
+      }
+      return history.map((h) => ({
+        type: 'item' as const,
+        text: h.text,
+        timestamp: h.timestamp,
+      }));
+    },
   };
 }
 

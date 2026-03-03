@@ -188,6 +188,7 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Sidebar / ProjectList ─────────────────────────────────────────────
     'sidebar.projects': 'Projects',
+    'sidebar.workspace': 'Workspace',
     'sidebar.library': 'Library',
     'sidebar.dropToLibrary': 'Drop to add to Library',
     'sidebar.loading': 'Loading...',
@@ -452,6 +453,7 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Sidebar / ProjectList ─────────────────────────────────────────────
     'sidebar.projects': '项目',
+    'sidebar.workspace': '工作区',
     'sidebar.library': '资料库',
     'sidebar.dropToLibrary': '拖放到资料库',
     'sidebar.loading': '加载中...',

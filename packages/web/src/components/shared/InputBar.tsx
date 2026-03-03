@@ -51,7 +51,8 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
-  // Mention system with all triggers: / @ # and /history
+  // Mention system with all triggers: / @ #
+  // SlashCommandPlugin handles /history with navigation to history list
   const historyPlugin = useMemo(() => createHistoryPlugin(), []);
   const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin, historyPlugin] as MentionPlugin<unknown>[], [historyPlugin]);
   const mention = useMention(plugins);
