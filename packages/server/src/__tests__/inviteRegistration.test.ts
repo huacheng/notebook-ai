@@ -217,8 +217,8 @@ describe('Invitation Registration - Rate Limit Responses', () => {
   });
 
   it('should return retryAfter when password validation fails', () => {
-    const pwdMatch = src.match(/Password must be at least[^}]+/);
+    // D6: Updated regex to handle template string `${MIN_PASSWORD_LENGTH}`
+    const pwdMatch = src.match(/Password must be at least.*retryAfter/s);
     expect(pwdMatch).toBeTruthy();
-    expect(pwdMatch![0]).toMatch(/retryAfter/);
   });
 });

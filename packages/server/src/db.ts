@@ -47,6 +47,9 @@ export interface ProjectRow {
 const DB_DIR = path.join(os.homedir(), '.notebook-ai');
 const DB_PATH = path.join(DB_DIR, 'notebook.db');
 
+/** D6: Default max age in days for file annotation cleanup */
+export const DEFAULT_ANNOTATION_MAX_AGE_DAYS = 7;
+
 export class NotebookDb {
   private db: Database.Database;
 
@@ -367,7 +370,7 @@ export class NotebookDb {
     return row ?? null;
   }
 
-  cleanupOldFileAnnotations(maxAgeDays = 7): void {
+  cleanupOldFileAnnotations(maxAgeDays = DEFAULT_ANNOTATION_MAX_AGE_DAYS): void {
     const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
     this.db.prepare('DELETE FROM file_annotations WHERE updated_at < ?').run(cutoff);
   }

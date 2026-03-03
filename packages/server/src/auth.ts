@@ -29,6 +29,8 @@ export const BASE_LOCKOUT_MS = 60_000;
 export const BASE_LOCKOUT_SEC = BASE_LOCKOUT_MS / 1000;
 /** Max lockout cap: 30 minutes. */
 export const MAX_LOCKOUT_MS = 30 * 60_000;
+/** Minimum password length for registration (D6: extracted constant). */
+export const MIN_PASSWORD_LENGTH = 8;
 
 export function getClientIp(req: Request): string {
   if (TRUST_PROXY) {
@@ -239,9 +241,9 @@ export async function handleRegister(req: Request, res: Response): Promise<void>
   }
 
   // Validate password
-  if (typeof password !== 'string' || !password || password.length < 8) {
+  if (typeof password !== 'string' || !password || password.length < MIN_PASSWORD_LENGTH) {
     const lockSec = recordFailure(ip);
-    res.status(400).json({ error: 'Password must be at least 8 characters.', retryAfter: lockSec });
+    res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, retryAfter: lockSec });
     return;
   }
 
@@ -323,7 +325,7 @@ export async function handleRegister(req: Request, res: Response): Promise<void>
 export async function handleLogin(req: Request, res: Response): Promise<void> {
   const ip = getClientIp(req);
   const { blocked, retryAfterSec } = checkRateLimit(ip);
-  console.log(`[AUTH] Login attempt from IP: ${ip}, blocked: ${blocked}, retryAfter: ${retryAfterSec}`);
+  // D2: Removed console.log that exposed IP addresses in production logs
   if (blocked) {
     res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
     return;
@@ -444,6 +446,8 @@ export function handleLogout(req: Request, res: Response): void {
 // ── Auth status endpoint ────────────────────────────────────────────────────
 
 export function handleAuthStatus(_req: Request, res: Response): void {
+  // Auth is always required for frontend — NB_AUTH_DISABLED only disables
+  // server-side checks for testing, it doesn't change frontend requirements.
   res.json({ authEnabled: true });
 }
 
