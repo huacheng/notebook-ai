@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store';
 import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
+import { storageKey as annotationStorageKey } from '../types/fileAnnotations';
 import * as lz4 from 'lz4js';
 
 export type FileFormat = 'text' | 'html' | 'pdf-binary' | 'docx-binary' | 'xlsx-binary' | 'pptx-binary' | 'image' | 'unsupported';
@@ -279,6 +280,10 @@ export function useFileStream(
           if (deletedPath !== filePath) break;
           setState((prev) => ({ ...prev, status: 'error', error: 'File has been deleted' }));
           cacheRemove(cacheKey);
+          // D1: cleanup orphaned annotations when file is deleted
+          if (notebookId) {
+            cacheRemove(annotationStorageKey(notebookId, filePath));
+          }
           break;
         }
       }

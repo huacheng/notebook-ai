@@ -375,6 +375,11 @@ export class NotebookDb {
     this.db.prepare('DELETE FROM file_annotations WHERE updated_at < ?').run(cutoff);
   }
 
+  /** Delete annotations for a specific session+file (called when file is deleted) */
+  deleteFileAnnotations(sessionId: string, filePath: string): void {
+    this.db.prepare('DELETE FROM file_annotations WHERE session_id = ? AND file_path = ?').run(sessionId, filePath);
+  }
+
   // ── Utility ──────────────────────────────────────────────────────────────
 
   close(): void {

@@ -751,11 +751,13 @@ export function setupWebSocket(
                     await fs.access(safePath);
                     await pushFileUpdate(safePath);
                   } catch {
-                    // File deleted - notify clients
+                    // File deleted - notify clients and cleanup annotations
                     const fileClients = fileOpenSubscriptions.get(safePath);
                     if (fileClients) {
                       for (const [, client] of fileClients) {
                         sendToClient(client.ws, { type: 'file-deleted', session_id: client.sessionId, path: filePath });
+                        // D1: cleanup orphaned annotations when file is deleted
+                        db.deleteFileAnnotations(client.sessionId, filePath);
                       }
                     }
                   }

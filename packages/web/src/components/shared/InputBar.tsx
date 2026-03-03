@@ -215,6 +215,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     { cmd: 'task-ai:research', icon: '🔍' },
     { cmd: 'task-ai:read', icon: '📖' },
     { cmd: 'task-ai:library search', icon: '📚' },
+    { cmd: 'task-ai:highlight', icon: '💡' },
     { cmd: 'task-ai:auto', icon: '🤖' },
   ];
 
