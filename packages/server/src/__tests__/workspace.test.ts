@@ -102,14 +102,27 @@ describe('initWorkspaceMemory', () => {
     expect(fileStat.mode & 0o777).toBe(0o444);
   });
 
-  it('creates .claude/settings.json with SessionStart hook', async () => {
+  it('creates .claude/settings.json with SessionStart hook using absolute path', async () => {
     const { initWorkspaceMemory } = await import('../workspace.js');
     await initWorkspaceMemory(workspaceDir);
     const content = await readFile(path.join(workspaceDir, '.claude', 'settings.json'), 'utf-8');
     const settings = JSON.parse(content);
     expect(settings.hooks).toBeDefined();
     expect(settings.hooks.SessionStart).toBeInstanceOf(Array);
-    expect(settings.hooks.SessionStart[0].command).toContain('.MEMORY.md');
+    // Must use absolute path
+    const absoluteMemoryPath = path.join(workspaceDir, '.MEMORY.md');
+    expect(settings.hooks.SessionStart[0].command).toContain(absoluteMemoryPath);
+  });
+
+  it('creates .claude/settings.json with SessionResume hook', async () => {
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(workspaceDir);
+    const content = await readFile(path.join(workspaceDir, '.claude', 'settings.json'), 'utf-8');
+    const settings = JSON.parse(content);
+    expect(settings.hooks.SessionResume).toBeInstanceOf(Array);
+    // Same absolute path as SessionStart
+    const absoluteMemoryPath = path.join(workspaceDir, '.MEMORY.md');
+    expect(settings.hooks.SessionResume[0].command).toContain(absoluteMemoryPath);
   });
 
   it('sets .claude/settings.json to read-only (chmod 444)', async () => {

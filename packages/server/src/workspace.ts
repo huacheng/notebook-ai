@@ -134,19 +134,23 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
   // Set file to read-only (444 = r--r--r--)
   await chmod(memoryPath, 0o444);
 
-  // Create .claude/settings.json with SessionStart hook to auto-load .MEMORY.md
+  // Create .claude/settings.json with SessionStart/SessionResume hooks to auto-load .MEMORY.md
   const claudeDir = path.join(workspaceDir, '.claude');
   const settingsPath = path.join(claudeDir, 'settings.json');
   mkdirSync(claudeDir, { recursive: true });
 
+  // Use absolute path for .MEMORY.md so the hook works regardless of Claude's cwd
+  const absoluteMemoryPath = path.join(workspaceDir, MEMORY_FILENAME);
+  const memoryLoadCommand = `cat "${absoluteMemoryPath}" 2>/dev/null || echo '无记忆文件'`;
+  const memoryLoadHook = {
+    command: memoryLoadCommand,
+    description: '加载记忆文件',
+  };
+
   const settingsContent = JSON.stringify({
     hooks: {
-      SessionStart: [
-        {
-          command: `cat ${MEMORY_FILENAME} 2>/dev/null || echo '无记忆文件'`,
-          description: '加载记忆文件',
-        },
-      ],
+      SessionStart: [memoryLoadHook],
+      SessionResume: [memoryLoadHook],
     },
   }, null, 2);
 

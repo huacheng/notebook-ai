@@ -21,6 +21,8 @@ describe('model change', () => {
   let sm: SessionManager;
   let ns: NotebookStore;
   let tempDir: string;
+  let tempHome: string;
+  let originalHome: string | undefined;
   let startSpy: ReturnType<typeof vi.spyOn>;
   let stopSpy: ReturnType<typeof vi.spyOn>;
 
@@ -28,6 +30,10 @@ describe('model change', () => {
     sm = new SessionManager();
     ns = new NotebookStore();
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'model-test-'));
+    // Set HOME to empty temp dir to avoid reading user's ~/.claude/settings.json
+    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'model-home-'));
+    originalHome = process.env.HOME;
+    process.env.HOME = tempHome;
 
     const { AgentProcess } = await import('../agent-process.js');
     startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
@@ -39,6 +45,8 @@ describe('model change', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    process.env.HOME = originalHome;
+    fs.rmSync(tempHome, { recursive: true, force: true });
   });
 
   async function createTestSession(model?: string) {

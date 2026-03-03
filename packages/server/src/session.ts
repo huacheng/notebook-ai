@@ -1,5 +1,6 @@
 import { readFile, writeFile, readdir, realpath } from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import crypto from 'crypto';
 import { AgentProcess, type AgentEngine } from './agent-process.js';
 import { GitManager } from './git.js';
@@ -20,6 +21,29 @@ import {
   findRunningCellId,
   findCellByToolUseId,
 } from './notebook-mutations.js';
+
+// ── Claude settings model helper ─────────────────────────────────────────────
+
+/**
+ * Reads the default model from Claude's settings file (~/.claude/settings.json).
+ * Returns undefined if the file doesn't exist, is malformed, or has no model field.
+ * This is called on every notebook open to pick up any changes to Claude's config.
+ */
+export async function getClaudeDefaultModel(): Promise<string | undefined> {
+  try {
+    const home = os.homedir();
+    const settingsPath = path.join(home, '.claude', 'settings.json');
+    const raw = await readFile(settingsPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.model === 'string' && parsed.model) {
+      return parsed.model;
+    }
+    return undefined;
+  } catch (_err: unknown) {
+    // File doesn't exist, not readable, or not valid JSON
+    return undefined;
+  }
+}
 const MEMORY_SYSTEM_PROMPT =
   'At the start of each session, read the .MEMORY.md file in your ' +
   'working directory. It contains important context, including the ' +
@@ -131,6 +155,12 @@ export class SessionManager {
       if (parsed?.metadata?.agent === 'gemini') engine = 'gemini';
       if (parsed?.metadata?.model) model = parsed.metadata.model;
     } catch (_err: unknown) { /* file doesn't exist yet — default claude */ }
+
+    // If notebook has no model, read default from Claude's settings file
+    // This is done on every notebook open so changes to Claude config are reflected
+    if (!model) {
+      model = await getClaudeDefaultModel();
+    }
 
     const notebook: Notebook = NotebookSchema.parse({
       version: 1,
