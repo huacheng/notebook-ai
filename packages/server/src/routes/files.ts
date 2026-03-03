@@ -19,6 +19,8 @@ function isProtectedWorkspacePath(filePath: string): boolean {
   const basename = normalized.split('/').pop() || '';
   // .MEMORY.md is protected at any level
   if (basename === MEMORY_FILENAME) return true;
+  // .claude/settings.json is protected (SessionStart hook config)
+  if (normalized === '.claude/settings.json') return true;
   // Root-level .notebook.json files are also protected
   if (normalized.endsWith('.notebook.json') && !normalized.includes('/')) return true;
   return false;

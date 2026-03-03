@@ -735,13 +735,17 @@ function FileBrowser() {
           // - .index.json (project metadata)
           // - .working directory
           // - .MEMORY.md (notebook environment config, read-only)
+          // - .claude directory (Claude settings, hooks)
           return name === '.index.json'
             || name === '.working'
             || name === '.MEMORY.md'
+            || name === '.claude'
             || subPath === '.working'
             || subPath.startsWith('.working/')
             || subPath.endsWith('/.working')
-            || subPath.includes('/.working/');
+            || subPath.includes('/.working/')
+            || subPath === '.claude'
+            || subPath.startsWith('.claude/');
         }}
       />
       {!isInsideNotebook && (

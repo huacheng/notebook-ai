@@ -133,4 +133,31 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
 
   // Set file to read-only (444 = r--r--r--)
   await chmod(memoryPath, 0o444);
+
+  // Create .claude/settings.json with SessionStart hook to auto-load .MEMORY.md
+  const claudeDir = path.join(workspaceDir, '.claude');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  mkdirSync(claudeDir, { recursive: true });
+
+  const settingsContent = JSON.stringify({
+    hooks: {
+      SessionStart: [
+        {
+          command: `cat ${MEMORY_FILENAME} 2>/dev/null || echo '无记忆文件'`,
+          description: '加载记忆文件',
+        },
+      ],
+    },
+  }, null, 2);
+
+  // If file exists and is read-only, temporarily make it writable
+  try {
+    await access(settingsPath, constants.F_OK);
+    await chmod(settingsPath, 0o644);
+  } catch {
+    // File doesn't exist yet
+  }
+
+  await writeFile(settingsPath, settingsContent, 'utf-8');
+  await chmod(settingsPath, 0o444);
 }

@@ -101,6 +101,24 @@ describe('initWorkspaceMemory', () => {
     // 0o444 = 292 decimal, check that file is read-only
     expect(fileStat.mode & 0o777).toBe(0o444);
   });
+
+  it('creates .claude/settings.json with SessionStart hook', async () => {
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(workspaceDir);
+    const content = await readFile(path.join(workspaceDir, '.claude', 'settings.json'), 'utf-8');
+    const settings = JSON.parse(content);
+    expect(settings.hooks).toBeDefined();
+    expect(settings.hooks.SessionStart).toBeInstanceOf(Array);
+    expect(settings.hooks.SessionStart[0].command).toContain('.MEMORY.md');
+  });
+
+  it('sets .claude/settings.json to read-only (chmod 444)', async () => {
+    const { stat } = await import('fs/promises');
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(workspaceDir);
+    const fileStat = await stat(path.join(workspaceDir, '.claude', 'settings.json'));
+    expect(fileStat.mode & 0o777).toBe(0o444);
+  });
 });
 
 // ── titleToSlug Unicode support tests ─────────────────────────────────────
