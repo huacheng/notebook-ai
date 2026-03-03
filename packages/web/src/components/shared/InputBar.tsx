@@ -5,6 +5,7 @@ import { loadDraft, saveDraft, clearDraft } from '../../utils/promptDraft';
 import { extractImagesFromClipboard, MAX_IMAGES, type PastedImage } from '../../utils/pasteImages';
 import { getCaretCoordinates } from '../../utils/getCaretCoordinates';
 import { useMention } from '../../hooks/useMention';
+import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { MentionPopup } from '../MentionPopup';
 import { SlashCommandPlugin } from '../../mention/SlashCommandPlugin';
 import { FileTreePlugin } from '../../mention/FileTreePlugin';
@@ -57,6 +58,20 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const plugins = useMemo(() => [SlashCommandPlugin, FileTreePlugin, CellRefPlugin, historyPlugin] as MentionPlugin<unknown>[], [historyPlugin]);
   const mention = useMention(plugins);
   const [caretPos, setCaretPos] = useState({ x: 0, y: 0 });
+
+  // Voice input
+  const { isSupported: voiceSupported, isListening, start: startVoice, stop: stopVoice } = useVoiceInput({
+    onResult: (result) => {
+      setText((prev) => prev + result);
+    },
+  });
+  const toggleVoice = useCallback(() => {
+    if (isListening) {
+      stopVoice();
+    } else {
+      startVoice();
+    }
+  }, [isListening, startVoice, stopVoice]);
 
   // Check if any cell is running
   const isRunning = notebook?.cells.some(
@@ -302,6 +317,16 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
           ))}
         </div>
         <div className="nb-input-actions">
+          {voiceSupported && (
+            <button
+              className={`voice-input-btn ${isListening ? 'voice-input-btn--active' : ''}`}
+              title={isListening ? t('input.stopVoice') : t('input.startVoice')}
+              disabled={disabled}
+              onClick={toggleVoice}
+            >
+              {isListening ? '🔴' : '🎤'}
+            </button>
+          )}
           <button
             className="nb-attach-btn"
             title={t('input.attachFile')}
