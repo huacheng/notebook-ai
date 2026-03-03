@@ -274,49 +274,64 @@ const CommitItem = memo(function CommitItem({
   const diffFileRef = useRef(diffFile);
   diffFileRef.current = diffFile;
   const filesLoadedRef = useRef(commit.files.length > 0);
-  // D3: Track mount state to avoid setState on unmounted component
+  // Track mount state to avoid setState on unmounted component
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // On-demand: load file list when first expanded (if not already loaded from stats)
-  const handleToggle = useCallback(() => {
-    setExpanded((prev) => {
-      const next = !prev;
-      if (next && !filesLoadedRef.current) {
-        filesLoadedRef.current = true;
-        setLoadingFiles(true);
-        const ws = useStore.getState().ws;
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          const requestId = crypto.randomUUID();
-          const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
-          function onResponse(e: Event) {
-            const d = (e as CustomEvent).detail;
-            if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setFiles(d.files); setLoadingFiles(false); } }
-          }
-          function onError(e: Event) {
-            const d = (e as CustomEvent).detail;
-            if (d.request_id === requestId) { cleanup(); if (mountedRef.current) { setFiles([]); setLoadingFiles(false); } }
-          }
-          function cleanup() {
-            clearTimeout(timeout);
-            window.removeEventListener('nb:git-commit-files-response', onResponse);
-            window.removeEventListener('nb:git-commit-files-error', onError);
-          }
-          function fallbackRest() {
-            fetchGitCommitFiles(projectId, token, commit.hash)
-              .then((f) => { if (mountedRef.current) setFiles(f); }).catch(() => { if (mountedRef.current) setFiles([]); }).finally(() => { if (mountedRef.current) setLoadingFiles(false); });
-          }
-          window.addEventListener('nb:git-commit-files-response', onResponse);
-          window.addEventListener('nb:git-commit-files-error', onError);
-          ws.send(JSON.stringify({ type: 'git_commit_files_request', request_id: requestId, project_id: projectId, commit: commit.hash }));
-        } else {
-          fetchGitCommitFiles(projectId, token, commit.hash)
-            .then((f) => setFiles(f)).catch(() => setFiles([])).finally(() => setLoadingFiles(false));
+  // Load files when first expanded (moved out of state setter to avoid React batching issues)
+  useEffect(() => {
+    if (!expanded || filesLoadedRef.current) return;
+    filesLoadedRef.current = true;
+    setLoadingFiles(true);
+    let cancelled = false;
+
+    const ws = useStore.getState().ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const requestId = crypto.randomUUID();
+      const timeout = setTimeout(() => { cleanup(); fallbackRest(); }, 120_000);
+      function onResponse(e: Event) {
+        const d = (e as CustomEvent).detail;
+        if (d.request_id === requestId) {
+          cleanup();
+          if (!cancelled) { setFiles(d.files); setLoadingFiles(false); }
         }
       }
-      return next;
-    });
-  }, [projectId, token, commit.hash]);
+      function onError(e: Event) {
+        const d = (e as CustomEvent).detail;
+        if (d.request_id === requestId) {
+          cleanup();
+          if (!cancelled) { setFiles([]); setLoadingFiles(false); }
+        }
+      }
+      function cleanup() {
+        clearTimeout(timeout);
+        window.removeEventListener('nb:git-commit-files-response', onResponse);
+        window.removeEventListener('nb:git-commit-files-error', onError);
+      }
+      function fallbackRest() {
+        fetchGitCommitFiles(projectId, token, commit.hash)
+          .then((f) => { if (!cancelled) setFiles(f); })
+          .catch(() => { if (!cancelled) setFiles([]); })
+          .finally(() => { if (!cancelled) setLoadingFiles(false); });
+      }
+      window.addEventListener('nb:git-commit-files-response', onResponse);
+      window.addEventListener('nb:git-commit-files-error', onError);
+      ws.send(JSON.stringify({ type: 'git_commit_files_request', request_id: requestId, project_id: projectId, commit: commit.hash }));
+
+      return () => { cancelled = true; cleanup(); };
+    } else {
+      fetchGitCommitFiles(projectId, token, commit.hash)
+        .then((f) => { if (!cancelled) setFiles(f); })
+        .catch(() => { if (!cancelled) setFiles([]); })
+        .finally(() => { if (!cancelled) setLoadingFiles(false); });
+
+      return () => { cancelled = true; };
+    }
+  }, [expanded, projectId, token, commit.hash]);
+
+  const handleToggle = useCallback(() => {
+    setExpanded((prev) => !prev);
+  }, []);
 
   const handleFileClick = useCallback((filePath: string) => {
     if (diffFileRef.current === filePath) {
