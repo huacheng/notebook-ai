@@ -37,11 +37,18 @@ export const PROVIDERS: ProviderDef[] = [
 
 const DEFAULT_MODEL = 'sonnet';
 
-/** Look up a ModelDef by id across all providers. */
+/** Look up a ModelDef by id across all providers.
+ *  Supports both short IDs (opus, sonnet) and full model IDs (claude-opus-4-5-20250514).
+ */
 export function findModelById(id: string): ModelDef | undefined {
   for (const p of PROVIDERS) {
-    const m = p.models.find((m) => m.id === id);
-    if (m) return m;
+    // Exact match first
+    const exact = p.models.find((m) => m.id === id);
+    if (exact) return exact;
+    // Fuzzy match: check if the full model ID contains the short ID
+    // e.g., "claude-opus-4-5-20250514" contains "opus"
+    const fuzzy = p.models.find((m) => id.toLowerCase().includes(m.id.toLowerCase()));
+    if (fuzzy) return fuzzy;
   }
   return undefined;
 }
