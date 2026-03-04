@@ -51,6 +51,7 @@ interface UseVoiceInputReturn {
   start: () => void;
   stop: () => void;
   error: string | null;
+  requestPermission: () => Promise<boolean>;
 }
 
 // Check for browser support
@@ -59,7 +60,8 @@ const SpeechRecognition: MySpeechRecognitionConstructor | undefined = typeof win
   : undefined;
 
 export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInputReturn {
-  const { lang = DEFAULT_LANG, continuous = true, onResult, onError } = options;
+  // Default continuous=false for better browser compatibility
+  const { lang = DEFAULT_LANG, continuous = false, onResult, onError } = options;
 
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -71,12 +73,15 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
 
   const isSupported = !!SpeechRecognition;
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (!SpeechRecognition) {
       setError('Speech recognition not supported');
       onError?.('Speech recognition not supported');
       return;
     }
+
+    // Skip getUserMedia pre-check - let SpeechRecognition request microphone directly
+    // This avoids conflicts where both APIs try to use the microphone
 
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -102,10 +107,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
+        const transcript = result[0]?.transcript || '';
         if (result.isFinal) {
-          final += result[0].transcript;
+          final += transcript;
         } else {
-          interim += result[0].transcript;
+          interim += transcript;
         }
       }
 
@@ -152,7 +158,15 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
+
+    try {
+      recognition.start();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start speech recognition';
+      console.error('[Voice] Start error:', err);
+      setError(msg);
+      onError?.(msg);
+    }
   }, [lang, continuous, onResult, onError]);
 
   const stop = useCallback(() => {
@@ -163,6 +177,30 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     setIsListening(false);
     setInterimTranscript('');
   }, []);
+
+  // Request microphone permission explicitly (for retry after denial)
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Permission granted - stop the stream immediately (we just needed permission)
+      stream.getTracks().forEach(track => track.stop());
+      setError(null);
+      return true;
+    } catch (err) {
+      const isPermanentBlock = err instanceof Error && err.name === 'NotAllowedError';
+      const msg = isPermanentBlock
+        ? 'Microphone blocked permanently'
+        : 'Failed to access microphone';
+      setError(msg);
+      onError?.(msg);
+
+      // Show alert for permanently blocked - browser won't show permission dialog
+      if (isPermanentBlock) {
+        alert('Microphone is blocked.\n\nTo enable:\n1. Click the 🔒 icon in address bar\n2. Find "Microphone" setting\n3. Change to "Allow"\n4. Refresh the page');
+      }
+      return false;
+    }
+  }, [onError]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -181,5 +219,6 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     start,
     stop,
     error,
+    requestPermission,
   };
 }

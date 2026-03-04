@@ -101,4 +101,22 @@ describe('useVoiceInput hook', () => {
     // Should auto-restart in continuous mode
     expect(src).toContain('no-speech');
   });
+
+  // Permission request for denied microphone
+  it('should return requestPermission function', () => {
+    const src = getSrc();
+    expect(src).toMatch(/return\s*\{[^}]*requestPermission/);
+  });
+
+  it('should use getUserMedia to request microphone permission', () => {
+    const src = getSrc();
+    expect(src).toContain('getUserMedia');
+    expect(src).toContain('audio');
+  });
+
+  it('should clear error on successful permission grant', () => {
+    const src = getSrc();
+    // After getUserMedia succeeds, should clear error
+    expect(src).toMatch(/getUserMedia.*setError\(null\)/s);
+  });
 });

@@ -43,6 +43,47 @@ describe('InputBar voice integration', () => {
     // onResult callback should append to setText
     expect(src).toMatch(/onResult.*setText/s);
   });
+
+  it('should destructure error from useVoiceInput', () => {
+    const src = getSrc();
+    // Must extract error state to show permission denied etc.
+    expect(src).toMatch(/error.*:.*voiceError.*=.*useVoiceInput/s);
+  });
+
+  it('should display voice error message to user', () => {
+    const src = getSrc();
+    // Must show error in UI (not silent failure)
+    expect(src).toContain('voiceError');
+    expect(src).toMatch(/voiceError.*&&/); // conditional render
+  });
+
+  it('should destructure requestPermission from useVoiceInput', () => {
+    const src = getSrc();
+    expect(src).toMatch(/requestPermission.*=.*useVoiceInput/s);
+  });
+
+  it('should have handleVoicePermission callback for retry', () => {
+    const src = getSrc();
+    expect(src).toContain('handleVoicePermission');
+    expect(src).toMatch(/handleVoicePermission.*requestPermission/s);
+  });
+
+  it('should make voice-error clickable for retry', () => {
+    const src = getSrc();
+    // voice-error should be a button with onClick
+    expect(src).toMatch(/voice-error.*onClick.*handleVoicePermission/s);
+  });
+
+  it('should destructure interimTranscript from useVoiceInput', () => {
+    const src = getSrc();
+    expect(src).toMatch(/interimTranscript.*=.*useVoiceInput/s);
+  });
+
+  it('should display voice-listening-indicator when isListening', () => {
+    const src = getSrc();
+    expect(src).toContain('voice-listening-indicator');
+    expect(src).toContain('voice-interim-text');
+  });
 });
 
 describe('InputBar existing functionality (regression)', () => {

@@ -60,7 +60,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const [caretPos, setCaretPos] = useState({ x: 0, y: 0 });
 
   // Voice input
-  const { isSupported: voiceSupported, isListening, start: startVoice, stop: stopVoice } = useVoiceInput({
+  const { isSupported: voiceSupported, isListening, interimTranscript, start: startVoice, stop: stopVoice, error: voiceError, requestPermission } = useVoiceInput({
     onResult: (result) => {
       setText((prev) => prev + result);
     },
@@ -72,6 +72,14 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
       startVoice();
     }
   }, [isListening, startVoice, stopVoice]);
+
+  // Handle voice permission request (click on ⚠️)
+  const handleVoicePermission = useCallback(async () => {
+    const granted = await requestPermission();
+    if (granted) {
+      startVoice();
+    }
+  }, [requestPermission, startVoice]);
 
   // Check if any cell is running
   const isRunning = notebook?.cells.some(
@@ -282,6 +290,17 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
           onChange={handleFilesChange}
           tabIndex={-1}
         />
+        {isListening && (
+          <div className="voice-listening-indicator">
+            <span className="voice-listening-dot" />
+            <span className="voice-interim-text">{interimTranscript || 'Starting...'}</span>
+          </div>
+        )}
+        {voiceError && !isListening && (
+          <div className="voice-listening-indicator" style={{ background: 'var(--bg-error)' }}>
+            <span>❌ {voiceError}</span>
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           className="nb-input-textarea"
@@ -320,11 +339,20 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
           {voiceSupported && (
             <button
               className={`voice-input-btn ${isListening ? 'voice-input-btn--active' : ''}`}
-              title={isListening ? t('input.stopVoice') : t('input.startVoice')}
+              title={voiceError || (isListening ? t('input.stopVoice') : t('input.startVoice'))}
               disabled={disabled}
               onClick={toggleVoice}
             >
               {isListening ? '🔴' : '🎤'}
+            </button>
+          )}
+          {voiceError && (
+            <button
+              className="voice-error"
+              title={voiceError + ' (click to retry)'}
+              onClick={handleVoicePermission}
+            >
+              ⚠️
             </button>
           )}
           <button
