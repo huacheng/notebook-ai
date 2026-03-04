@@ -60,6 +60,11 @@ run_test "C-DOC-1/H-DOC-1/2: 文档一致性" "doc-language.test.sh"
 run_test "H-DOC-3: 无中文注释" "no-chinese-comments.test.sh"
 
 echo ""
+echo "--- Phase 7: 扩展功能 ---"
+run_test "SKILL-HOTRELOAD: 热重载支持" "skill-hotreload.test.sh"
+run_test "SKILL-SANDBOX: 原生沙箱验证" "skill-sandbox.test.sh"
+
+echo ""
 echo "====================================="
 echo "结果: $PASSED 通过, $FAILED 失败"
 echo "====================================="

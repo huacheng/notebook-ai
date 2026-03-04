@@ -173,7 +173,7 @@ export function MobileNotebookView() {
   if (!notebook) {
     return (
       <div className="mobile-view mobile-notebook-view">
-        <MobileHeader title="Notebook" showBack onBack={handleBack} />
+        <MobileHeader title="Notebook" showBack onBack={handleBack} showLangToggle={false} />
         <main className="mobile-content">
           <div className="mobile-loading">Loading notebook...</div>
         </main>
@@ -192,6 +192,7 @@ export function MobileNotebookView() {
         onBack={handleBack}
         showLeftMenu
         showRightMenu
+        showLangToggle={false}
         rightContent={<MobileNotebookActions />}
       />
 

@@ -680,6 +680,61 @@ highlight **does not change notebook status**. Regardless of scope, `.index.json
 | complete (failure) | `{ "step": "highlight", "result": "failed", "next": "report", "checkpoint": "", "timestamp": "..." }` |
 | adhoc | No signal (not part of auto) |
 | inline scopes | No signal (callers write their own signals) |
+| promote | No signal (batch operation, not part of auto) |
+
+---
+
+### §3.7 scope=promote — Experience to Skill Promotion
+
+**Caller**: None (batch operation)
+**Independent execution**: **Yes** — manual or scheduled invocation
+
+#### Trigger Conditions
+
+All three must be met:
+1. `quality_status: verified` in experience frontmatter
+2. `usage_count >= 3` (counted from `.changelog` references)
+3. Contains structural patterns: `## Patterns` or `## Steps` headers
+
+#### Usage
+
+```bash
+# Scan all experiences and promote eligible ones
+bash skills/highlight/scripts/promote.sh
+
+# Dry-run to see what would be promoted
+bash skills/highlight/scripts/promote.sh --dry-run
+
+# Promote specific experience file
+bash skills/highlight/scripts/promote.sh --target <experience-file.md>
+```
+
+#### Output
+
+| File | Location | Content |
+|------|----------|---------|
+| SKILL.md | `.skills/.candidates/<slug>/SKILL.md` | Generated skill definition |
+| trust-report.md | `.skills/.candidates/<slug>/trust-report.md` | Promotion criteria and trust assessment |
+
+#### Pipeline
+
+```
+1. Static scan of .memory/.experiences/
+2. Filter: quality_status=verified
+3. Filter: usage_count >= 3 (from changelog)
+4. Filter: has structural patterns
+5. Generate SKILL.md (trust_tier: T1)
+6. Generate trust-report.md
+7. Write to .skills/.candidates/<slug>/
+8. Update .changelog
+```
+
+#### Next Steps After Promotion
+
+1. `check --checkpoint skill-review --target SKILL.md` → six-dimension audit
+2. Score >= 0.70 → move to `.skills/.drafts/` (T2)
+3. Human review → move to `.skills/<name>/` (T3)
+4. Production validation → T4 (fully verified)
 
 ## Notes
 

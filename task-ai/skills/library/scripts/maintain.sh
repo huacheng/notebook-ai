@@ -24,6 +24,16 @@ while [[ $# -gt 0 ]]; do
     --rebuild-relations)
       python3 "$REBUILD_RELATIONS_PY"
       shift ;;
+    --evolve)
+      EVOLVE_SCRIPT="$SCRIPT_DIR/evolve-rules.sh"
+      if [[ -f "$EVOLVE_SCRIPT" ]]; then
+          bash "$EVOLVE_SCRIPT" --domain "${2:-all}" --mode auto
+          shift 2 2>/dev/null || shift
+      else
+          echo "[ERROR] evolve-rules.sh not found" >&2
+          exit 1
+      fi
+      ;;
     --compact)
       CHANGELOG="$LIB_PATH/.changelog"
       if [[ -f "$CHANGELOG" ]] && [[ $(wc -l < "$CHANGELOG") -gt 2000 ]]; then

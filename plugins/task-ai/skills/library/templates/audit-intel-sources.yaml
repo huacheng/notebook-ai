@@ -1,0 +1,76 @@
+# Intelligence Source Configuration for Rule Evolution
+# Used by: research.sh --caller audit
+# Location: Copy to $NB_WORKSPACES_LIBRARY/.audit-intel-sources.yaml
+#
+# Each source defines where to fetch security intelligence for
+# generating candidate rules in .evolving-rules/*/candidates/
+
+sources:
+  # NIST National Vulnerability Database - official CVE feed
+  - name: nist_nvd
+    type: api
+    url: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+    params:
+      keywordSearch: "LLM OR AI agent OR prompt injection"
+      pubStartDate: "{7_days_ago}"
+    scan_interval: weekly
+    priority: 1
+    enabled: true
+    target_domain: security
+
+  # OWASP Top 10 for LLM Applications
+  - name: owasp_llm
+    type: html
+    url: "https://genai.owasp.org/llmrisk/"
+    scan_interval: monthly
+    priority: 2
+    enabled: true
+    target_domain: security
+
+  # GitHub Security Advisories
+  - name: github_advisories
+    type: api
+    url: "https://api.github.com/advisories"
+    params:
+      ecosystem: "actions,pip,npm"
+      keywords: "claude,openai,langchain,mcp"
+    scan_interval: weekly
+    priority: 1
+    enabled: true
+    target_domain: security
+
+  # Prompt Injection research papers (arXiv)
+  - name: arxiv_prompt_injection
+    type: api
+    url: "https://export.arxiv.org/api/query"
+    params:
+      search_query: "all:prompt injection OR all:jailbreak LLM"
+      sortBy: submittedDate
+      sortOrder: descending
+      max_results: 20
+    scan_interval: weekly
+    priority: 2
+    enabled: false  # Manual review recommended
+    target_domain: sanitization
+
+  # HuggingFace security reports
+  - name: huggingface_security
+    type: rss
+    url: "https://huggingface.co/blog/feed.xml"
+    filter_keywords:
+      - security
+      - vulnerability
+      - injection
+    scan_interval: weekly
+    priority: 3
+    enabled: false
+    target_domain: security
+
+# Output configuration
+output:
+  # Rule ID prefix for generated candidates
+  id_prefix: "AUTO"
+  # Minimum confidence score to create candidate (0.0-1.0)
+  min_confidence: 0.6
+  # Maximum candidates per fetch cycle
+  max_candidates_per_cycle: 10

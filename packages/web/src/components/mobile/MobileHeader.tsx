@@ -13,6 +13,7 @@ interface MobileHeaderProps {
   showRightMenu?: boolean;
   rightContent?: React.ReactNode;
   showPluginBtn?: boolean;
+  showLangToggle?: boolean;
 }
 
 /**
@@ -70,6 +71,7 @@ export function MobileHeader({
   showRightMenu,
   rightContent,
   showPluginBtn,
+  showLangToggle = true,
 }: MobileHeaderProps) {
   const t = useT();
   const toggleLeftDrawer = useStore((s) => s.toggleLeftDrawer);
@@ -137,7 +139,7 @@ export function MobileHeader({
         )}
 
         {/* Language toggle */}
-        <LanguageToggle variant="compact" className="mobile-lang-btn" />
+        {showLangToggle && <LanguageToggle variant="compact" className="mobile-lang-btn" />}
 
         {rightContent}
 

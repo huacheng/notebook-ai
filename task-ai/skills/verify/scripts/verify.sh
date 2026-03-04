@@ -14,10 +14,14 @@ resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 CHECKPOINT=""
+TARGET_FILE=""
+GENERATE_SKILL_TESTS=false
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --checkpoint) CHECKPOINT="$2"; shift 2 ;;
+    --target) TARGET_FILE="$2"; shift 2 ;;
+    --generate-skill-tests) GENERATE_SKILL_TESTS=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -28,6 +32,56 @@ fi
 
 TEST_DIR="$WORK_DIR/.test"
 mkdir -p "$TEST_DIR"
+
+# Handle --generate-skill-tests
+if [[ "$GENERATE_SKILL_TESTS" == "true" ]]; then
+    if [[ -z "$TARGET_FILE" || ! -f "$TARGET_FILE" ]]; then
+        echo "[ERROR] --target <skill.md> required for --generate-skill-tests" >&2
+        exit 1
+    fi
+
+    SKILL_NAME=$(basename "${TARGET_FILE%.*}")
+    TEST_FILE="$TEST_DIR/skill-$SKILL_NAME.test.md"
+    DATE=$(date +%Y-%m-%d)
+
+    # Extract skill description and steps
+    SKILL_DESC=$(grep -E "^description:" "$TARGET_FILE" | sed 's/^description:\s*//' || echo "No description")
+    SKILL_STEPS=$(grep -A 100 "^## Steps" "$TARGET_FILE" | grep -E "^[0-9]+\." | head -5 || echo "No steps found")
+
+    cat > "$TEST_FILE" <<EOF
+# Skill Test: $SKILL_NAME
+Generated: $DATE
+
+## Skill Under Test
+- File: $TARGET_FILE
+- Description: $SKILL_DESC
+
+## Test Cases
+
+### TC1: Basic Invocation (Green)
+**Input**: Invoke /$SKILL_NAME with minimal valid input
+**Expected**: Skill executes without error
+
+### TC2: Missing Required Input (Red)
+**Input**: Invoke /$SKILL_NAME without required parameters
+**Expected**: Clear error message, non-zero exit
+
+### TC3: Permission Boundary
+**Input**: Invoke /$SKILL_NAME in --permission-mode strict
+**Expected**: No unexpected permission requests
+
+## Extracted Steps
+$SKILL_STEPS
+
+## Execution Notes
+- Run in isolated worktree: \`init skill-test-$SKILL_NAME --worktree --ephemeral\`
+- Use strict permission mode: \`claude --permission-mode strict\`
+- Collect permission requests as behavioral fingerprint
+EOF
+
+    echo "Generated skill tests: $TEST_FILE"
+    exit 0
+fi
 
 echo "Verifying $NOTEBOOK with checkpoint: $CHECKPOINT"
 

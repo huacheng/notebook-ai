@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 # Library Commit Helper
 # Usage: lib-commit.sh <notebook> <type> <description> <file1> [file2...]
+#        lib-commit.sh --system <type> <description> <file1> [file2...]
 
 set -euo pipefail
 
-if [[ $# -lt 4 ]]; then
+if [[ $# -lt 3 ]]; then
     echo "Usage: $0 <notebook> <type> <description> <file...>"
+    echo "       $0 --system <type> <description> <file...>"
     exit 1
 fi
 
-NOTEBOOK="$1"; shift
+# Check for system-level commit (no notebook)
+if [[ "$1" == "--system" ]]; then
+    shift
+    NOTEBOOK=""
+    COMMIT_PREFIX="task-ai(library)"
+else
+    NOTEBOOK="$1"; shift
+    COMMIT_PREFIX="task-ai($NOTEBOOK)"
+fi
+
 TYPE="$1"; shift
 DESC="$1"; shift
 FILES=("$@")
@@ -34,7 +45,7 @@ done
 
 # Commit if there are staged changes
 if ! git diff --cached --quiet; then
-    git commit -m "task-ai($NOTEBOOK):$TYPE $DESC"
+    git commit -m "$COMMIT_PREFIX:$TYPE $DESC"
     echo "Library changes committed."
 else
     echo "No changes to commit in Library."

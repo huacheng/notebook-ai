@@ -3,7 +3,18 @@
 # Provides context discovery and workdir resolution for skill scripts.
 # shellcheck disable=SC2034
 
+set -euo pipefail
+
 TASK_AI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# --- Environment Variable Normalization ---
+# Default NB_WORKSPACES_ROOT to current directory if not set
+if [[ -z "${NB_WORKSPACES_ROOT:-}" ]]; then
+    export NB_WORKSPACES_ROOT="$(pwd)"
+fi
+
+# Library directory: $NB_WORKSPACES_ROOT/.library
+export NB_WORKSPACES_LIBRARY="${NB_WORKSPACES_LIBRARY:-$NB_WORKSPACES_ROOT/.library}"
 
 # --- Context Discovery ---
 
@@ -24,9 +35,8 @@ find_nb_context() {
   branch=$(git branch --show-current 2>/dev/null)
   if [[ "$branch" =~ ^task/ ]]; then
     export NB_NOTEBOOK="${branch#task/}"
-    local root="${NB_WORKSPACES_ROOT:-$(pwd)}"
     local nb_dir
-    nb_dir=$(find "$root" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null)
+    nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null)
     if [[ -n "$nb_dir" ]]; then
       export NB_WORKING="$nb_dir/.working"
       return 0

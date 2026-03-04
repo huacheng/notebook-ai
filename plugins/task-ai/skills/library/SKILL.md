@@ -1,22 +1,22 @@
 ---
 name: library
-description: "Cross-task knowledge library management — search, list, audit, and maintain the shared .library/ knowledge base. Defines the write protocol and changelog consumption protocol for all other sub-commands. Does not participate in the automation loop."
+description: "Cross-task knowledge library management — search, list, audit, maintain, and evolve the shared .library/ knowledge base. Includes security rules evolution loop (separate from task auto loop)."
 model_tier: light
 auto_delegatable: true
 triggers:
   keywords:
-    zh: [知识库, 图书馆, 搜索参考, 查经验, 知识管理, 参考文献]
-    en: [library, knowledge base, search references, find experience, knowledge management]
+    zh: [知识库, 图书馆, 搜索参考, 查经验, 知识管理, 参考文献, 规则进化, 安全扫描]
+    en: [library, knowledge base, search references, find experience, knowledge management, rule evolution, security scan]
   phrases:
-    zh: [搜索知识库, 查查经验, 有没有参考, 知识库里有什么, 维护知识库, 知识库状态]
-    en: [search the library, find related references, what's in the knowledge base, library status, maintain library]
+    zh: [搜索知识库, 查查经验, 有没有参考, 知识库里有什么, 维护知识库, 知识库状态, 检查安全规则, 进化规则, 安全更新]
+    en: [search the library, find related references, what's in the knowledge base, library status, maintain library, check security rules, evolve rules, security update]
   disambiguate: >
     Core intent: query or maintain the shared cross-task knowledge library (.library/).
     User wants to SEARCH existing knowledge → library search.
     User wants to COLLECT NEW knowledge via web research → research. User wants to INGEST a local file → read.
 arguments:
   - name: operation
-    description: "Operation: search, list, status, or maintain"
+    description: "Operation: search, list, status, maintain, or evolve"
     required: true
   - name: query
     description: "Search query string (for search)"
@@ -125,6 +125,7 @@ The sub-command executes one of the following operations based on the provided a
 2. **list**: List library contents by category.
 3. **status**: Audit library health across six dimensions.
 4. **maintain**: Maintenance operations including index rebuild and changelog compaction.
+5. **evolve**: Security rules evolution loop (discover → review → integrate).
 
 ## Operation Details
 
@@ -230,6 +231,47 @@ Report stale knowledge without auto-triggering `research`.
 #### `--all`
 
 Run `--rebuild-index` → `--compact` → `--check-staleness` in sequence. Also sweep for stale `.lock` files: for each `.lock` file in library, read its `pid`; if `kill -0 <pid>` fails → remove stale lock and log cleanup.
+
+### 5. `evolve`
+
+Security rules evolution loop — discovers new threats and evolves Core/Extended rules.
+
+**This is a separate loop from `auto`** — does not participate in task execution.
+
+#### Sub-commands
+
+| Command | Description |
+|---------|-------------|
+| `evolve --status` | Show last scan time, pending proposals, rule counts |
+| `evolve --discover` | Search external intel for new threats (LLM-driven) |
+| `evolve --full` | Run full pipeline: discover → elaborate → review → integrate |
+
+#### Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. DISCOVER — search CVE/OWASP/GitHub advisories           │
+│  2. PROPOSE  — generate .core-rule-proposals/CORE-XXX.md    │
+│  3. ELABORATE — LLM fills rationale + test cases            │
+│  4. VALIDATE — pattern syntax + historical backtest         │
+│  5. REVIEW   — six-dimension review (composite ≥ 0.95)      │
+│  6. INTEGRATE — modify security.sh (if thresholds met)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Trigger Frequency
+
+| Rule Layer | Recommended Interval | Trigger |
+|------------|---------------------|---------|
+| Core Rules | Weekly | User runs `evolve --discover` or `evolve --full` |
+| Extended Rules | Daily | Hot-reload from `.evolving-rules/security/active/` |
+
+#### State Files
+
+- `.library/.core-rule-proposals/.last-scan` — Unix timestamp of last scan
+- `.library/.core-rule-proposals/.audit.log` — JSON Lines audit trail
+
+**User triggers evolution manually** — task-ai does not run background daemons.
 
 ---
 

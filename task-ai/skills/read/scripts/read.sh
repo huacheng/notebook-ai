@@ -33,16 +33,25 @@ echo "[1/4] Extracted Topic: $TOPIC"
 # 2. Library Deduplication (Layer 1) (Simulated)
 echo "[2/4] Deduplicating against library..."
 
-# 3. Detox Pipeline (Simulated 10-category rules)
-# In a real agent, this invokes the Python parser or agent prompt.
-# We simulate finding an encoded payload for TDD.
+# 3. Detox Pipeline (dynamic rules from .evolving-rules/sanitization/ + hardcoded fallback)
 echo "[3/4] Applying Detox pipeline..."
 CONTENT=$(cat "$FILE_PATH")
 INJECTION_RISK="none"
 FINDINGS="[]"
 
-# Extended injection detection (10 categories from injection-rules.md)
-INJECTION_PATTERNS=(
+# Load dynamic sanitization rules from .evolving-rules/sanitization/active/
+RULE_LOADER="$SCRIPT_DIR/../../../core/rule-loader.sh"
+DYNAMIC_PATTERNS=()
+if [[ -f "$RULE_LOADER" ]]; then
+    source "$RULE_LOADER"
+    load_rules_from_domain "sanitization" 2>/dev/null || true
+    for i in "${!RULE_PATTERNS[@]}"; do
+        DYNAMIC_PATTERNS+=("${RULE_PATTERNS[$i]}")
+    done
+fi
+
+# Hardcoded fallback patterns (10 categories from injection-rules.md)
+HARDCODED_PATTERNS=(
     'eval\s*\('
     'btoa\s*\('
     'curl.*\|'
@@ -54,7 +63,11 @@ INJECTION_PATTERNS=(
     'base64\s+-d'
     '\\x1b\['
 )
-for pattern in "${INJECTION_PATTERNS[@]}"; do
+
+# Merge: dynamic rules first, then hardcoded fallback
+ALL_PATTERNS=("${DYNAMIC_PATTERNS[@]}" "${HARDCODED_PATTERNS[@]}")
+
+for pattern in "${ALL_PATTERNS[@]}"; do
     if grep -qE "$pattern" "$FILE_PATH" 2>/dev/null; then
         INJECTION_RISK="high"
         FINDINGS="[\"removed: detected injection pattern: $pattern\"]"

@@ -1,40 +1,200 @@
 ---
 name: check
-description: Check plan feasibility at key checkpoints — post-plan, mid-execution, post-execution
+description: "Six-dimension gated review — context-aware plan/solution audit, lifecycle checkpoints, and skill validation"
 model_tier: heavy
 auto_delegatable: false
 triggers:
   keywords:
-    zh: [检查, 评审, 审查, 评估, 可行性, 审核, 把关]
-    en: [check, review, evaluate, assess, feasibility, audit, gate]
+    zh: [检查, 评审, 审查, 评估, 可行性, 审核, 把关, 六维]
+    en: [check, review, evaluate, assess, feasibility, audit, gate, six-dimension]
   phrases:
-    zh: [检查一下计划, 方案可行吗, 评审一下, 看看行不行, 审查通过了吗, 能不能执行]
-    en: [check the plan, is it feasible, review the implementation, evaluate progress, ready to execute]
+    zh: [检查一下计划, 方案可行吗, 评审一下, 看看行不行, 审查通过了吗, 能不能执行, 帮我审查这个方案, 六维审查]
+    en: [check the plan, is it feasible, review the implementation, evaluate progress, ready to execute, review this solution, six-dimension audit]
   disambiguate: >
-    Core intent: evaluate and render a verdict (PASS/NEEDS_REVISION/ACCEPT/REPLAN) at a lifecycle checkpoint.
-    User asks "is this plan OK?" or "can we proceed?" → check.
+    Core intent: evaluate and render a verdict using six-dimension gated review.
+    User asks "is this plan OK?" or "review this solution" → check (context review).
+    User in task lifecycle → check with checkpoint.
     User asks to RUN tests → verify. User asks to SEE task status → list.
 arguments:
   - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
+    description: "Notebook name for lifecycle checkpoints (e.g., auth-refactor)"
+    required: false
+  - name: description
+    description: "Natural language description for context review (e.g., '审查上面讨论的方案')"
     required: false
   - name: checkpoint
     description: "Evaluation checkpoint: post-plan, mid-exec, post-exec"
     required: false
-    default: post-plan
+  - name: caller
+    description: "Inline caller: plan, exec, auto, skill-review, audit-validate"
+    required: false
 ---
 
-# /task-ai:check — Plan Feasibility Check
+# /task-ai:check — Six-Dimension Gated Review
 
-Check the implementation plan at three lifecycle checkpoints. Acts as the decision maker in the task state machine.
+Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 (D1 Correctness) → Gate 3 (D3 Reliability) → Gate 4 (D4+D5+D6 Optimization).
 
 ## Usage
 
 ```
-/task-ai:check <notebook_name> [--checkpoint post-plan|mid-exec|post-exec]
+/task-ai:check                           # Review current conversation context (plan/solution)
+/task-ai:check "<description>"           # Review with specified focus
+/task-ai:check <notebook> --checkpoint   # Lifecycle checkpoint review
+/task-ai:check --caller <caller>         # Inline call from other commands
 ```
 
-## Checkpoints
+**Parameter routing:**
+- No arguments → scope=context (review current conversation's plan/solution)
+- `check "<description>"` → scope=context with focus (e.g., "审查上面的修复方案")
+- `check <notebook> --checkpoint post-plan` → scope=lifecycle (task lifecycle checkpoint)
+- `check --caller skill-review --target <file>` → scope=skill (skill validation)
+- `check --caller audit-validate` → scope=rules (rule candidate validation)
+
+---
+
+## Scope Definitions
+
+check defines 4 scopes. Scopes context and lifecycle are **independent executions**. Scopes skill and rules are **inline protocols** (called via `--caller`).
+
+---
+
+### §S1 scope=context — Conversation Context Review
+
+**Caller**: None (independent execution)
+**Trigger**: `/task-ai:check` or `/task-ai:check "<description>"`
+
+Reviews the current conversation context for plans, solutions, or proposals using six-dimension gated audit.
+
+#### When to Use
+
+- After discussing and drafting a plan in conversation
+- After proposing a fix or solution approach
+- Before implementing a discussed design
+- When asking "is this approach OK?"
+
+#### Input Identification
+
+From current conversation context, identify:
+
+1. **Review target** — the plan, solution, or proposal to evaluate
+   - Look for: numbered steps, bullet lists, code blocks, design decisions
+   - If description provided, use it to focus on specific content
+   - If ambiguous → ask user to clarify what to review
+
+2. **Review type** — determines dimension weights
+   - `plan` — implementation steps, feature design
+   - `fix` — bug fix approach, remediation
+   - `design` — architecture, system design
+   - `code` — code snippet review
+
+#### Gated Execution (same as skill-review)
+
+```
+Gate 1: D2 Security (blocking, threshold 0.5)
+    ├─ FAIL → output fix suggestion → BLOCKED
+    └─ PASS ↓
+
+Gate 2: D1 Correctness (blocking, threshold 0.5)
+    ├─ FAIL → output fix suggestion → BLOCKED
+    └─ PASS ↓
+
+Gate 3: D3 Reliability (blocking, threshold 0.5)
+    ├─ FAIL → output fix suggestion → BLOCKED
+    └─ PASS ↓
+
+Gate 4: D4+D5+D6 Optimization (parallel, non-blocking)
+    └─ Output improvement suggestions
+```
+
+#### Dimension Adaptation (Dynamic)
+
+Dimension weights and focus areas are **not hardcoded** — they adapt based on review type:
+
+1. **Identify review type** from context: `plan` / `fix` / `design` / `code` / `<task-type>`
+
+2. **Load adaptation config** (priority order):
+   - If in notebook context → read `.type-profile.md` "Audit Adaptation" section
+   - Else → read `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md`
+   - Fallback → `check/references/six-dimension-audit.md` Domain Adaptation seed table
+
+3. **Apply weights** — config specifies per-dimension:
+   - Weight adjustment (↑/↓/default)
+   - Focus questions for this type
+   - Blocking threshold override (if any)
+
+4. **Auto-update mechanism**:
+   - When check completes, if new type-specific insights discovered
+   - Write to `.memory/.experiences/<type>/<notebook>-eval.md`
+   - highlight scope=complete syncs to `.type-profiles/`
+   - Next check for same type uses updated adaptation
+
+> See `check/references/six-dimension-audit.md` §Domain Adaptation for seed table structure and `plan/references/type-profiling.md` for type system details.
+
+#### Output
+
+Direct conversation response with:
+
+1. **Gate Progress Table** — which gates passed/failed
+2. **Blocking Issues** — if any gate failed, specific problems and fix suggestions
+3. **Optimization Suggestions** — from Gate 4 (if reached)
+4. **Verdict** — PASS / NEEDS_REVISION / BLOCKED
+
+#### Example
+
+User discusses a fix approach, then:
+```
+User: /task-ai:check
+```
+
+Response:
+```
+=== Context Review: Fix Approach ===
+
+Gate 1 (D2 Security): PASS ✅
+Gate 2 (D1 Correctness): PASS ✅
+Gate 3 (D3 Reliability): FAIL ❌
+  - No rollback plan if fix causes regression
+  - Missing error handling for edge case X
+
+Fix suggestion: Add rollback steps and handle case X.
+
+Verdict: NEEDS_REVISION
+```
+
+#### Does NOT Write Files
+
+scope=context is conversational — no `.analysis/` files, no `.auto-signal`, no state changes. Output is direct response in conversation.
+
+---
+
+### §S2 scope=lifecycle — Task Lifecycle Checkpoint
+
+**Caller**: None (independent execution)
+**Trigger**: `/task-ai:check <notebook> --checkpoint <checkpoint>`
+
+This is the existing checkpoint-based review for task lifecycle. See Checkpoints section below.
+
+---
+
+### §S3 scope=skill — Skill Validation
+
+**Caller**: `--caller skill-review` (inline)
+**Trigger**: `check --caller skill-review --target <skill.md>`
+
+Validates skill files using six-dimension gated review. Implemented in `check.sh`.
+
+---
+
+### §S4 scope=rules — Rule Candidate Validation
+
+**Caller**: `--caller audit-validate` (inline)
+**Trigger**: `check --caller audit-validate`
+
+Validates rule candidates in `.evolving-rules/*/candidates/`. Implemented in `check.sh`.
+
+---
+
+## Checkpoints (scope=lifecycle)
 
 ### 1. post-plan (default)
 

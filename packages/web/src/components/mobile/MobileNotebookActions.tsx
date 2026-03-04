@@ -23,6 +23,8 @@ export function MobileNotebookActions() {
   const setEditMode = useStore((s) => s.setEditMode);
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const openModelPanel = useStore((s) => s.openModelPanel);
+  const language = useStore((s) => s.language);
+  const setLanguage = useStore((s) => s.setLanguage);
 
   const [open, setOpen] = useState(false);
   const [showRerunModal, setShowRerunModal] = useState(false);
@@ -85,6 +87,13 @@ export function MobileNotebookActions() {
       label: t('model.title'),
       icon: '⚙️',
       onClick: () => { setOpen(false); openModelPanel(); },
+      disabled: false,
+      group: 'settings',
+    },
+    {
+      label: language === 'en' ? '切换到中文' : 'Switch to English',
+      icon: '🌐',
+      onClick: () => { setLanguage(language === 'en' ? 'zh' : 'en'); setOpen(false); },
       disabled: false,
       group: 'settings',
     },

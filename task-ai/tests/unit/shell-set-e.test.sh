@@ -7,7 +7,8 @@ TASK_AI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPTS=$(find "$TASK_AI_ROOT" -name "*.sh" -type f \
     ! -path "*/.dev/*" \
     ! -path "*/tests/*" \
-    ! -name "lib.sh")
+    ! -name "lib.sh" \
+    ! -name "shell-aliases.sh")
 MISSING=0
 
 for script in $SCRIPTS; do

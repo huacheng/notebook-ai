@@ -27,6 +27,52 @@ while [[ $# -gt 0 ]]; do
 done
 TARGET_MD="$WORK_DIR/.target.md"
 
+# Handle audit caller mode - intelligence collection for rule evolution
+# Does not require .target.md or task context
+if [[ "$CALLER" == "audit" ]]; then
+    LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
+    INTEL_SOURCES="$LIB_PATH/.audit-intel-sources.yaml"
+    EVOLVING_RULES_DIR="$LIB_PATH/.evolving-rules"
+    YAML_PARSER="$SCRIPT_DIR/../../../core/yaml_parser.py"
+    INTEL_FETCHER="$SCRIPT_DIR/intel-fetcher.sh"
+
+    echo "[research:audit] Starting intelligence collection..."
+
+    # Ensure candidates directories exist
+    for domain in security sanitization audit; do
+        mkdir -p "$EVOLVING_RULES_DIR/$domain/candidates"
+    done
+
+    # Check if intel sources config exists
+    if [[ -f "$INTEL_SOURCES" ]]; then
+        echo "[research:audit] Loading intel sources from $INTEL_SOURCES"
+
+        # Parse sources using Python yaml_parser
+        if [[ -f "$YAML_PARSER" ]]; then
+            SOURCES_JSON=$(python3 "$YAML_PARSER" parse "$INTEL_SOURCES" 2>/dev/null || echo '{}')
+            echo "[research:audit] Parsed intel sources config"
+        fi
+
+        # Call intel-fetcher if available
+        if [[ -f "$INTEL_FETCHER" ]]; then
+            echo "[research:audit] Invoking intel-fetcher..."
+            bash "$INTEL_FETCHER" --sources "$INTEL_SOURCES" --output "$EVOLVING_RULES_DIR" 2>/dev/null || true
+        else
+            echo "[research:audit] intel-fetcher.sh not found, skipping external fetch"
+        fi
+    else
+        echo "[research:audit] No intel sources config at $INTEL_SOURCES"
+        echo "[research:audit] Copy template from skills/library/templates/audit-intel-sources.yaml"
+    fi
+
+    # Output .auto-signal for automation loop
+    echo "[research:audit] Intelligence collection complete"
+    echo 'result="(intel-collected)"' > "$WORK_DIR/.auto-signal" 2>/dev/null || true
+    echo 'next="(stop)"' >> "$WORK_DIR/.auto-signal" 2>/dev/null || true
+
+    exit 0
+fi
+
 if [[ ! -f "$TARGET_MD" ]]; then
     echo "[ERROR] .target.md not found at $TARGET_MD" >&2
     exit 1
