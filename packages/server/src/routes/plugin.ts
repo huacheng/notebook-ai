@@ -1,5 +1,5 @@
 import { Router, type IRouter } from 'express';
-import { readFile, readdir, writeFile } from 'fs/promises';
+import { readFile, readdir, writeFile, unlink } from 'fs/promises';
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -97,6 +97,14 @@ async function fixInstalledPluginVersion(pluginKey: string): Promise<void> {
   }
 
   if (!latestVersion) return;
+
+  // Remove .orphaned_at marker from latest version (Claude CLI bug workaround)
+  const orphanedPath = path.join(cacheDir, latestVersion, '.orphaned_at');
+  try {
+    await unlink(orphanedPath);
+  } catch {
+    // Ignore if marker doesn't exist
+  }
 
   // Read and update installed_plugins.json
   const installedRaw = await readJson<{ version?: number; plugins?: Record<string, unknown[]> }>(
