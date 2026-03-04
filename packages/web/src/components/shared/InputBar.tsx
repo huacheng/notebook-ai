@@ -234,14 +234,18 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   };
 
   // Convert vertical scroll to horizontal scroll on command toolbar
-  const handleCmdWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+  // Must use native event listener with { passive: false } to allow preventDefault
+  useEffect(() => {
     const el = cmdBtnsRef.current;
     if (!el) return;
-    // Only convert if there's horizontal overflow
-    if (el.scrollWidth > el.clientWidth) {
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    }
+    const handler = (e: WheelEvent) => {
+      if (el.scrollWidth > el.clientWidth) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
   }, []);
 
   // Command shortcuts
@@ -335,7 +339,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
         />
       </div>
       <div className="nb-cmd-toolbar">
-        <div className="nb-cmd-btns" ref={cmdBtnsRef} onWheel={handleCmdWheel}>
+        <div className="nb-cmd-btns" ref={cmdBtnsRef}>
           {commands.map(({ cmd, icon }) => (
             <button
               key={cmd}

@@ -21,10 +21,11 @@ describe('Command toolbar horizontal scroll', () => {
     expect(src).toMatch(/className="nb-cmd-btns"[^>]*ref=\{cmdBtnsRef\}/);
   });
 
-  it('should have wheel event handler', () => {
+  it('should have wheel event handler via useEffect', () => {
     const src = getInputBarSrc();
-    expect(src).toMatch(/handleCmdWheel/);
-    expect(src).toMatch(/onWheel=\{handleCmdWheel\}/);
+    // Uses native addEventListener with passive: false
+    expect(src).toMatch(/addEventListener\('wheel'/);
+    expect(src).toMatch(/passive:\s*false/);
   });
 
   it('should convert deltaY to horizontal scroll', () => {
