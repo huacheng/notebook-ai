@@ -17,7 +17,6 @@ import { EventBuffer } from './event-buffer.js';
 import {
   updateCellStatus,
   updateCellDuration,
-  updateCellGitDiff,
   appendCellOutput,
   attachToolResult,
   findRunningCellId,
@@ -1098,16 +1097,9 @@ export class SessionManager {
 
       const gitResult = await session.gitManager.commitCellExecution(cellId, source);
       if (gitResult) {
-        const diffLen = gitResult.diff.length;
-        session.notebook = updateCellGitDiff(session.notebook, cellId, gitResult.diff);
-        this.broadcast(session, {
-          type: 'git_diff',
-          cell_id: cellId,
-          diff: gitResult.diff,
-          files_changed: gitResult.filesChanged,
-        });
+        // D4: git_diff no longer saved to notebook or broadcast - Git Preview tab provides this
         console.log(
-          `[session ${session.id}] Committed cell "${cellId}" – ${gitResult.filesChanged.length} file(s) changed, diff ${diffLen} chars.`,
+          `[session ${session.id}] Committed cell "${cellId}" – ${gitResult.filesChanged.length} file(s) changed.`,
         );
       } else {
         console.log(`[session ${session.id}] No workspace changes for cell "${cellId}" – skipping git commit.`);
