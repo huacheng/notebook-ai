@@ -34,10 +34,13 @@ vi.mock('../agent', () => ({
 
 function createMockNotebook(): Notebook {
   return {
+    version: 1,
     metadata: {
       title: 'Test',
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
+      git_repo: false,
+      agent: 'claude',
     },
     cells: [
       {
@@ -52,7 +55,16 @@ function createMockNotebook(): Notebook {
       },
     ],
     slide: { generated: false, sections: [] },
+    annotations: [],
+    assets: { intermediate_files: [] },
   };
+}
+
+// Helper to get outputs from a prompt cell
+function getPromptCellOutputs(notebook: Notebook, index: number) {
+  const cell = notebook.cells[index];
+  if (cell.type !== 'prompt') throw new Error('Not a prompt cell');
+  return cell.outputs;
 }
 
 describe('Tool output ephemeral storage', () => {
@@ -76,8 +88,8 @@ describe('Tool output ephemeral storage', () => {
         listeners: new Set(),
       };
 
-      // Simulate processing a Read tool_use
-      const toolUseOutput = {
+      // Simulate processing a Read tool_use (variable kept for documentation)
+      void {
         type: 'tool_use' as const,
         tool_use_id: 'tu-123',
         name: 'Read',
@@ -87,7 +99,7 @@ describe('Tool output ephemeral storage', () => {
 
       // After processing, notebook should NOT contain the tool_use
       // This test will FAIL until we implement the feature
-      const cellOutputs = session.notebook.cells[0].outputs;
+      const cellOutputs = getPromptCellOutputs(session.notebook, 0);
       const hasToolUse = cellOutputs.some(
         (o: any) => o.type === 'tool_use' && o.name === 'Read'
       );
@@ -100,7 +112,7 @@ describe('Tool output ephemeral storage', () => {
 
       // Simulate: tool_use with name='Bash' was processed
       // Expectation: NOT in notebook.cells[0].outputs
-      const cellOutputs = notebook.cells[0].outputs;
+      const cellOutputs = getPromptCellOutputs(notebook, 0);
       const hasBashTool = cellOutputs.some(
         (o: any) => o.type === 'tool_use' && o.name === 'Bash'
       );
@@ -122,9 +134,9 @@ describe('Tool output ephemeral storage', () => {
 
       // After implementation, AskUserQuestion SHOULD be in outputs
       // For now, manually add to verify test structure
-      notebook.cells[0].outputs.push(askUserOutput);
+      getPromptCellOutputs(notebook, 0).push(askUserOutput);
 
-      const cellOutputs = notebook.cells[0].outputs;
+      const cellOutputs = getPromptCellOutputs(notebook, 0);
       const hasAskUser = cellOutputs.some(
         (o: any) => o.type === 'tool_use' && o.name === 'AskUserQuestion'
       );
@@ -138,7 +150,7 @@ describe('Tool output ephemeral storage', () => {
       const notebook = createMockNotebook();
 
       // No tool_use in notebook = no tool_result should be attached
-      const cellOutputs = notebook.cells[0].outputs;
+      const cellOutputs = getPromptCellOutputs(notebook, 0);
       const hasToolResult = cellOutputs.some(
         (o: any) => o.type === 'tool_use' && o.result !== undefined
       );
@@ -158,12 +170,12 @@ describe('Tool output ephemeral storage', () => {
         timestamp: new Date().toISOString(),
         result: undefined as string | undefined,
       };
-      notebook.cells[0].outputs.push(askUserOutput);
+      getPromptCellOutputs(notebook, 0).push(askUserOutput);
 
       // Simulate attaching result
       askUserOutput.result = 'User selected option A';
 
-      const cellOutputs = notebook.cells[0].outputs;
+      const cellOutputs = getPromptCellOutputs(notebook, 0);
       const askUserWithResult = cellOutputs.find(
         (o: any) => o.type === 'tool_use' && o.name === 'AskUserQuestion'
       );
@@ -220,7 +232,7 @@ describe('Regression: notebook file integrity', () => {
     const notebook = createMockNotebook();
 
     // Add AskUserQuestion with result
-    notebook.cells[0].outputs.push({
+    getPromptCellOutputs(notebook, 0).push({
       type: 'tool_use',
       tool_use_id: 'tu-persist-test',
       name: 'AskUserQuestion',
@@ -233,7 +245,7 @@ describe('Regression: notebook file integrity', () => {
     const json = JSON.stringify(notebook);
     const restored = JSON.parse(json) as Notebook;
 
-    const restoredOutput = restored.cells[0].outputs.find(
+    const restoredOutput = getPromptCellOutputs(restored, 0).find(
       (o: any) => o.name === 'AskUserQuestion'
     );
 
@@ -246,7 +258,7 @@ describe('Regression: notebook file integrity', () => {
 
     // Notebook should NOT have Read/Write/Bash tool outputs
     // (they are ephemeral, only pushed via WS)
-    const hasRegularTools = notebook.cells[0].outputs.some(
+    const hasRegularTools = getPromptCellOutputs(notebook, 0).some(
       (o: any) => o.type === 'tool_use' &&
         ['Read', 'Write', 'Bash', 'Grep', 'Glob'].includes(o.name)
     );
