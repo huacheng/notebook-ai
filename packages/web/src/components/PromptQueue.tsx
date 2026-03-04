@@ -47,13 +47,14 @@ export function PromptQueue() {
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDrop(e, item.id)}
           >
+            <span className="prompt-queue-drag-handle" title="Drag to reorder">⋮⋮</span>
             <span className="prompt-queue-text">{truncatePrompt(item.source)}</span>
             <button
               className="prompt-queue-delete"
               onClick={() => removeQueueItem(item.id)}
               title="Remove from queue"
             >
-              &times;
+              ×
             </button>
           </li>
         ))}

@@ -36,21 +36,23 @@ export function MobilePromptQueue() {
         <span className="mobile-prompt-queue-count">
           {promptQueue.length} queued
         </span>
+        <span className="mobile-prompt-queue-hint">swipe left to delete</span>
       </div>
       <ul className="mobile-prompt-queue-list">
-        {promptQueue.map((item) => (
+        {promptQueue.map((item, index) => (
           <li
             key={item.id}
             className="mobile-prompt-queue-item"
             onTouchStart={(e) => handleTouchStart(e, item.id)}
             onTouchEnd={handleTouchEnd}
           >
-            <span className="mobile-prompt-queue-text">{truncatePrompt(item.source, 60)}</span>
+            <span className="mobile-prompt-queue-number">{index + 1}</span>
+            <span className="mobile-prompt-queue-text">{truncatePrompt(item.source, 50)}</span>
             <button
               className="mobile-prompt-queue-delete"
               onClick={() => removeQueueItem(item.id)}
             >
-              &times;
+              ×
             </button>
           </li>
         ))}

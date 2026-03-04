@@ -1446,23 +1446,25 @@ textarea.cell-input {
 }
 
 /* ============================================================
-   Prompt Queue (desktop)
+   Prompt Queue (desktop) - Atelier warm studio theme
    ============================================================ */
 .prompt-queue {
-  background: var(--bg-output);
-  border-top: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
-  max-height: 200px;
+  background: var(--color-primary-light);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: var(--radius-md);
+  margin: 0 var(--space-xl) var(--space-sm);
+  max-height: 180px;
   overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.08);
 }
 
 .prompt-queue-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-xs) var(--space-xl);
-  background: var(--bg-cell);
-  border-bottom: 1px solid var(--border-default);
+  padding: var(--space-xs) var(--space-md);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(14, 165, 233, 0.06));
+  border-bottom: 1px solid rgba(14, 165, 233, 0.15);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -1470,8 +1472,16 @@ textarea.cell-input {
 
 .prompt-queue-count {
   font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  font-weight: 500;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.prompt-queue-count::before {
+  content: '⏳';
+  font-size: 12px;
 }
 
 .prompt-queue-list {
@@ -1483,23 +1493,30 @@ textarea.cell-input {
 .prompt-queue-item {
   display: flex;
   align-items: center;
-  padding: var(--space-sm) var(--space-xl);
-  border-bottom: 1px solid var(--border-default);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid rgba(14, 165, 233, 0.1);
   gap: var(--space-md);
   cursor: grab;
   transition: background 0.15s ease;
 }
 
 .prompt-queue-item:hover {
-  background: var(--bg-cell-hover);
+  background: rgba(14, 165, 233, 0.08);
 }
 
 .prompt-queue-item:active {
   cursor: grabbing;
+  background: rgba(14, 165, 233, 0.12);
 }
 
 .prompt-queue-item:last-child {
   border-bottom: none;
+}
+
+.prompt-queue-drag-handle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  opacity: 0.5;
 }
 
 .prompt-queue-text {
@@ -1521,6 +1538,11 @@ textarea.cell-input {
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   transition: color 0.15s ease, background 0.15s ease;
+  opacity: 0.6;
+}
+
+.prompt-queue-item:hover .prompt-queue-delete {
+  opacity: 1;
 }
 
 .prompt-queue-delete:hover {
@@ -7372,28 +7394,53 @@ button:focus-visible {
   padding: var(--space-xl) 0;
 }
 
-/* ── Mobile Prompt Queue ─────────────────────────────────────────────────── */
+/* ── Mobile Prompt Queue - Atelier warm studio theme ─────────────────────── */
 .mobile-prompt-queue {
   position: fixed;
   bottom: var(--mobile-input-bar-height);
-  left: 0;
-  right: 0;
-  background: var(--bg-output);
-  border-top: 1px solid var(--border-default);
+  left: var(--space-sm);
+  right: var(--space-sm);
+  background: var(--color-primary-light);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   z-index: 19;
-  max-height: 30vh;
+  max-height: 40vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  box-shadow: 0 -4px 16px rgba(14, 165, 233, 0.12);
 }
 
 .mobile-prompt-queue-header {
-  padding: var(--space-xs) var(--space-md);
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-cell);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(14, 165, 233, 0.08));
+  border-bottom: 1px solid rgba(14, 165, 233, 0.15);
   position: sticky;
   top: 0;
+  z-index: 1;
+}
+
+.mobile-prompt-queue-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.mobile-prompt-queue-count::before {
+  content: '⏳';
+  font-size: 14px;
+}
+
+.mobile-prompt-queue-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  opacity: 0.8;
 }
 
 .mobile-prompt-queue-list {
@@ -7405,9 +7452,33 @@ button:focus-visible {
 .mobile-prompt-queue-item {
   display: flex;
   align-items: center;
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border-default);
+  padding: var(--space-md) var(--space-md);
+  border-bottom: 1px solid rgba(14, 165, 233, 0.1);
   gap: var(--space-sm);
+  background: rgba(255, 255, 255, 0.6);
+  transition: background 0.15s ease;
+}
+
+.mobile-prompt-queue-item:last-child {
+  border-bottom: none;
+}
+
+.mobile-prompt-queue-item:active {
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.mobile-prompt-queue-number {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .mobile-prompt-queue-text {
@@ -7417,19 +7488,23 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--font-mono);
 }
 
 .mobile-prompt-queue-delete {
   border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 18px;
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-error);
+  font-size: 16px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  opacity: 0.8;
 }
 
 .mobile-prompt-queue-delete:active {
-  color: var(--color-error);
+  opacity: 1;
+  background: rgba(220, 38, 38, 0.15);
 }
 
 /* ── Mobile Input Bar ────────────────────────────────────────────────────── */
