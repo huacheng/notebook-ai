@@ -92,17 +92,10 @@ if $PROD_MODE; then
   pnpm run build
 
   echo "==> Starting production server..."
-  # Backend serves API on 3002, frontend static files served by a simple server on 3000
-  PORT=3002 nohup node packages/server/dist/index.js > /tmp/notebook-prod-backend.log 2>&1 &
+  # Backend serves both API and static files in production mode (single port 3000)
+  NODE_ENV=production PORT=3000 nohup node packages/server/dist/index.js > /tmp/notebook-prod.log 2>&1 &
 
-  # Serve frontend static files (using npx serve or python)
-  if command -v serve &>/dev/null; then
-    nohup serve -s packages/web/dist -l 3000 --ssl-cert packages/web/localhost.pem --ssl-key packages/web/localhost-key.pem > /tmp/notebook-prod-frontend.log 2>&1 &
-  else
-    nohup npx serve -s packages/web/dist -l 3000 --ssl-cert packages/web/localhost.pem --ssl-key packages/web/localhost-key.pem > /tmp/notebook-prod-frontend.log 2>&1 &
-  fi
-
-  LOG_FILE="/tmp/notebook-prod-backend.log"
+  LOG_FILE="/tmp/notebook-prod.log"
   MODE_MSG="Production"
 else
   echo "==> Starting notebook-ai dev server..."
@@ -112,11 +105,19 @@ else
 fi
 
 # Wait for backend to be ready (up to 15s)
-echo -n "==> Waiting for backend on :3002"
+if $PROD_MODE; then
+  WAIT_PORT=3000
+  FINAL_MSG="==> notebook-ai ($MODE_MSG) is running.  URL: https://localhost:3000"
+else
+  WAIT_PORT=3002
+  FINAL_MSG="==> notebook-ai ($MODE_MSG) is running.  Frontend: https://localhost:3000  Backend: :3002"
+fi
+
+echo -n "==> Waiting for backend on :$WAIT_PORT"
 for i in $(seq 1 30); do
   if curl -sk --max-time 1 https://localhost:3000/api/auth/status >/dev/null 2>&1; then
     echo " OK"
-    echo "==> notebook-ai ($MODE_MSG) is running.  Frontend: https://localhost:3000  Backend: :3002"
+    echo "$FINAL_MSG"
     exit 0
   fi
   echo -n "."

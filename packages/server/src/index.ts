@@ -1,9 +1,11 @@
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import http from 'http';
+import https from 'https';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import fs from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { SessionManager } from './session.js';
 import { NotebookStore } from './notebook-store.js';
@@ -24,7 +26,25 @@ import { GitWatcher, FileWatcher } from './watcher.js';
 // ── App setup ────────────────────────────────────────────────────────────────
 
 const app = express();
-const server = http.createServer(app);
+
+// In production, use HTTPS with self-signed cert; in dev, use HTTP (Vite handles HTTPS)
+let server: http.Server | https.Server;
+if (process.env['NODE_ENV'] === 'production') {
+  const certPath = path.resolve(import.meta.dirname, '../../web/localhost.pem');
+  const keyPath = path.resolve(import.meta.dirname, '../../web/localhost-key.pem');
+  try {
+    const cert = fs.readFileSync(certPath);
+    const key = fs.readFileSync(keyPath);
+    server = https.createServer({ cert, key }, app);
+    console.log('[server] HTTPS enabled (production mode)');
+  } catch {
+    console.warn('[server] SSL certs not found, falling back to HTTP');
+    server = http.createServer(app);
+  }
+} else {
+  server = http.createServer(app);
+}
+
 const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
 app.use(express.json());
@@ -88,6 +108,18 @@ app.use('/api/projects', createProjectsRouter(db, sessionManager, notebookStore,
 app.use('/api/projects', createGitRouter(db));
 app.use('/api/plugin', createPluginRouter());
 app.use('/api/commands', commandsRouter);
+
+// ── Production: serve frontend static files ─────────────────────────────────
+
+if (process.env['NODE_ENV'] === 'production') {
+  const webDistPath = path.resolve(import.meta.dirname, '../../web/dist');
+  app.use(express.static(webDistPath));
+  // SPA fallback: serve index.html for non-API routes
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) return next();
+    res.sendFile(path.join(webDistPath, 'index.html'));
+  });
+}
 
 // ── Watchers (push-based change detection) ──────────────────────────────────
 
