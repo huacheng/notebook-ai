@@ -41,6 +41,17 @@ export const MAX_QUEUE_IMAGES_SIZE = 30 * 1024 * 1024;
 /** Base64 to bytes conversion ratio (base64 encoding adds ~33% overhead) */
 export const BASE64_TO_BYTES_RATIO = 0.75;
 
+// ── Heartbeat Constants ───────────────────────────────────────────────────────
+
+/** Heartbeat check interval (30 seconds) */
+export const HEARTBEAT_INTERVAL_MS = 30 * 1000;
+
+/** Threshold for detecting stuck cells (120 seconds without output) */
+export const STUCK_THRESHOLD_MS = 120 * 1000;
+
+/** Maximum retry attempts for stuck cells before giving up */
+export const MAX_STUCK_RETRIES = 3;
+
 // ── Claude settings model helper ─────────────────────────────────────────────
 
 /**
@@ -138,6 +149,12 @@ interface NotebookSession {
   _queueVersion: number;
   /** Debounced queue file saver. */
   _saveQueue: ((items: QueuedPrompt[], version: number) => void) & { flush: () => Promise<void> };
+  /** Heartbeat: last time output was received from agent (ms timestamp). */
+  _lastOutputTime: number;
+  /** Heartbeat: number of "继续" retries sent for current stuck cell. */
+  _stuckRetryCount: number;
+  /** Heartbeat: interval timer reference. */
+  _heartbeatTimer: ReturnType<typeof setInterval> | null;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -257,6 +274,9 @@ export class SessionManager {
       _promptQueue: queueData.items,
       _queueVersion: queueData.version,
       _saveQueue: saveQueue,
+      _lastOutputTime: Date.now(),
+      _stuckRetryCount: 0,
+      _heartbeatTimer: null,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -277,6 +297,9 @@ export class SessionManager {
 
     this.sessions.set(sessionName, session);
     console.log(`[session] Created session "${sessionName}" for "${notebookPath}"`);
+
+    // Start heartbeat timer for stuck detection and queue processing
+    this.startHeartbeat(sessionName);
 
     return session;
   }
@@ -539,6 +562,9 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    // Stop heartbeat timer
+    this.stopHeartbeat(session);
+
     // D3: Await any pending post-completion work (git commit + autoSave) before closing
     await session._pendingPostComplete.catch(() => {});
 
@@ -797,6 +823,9 @@ export class SessionManager {
     }
     session.notebook = updateCellStatus(session.notebook, cellId, status);
 
+    // Heartbeat: reset stuck retry count on successful completion
+    session._stuckRetryCount = 0;
+
     const startMs = session._execStartTimes.get(cellId);
     const duration_ms = startMs ? Date.now() - startMs : 0;
     session._execStartTimes.delete(cellId);
@@ -887,6 +916,78 @@ export class SessionManager {
     this.executeCell(session.id, cellId, prompt.source, prompt.images).catch((err) => {
       console.error(`[session ${session.id}] Queue execute failed:`, err);
     });
+  }
+
+  // ── Heartbeat Mechanism ─────────────────────────────────────────────────────
+
+  /**
+   * Start heartbeat timer for a session.
+   * Checks for stuck cells and processes queue periodically.
+   */
+  startHeartbeat(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    // Don't start if already running
+    if (session._heartbeatTimer) return;
+
+    session._heartbeatTimer = setInterval(() => {
+      this.heartbeatCheck(session);
+    }, HEARTBEAT_INTERVAL_MS);
+
+    console.log(`[session ${sessionId}] Heartbeat started (${HEARTBEAT_INTERVAL_MS / 1000}s interval)`);
+  }
+
+  /**
+   * Stop heartbeat timer for a session.
+   */
+  stopHeartbeat(session: NotebookSession): void {
+    if (session._heartbeatTimer) {
+      clearInterval(session._heartbeatTimer);
+      session._heartbeatTimer = null;
+    }
+  }
+
+  /**
+   * Heartbeat check: detect stuck cells and process queue.
+   */
+  private heartbeatCheck(session: NotebookSession): void {
+    const runningCellId = findRunningCellId(session.notebook);
+
+    if (runningCellId) {
+      // Check if cell is stuck (no output for STUCK_THRESHOLD_MS)
+      const now = Date.now();
+      const elapsed = now - session._lastOutputTime;
+
+      if (elapsed > STUCK_THRESHOLD_MS) {
+        // Cell appears stuck
+        if (session._stuckRetryCount < MAX_STUCK_RETRIES) {
+          session._stuckRetryCount++;
+          console.log(
+            `[session ${session.id}] Cell "${runningCellId}" stuck (${Math.round(elapsed / 1000)}s), ` +
+            `sending "继续" (retry ${session._stuckRetryCount}/${MAX_STUCK_RETRIES})`
+          );
+
+          // Send "继续" as a new prompt to unstick
+          const continuePrompt = '继续';
+          try {
+            session.agentProcess.sendPrompt(continuePrompt);
+          } catch (err) {
+            console.error(`[session ${session.id}] Failed to send continue prompt:`, err);
+          }
+
+          // Reset output time to avoid immediate re-trigger
+          session._lastOutputTime = Date.now();
+        } else {
+          console.warn(
+            `[session ${session.id}] Cell "${runningCellId}" still stuck after ${MAX_STUCK_RETRIES} retries`
+          );
+        }
+      }
+    } else {
+      // No running cell — check if queue needs processing
+      this.processNextQueueItem(session);
+    }
   }
 
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */
@@ -989,6 +1090,9 @@ export class SessionManager {
           }
 
           if (output) {
+            // Heartbeat: update last output time
+            session._lastOutputTime = Date.now();
+
             // D1: Only persist AskUserQuestion tool calls (user choices must survive reload)
             const shouldPersist = output.type !== 'tool_use' ||
               (output.type === 'tool_use' && output.name === 'AskUserQuestion');
