@@ -74,7 +74,19 @@ app.options('/{*path}', (_req, res) => {
 
 app.use('/api/auth', createAuthRouter());
 
-// Auth middleware — protects all routes below this point.
+// ── Production: serve frontend static files (before auth) ───────────────────
+
+if (process.env['NODE_ENV'] === 'production') {
+  const webDistPath = path.resolve(import.meta.dirname, '../../web/dist');
+  app.use(express.static(webDistPath));
+  // SPA fallback: serve index.html for non-API routes
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) return next();
+    res.sendFile(path.join(webDistPath, 'index.html'));
+  });
+}
+
+// Auth middleware — protects all API routes below this point.
 app.use(authMiddleware);
 
 // ── Singletons ───────────────────────────────────────────────────────────────
@@ -108,18 +120,6 @@ app.use('/api/projects', createProjectsRouter(db, sessionManager, notebookStore,
 app.use('/api/projects', createGitRouter(db));
 app.use('/api/plugin', createPluginRouter());
 app.use('/api/commands', commandsRouter);
-
-// ── Production: serve frontend static files ─────────────────────────────────
-
-if (process.env['NODE_ENV'] === 'production') {
-  const webDistPath = path.resolve(import.meta.dirname, '../../web/dist');
-  app.use(express.static(webDistPath));
-  // SPA fallback: serve index.html for non-API routes
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) return next();
-    res.sendFile(path.join(webDistPath, 'index.html'));
-  });
-}
 
 // ── Watchers (push-based change detection) ──────────────────────────────────
 
