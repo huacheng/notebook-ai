@@ -104,4 +104,29 @@ describe('Session Heartbeat Mechanism', () => {
       expect(src).toMatch(/_stuckRetryCount\s*=\s*0/);
     });
   });
+
+  describe('Tool execution awareness', () => {
+    it('should track pending tool_use IDs in session', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_pendingToolUseIds');
+    });
+
+    it('should add tool_use_id to pending set when tool_use received', () => {
+      const src = sessionSrc();
+      // When processing tool_use block, should add to pending set
+      expect(src).toMatch(/_pendingToolUseIds\.add\(/);
+    });
+
+    it('should remove tool_use_id from pending set when tool_result received', () => {
+      const src = sessionSrc();
+      // When processing tool_result, should remove from pending set
+      expect(src).toMatch(/_pendingToolUseIds\.delete\(/);
+    });
+
+    it('should skip stuck detection when tool is pending', () => {
+      const src = sessionSrc();
+      // heartbeatCheck should check _pendingToolUseIds.size before stuck detection
+      expect(src).toMatch(/_pendingToolUseIds\.size\s*[><=]/);
+    });
+  });
 });

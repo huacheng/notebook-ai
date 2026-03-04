@@ -155,6 +155,8 @@ interface NotebookSession {
   _stuckRetryCount: number;
   /** Heartbeat: interval timer reference. */
   _heartbeatTimer: ReturnType<typeof setInterval> | null;
+  /** Heartbeat: tool_use IDs awaiting tool_result (tool execution in progress). */
+  _pendingToolUseIds: Set<string>;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -277,6 +279,7 @@ export class SessionManager {
       _lastOutputTime: Date.now(),
       _stuckRetryCount: 0,
       _heartbeatTimer: null,
+      _pendingToolUseIds: new Set(),
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -955,6 +958,11 @@ export class SessionManager {
     const runningCellId = findRunningCellId(session.notebook);
 
     if (runningCellId) {
+      // Skip stuck detection if tools are executing (waiting for tool_result)
+      if (session._pendingToolUseIds.size > 0) {
+        return;
+      }
+
       // Check if cell is stuck (no output for STUCK_THRESHOLD_MS)
       const now = Date.now();
       const elapsed = now - session._lastOutputTime;
@@ -1087,6 +1095,8 @@ export class SessionManager {
               input: block.input,
               timestamp: new Date().toISOString(),
             };
+            // Heartbeat: track pending tool execution (awaiting tool_result)
+            session._pendingToolUseIds.add(block.id);
           }
 
           if (output) {
@@ -1191,6 +1201,9 @@ export class SessionManager {
           const cellId = findCellByToolUseId(session.notebook, block.tool_use_id)
             ?? findRunningCellId(session.notebook);
           if (!cellId) continue;
+
+          // Heartbeat: tool execution completed, remove from pending
+          session._pendingToolUseIds.delete(block.tool_use_id);
 
           const content =
             typeof block.content === 'string'
