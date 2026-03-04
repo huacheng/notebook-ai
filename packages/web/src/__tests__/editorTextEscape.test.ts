@@ -13,12 +13,10 @@ const src = readFileSync(
  */
 describe('FileViewerEditor text escape (P0-2)', () => {
   it('should HTML-escape text content before inserting into pre/code', () => {
-    const editorBlock = src.slice(
-      src.indexOf('useEditor('),
-      src.indexOf('});', src.indexOf('useEditor(')) + 3,
-    );
-    // Should contain escaping logic
-    const hasEscape = /escapeHtml|\.replace\(.*[<&]|DOMPurify|sanitize/.test(editorBlock);
+    // Should contain escaping logic somewhere in the file (initialContent or useEditor)
+    const hasEscape = /escapeHtml|\.replace\(.*[<&]|DOMPurify|sanitize/.test(src);
     expect(hasEscape).toBe(true);
+    // Text format should also be handled with escape
+    expect(src).toMatch(/replace\([^)]*&lt;|replace\([^)]*&amp;|replace\([^)]*<.*replace\([^)]*>/);
   });
 });

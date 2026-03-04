@@ -62,3 +62,52 @@ describe('InteractiveOptions answer submission', () => {
     expect(src).toMatch(/answered.*Submitted|interactive-options--answered/);
   });
 });
+
+describe('InteractiveOptions useEffect sync (notebook reopen)', () => {
+  it('should have useEffect to sync answered state when initialAnswered changes', () => {
+    const src = readFileSync(
+      path.resolve(__dirname, '../components/InteractiveOptions.tsx'),
+      'utf-8'
+    );
+
+    // useEffect should sync answered state when initialAnswered becomes true
+    expect(src).toContain('useEffect');
+    expect(src).toMatch(/initialAnswered.*setAnswered|setAnswered.*initialAnswered/);
+  });
+});
+
+describe('InteractiveOptions disabled button styles', () => {
+  it('should have pointer-events: none for disabled buttons', () => {
+    const css = readFileSync(
+      path.resolve(__dirname, '../styles.css'),
+      'utf-8'
+    );
+
+    // Disabled buttons should not be clickable
+    const disabledSection = css.match(/\.interactive-option-card:disabled\s*\{[^}]+\}/);
+    expect(disabledSection).not.toBeNull();
+    expect(disabledSection![0]).toContain('pointer-events: none');
+  });
+
+  it('should have opacity reduction for disabled buttons', () => {
+    const css = readFileSync(
+      path.resolve(__dirname, '../styles.css'),
+      'utf-8'
+    );
+
+    // Disabled buttons should look visually disabled
+    const disabledSection = css.match(/\.interactive-option-card:disabled\s*\{[^}]+\}/);
+    expect(disabledSection).not.toBeNull();
+    expect(disabledSection![0]).toMatch(/opacity:\s*0\.\d/);
+  });
+
+  it('should keep selected option visible when answered', () => {
+    const css = readFileSync(
+      path.resolve(__dirname, '../styles.css'),
+      'utf-8'
+    );
+
+    // Selected option should remain highlighted in answered state
+    expect(css).toContain('.interactive-options--answered .interactive-option-card--selected');
+  });
+});

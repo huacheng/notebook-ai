@@ -33,6 +33,70 @@ import {
 } from '../utils/annotationHighlight';
 
 import { isJsonFile, formatJsonContent } from '../utils/jsonFormat';
+import hljs from 'highlight.js/lib/core';
+// Register commonly used languages
+import python from 'highlight.js/lib/languages/python';
+import rust from 'highlight.js/lib/languages/rust';
+import typescript from 'highlight.js/lib/languages/typescript';
+import javascript from 'highlight.js/lib/languages/javascript';
+import cpp from 'highlight.js/lib/languages/cpp';
+import c from 'highlight.js/lib/languages/c';
+import java from 'highlight.js/lib/languages/java';
+import go from 'highlight.js/lib/languages/go';
+import bash from 'highlight.js/lib/languages/bash';
+import sql from 'highlight.js/lib/languages/sql';
+import css from 'highlight.js/lib/languages/css';
+import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
+
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('rust', rust);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('c', c);
+hljs.registerLanguage('java', java);
+hljs.registerLanguage('go', go);
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('sql', sql);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('yaml', yaml);
+
+// Extension to highlight.js language mapping
+const CODE_EXT_MAP: Record<string, string> = {
+  py: 'python',
+  rs: 'rust',
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  c: 'c',
+  h: 'c',
+  cpp: 'cpp',
+  hpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  java: 'java',
+  go: 'go',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  sql: 'sql',
+  css: 'css',
+  html: 'xml',
+  htm: 'xml',
+  xml: 'xml',
+  yaml: 'yaml',
+  yml: 'yaml',
+};
+
+function getCodeLanguage(filename: string): string | null {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return CODE_EXT_MAP[ext] ?? null;
+}
 
 // Set PDF.js worker — served from public/ to avoid pnpm symlink issues
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -130,6 +194,36 @@ function XlsxRenderer({ buffer }: { buffer: Uint8Array }) {
         </div>
       )}
       <div className="fv-render__xlsx-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
+    </div>
+  );
+}
+
+// ── Code Renderer with syntax highlighting ───────────────────────────────
+function CodeRenderer({ content, language }: { content: string; language: string }) {
+  const highlighted = useMemo(() => {
+    try {
+      return hljs.highlight(content, { language }).value;
+    } catch {
+      // Fallback to plain text if highlighting fails
+      return content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+  }, [content, language]);
+
+  const lines = content.split('\n');
+
+  return (
+    <div className="fv-render__code">
+      <div className="fv-code-lines">
+        {lines.map((_, i) => (
+          <div key={i} className="fv-code-line-number">{i + 1}</div>
+        ))}
+      </div>
+      <pre className="fv-code-content">
+        <code
+          className={`hljs language-${language}`}
+          dangerouslySetInnerHTML={{ __html: highlighted }}
+        />
+      </pre>
     </div>
   );
 }
@@ -296,6 +390,7 @@ export function FileViewerRender({
   }, [onPdfVisiblePage]);
   const isMd = filename.endsWith('.md');
   const isJson = isJsonFile(filename);
+  const codeLanguage = getCodeLanguage(filename);
 
   // ── Markdown enhancements ──────────────────────────────────────────────
   const mdRef = useRef<HTMLDivElement>(null);
@@ -573,7 +668,10 @@ export function FileViewerRender({
           {!isMd && isJson && (
             <pre className="fv-render__json">{formatJsonContent(content)}</pre>
           )}
-          {!isMd && !isJson && (
+          {!isMd && !isJson && codeLanguage && (
+            <CodeRenderer content={content} language={codeLanguage} />
+          )}
+          {!isMd && !isJson && !codeLanguage && (
             <pre className="fv-render__text">{content}</pre>
           )}
         </div>

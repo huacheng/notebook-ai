@@ -2140,6 +2140,15 @@ textarea.cell-input {
 }
 .interactive-option-card:disabled {
   cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+  background: var(--bg-cell);
+}
+/* Keep selected option visible when answered */
+.interactive-options--answered .interactive-option-card--selected {
+  opacity: 1;
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
 }
 .interactive-option-check {
   flex-shrink: 0;
@@ -4876,6 +4885,48 @@ button:focus-visible {
   overflow: auto;
   color: var(--text-primary);
 }
+
+/* ── Code syntax highlighting ──────────────────────────────────── */
+.fv-render__code {
+  display: flex;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  overflow: auto;
+  background: #0d1117;
+  border-radius: var(--radius-md);
+}
+.fv-code-lines {
+  flex-shrink: 0;
+  padding: var(--space-md) 0;
+  background: #161b22;
+  border-right: 1px solid #30363d;
+  user-select: none;
+}
+.fv-code-line-number {
+  padding: 0 var(--space-md);
+  text-align: right;
+  color: #6e7681;
+  min-width: 3em;
+}
+.fv-code-content {
+  flex: 1;
+  margin: 0;
+  padding: var(--space-md);
+  overflow-x: auto;
+  background: transparent;
+}
+.fv-code-content code {
+  font-family: var(--font-mono);
+  font-size: inherit;
+  line-height: inherit;
+}
+/* Use github-dark theme colors for code blocks */
+.fv-code-content .hljs {
+  color: #c9d1d9;
+  background: transparent;
+}
+
 .fv-render__markdown,
 .fv-render__html,
 .output-text-md {

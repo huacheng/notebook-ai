@@ -1,4 +1,4 @@
-import { useState, useRef, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import type { AskQuestion } from '../utils/interactiveOptions';
 import { formatAnswer } from '../utils/interactiveOptions';
 
@@ -14,6 +14,13 @@ export function InteractiveOptions({ questions, onSelect, initialAnswered = fals
   const [otherTexts, setOtherTexts] = useState<string[]>(() => questions.map(() => ''));
   const [declineReason, setDeclineReason] = useState('');
   const otherRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Sync answered state when initialAnswered changes (e.g., notebook reopened)
+  useEffect(() => {
+    if (initialAnswered && !answered) {
+      setAnswered(true);
+    }
+  }, [initialAnswered, answered]);
 
   const isSingleQuestion = questions.length === 1;
   const isSingleSelect = isSingleQuestion && !questions[0].multiSelect;

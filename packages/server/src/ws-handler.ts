@@ -182,6 +182,7 @@ export function setupWebSocket(
     source: 'workspace' | 'library' | 'deliverables';
     projectId?: string;
     basedir: string;
+    originalPath: string; // The path the client sent (relative), used for sending back updates
   }
   /** filePath → Set of clients that have this file open */
   const fileOpenSubscriptions = new Map<string, Map<string, FileOpenClient>>();
@@ -223,7 +224,8 @@ export function setupWebSocket(
         if (client.ws.readyState !== client.ws.OPEN) continue;
 
         const session_id = client.sessionId;
-        sendToClient(client.ws, { type: 'file-changed-meta', session_id, path: filePath, mtime: stat.mtimeMs, format });
+        const clientPath = client.originalPath; // Use the path the client sent, not the resolved absolute path
+        sendToClient(client.ws, { type: 'file-changed-meta', session_id, path: clientPath, mtime: stat.mtimeMs, format });
 
         const stream = createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
         let chunkIndex = 0;
@@ -236,7 +238,7 @@ export function setupWebSocket(
               sendToClient(client.ws, {
                 type: 'file-changed-chunk-compressed',
                 session_id,
-                path: filePath,
+                path: clientPath,
                 data: compressed.toString('base64'),
                 encoding: isBinary ? 'base64' : 'utf8',
                 compression: 'lz4',
@@ -244,9 +246,9 @@ export function setupWebSocket(
               });
             } else {
               if (isBinary) {
-                sendToClient(client.ws, { type: 'file-changed-chunk', session_id, path: filePath, data: chunkBuffer.toString('base64'), encoding: 'base64' });
+                sendToClient(client.ws, { type: 'file-changed-chunk', session_id, path: clientPath, data: chunkBuffer.toString('base64'), encoding: 'base64' });
               } else {
-                sendToClient(client.ws, { type: 'file-changed-chunk', session_id, path: filePath, data: chunkBuffer.toString('utf-8'), encoding: 'utf8' });
+                sendToClient(client.ws, { type: 'file-changed-chunk', session_id, path: clientPath, data: chunkBuffer.toString('utf-8'), encoding: 'utf8' });
               }
             }
           });
@@ -254,7 +256,7 @@ export function setupWebSocket(
           stream.on('error', reject);
         });
 
-        sendToClient(client.ws, { type: 'file-changed-end', session_id, path: filePath, mtime: stat.mtimeMs });
+        sendToClient(client.ws, { type: 'file-changed-end', session_id, path: clientPath, mtime: stat.mtimeMs });
       }
     } catch (err) {
       console.error('[ws] pushFileUpdate error:', err);
@@ -750,12 +752,11 @@ export function setupWebSocket(
                 clients = new Map();
                 fileOpenSubscriptions.set(safePath, clients);
               }
-              clients.set(clientId, { ws, sessionId: session_id, source: source as 'workspace' | 'library' | 'deliverables', projectId: project_id, basedir });
+              clients.set(clientId, { ws, sessionId: session_id, source: source as 'workspace' | 'library' | 'deliverables', projectId: project_id, basedir, originalPath: filePath });
 
               // Start file watcher if this is the first client
               if (!fileWatcherUnsubscribers.has(safePath)) {
                 const dirPath = path.dirname(safePath);
-                const fileName = path.basename(safePath);
                 const unsub = fileWatcher.subscribe(dirPath, async () => {
                   // Check if this specific file changed
                   try {
@@ -766,9 +767,9 @@ export function setupWebSocket(
                     const fileClients = fileOpenSubscriptions.get(safePath);
                     if (fileClients) {
                       for (const [, client] of fileClients) {
-                        sendToClient(client.ws, { type: 'file-deleted', session_id: client.sessionId, path: filePath });
+                        sendToClient(client.ws, { type: 'file-deleted', session_id: client.sessionId, path: client.originalPath });
                         // D1: cleanup orphaned annotations when file is deleted
-                        db.deleteFileAnnotations(client.sessionId, filePath);
+                        db.deleteFileAnnotations(client.sessionId, client.originalPath);
                       }
                     }
                   }
