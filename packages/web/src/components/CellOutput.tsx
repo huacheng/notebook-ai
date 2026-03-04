@@ -200,16 +200,15 @@ function InteractiveOptionsWrapper({ item, cellId }: { item: ToolItem; cellId?: 
       questions={questions}
       initialAnswered={isAnswered}
       onSelect={(answer) => {
-        if (!sessionId) return;
-
         if (isAutoResponse) {
           // D1/D3: Persist user's actual choice to notebook (replaces "Answer questions?")
-          if (cellId && item.tool_use_id) {
+          // Best-effort: only if we have all required IDs
+          if (sessionId && cellId && item.tool_use_id) {
             updateToolResultLocal(sessionId, cellId, item.tool_use_id, answer);
           }
           // Claude Code auto-responded - send a follow-up prompt with the user's choice
           submitPrompt(`用户选择了: ${answer}`);
-        } else if (item.tool_use_id) {
+        } else if (sessionId && item.tool_use_id) {
           // Normal case - send tool_result
           submitToolResult(sessionId, item.tool_use_id, answer);
         }
