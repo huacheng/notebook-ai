@@ -7,6 +7,7 @@ import { runRenameFlow, type RenamePhase } from './renameFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
 import { validateTitle, MAX_TITLE_LENGTH } from '../utils/validateTitle';
 import { useWatcher } from '../hooks/useWatcher';
+import { NotebookDeleteModal } from './NotebookDeleteModal';
 
 function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   phase: 'creating' | 'done' | 'error';
@@ -455,11 +456,22 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
 
   useEffect(() => {
     if (showDeleteModal) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    // Delay adding listener to avoid capturing the click that just closed the modal
+    const timeoutId = setTimeout(() => {
+      const handler = (e: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+      };
+      document.addEventListener('mousedown', handler);
+      (window as any).__nbMenuHandler = handler; // Store for cleanup
+    }, 100);
+    return () => {
+      clearTimeout(timeoutId);
+      const handler = (window as any).__nbMenuHandler;
+      if (handler) {
+        document.removeEventListener('mousedown', handler);
+        delete (window as any).__nbMenuHandler;
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
   }, [onClose, showDeleteModal]);
 
   const handleExport = async () => {
@@ -478,6 +490,12 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
   };
 
   const displayName = relPath.split('/').pop() || relPath;
+  const isWorktree = relPath.includes('.worktrees/');
+
+  // Infer branch name from worktree path: .worktrees/task-xxx → task/xxx
+  const branchName = isWorktree
+    ? 'task/' + (displayName.startsWith('task-') ? displayName.slice(5) : displayName)
+    : '';
 
   // Use fixed positioning when anchorRect is provided
   const style: React.CSSProperties = anchorRect ? {
@@ -486,6 +504,13 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
     right: window.innerWidth - anchorRect.right,
   } : {};
 
+  const handleDeleteDone = () => {
+    useStore.getState().closeProjectFileTabs(projectId, relPath.endsWith('/') ? relPath : relPath + '/');
+    setShowDeleteModal(false);
+    onClose();
+    onDeleted?.();
+  };
+
   return (
     <>
       <div className="project-item-menu" ref={menuRef} style={style}>
@@ -493,15 +518,22 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
         {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
         <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>{t('sidebar.delete')}</button>
       </div>
-      {showDeleteModal && (
+      {showDeleteModal && isWorktree && (
+        <NotebookDeleteModal
+          name={displayName}
+          branchName={branchName}
+          onMergeDelete={() => deleteProjectNotebook(projectId, relPath, true)}
+          onDeleteOnly={() => deleteProjectNotebook(projectId, relPath, false)}
+          onCancel={() => { setShowDeleteModal(false); onClose(); }}
+          onDone={handleDeleteDone}
+        />
+      )}
+      {showDeleteModal && !isWorktree && (
         <ConfirmDeleteModal
           name={displayName}
           onCancel={() => { setShowDeleteModal(false); onClose(); }}
           onConfirm={() => deleteProjectNotebook(projectId, relPath)}
-          onDone={() => {
-            useStore.getState().closeProjectFileTabs(projectId, relPath.endsWith('/') ? relPath : relPath + '/');
-            setShowDeleteModal(false); onClose(); onDeleted?.();
-          }}
+          onDone={handleDeleteDone}
         />
       )}
     </>

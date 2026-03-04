@@ -186,4 +186,47 @@ export class GitManager {
     }
     return worktrees;
   }
+
+  /** Get the main branch name (master or main) */
+  async getMainBranch(_repoDir: string): Promise<string> {
+    const branches = await this.git.branch(['-l']);
+    if (branches.all.includes('main')) return 'main';
+    return 'master';
+  }
+
+  /**
+   * Merge a branch into main/master with --no-ff.
+   * Returns success status and message.
+   */
+  async mergeBranchToMain(_repoDir: string, branchName: string): Promise<{ success: boolean; message: string }> {
+    const mainBranch = await this.getMainBranch(_repoDir);
+
+    try {
+      // Ensure we're on the main branch
+      await this.git.checkout(mainBranch);
+
+      // Merge with --no-ff to preserve branch history
+      await this.git.merge([branchName, '--no-ff', '-m', `Merge branch '${branchName}' into ${mainBranch}`]);
+
+      return { success: true, message: `Successfully merged ${branchName} into ${mainBranch}` };
+    } catch (err) {
+      // Abort the merge if it failed
+      try {
+        await this.git.merge(['--abort']);
+      } catch {
+        // Ignore abort errors
+      }
+
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('CONFLICT') || message.includes('conflict')) {
+        return { success: false, message: `Merge conflict: ${branchName} has conflicts with ${mainBranch}` };
+      }
+      return { success: false, message: `Merge failed: ${message}` };
+    }
+  }
+
+  /** Delete a local branch (force) */
+  async deleteBranch(_repoDir: string, branchName: string): Promise<void> {
+    await this.git.branch(['-D', branchName]);
+  }
 }

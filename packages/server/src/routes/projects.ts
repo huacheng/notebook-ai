@@ -750,12 +750,46 @@ export function createProjectsRouter(
 
       // Remove notebook directory from disk (and git worktree if applicable)
       if (nbDir !== project.path) {
-        // If it's a worktree, remove via git first (cleans up .git/worktrees/ ref)
+        // If it's a worktree, handle merge option and branch cleanup
         if (nbDir.includes('/.worktrees/')) {
+          const git = new GitManager(project.path);
+          const merge = req.query['merge'] === 'true';
+
+          // Get branch name from worktree list
+          let branchName: string | undefined;
           try {
-            const git = new GitManager(project.path);
+            const worktrees = await git.listWorktrees();
+            const wt = worktrees.find((w) => w.path === nbDir);
+            if (wt) branchName = wt.branch;
+          } catch (_err: unknown) { /* ignore */ }
+
+          // Fallback: infer branch from directory name (task-xxx → task/xxx)
+          if (!branchName) {
+            const dirName = path.basename(nbDir);
+            if (dirName.startsWith('task-')) {
+              branchName = 'task/' + dirName.slice(5);
+            }
+          }
+
+          // If merge requested and we have a branch, merge to main first
+          if (merge && branchName) {
+            const mergeResult = await git.mergeBranchToMain(project.path, branchName);
+            if (!mergeResult.success) {
+              return res.status(409).json({ error: mergeResult.message });
+            }
+          }
+
+          // Remove the worktree
+          try {
             await git.removeWorktree(nbDir);
           } catch (_err: unknown) { /* fallback to rm below */ }
+
+          // Delete the branch after worktree is removed
+          if (branchName) {
+            try {
+              await git.deleteBranch(project.path, branchName);
+            } catch (_err: unknown) { /* branch might not exist */ }
+          }
         }
         await rm(nbDir, { recursive: true, force: true }).catch(() => {});
       }

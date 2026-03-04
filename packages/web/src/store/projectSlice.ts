@@ -87,10 +87,11 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     if (res.ok) await get().fetchProjects();
   },
 
-  deleteProjectNotebook: async (projectId: string, notebookRelPath: string) => {
+  deleteProjectNotebook: async (projectId: string, notebookRelPath: string, merge = false) => {
     const token = get().authToken;
+    const mergeParam = merge ? '&merge=true' : '';
     const res = await fetch(
-      `/api/projects/${projectId}/notebooks/by-path?path=${encodeURIComponent(notebookRelPath)}`,
+      `/api/projects/${projectId}/notebooks/by-path?path=${encodeURIComponent(notebookRelPath)}${mergeParam}`,
       {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},

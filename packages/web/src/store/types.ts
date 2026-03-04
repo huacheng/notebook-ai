@@ -190,7 +190,7 @@ export interface NotebookStore {
   createProject(title: string): Promise<void>;
   deleteProject(projectId: string): Promise<void>;
   importProject(file: File): Promise<void>;
-  deleteProjectNotebook(projectId: string, notebookRelPath: string): Promise<void>;
+  deleteProjectNotebook(projectId: string, notebookRelPath: string, merge?: boolean): Promise<void>;
   importProjectNotebook(projectId: string, file: File): Promise<void>;
   setActiveProject(id: string, path: string): void;
   goBackToProjectList(): void;

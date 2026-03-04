@@ -47,10 +47,16 @@ export const messages: Record<Language, Record<string, string>> = {
     'modal.deleteCells': 'Delete {0} cell(s)?',
     'modal.deleteCellsDesc': 'This will permanently remove the selected cell(s) and their responses.',
     'modal.cancel': 'Cancel',
+    'modal.confirm': 'Confirm',
     'modal.delete': 'Delete',
     'modal.rerunAll': 'Rerun all cells?',
     'modal.rerunAllDesc': 'This will clear all cell outputs, reset the agent session (clean context), and re-execute every cell from scratch.',
     'modal.rerun': 'Rerun',
+
+    // ── Delete Notebook Modal ─────────────────────────────────────────────
+    'delete.confirmTitle': 'Delete "{0}"?',
+    'delete.deleting': 'Deleting...',
+    'delete.success': 'Deleted successfully',
 
     // ── Restart/Save Overlay ─────────────────────────────────────────────
     'overlay.restarting': 'Restarting session...',
@@ -321,10 +327,16 @@ export const messages: Record<Language, Record<string, string>> = {
     'modal.deleteCells': '删除 {0} 个 cell？',
     'modal.deleteCellsDesc': '这将永久删除所选 cell 及其响应。',
     'modal.cancel': '取消',
+    'modal.confirm': '确认',
     'modal.delete': '删除',
     'modal.rerunAll': '重跑所有 cell？',
     'modal.rerunAllDesc': '这将清除所有 cell 输出，重置 agent 会话（清空上下文），并从头重新执行每个 cell。',
     'modal.rerun': '重跑',
+
+    // ── Delete Notebook Modal ─────────────────────────────────────────────
+    'delete.confirmTitle': '删除 "{0}"？',
+    'delete.deleting': '删除中...',
+    'delete.success': '删除成功',
 
     // ── Restart/Save Overlay ─────────────────────────────────────────────
     'overlay.restarting': '正在重启会话...',

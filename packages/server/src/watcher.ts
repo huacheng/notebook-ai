@@ -5,7 +5,7 @@ import fs from 'fs';
 const execFile = promisify(execFileCb);
 
 // ── GitWatcher ────────────────────────────────────────────────────────────────
-// Polls `git rev-parse HEAD` to detect new commits.
+// Polls `git rev-parse HEAD` + branch list to detect new commits and branch changes.
 // Reference-counted: first subscriber starts polling, last unsubscribe stops it.
 
 type GitCallback = (projectId: string, latestHash: string) => void;
@@ -13,6 +13,7 @@ type GitCallback = (projectId: string, latestHash: string) => void;
 interface GitEntry {
   projectId: string;
   lastHash: string;
+  lastBranches: string;
   callbacks: Set<GitCallback>;
   timer: ReturnType<typeof setInterval>;
   debounceTimer: ReturnType<typeof setTimeout> | null;
@@ -34,6 +35,7 @@ export class GitWatcher {
       entry = {
         projectId,
         lastHash: '',
+        lastBranches: '',
         callbacks: new Set([cb]),
         timer: setInterval(() => this.poll(repoPath), this.pollMs),
         debounceTimer: null,
@@ -71,21 +73,29 @@ export class GitWatcher {
     if (!entry) return;
 
     try {
-      const { stdout } = await execFile('git', ['rev-parse', 'HEAD'], {
-        cwd: repoPath,
-        timeout: 3000,
-      });
-      const hash = stdout.trim();
+      // Check HEAD and branch list in parallel
+      const [headResult, branchResult] = await Promise.all([
+        execFile('git', ['rev-parse', 'HEAD'], { cwd: repoPath, timeout: 3000 }),
+        execFile('git', ['branch', '-l', '--format=%(refname:short)'], { cwd: repoPath, timeout: 3000 }),
+      ]);
+
+      const hash = headResult.stdout.trim();
+      const branches = branchResult.stdout.trim();
       if (!hash) return;
 
       if (entry.lastHash === '') {
         // First poll — just record the baseline
         entry.lastHash = hash;
+        entry.lastBranches = branches;
         return;
       }
 
-      if (hash !== entry.lastHash) {
+      const hashChanged = hash !== entry.lastHash;
+      const branchesChanged = branches !== entry.lastBranches;
+
+      if (hashChanged || branchesChanged) {
         entry.lastHash = hash;
+        entry.lastBranches = branches;
         // 200ms debounce to batch rapid changes (rebase, etc.)
         if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
         entry.debounceTimer = setTimeout(() => {
