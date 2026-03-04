@@ -184,6 +184,38 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       const store = get();
       const msgSessionId = envelope.session_id;
       switch (parsed.type) {
+        case 'cell_created':
+          // Multi-device sync: another client created a new cell
+          if (msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) => {
+              // Only add if cell doesn't already exist
+              if (nb.cells.some((c) => c.id === parsed.cell_id)) return nb;
+              return {
+                ...nb,
+                cells: [
+                  ...nb.cells,
+                  {
+                    id: parsed.cell_id,
+                    type: 'prompt' as const,
+                    source: parsed.source ?? '',
+                    outputs: [],
+                    execution_count: 0,
+                    status: 'idle' as const,
+                  },
+                ],
+              };
+            }));
+          }
+          break;
+        case 'cell_status':
+          // Multi-device sync: cell status changed (e.g., running)
+          if (msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) =>
+              setCellStatusInNotebook(nb, parsed.cell_id, parsed.status)));
+          } else {
+            store.setCellStatus(parsed.cell_id, parsed.status);
+          }
+          break;
         case 'cell_output':
           if (msgSessionId) {
             set((state) => applyToSession(state, msgSessionId, (nb) =>

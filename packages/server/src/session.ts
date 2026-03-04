@@ -369,9 +369,21 @@ export class SessionManager {
           },
         ],
       };
+      // Broadcast cell_created to all subscribers for multi-device sync
+      this.broadcast(session, {
+        type: 'cell_created',
+        cell_id: cellId,
+        source,
+      });
     }
 
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
+    // Broadcast cell_status so other clients know execution started
+    this.broadcast(session, {
+      type: 'cell_status',
+      cell_id: cellId,
+      status: 'running',
+    });
     session._execStartTimes.set(cellId, Date.now());
     session._lastCellId = cellId;
 

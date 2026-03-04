@@ -525,6 +525,22 @@ export const CellOutputMessageSchema = z.object({
   output: CellOutputSchema,
 });
 
+// Multi-device sync: broadcast when a new cell is created via execute_request
+export const CellCreatedMessageSchema = z.object({
+  type: z.literal('cell_created'),
+  session_id: z.string(),
+  cell_id: z.string(),
+  source: z.string(),
+});
+
+// Multi-device sync: broadcast when cell status changes (e.g., running)
+export const CellStatusMessageSchema = z.object({
+  type: z.literal('cell_status'),
+  session_id: z.string(),
+  cell_id: z.string(),
+  status: CellStatusSchema,
+});
+
 export const CellStreamMessageSchema = z.object({
   type: z.literal('cell_stream'),
   session_id: z.string(),
@@ -859,6 +875,8 @@ export const QueueErrorSchema = z.object({
 
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
+  CellCreatedMessageSchema,
+  CellStatusMessageSchema,
   CellStreamMessageSchema,
   ExecutionCompleteSchema,
   GitDiffMessageSchema,
@@ -973,6 +991,8 @@ export type Notebook = z.infer<typeof NotebookSchema>;
 
 export type ExecuteRequest = z.infer<typeof ExecuteRequestSchema>;
 export type CellOutputMessage = z.infer<typeof CellOutputMessageSchema>;
+export type CellCreatedMessage = z.infer<typeof CellCreatedMessageSchema>;
+export type CellStatusMessage = z.infer<typeof CellStatusMessageSchema>;
 export type CellStreamMessage = z.infer<typeof CellStreamMessageSchema>;
 export type ExecutionComplete = z.infer<typeof ExecutionCompleteSchema>;
 export type GitDiffMessage = z.infer<typeof GitDiffMessageSchema>;
