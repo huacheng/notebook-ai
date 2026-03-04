@@ -189,11 +189,32 @@ function MobileProjectMenu({ projectId, projectSlug, authToken, onClose, onReque
     onClose();
   };
 
+  // Touch event handlers for immediate response (don't wait for click)
+  const handleRenameTouch = (e: React.TouchEvent) => {
+    e.preventDefault();
+    onClose();
+    onRequestRename();
+  };
+  const handleExportTouch = (e: React.TouchEvent) => {
+    e.preventDefault();
+    handleExport();
+  };
+  const handleDeleteTouch = (e: React.TouchEvent) => {
+    e.preventDefault();
+    onClose();
+    onRequestDelete();
+  };
+
   return (
-    <div className="mobile-item-menu" ref={menuRef} onClick={e => e.stopPropagation()}>
-      <button className="mobile-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>Rename</button>
-      <button className="mobile-item-menu-item" onClick={handleExport}>Export</button>
-      <button className="mobile-item-menu-item mobile-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }}>Delete</button>
+    <div
+      className="mobile-item-menu"
+      ref={menuRef}
+      onClick={e => e.stopPropagation()}
+      onTouchStart={e => e.stopPropagation()}
+    >
+      <button className="mobile-item-menu-item" onClick={() => { onClose(); onRequestRename(); }} onTouchEnd={handleRenameTouch}>Rename</button>
+      <button className="mobile-item-menu-item" onClick={handleExport} onTouchEnd={handleExportTouch}>Export</button>
+      <button className="mobile-item-menu-item mobile-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete(); }} onTouchEnd={handleDeleteTouch}>Delete</button>
     </div>
   );
 }

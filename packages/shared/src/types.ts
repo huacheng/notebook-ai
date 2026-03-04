@@ -531,6 +531,7 @@ export const CellCreatedMessageSchema = z.object({
   session_id: z.string(),
   cell_id: z.string(),
   source: z.string(),
+  images: z.array(PromptImageSchema).optional(),
 });
 
 // Multi-device sync: broadcast when cell status changes (e.g., running)

@@ -198,6 +198,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
                     id: parsed.cell_id,
                     type: 'prompt' as const,
                     source: parsed.source ?? '',
+                    images: parsed.images,
                     outputs: [],
                     execution_count: 0,
                     status: 'idle' as const,

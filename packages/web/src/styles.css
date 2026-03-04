@@ -1446,6 +1446,89 @@ textarea.cell-input {
 }
 
 /* ============================================================
+   Prompt Queue (desktop)
+   ============================================================ */
+.prompt-queue {
+  background: var(--bg-output);
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.prompt-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-xl);
+  background: var(--bg-cell);
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.prompt-queue-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.prompt-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.prompt-queue-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-sm) var(--space-xl);
+  border-bottom: 1px solid var(--border-default);
+  gap: var(--space-md);
+  cursor: grab;
+  transition: background 0.15s ease;
+}
+
+.prompt-queue-item:hover {
+  background: var(--bg-cell-hover);
+}
+
+.prompt-queue-item:active {
+  cursor: grabbing;
+}
+
+.prompt-queue-item:last-child {
+  border-bottom: none;
+}
+
+.prompt-queue-text {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.prompt-queue-delete {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.prompt-queue-delete:hover {
+  color: var(--color-error);
+  background: rgba(220, 38, 38, 0.1);
+}
+
+/* ============================================================
    Bottom input bar (always visible, fixed at bottom of notebook-container)
    ============================================================ */
 .notebook-input-bar {
@@ -3024,7 +3107,7 @@ textarea.cell-input {
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 32px rgba(28, 25, 23, 0.15), 0 2px 8px rgba(28, 25, 23, 0.08);
   padding: var(--space-2xl);
-  min-width: 380px;
+  min-width: min(380px, 90vw);
   max-width: 520px;
   width: 90%;
   animation: modal-enter 0.2s ease-out;
@@ -6915,6 +6998,10 @@ button:focus-visible {
   max-height: 70vh;
   overflow-y: auto;
   z-index: 1000;
+  /* Touch scrolling support */
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
 }
 
 .mobile-actions-header {
@@ -6938,6 +7025,8 @@ button:focus-visible {
 
 .mobile-actions-list {
   padding: var(--space-sm);
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .mobile-action-item {
@@ -7283,6 +7372,66 @@ button:focus-visible {
   padding: var(--space-xl) 0;
 }
 
+/* ── Mobile Prompt Queue ─────────────────────────────────────────────────── */
+.mobile-prompt-queue {
+  position: fixed;
+  bottom: var(--mobile-input-bar-height);
+  left: 0;
+  right: 0;
+  background: var(--bg-output);
+  border-top: 1px solid var(--border-default);
+  z-index: 19;
+  max-height: 30vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-prompt-queue-header {
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-cell);
+  position: sticky;
+  top: 0;
+}
+
+.mobile-prompt-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mobile-prompt-queue-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-default);
+  gap: var(--space-sm);
+}
+
+.mobile-prompt-queue-text {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-prompt-queue-delete {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.mobile-prompt-queue-delete:active {
+  color: var(--color-error);
+}
+
 /* ── Mobile Input Bar ────────────────────────────────────────────────────── */
 .mobile-input-bar,
 .mobile-annotation-bar {
@@ -7365,7 +7514,13 @@ button:focus-visible {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   touch-action: pan-y;
-  padding-bottom: calc(var(--mobile-input-bar-height) + var(--space-lg));
+  /* Extra padding to prevent overlap with fixed input bar + toolbar */
+  padding-bottom: calc(var(--mobile-input-bar-height) + 80px);
+}
+
+/* Extra padding when prompt queue is visible */
+.mobile-notebook-content.has-queue {
+  padding-bottom: calc(var(--mobile-input-bar-height) + 160px);
 }
 
 .mobile-cells {
@@ -7377,8 +7532,9 @@ button:focus-visible {
 /* Mobile scroll-to-bottom floating button */
 .mobile-scroll-to-bottom {
   position: fixed;
-  bottom: calc(var(--mobile-input-bar-height) + var(--space-xl) + 8px);
+  top: 50%;
   right: var(--space-md);
+  transform: translateY(-50%);
   z-index: 100;
   width: 36px;
   height: 36px;
@@ -7403,6 +7559,8 @@ button:focus-visible {
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
+
+/* Scroll button stays vertically centered regardless of queue state */
 
 /* ── Mobile Connection Banner ────────────────────────────────────────────── */
 .mobile-conn-banner {
@@ -7763,6 +7921,10 @@ button:focus-visible {
   .mobile-input-bar,
   .mobile-annotation-bar {
     padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom));
+  }
+
+  .mobile-prompt-queue {
+    bottom: calc(var(--mobile-input-bar-height) + env(safe-area-inset-bottom));
   }
 
   .mobile-footer {

@@ -168,7 +168,7 @@ export function MobileNotebookActions() {
       {/* Actions sheet */}
       {open && (
         <div className="annotation-modal-overlay" onClick={() => setOpen(false)}>
-          <div className="mobile-actions-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="mobile-actions-sheet" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
             <div className="mobile-actions-header">
               <span>{t('status.actions')}</span>
               <button onClick={() => setOpen(false)}>×</button>

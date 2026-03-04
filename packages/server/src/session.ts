@@ -899,7 +899,10 @@ export class SessionManager {
 
     // Process prompt queue: if not interrupted and queue has items, execute next
     if (status !== 'interrupted') {
+      console.log(`[session ${session.id}] completeCell: scheduling processNextQueueItem (status=${status})`);
       setTimeout(() => this.processNextQueueItem(session), 0);
+    } else {
+      console.log(`[session ${session.id}] completeCell: skipping queue (status=${status})`);
     }
   }
 
@@ -908,12 +911,20 @@ export class SessionManager {
    * Dequeues and executes the first prompt if no cell is currently running.
    */
   private processNextQueueItem(session: NotebookSession): void {
+    console.log(`[session ${session.id}] processNextQueueItem called, queue length: ${session._promptQueue.length}`);
+
     // Skip if a cell is already running
     const runningId = findRunningCellId(session.notebook);
-    if (runningId) return;
+    if (runningId) {
+      console.log(`[session ${session.id}] processNextQueueItem: cell ${runningId} still running, skipping`);
+      return;
+    }
 
     // Skip if queue is empty
-    if (session._promptQueue.length === 0) return;
+    if (session._promptQueue.length === 0) {
+      console.log(`[session ${session.id}] processNextQueueItem: queue empty, skipping`);
+      return;
+    }
 
     // Dequeue first item
     const prompt = session._promptQueue.shift()!;
@@ -927,12 +938,13 @@ export class SessionManager {
       version: session._queueVersion,
     });
 
-    // Create and execute new cell
+    // Create new cell
     const cellId = crypto.randomUUID();
     const newCell = {
       id: cellId,
       type: 'prompt' as const,
       source: prompt.source,
+      images: prompt.images,
       status: 'idle' as const,
       execution_count: 0,
       outputs: [] as CellOutput[],
@@ -943,7 +955,16 @@ export class SessionManager {
       cells: [...session.notebook.cells, newCell],
     };
 
+    // Broadcast cell_created to all subscribers (same as normal executeCell flow)
+    this.broadcast(session, {
+      type: 'cell_created',
+      cell_id: cellId,
+      source: prompt.source,
+      images: prompt.images,
+    });
+
     // Execute the cell
+    console.log(`[session ${session.id}] processNextQueueItem: executing queued prompt "${prompt.source.slice(0, 50)}..." as cell ${cellId}`);
     this.executeCell(session.id, cellId, prompt.source, prompt.images).catch((err) => {
       console.error(`[session ${session.id}] Queue execute failed:`, err);
     });

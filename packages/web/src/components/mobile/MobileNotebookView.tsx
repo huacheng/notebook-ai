@@ -35,7 +35,9 @@ export function MobileNotebookView() {
   const notebook = useStore((s) => s.notebook);
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
+  const promptQueue = useStore((s) => s.promptQueue);
   const cells = notebook?.cells ?? [];
+  const hasQueuedPrompts = promptQueue.length > 0;
 
   // File section state (same as desktop for consistency)
   const activeProjectId = useStore((s) => s.activeProjectId);
@@ -185,7 +187,7 @@ export function MobileNotebookView() {
   const title = notebook.metadata?.title || 'Notebook';
 
   return (
-    <div className="mobile-view mobile-notebook-view">
+    <div className={`mobile-view mobile-notebook-view${hasQueuedPrompts ? ' has-queue' : ''}`}>
       <MobileHeader
         title={title}
         showBack
@@ -258,7 +260,7 @@ export function MobileNotebookView() {
       </MobileDrawer>
 
       {/* Notebook content */}
-      <main className="mobile-content mobile-notebook-content" ref={contentRef}>
+      <main className={`mobile-content mobile-notebook-content${hasQueuedPrompts ? ' has-queue' : ''}`} ref={contentRef}>
         <div className="mobile-cells">
           {/* Invisible sentinel for scroll-triggered lazy loading */}
           {cellsOffset > 0 && (
@@ -275,17 +277,18 @@ export function MobileNotebookView() {
           ))}
           <div ref={bottomRef} />
         </div>
-        {/* Scroll-to-bottom floating button (same as desktop) */}
-        {showScrollBtn && (
-          <button
-            className="mobile-scroll-to-bottom"
-            onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-            aria-label={t('notebook.scrollToBottom')}
-          >
-            ↓
-          </button>
-        )}
       </main>
+
+      {/* Scroll-to-bottom floating button - outside scrollable container for stable fixed positioning */}
+      {showScrollBtn && (
+        <button
+          className="mobile-scroll-to-bottom"
+          onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          aria-label={t('notebook.scrollToBottom')}
+        >
+          ↓
+        </button>
+      )}
 
       {/* Prompt queue */}
       <MobilePromptQueue />
@@ -296,6 +299,62 @@ export function MobileNotebookView() {
       {/* Bottom sheets */}
       <MobileModelSheet />
       <MobilePluginSheet />
+
+      {/* Restart overlay */}
+      <MobileRestartOverlay />
+    </div>
+  );
+}
+
+/** Restart overlay for mobile - freezes page during restart */
+function MobileRestartOverlay() {
+  const t = useT();
+  const restartPhase = useStore((s) => s.restartPhase);
+  const restartError = useStore((s) => s.restartError);
+
+  if (restartPhase === 'idle') return null;
+
+  return (
+    <div className="annotation-modal-overlay">
+      <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
+        {restartPhase === 'restarting' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              {t('overlay.restarting')}
+            </p>
+          </div>
+        )}
+        {restartPhase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-completed)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              {t('overlay.restarted')}
+            </p>
+          </div>
+        )}
+        {restartPhase === 'error' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)', color: 'var(--color-error)' }}>&#10007;</div>
+            <p style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-sm)', fontWeight: 500, marginBottom: 'var(--space-md)' }}>
+              {t('overlay.restartFailed', restartError)}
+            </p>
+            <button
+              className="notebook-statusbar-btn"
+              onClick={() => useStore.getState().restartSession()}
+              style={{ marginRight: 'var(--space-sm)' }}
+            >
+              {t('overlay.retry')}
+            </button>
+            <button
+              className="notebook-statusbar-btn"
+              onClick={() => useStore.setState({ restartPhase: 'idle', restartError: '' })}
+            >
+              {t('overlay.close')}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

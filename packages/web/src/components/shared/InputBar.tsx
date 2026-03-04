@@ -39,6 +39,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const submitPrompt = useStore((s) => s.submitPrompt);
+  const queuePrompt = useStore((s) => s.queuePrompt);
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
   const sessionId = useStore((s) => s.sessionId);
   const notebook = useStore((s) => s.notebook);
@@ -87,7 +88,8 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     (c) => c.status === 'running' || c.status === 'pending'
   );
 
-  const disabled = isRunning || uploading || editMode;
+  // Don't disable input when running - allow queueing prompts
+  const disabled = uploading || editMode;
 
   // Auto-resize textarea
   const resize = useCallback(() => {
@@ -146,13 +148,18 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
 
   function handleRun() {
     const source = text.trim();
-    if ((!source && images.length === 0) || isRunning) return;
+    if (!source && images.length === 0) return;
     // Save to prompt history before submitting
     if (source) saveToHistory(source);
     const imgs = images.length > 0
       ? images.map(({ media_type, data }) => ({ media_type, data }))
       : undefined;
-    submitPrompt(source || '(image)', imgs);
+    // If running, queue the prompt instead of submitting immediately
+    if (isRunning) {
+      queuePrompt(source || '(image)', imgs);
+    } else {
+      submitPrompt(source || '(image)', imgs);
+    }
     setText('');
     setImages([]);
     clearDraft(draftKey);
