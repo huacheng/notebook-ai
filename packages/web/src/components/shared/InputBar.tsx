@@ -35,6 +35,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const t = useT();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cmdBtnsRef = useRef<HTMLDivElement>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const submitPrompt = useStore((s) => s.submitPrompt);
@@ -232,6 +233,17 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     textareaRef.current?.focus();
   };
 
+  // Convert vertical scroll to horizontal scroll on command toolbar
+  const handleCmdWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const el = cmdBtnsRef.current;
+    if (!el) return;
+    // Only convert if there's horizontal overflow
+    if (el.scrollWidth > el.clientWidth) {
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    }
+  }, []);
+
   // Command shortcuts
   const commands = [
     { cmd: 'task-ai:target', icon: '🎯' },
@@ -323,7 +335,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
         />
       </div>
       <div className="nb-cmd-toolbar">
-        <div className="nb-cmd-btns">
+        <div className="nb-cmd-btns" ref={cmdBtnsRef} onWheel={handleCmdWheel}>
           {commands.map(({ cmd, icon }) => (
             <button
               key={cmd}
