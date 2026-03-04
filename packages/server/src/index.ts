@@ -49,12 +49,23 @@ const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
 app.use(express.json());
 
+// Build ALLOWED_ORIGINS dynamically from all network interfaces
 const ALLOWED_ORIGINS = new Set([
   'https://localhost:3000',
   'http://localhost:3000',
   'https://127.0.0.1:3000',
   'http://127.0.0.1:3000',
 ]);
+// Add all local IPs (including external) to allowed origins
+for (const ifaces of Object.values(os.networkInterfaces())) {
+  for (const iface of ifaces ?? []) {
+    if (iface.family === 'IPv4') {
+      ALLOWED_ORIGINS.add(`https://${iface.address}:3000`);
+      ALLOWED_ORIGINS.add(`http://${iface.address}:3000`);
+    }
+  }
+}
+console.log('[server] Allowed origins:', [...ALLOWED_ORIGINS]);
 
 app.use((req, res, next) => {
   const origin = req.headers['origin'] ?? '';
