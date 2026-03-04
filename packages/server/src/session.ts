@@ -55,6 +55,9 @@ export const MAX_STUCK_RETRIES = 3;
 /** Prompt sent to unstick a stuck cell */
 export const CONTINUE_PROMPT = '继续';
 
+/** Threshold for notifying user about long-running tool (5 minutes) */
+export const TOOL_LONG_RUNNING_MS = 5 * 60 * 1000;
+
 // ── Claude settings model helper ─────────────────────────────────────────────
 
 /**
@@ -835,8 +838,9 @@ export class SessionManager {
     }
     session.notebook = updateCellStatus(session.notebook, cellId, status);
 
-    // Heartbeat: reset stuck retry count on successful completion
+    // Heartbeat: reset stuck retry count and clear pending tools on completion
     session._stuckRetryCount = 0;
+    session._pendingToolUseIds.clear();
 
     const startMs = session._execStartTimes.get(cellId);
     const duration_ms = startMs ? Date.now() - startMs : 0;
@@ -967,14 +971,24 @@ export class SessionManager {
     const runningCellId = findRunningCellId(session.notebook);
 
     if (runningCellId) {
+      const now = Date.now();
+      const elapsed = now - session._lastOutputTime;
+
       // Skip stuck detection if tools are executing (waiting for tool_result)
       if (session._pendingToolUseIds.size > 0) {
+        // Notify user if tool is taking unusually long
+        if (elapsed > TOOL_LONG_RUNNING_MS) {
+          this.broadcast(session, {
+            type: 'tool_long_running',
+            cell_id: runningCellId,
+            elapsed_ms: elapsed,
+            pending_tools: session._pendingToolUseIds.size,
+          });
+        }
         return;
       }
 
       // Check if cell is stuck (no output for STUCK_THRESHOLD_MS)
-      const now = Date.now();
-      const elapsed = now - session._lastOutputTime;
 
       if (elapsed > STUCK_THRESHOLD_MS) {
         // Cell appears stuck
@@ -982,7 +996,7 @@ export class SessionManager {
           session._stuckRetryCount++;
           console.log(
             `[session ${session.id}] Cell "${runningCellId}" stuck (${Math.round(elapsed / 1000)}s), ` +
-            `sending "继续" (retry ${session._stuckRetryCount}/${MAX_STUCK_RETRIES})`
+            `sending "${CONTINUE_PROMPT}" (retry ${session._stuckRetryCount}/${MAX_STUCK_RETRIES})`
           );
 
           // Send continue prompt to unstick

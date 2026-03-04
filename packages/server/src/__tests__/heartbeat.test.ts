@@ -164,5 +164,32 @@ describe('Session Heartbeat Mechanism', () => {
       // Continue prompt should be a constant, not hardcoded
       expect(src).toMatch(/CONTINUE_PROMPT\s*=/);
     });
+
+    it('should use CONTINUE_PROMPT constant in log messages (D1-2)', () => {
+      const src = sessionSrc();
+      // Log message should interpolate the constant, not hardcode the string
+      expect(src).toMatch(/sending.*\$\{CONTINUE_PROMPT\}/);
+    });
+  });
+
+  describe('Cell completion cleanup (P1: D1-1)', () => {
+    it('should clear pendingToolUseIds in completeCell', () => {
+      const src = sessionSrc();
+      // completeCell should clear pending tool IDs to prevent stuck detection bypass
+      const completeCellMatch = src.match(/completeCell[\s\S]*?_pendingToolUseIds\.clear\(\)/);
+      expect(completeCellMatch).toBeTruthy();
+    });
+  });
+
+  describe('Tool execution timeout feedback (P3: D3-1)', () => {
+    it('should have TOOL_LONG_RUNNING_MS constant', () => {
+      const src = sessionSrc();
+      expect(src).toMatch(/TOOL_LONG_RUNNING_MS\s*=/);
+    });
+
+    it('should broadcast tool_long_running event when tool takes too long', () => {
+      const src = sessionSrc();
+      expect(src).toContain('tool_long_running');
+    });
   });
 });
