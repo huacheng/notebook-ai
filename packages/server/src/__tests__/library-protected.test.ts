@@ -19,7 +19,7 @@ let app: ReturnType<typeof express>;
 beforeEach(async () => {
   tmpDir = await mkdtemp(path.join(os.tmpdir(), 'nb-test-library-'));
   // Point library to our temp dir
-  process.env['NB_WORKSPACE_DIR'] = tmpDir;
+  process.env['NB_WORKSPACES_ROOT'] = tmpDir;
 
   // Create .library structure
   const libDir = path.join(tmpDir, '.library');
@@ -39,7 +39,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  delete process.env['NB_WORKSPACE_DIR'];
+  delete process.env['NB_WORKSPACES_ROOT'];
   await rm(tmpDir, { recursive: true, force: true });
 });
 

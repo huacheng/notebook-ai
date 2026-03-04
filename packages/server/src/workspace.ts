@@ -9,7 +9,7 @@ const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'nb-workspaces');
 export const MEMORY_FILENAME = '.MEMORY.md';
 
 export function getWorkspaceRoot(): string {
-  return process.env['NB_WORKSPACE_DIR'] ?? DEFAULT_WORKSPACE_ROOT;
+  return process.env['NB_WORKSPACES_ROOT'] ?? DEFAULT_WORKSPACE_ROOT;
 }
 
 /**

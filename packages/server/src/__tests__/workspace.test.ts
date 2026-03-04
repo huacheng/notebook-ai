@@ -11,11 +11,11 @@ beforeEach(async () => {
   workspaceDir = path.join(tmpRoot, 'my-notebook');
   await mkdir(workspaceDir, { recursive: true });
   await mkdir(path.join(tmpRoot, '.library'), { recursive: true });
-  process.env['NB_WORKSPACE_DIR'] = tmpRoot;
+  process.env['NB_WORKSPACES_ROOT'] = tmpRoot;
 });
 
 afterEach(async () => {
-  delete process.env['NB_WORKSPACE_DIR'];
+  delete process.env['NB_WORKSPACES_ROOT'];
   await rm(tmpRoot, { recursive: true, force: true });
 });
 

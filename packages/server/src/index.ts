@@ -62,7 +62,7 @@ app.use(authMiddleware);
 const sessionManager = new SessionManager();
 const notebookStore = new NotebookStore();
 const db = new NotebookDb();
-const workspaceRoot = process.env['NB_WORKSPACE_DIR'] ?? path.join(os.homedir(), 'nb-workspaces');
+const workspaceRoot = process.env['NB_WORKSPACES_ROOT'] ?? path.join(os.homedir(), 'nb-workspaces');
 
 // Wire auto-save: when a cell completes, sync cell_count + updated_at to DB.
 sessionManager.onAutoSave = (notebookDbId, cellCount) => {
