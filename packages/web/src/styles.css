@@ -6959,8 +6959,10 @@ button:focus-visible {
   gap: 6px;
   flex-wrap: nowrap;
   overflow-x: auto;
+  overflow-y: hidden; /* Prevent vertical scroll, only horizontal */
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain; /* Prevent scroll chaining to parent */
   min-width: 0; /* Allow horizontal scroll when container shrinks */
   flex: 1 1 0; /* Take available space but allow shrinking */
 }
