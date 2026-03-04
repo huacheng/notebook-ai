@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 
@@ -21,6 +21,8 @@ export function MobileNotebookActions() {
   const editMode = useStore((s) => s.editMode);
   const pendingDeletes = useStore((s) => s.pendingDeletes);
   const setEditMode = useStore((s) => s.setEditMode);
+  const openPluginPanel = useStore((s) => s.openPluginPanel);
+  const openModelPanel = useStore((s) => s.openModelPanel);
 
   const [open, setOpen] = useState(false);
   const [showRerunModal, setShowRerunModal] = useState(false);
@@ -73,40 +75,60 @@ export function MobileNotebookActions() {
 
   const actions = [
     {
+      label: t('toolbar.plugins'),
+      icon: '🧩',
+      onClick: () => { setOpen(false); openPluginPanel(); },
+      disabled: false,
+      group: 'settings',
+    },
+    {
+      label: t('model.title'),
+      icon: '⚙️',
+      onClick: () => { setOpen(false); openModelPanel(); },
+      disabled: false,
+      group: 'settings',
+    },
+    {
       label: editMode ? t('status.done') + (pendingDeletes.size > 0 ? ` (${pendingDeletes.size})` : '') : t('status.edit'),
       icon: editMode ? '✓' : '✏️',
       onClick: handleEditToggle,
       disabled: !connected || isRunning || inSlide,
+      group: 'actions',
     },
     {
       label: isRestarting ? '...' : t('status.restart'),
       icon: '🔄',
       onClick: handleRestart,
       disabled: !connected || isRestarting || editMode,
+      group: 'actions',
     },
     {
       label: t('status.rerun'),
       icon: '▶️',
       onClick: () => { setShowRerunModal(true); setOpen(false); },
       disabled: !connected || isRunning || isRestarting || editMode,
+      group: 'actions',
     },
     {
       label: t('status.save'),
       icon: '💾',
       onClick: handleSave,
       disabled: !connected || editMode,
+      group: 'actions',
     },
     {
       label: t('status.export'),
       icon: '📦',
       onClick: handleExport,
       disabled: !sessionId || editMode,
+      group: 'actions',
     },
     {
       label: inSlide ? t('status.slideBack') : t('status.slideOpen'),
       icon: '📄',
       onClick: handleSlideToggle,
       disabled: editMode,
+      group: 'actions',
     },
   ];
 
@@ -144,15 +166,20 @@ export function MobileNotebookActions() {
             </div>
             <div className="mobile-actions-list">
               {actions.map((action, i) => (
-                <button
-                  key={i}
-                  className="mobile-action-item"
-                  onClick={action.onClick}
-                  disabled={action.disabled}
-                >
-                  <span className="mobile-action-icon">{action.icon}</span>
-                  <span className="mobile-action-label">{action.label}</span>
-                </button>
+                <React.Fragment key={i}>
+                  {/* Add divider between settings and actions groups */}
+                  {i > 0 && actions[i - 1].group !== action.group && (
+                    <div className="mobile-actions-divider" />
+                  )}
+                  <button
+                    className="mobile-action-item"
+                    onClick={action.onClick}
+                    disabled={action.disabled}
+                  >
+                    <span className="mobile-action-icon">{action.icon}</span>
+                    <span className="mobile-action-label">{action.label}</span>
+                  </button>
+                </React.Fragment>
               ))}
             </div>
           </div>
