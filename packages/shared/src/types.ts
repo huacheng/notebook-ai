@@ -694,6 +694,7 @@ export const CellsLoadedSchema = z.object({
 export const CellsRemovedSchema = z.object({
   type: z.literal('cells_removed'),
   session_id: z.string(),
+  cell_ids: z.array(z.string()), // Multi-device sync: which cells were removed
 });
 
 export const CellsRemoveFailedSchema = z.object({

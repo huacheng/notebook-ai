@@ -970,7 +970,8 @@ export function setupWebSocket(
                 updated_at: new Date().toISOString(),
               });
             }
-            sendToClient(ws, { type: 'cells_removed', session_id });
+            // Broadcast to all subscribers for multi-device sync
+            sessionManager.broadcastToSession(session_id, { type: 'cells_removed', session_id, cell_ids });
 
             // Best-effort git commit — fire after cells_removed is already sent
             try {

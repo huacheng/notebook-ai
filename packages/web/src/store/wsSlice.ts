@@ -326,11 +326,15 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             sessionNotice: 'This notebook is already open in another tab. Please close it first.',
           });
           break;
-        case 'cells_removed':
+        case 'cells_removed': {
+          // Multi-device sync: use cell_ids from message, fallback to pendingDeletes for local delete
+          const removedIds = parsed.cell_ids
+            ? new Set(parsed.cell_ids as string[])
+            : get().pendingDeletes;
           set((s) => ({
             notebook: s.notebook ? {
               ...s.notebook,
-              cells: s.notebook.cells.filter((c) => !s.pendingDeletes.has(c.id)),
+              cells: s.notebook.cells.filter((c) => !removedIds.has(c.id)),
             } : null,
             editMode: false,
             pendingDeletes: new Set<string>(),
@@ -338,6 +342,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             editSaveError: '',
           }));
           break;
+        }
         case 'cells_loaded': {
           store.prependCells(parsed.cells, parsed.offset);
           set({ loadingOlderCells: false });

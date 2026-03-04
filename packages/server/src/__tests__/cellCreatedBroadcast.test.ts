@@ -46,6 +46,42 @@ describe('cell_created broadcast (multi-device sync)', () => {
   });
 });
 
+describe('cells_removed broadcast (multi-device sync)', () => {
+  const getWsHandlerSrc = () =>
+    readFileSync(path.resolve(__dirname, '../ws-handler.ts'), 'utf-8');
+
+  it('should broadcast cells_removed to all subscribers, not just the sender', () => {
+    const src = getWsHandlerSrc();
+    // Must use broadcastToSession for cells_removed
+    expect(src).toMatch(/broadcastToSession\([^)]*cells_removed/);
+  });
+
+  it('should include cell_ids in cells_removed broadcast', () => {
+    const src = getWsHandlerSrc();
+    // Other clients need to know which cells were removed
+    expect(src).toMatch(/cells_removed[^}]*cell_ids/);
+  });
+});
+
+describe('frontend cells_removed handling', () => {
+  const getWsSliceSrc = () =>
+    readFileSync(
+      path.resolve(__dirname, '../../../../packages/web/src/store/wsSlice.ts'),
+      'utf-8'
+    );
+
+  it('should handle cells_removed message type', () => {
+    const src = getWsSliceSrc();
+    expect(src).toContain("case 'cells_removed':");
+  });
+
+  it('should remove cells from notebook when cells_removed is received', () => {
+    const src = getWsSliceSrc();
+    // Should filter out the removed cells
+    expect(src).toMatch(/cells_removed[\s\S]*?filter/);
+  });
+});
+
 describe('frontend cell_created handling', () => {
   const getWsSliceSrc = () =>
     readFileSync(
