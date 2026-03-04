@@ -191,5 +191,25 @@ describe('Session Heartbeat Mechanism', () => {
       const src = sessionSrc();
       expect(src).toContain('tool_long_running');
     });
+
+    it('should track _toolLongRunningNotified to prevent spam (D3-1 round 3)', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_toolLongRunningNotified');
+    });
+
+    it('should only broadcast tool_long_running once per tool execution', () => {
+      const src = sessionSrc();
+      // Should check the flag before broadcasting
+      expect(src).toMatch(/!session\._toolLongRunningNotified/);
+      // Should set the flag after broadcasting
+      expect(src).toMatch(/_toolLongRunningNotified\s*=\s*true/);
+    });
+
+    it('should reset _toolLongRunningNotified on tool_result', () => {
+      const src = sessionSrc();
+      // When tool_result arrives, reset the flag
+      const toolResultMatch = src.match(/tool_result[\s\S]*?_toolLongRunningNotified\s*=\s*false/);
+      expect(toolResultMatch).toBeTruthy();
+    });
   });
 });

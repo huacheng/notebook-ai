@@ -163,6 +163,8 @@ interface NotebookSession {
   _heartbeatTimer: ReturnType<typeof setInterval> | null;
   /** Heartbeat: tool_use IDs awaiting tool_result (tool execution in progress). */
   _pendingToolUseIds: Set<string>;
+  /** Heartbeat: flag to prevent repeated tool_long_running notifications. */
+  _toolLongRunningNotified: boolean;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -286,6 +288,7 @@ export class SessionManager {
       _stuckRetryCount: 0,
       _heartbeatTimer: null,
       _pendingToolUseIds: new Set(),
+      _toolLongRunningNotified: false,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -976,8 +979,9 @@ export class SessionManager {
 
       // Skip stuck detection if tools are executing (waiting for tool_result)
       if (session._pendingToolUseIds.size > 0) {
-        // Notify user if tool is taking unusually long
-        if (elapsed > TOOL_LONG_RUNNING_MS) {
+        // Notify user once if tool is taking unusually long (prevent spam)
+        if (elapsed > TOOL_LONG_RUNNING_MS && !session._toolLongRunningNotified) {
+          session._toolLongRunningNotified = true;
           this.broadcast(session, {
             type: 'tool_long_running',
             cell_id: runningCellId,
@@ -1235,8 +1239,9 @@ export class SessionManager {
             ?? findRunningCellId(session.notebook);
           if (!cellId) continue;
 
-          // Heartbeat: tool execution completed, remove from pending
+          // Heartbeat: tool execution completed, remove from pending and reset notification flag
           session._pendingToolUseIds.delete(block.tool_use_id);
+          session._toolLongRunningNotified = false;
 
           const content =
             typeof block.content === 'string'
