@@ -1,6 +1,7 @@
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
 
 const execFile = promisify(execFileCb);
 
@@ -119,8 +120,11 @@ type FileCallback = (dirPath: string) => void;
 
 interface FileEntry {
   callbacks: Set<FileCallback>;
-  watcher: fs.FSWatcher;
+  watcher: fs.FSWatcher | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
+  // For lazy watching: parent watcher when target doesn't exist
+  parentWatcher: fs.FSWatcher | null;
+  parentPath: string | null;
 }
 
 export class FileWatcher {
@@ -136,21 +140,38 @@ export class FileWatcher {
     if (entry) {
       entry.callbacks.add(cb);
     } else {
-      let fsWatcher: fs.FSWatcher;
+      let fsWatcher: fs.FSWatcher | null = null;
+      let parentWatcher: fs.FSWatcher | null = null;
+      let parentPath: string | null = null;
+
       try {
         fsWatcher = fs.watch(dirPath, { recursive: true }, () => {
           this.handleChange(dirPath);
         });
       } catch {
-        // Directory doesn't exist or not watchable — create a stub entry
-        // that will still allow subscribe/unsubscribe tracking
-        fsWatcher = null as any;
+        // Directory doesn't exist — find first existing parent and watch it
+        let candidateParent = path.dirname(dirPath);
+        while (candidateParent && candidateParent !== path.dirname(candidateParent)) {
+          try {
+            fs.statSync(candidateParent);
+            // This parent exists — watch it with recursive to detect nested creation
+            parentPath = candidateParent;
+            parentWatcher = fs.watch(candidateParent, { recursive: true }, () => {
+              this.checkAndUpgrade(dirPath);
+            });
+            break;
+          } catch {
+            candidateParent = path.dirname(candidateParent);
+          }
+        }
       }
 
       entry = {
         callbacks: new Set([cb]),
         watcher: fsWatcher,
         debounceTimer: null,
+        parentWatcher,
+        parentPath,
       };
       this.watchers.set(dirPath, entry);
 
@@ -158,6 +179,17 @@ export class FileWatcher {
       if (fsWatcher) {
         fsWatcher.on('error', () => {
           this.cleanup(dirPath);
+        });
+      }
+      if (parentWatcher) {
+        parentWatcher.on('error', () => {
+          // Parent deleted — cleanup parent watcher only
+          const e = this.watchers.get(dirPath);
+          if (e?.parentWatcher) {
+            try { e.parentWatcher.close(); } catch { /* ignore */ }
+            e.parentWatcher = null;
+            e.parentPath = null;
+          }
         });
       }
     }
@@ -181,6 +213,44 @@ export class FileWatcher {
     }
   }
 
+  /**
+   * Check if target directory now exists and upgrade from parent watcher to direct watcher
+   */
+  private checkAndUpgrade(dirPath: string): void {
+    const entry = this.watchers.get(dirPath);
+    if (!entry || entry.watcher) return; // Already watching or no entry
+
+    // Check if target directory now exists
+    try {
+      const stat = fs.statSync(dirPath);
+      if (!stat.isDirectory()) return;
+    } catch {
+      return; // Still doesn't exist
+    }
+
+    // Directory exists now — upgrade to direct watcher
+    try {
+      entry.watcher = fs.watch(dirPath, { recursive: true }, () => {
+        this.handleChange(dirPath);
+      });
+      entry.watcher.on('error', () => {
+        this.cleanup(dirPath);
+      });
+
+      // Cleanup parent watcher
+      if (entry.parentWatcher) {
+        try { entry.parentWatcher.close(); } catch { /* ignore */ }
+        entry.parentWatcher = null;
+        entry.parentPath = null;
+      }
+
+      // Trigger initial callback since directory was just created
+      this.handleChange(dirPath);
+    } catch {
+      // Failed to start watching — keep parent watcher
+    }
+  }
+
   private handleChange(dirPath: string): void {
     const entry = this.watchers.get(dirPath);
     if (!entry) return;
@@ -199,6 +269,7 @@ export class FileWatcher {
     if (!entry) return;
     if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
     try { entry.watcher?.close(); } catch { /* already closed */ }
+    try { entry.parentWatcher?.close(); } catch { /* already closed */ }
     this.watchers.delete(dirPath);
   }
 }

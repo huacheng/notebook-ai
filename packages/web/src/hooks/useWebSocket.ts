@@ -36,8 +36,16 @@ export function useWebSocket(sessionId: string | null) {
   const subscribedRef = useRef<Set<string>>(new Set());
 
   // Derive a stable string key from all open session IDs.
+  // Include both openNotebooks sessions AND global sessionId for backward compat (restoreNotebook sets global sessionId)
   const openSessionIds = useStore(
-    (s) => Object.values(s.openNotebooks).map((e) => e.sessionId).filter(Boolean).sort().join(','),
+    (s) => {
+      const ids = Object.values(s.openNotebooks).map((e) => e.sessionId).filter(Boolean);
+      // Also include global sessionId (set by restoreNotebook after page refresh)
+      if (s.sessionId && !ids.includes(s.sessionId)) {
+        ids.push(s.sessionId);
+      }
+      return ids.sort().join(',');
+    },
   );
 
   // Connect once on mount; auto-reconnect with exponential backoff.

@@ -34,6 +34,7 @@ export function useFileStream(
   filePath: string | null,
   source: 'workspace' | 'library' | 'deliverables',
   projectId?: string | null,
+  suppressChanges = false,
 ) {
   const ws = useStore((s) => s.ws);
   const wsStatus = useStore((s) => s.wsStatus);
@@ -63,6 +64,10 @@ export function useFileStream(
   useEffect(() => {
     if (!filePath || !ws || wsStatus !== 'connected') return;
     if (!sessionId && source !== 'library' && !projectId) return;
+    // Determine effective session for file access:
+    // - For workspace/deliverables: use sessionId (real session) when available, or fallback to projectId-based pseudo-session
+    // - Pseudo-session (__project_{projectId}__) works without active subscription, enabling file access after page refresh
+    // - The key insight: file access only needs project context, not the Claude agent session
     const effectiveSessionId = sessionId || (projectId ? `__project_${projectId}__` : '__library__');
 
     contentChunksRef.current = [];
@@ -202,8 +207,10 @@ export function useFileStream(
 
         // ── Live push update handlers ─────────────────────────────────
         // Server pushes file changes when the file is modified on the backend
+        // When suppressChanges is true (edit mode), ignore these to prevent flash/content loss
 
         case 'file-changed-meta': {
+          if (suppressChanges) break; // Ignore external changes while editing
           const { path: changedPath, mtime, format } = msg as unknown as { path: string; mtime: number; format: FileFormat };
           // Only process if this is the file we're watching
           if (changedPath !== filePath) break;
@@ -218,6 +225,7 @@ export function useFileStream(
         }
 
         case 'file-changed-chunk': {
+          if (suppressChanges) break;
           const { path: changedPath, data, encoding } = msg as unknown as { path: string; data: string; encoding: 'utf8' | 'base64' };
           if (changedPath !== filePath) break;
           if (encoding === 'base64') {
@@ -230,6 +238,7 @@ export function useFileStream(
         }
 
         case 'file-changed-chunk-compressed': {
+          if (suppressChanges) break;
           const { path: changedPath, data, encoding } = msg as unknown as {
             path: string;
             data: string;
@@ -253,6 +262,7 @@ export function useFileStream(
         }
 
         case 'file-changed-end': {
+          if (suppressChanges) break;
           const { path: changedPath, mtime } = msg as unknown as { path: string; mtime: number };
           if (changedPath !== filePath) break;
           if (throttleRef.current !== null) { clearTimeout(throttleRef.current); throttleRef.current = null; }
@@ -299,7 +309,7 @@ export function useFileStream(
       ws.removeEventListener('message', handleMessage);
       if (throttleRef.current !== null) { clearTimeout(throttleRef.current); throttleRef.current = null; }
     };
-  }, [sessionId, notebookId, filePath, source, projectId, ws, wsStatus, scheduleFlush]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, notebookId, filePath, source, projectId, ws, wsStatus, scheduleFlush, suppressChanges]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }

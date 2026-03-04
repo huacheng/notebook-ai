@@ -36,6 +36,7 @@ export function FileViewer() {
     activeFile?.path ?? null,
     activeFile?.source ?? 'workspace',
     activeFile?.projectId ?? null,
+    mode === 'edit', // suppressChanges: ignore file-changed notifications while editing
   );
 
   const effectiveAnnSessionId = activeFile?.sessionId
@@ -127,7 +128,8 @@ export function FileViewer() {
           onPdfVisiblePage={setPdfPage}
         />
       )}
-      {fileState.status === 'complete' && mode === 'edit' && canEdit && (
+      {/* Keep editor mounted during loading to prevent content loss from self-triggered file updates */}
+      {(fileState.status === 'complete' || (mode === 'edit' && fileState.status === 'loading')) && mode === 'edit' && canEdit && (
         <FileViewerEditor
           content={fileState.content}
           format={fileState.format === 'html' ? 'html' : 'text'}

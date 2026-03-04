@@ -350,6 +350,21 @@ export function setupWebSocket(
         return true;
       }
 
+      // D2: ownership-only check for read-only operations (cell_load)
+      // Allows access without subscription to avoid race condition after page refresh
+      function checkSessionOwnership(sid: string): boolean {
+        if (sid === '__library__' || sid.startsWith('__project_')) {
+          return true;
+        }
+        const owningUser = sessionOwningUser.get(sid);
+        // Allow if: no owner recorded (new session) OR owner matches current user
+        if (owningUser && owningUser !== currentUserId) {
+          sendToClient(ws, { type: 'error', session_id: sid, message: 'Access denied: session belongs to another user.' });
+          return false;
+        }
+        return true;
+      }
+
       switch (msg.type) {
         case 'subscribe': {
           const { session_id } = msg;
@@ -1146,7 +1161,9 @@ export function setupWebSocket(
 
         case 'cell_load': {
           const { request_id, session_id, cell_id } = msg;
-          if (!checkSessionPermission(session_id)) break;
+          // Use ownership check (not subscription check) to avoid race condition after page refresh
+          // cell_load is read-only, so subscription is not required for security
+          if (!checkSessionOwnership(session_id)) break;
           try {
             const session = sessionManager.getSession(session_id);
             if (!session || !session.notebook) {

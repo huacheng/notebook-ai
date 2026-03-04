@@ -12,18 +12,31 @@ const INITIAL_STATE: MentionState = {
   path: [],
 };
 
+const DEBOUNCE_MS = 150; // Debounce fetchItems to reduce API calls
+
 export function useMention(plugins: MentionPlugin<unknown>[]) {
   const [state, setState] = useState<MentionState<unknown>>(INITIAL_STATE);
   const fetchingRef = useRef(false);
+  const debounceTimerRef = useRef<number | null>(null);
 
   const close = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
     setState(INITIAL_STATE);
   }, []);
 
-  const handleChange = useCallback(async (
+  const handleChange = useCallback((
     value: string,
     cursorPos: number,
   ) => {
+    // Clear any pending debounce
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
     // Find if any trigger character precedes cursor
     for (const plugin of plugins) {
       const triggerIdx = value.lastIndexOf(plugin.trigger, cursorPos - 1);
@@ -36,15 +49,17 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
       const query = value.slice(triggerIdx + 1, cursorPos);
       if (/\s/.test(query)) continue;
 
-      // Trigger detected - fetch items
-      if (!fetchingRef.current) {
+      // Trigger detected - debounce fetch items
+      debounceTimerRef.current = window.setTimeout(async () => {
+        debounceTimerRef.current = null;
+        if (fetchingRef.current) return;
         fetchingRef.current = true;
         try {
           const items = await plugin.fetchItems(query);
-          // If plugin returns empty array, continue to next plugin with same trigger
+          // If plugin returns empty array, don't open popup
           if (items.length === 0) {
             fetchingRef.current = false;
-            continue;
+            return;
           }
           setState({
             open: true,
@@ -56,11 +71,11 @@ export function useMention(plugins: MentionPlugin<unknown>[]) {
             triggerPos: triggerIdx,
             path: [],
           });
-          return;
         } finally {
           fetchingRef.current = false;
         }
-      }
+      }, DEBOUNCE_MS);
+      return;
     }
 
     // No trigger found - close if open
