@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { WSServerMessage, QueuedPrompt } from '@notebook-ai/shared';
+import type { WSServerMessage, QueuedPrompt, Cell } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 import type { Command } from '../mention/types';
 import DOMPurify from 'dompurify';
@@ -345,7 +345,24 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         }
         case 'cells_loaded': {
-          store.prependCells(parsed.cells, parsed.offset);
+          // Decompress cells if compressed (LZ4)
+          const msg = parsed as { cells?: unknown[]; cells_compressed?: string; offset: number };
+          let cells = msg.cells;
+          if (msg.cells_compressed && typeof msg.cells_compressed === 'string') {
+            try {
+              const compressed = Uint8Array.from(atob(msg.cells_compressed), c => c.charCodeAt(0));
+              const decompressed = lz4.decompress(compressed);
+              const text = new TextDecoder().decode(decompressed);
+              cells = JSON.parse(text);
+            } catch (e) {
+              console.error('[ws] Failed to decompress cells:', e);
+              set({ loadingOlderCells: false });
+              break;
+            }
+          }
+          if (cells && Array.isArray(cells) && cells.length > 0) {
+            store.prependCells(cells as Cell[], msg.offset);
+          }
           set({ loadingOlderCells: false });
           break;
         }

@@ -683,12 +683,16 @@ export const SessionRestartFailedSchema = z.object({
   error: z.string(),
 });
 
-// Server → Client: cells loaded (pagination response)
+// Server → Client: cells loaded (pagination response, LZ4 compressed)
 export const CellsLoadedSchema = z.object({
   type: z.literal('cells_loaded'),
   session_id: z.string(),
-  cells: z.array(CellSchema),
+  // Either raw cells or compressed
+  cells: z.array(CellSchema).optional(),
+  cells_compressed: z.string().optional(), // Base64-encoded LZ4 compressed JSON
+  compression: z.enum(['lz4']).optional(),
   offset: z.number().int().nonnegative(),
+  count: z.number().int().nonnegative().optional(), // Number of cells in compressed payload
 });
 
 // Server → Client: cells removed responses

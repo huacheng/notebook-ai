@@ -948,7 +948,17 @@ export function setupWebSocket(
             break;
           }
           const cells = session.notebook.cells.slice(offset, offset + limit);
-          sendToClient(ws, { type: 'cells_loaded', session_id, cells, offset });
+          // Use LZ4 compression for cells_loaded (same as notebook_opened)
+          const cellsJson = JSON.stringify(cells);
+          const compressed = Buffer.from(lz4.compress(Buffer.from(cellsJson, 'utf-8')));
+          sendToClient(ws, {
+            type: 'cells_loaded',
+            session_id,
+            cells_compressed: compressed.toString('base64'),
+            compression: 'lz4',
+            offset,
+            count: cells.length,
+          });
           break;
         }
 

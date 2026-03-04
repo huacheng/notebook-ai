@@ -155,15 +155,16 @@ describe('ws-handler load_cells dispatch', () => {
     expect(foundSession).toBeDefined();
 
     const cells = foundSession!.notebook.cells.slice(msg.offset, msg.offset + msg.limit);
+    // Test with raw cells (old format, still valid)
     const response = { type: 'cells_loaded', session_id: msg.session_id, cells, offset: msg.offset };
 
     // Validate the response against the schema (proves handler output is schema-conformant)
     const parsed = CellsLoadedSchema.safeParse(response);
     expect(parsed.success).toBe(true);
-    expect(parsed.data!.cells).toHaveLength(10);
-    expect(parsed.data!.cells[0].id).toBe('cell-5');
-    expect(parsed.data!.cells[9].id).toBe('cell-14');
-    expect(parsed.data!.offset).toBe(5);
+    expect(parsed.data?.cells).toHaveLength(10);
+    expect(parsed.data?.cells?.[0].id).toBe('cell-5');
+    expect(parsed.data?.cells?.[9].id).toBe('cell-14');
+    expect(parsed.data?.offset).toBe(5);
   });
 
   it('returns error for non-existent session', () => {
