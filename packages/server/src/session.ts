@@ -52,6 +52,9 @@ export const STUCK_THRESHOLD_MS = 120 * 1000;
 /** Maximum retry attempts for stuck cells before giving up */
 export const MAX_STUCK_RETRIES = 3;
 
+/** Prompt sent to unstick a stuck cell */
+export const CONTINUE_PROMPT = '继续';
+
 // ── Claude settings model helper ─────────────────────────────────────────────
 
 /**
@@ -395,6 +398,9 @@ export class SessionManager {
     // Stop old process
     session.agentProcess.stop();
 
+    // Clear pending tool IDs (old process won't send tool_result)
+    session._pendingToolUseIds.clear();
+
     // Create new AgentProcess with same config (preserve model + allowedDirs)
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
@@ -439,6 +445,9 @@ export class SessionManager {
 
     // 2. Stop old agent process
     session.agentProcess.stop();
+
+    // Clear pending tool IDs (old process won't send tool_result)
+    session._pendingToolUseIds.clear();
 
     // 3. Create new AgentProcess WITHOUT resumeSessionId (clean context)
     const engine = session.agentProcess.engine;
@@ -976,10 +985,9 @@ export class SessionManager {
             `sending "继续" (retry ${session._stuckRetryCount}/${MAX_STUCK_RETRIES})`
           );
 
-          // Send "继续" as a new prompt to unstick
-          const continuePrompt = '继续';
+          // Send continue prompt to unstick
           try {
-            session.agentProcess.sendPrompt(continuePrompt);
+            session.agentProcess.sendPrompt(CONTINUE_PROMPT);
           } catch (err) {
             console.error(`[session ${session.id}] Failed to send continue prompt:`, err);
           }
@@ -987,9 +995,20 @@ export class SessionManager {
           // Reset output time to avoid immediate re-trigger
           session._lastOutputTime = Date.now();
         } else {
-          console.warn(
-            `[session ${session.id}] Cell "${runningCellId}" still stuck after ${MAX_STUCK_RETRIES} retries`
+          // Retries exhausted — complete cell as error and notify frontend
+          console.error(
+            `[session ${session.id}] Cell "${runningCellId}" stuck after ${MAX_STUCK_RETRIES} retries, marking as error`
           );
+
+          // Notify frontend of stuck exhaustion
+          this.broadcast(session, {
+            type: 'stuck_exhausted',
+            cell_id: runningCellId,
+            retries: MAX_STUCK_RETRIES,
+          });
+
+          // Complete the cell as error
+          this.completeCell(session, runningCellId, true);
         }
       }
     } else {

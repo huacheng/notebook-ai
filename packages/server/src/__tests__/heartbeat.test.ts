@@ -128,5 +128,41 @@ describe('Session Heartbeat Mechanism', () => {
       // heartbeatCheck should check _pendingToolUseIds.size before stuck detection
       expect(src).toMatch(/_pendingToolUseIds\.size\s*[><=]/);
     });
+
+    it('should clear pendingToolUseIds on restartSession (P1: D1-2)', () => {
+      const src = sessionSrc();
+      // restartSession should clear pending tool IDs to avoid stuck detection bypass
+      const restartMatch = src.match(/restartSession[\s\S]*?_pendingToolUseIds\.clear\(\)/);
+      expect(restartMatch).toBeTruthy();
+    });
+
+    it('should clear pendingToolUseIds on rerunNotebook (P1: D1-2)', () => {
+      const src = sessionSrc();
+      // rerunNotebook should clear pending tool IDs
+      const rerunMatch = src.match(/rerunNotebook[\s\S]*?_pendingToolUseIds\.clear\(\)/);
+      expect(rerunMatch).toBeTruthy();
+    });
+  });
+
+  describe('Retry exhaustion handling (P2: D3-1)', () => {
+    it('should complete cell as error when retries exhausted', () => {
+      const src = sessionSrc();
+      // After MAX_STUCK_RETRIES, should call completeCell with error
+      expect(src).toMatch(/completeCell\s*\(\s*session\s*,\s*runningCellId\s*,\s*true/);
+    });
+
+    it('should broadcast stuck_exhausted event to notify frontend', () => {
+      const src = sessionSrc();
+      // Should notify frontend when stuck retries exhausted
+      expect(src).toContain('stuck_exhausted');
+    });
+  });
+
+  describe('Configuration (P3: D5-1)', () => {
+    it('should have CONTINUE_PROMPT constant', () => {
+      const src = sessionSrc();
+      // Continue prompt should be a constant, not hardcoded
+      expect(src).toMatch(/CONTINUE_PROMPT\s*=/);
+    });
   });
 });
