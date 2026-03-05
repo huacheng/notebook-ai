@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react';
 import { useStore } from '../../store';
-import { MobileAnnotationBar } from './MobileAnnotationBar';
 import { MobileInputBar } from './MobileInputBar';
 import { FileViewer } from '../FileViewer';
 import { Cell } from '../Cell';
@@ -100,7 +99,6 @@ export function MobileSplitView() {
           <FileViewer />
         </div>
 
-        <MobileAnnotationBar filePath={mobileFileViewerPath} />
       </div>
 
       {/* Right side - Notebook */}

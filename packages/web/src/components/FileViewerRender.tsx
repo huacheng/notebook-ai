@@ -542,7 +542,7 @@ export function FileViewerRender({
       clearTimeout(timer);
       timer = setTimeout(() => {
         const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !sel.toString().trim()) return;
         const container = containerRef.current;
         if (!container || !container.contains(sel.anchorNode)) return;
         const range = sel.getRangeAt(0);

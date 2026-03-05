@@ -80,6 +80,7 @@ export function MobileNotebookView() {
 
   // Open a .notebook.json as a notebook tab (same logic as desktop ProjectSidebar)
   const openAsNotebook = useCallback(async (subPath: string, name: string) => {
+    if (!activeProjectPath) return;
     const { openNotebooks, setActiveNotebookTab, deactivateFileTab } = useStore.getState();
     const notebookPath = subPath === '.' ? `${activeProjectPath}/${name}` : `${activeProjectPath}/${subPath}/${name}`;
     const wsDir = notebookPath.replace(/\/[^/]+$/, '');
