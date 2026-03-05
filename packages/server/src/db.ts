@@ -42,6 +42,21 @@ export interface ProjectRow {
   updated_at: string;
 }
 
+export interface TaskAutoRow {
+  session_name: string;
+  task_dir: string;
+  status: string;
+  max_iterations: number;
+  timeout_minutes: number;
+  iteration_count: number;
+  recovery_count_step: number;
+  recovery_count_total: number;
+  stall_count: number;
+  quota_wait_since: string;
+  started_at: string;
+  last_signal_at: string;
+}
+
 // ── Database ─────────────────────────────────────────────────────────────────
 
 const DB_DIR = path.join(os.homedir(), '.notebook-ai');
@@ -165,6 +180,24 @@ export class NotebookDb {
 
     // Now create email index (safe after migration)
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+
+    // ── Task Auto (auto mode daemon state) ────────────────────────────────
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS task_auto (
+        session_name        TEXT PRIMARY KEY,
+        task_dir            TEXT NOT NULL UNIQUE,
+        status              TEXT DEFAULT 'running',
+        max_iterations      INTEGER DEFAULT 20,
+        timeout_minutes     INTEGER DEFAULT 30,
+        iteration_count     INTEGER DEFAULT 0,
+        recovery_count_step INTEGER DEFAULT 0,
+        recovery_count_total INTEGER DEFAULT 0,
+        stall_count         INTEGER DEFAULT 0,
+        quota_wait_since    TEXT DEFAULT '',
+        started_at          TEXT,
+        last_signal_at      TEXT
+      );
+    `);
   }
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────
@@ -378,6 +411,31 @@ export class NotebookDb {
   /** Delete annotations for a specific session+file (called when file is deleted) */
   deleteFileAnnotations(sessionId: string, filePath: string): void {
     this.db.prepare('DELETE FROM file_annotations WHERE session_id = ? AND file_path = ?').run(sessionId, filePath);
+  }
+
+  // ── Task Auto ────────────────────────────────────────────────────────────
+
+  startAuto(sessionName: string, taskDir: string, maxIterations: number, timeoutMinutes: number): void {
+    this.db.prepare(`
+      INSERT INTO task_auto (session_name, task_dir, status, max_iterations, timeout_minutes, started_at, last_signal_at)
+      VALUES (?, ?, 'running', ?, ?, datetime('now'), datetime('now'))
+    `).run(sessionName, taskDir, maxIterations, timeoutMinutes);
+  }
+
+  stopAuto(sessionName: string): void {
+    this.db.prepare('DELETE FROM task_auto WHERE session_name = ?').run(sessionName);
+  }
+
+  getAuto(sessionName: string): TaskAutoRow | undefined {
+    return this.db.prepare('SELECT * FROM task_auto WHERE session_name = ?').get(sessionName) as TaskAutoRow | undefined;
+  }
+
+  getAutoByTaskDir(taskDir: string): TaskAutoRow | undefined {
+    return this.db.prepare('SELECT * FROM task_auto WHERE task_dir = ?').get(taskDir) as TaskAutoRow | undefined;
+  }
+
+  getAllRunningAuto(): TaskAutoRow[] {
+    return this.db.prepare("SELECT * FROM task_auto WHERE status = 'running'").all() as TaskAutoRow[];
   }
 
   // ── Utility ──────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import { createProjectsRouter } from './routes/projects.js';
 import { createGitRouter } from './routes/git.js';
 import { createPluginRouter } from './routes/plugin.js';
 import commandsRouter from './routes/commands.js';
+import { createTaskAutoRouter, recoverDaemons } from './routes/task-auto.js';
 import { setupWebSocket } from './ws-handler.js';
 import { authMiddleware } from './auth.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
@@ -131,6 +132,8 @@ app.use('/api/projects', createProjectsRouter(db, sessionManager, notebookStore,
 app.use('/api/projects', createGitRouter(db));
 app.use('/api/plugin', createPluginRouter());
 app.use('/api/commands', commandsRouter);
+app.use('/api/sessions', createTaskAutoRouter(db));
+app.use('/api/task-auto', createTaskAutoRouter(db));
 
 // ── Watchers (push-based change detection) ──────────────────────────────────
 
@@ -234,4 +237,14 @@ const PORT = process.env['PORT'] ?? 3002;
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   importExistingNotebooks().catch((err) => console.error('[import] Error:', err));
+
+  // Recover auto daemons from previous server session
+  try {
+    const recovered = recoverDaemons(db);
+    if (recovered > 0) {
+      console.log(`[auto] Recovered ${recovered} auto daemon(s) from previous session.`);
+    }
+  } catch (err) {
+    console.error('[auto] Failed to recover daemons:', err);
+  }
 });
