@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # /task-ai:auto implementation
 # Usage: auto.sh [--stop]
+# Notebook is auto-detected from CWD or git branch context.
 
 set -euo pipefail
 # Load context discovery from lib.sh
@@ -25,11 +26,11 @@ ACTION="start"  # Default action
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --stop)   ACTION="stop"; shift ;;
-    *)        NOTEBOOK="${1:-}"; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
-resolve_workdir "${NOTEBOOK:-}"
+resolve_workdir ""
 NOTEBOOK="$NB_NOTEBOOK"
 STATUS_JSON="$WORK_DIR/.status.json"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"

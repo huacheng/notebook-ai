@@ -18,8 +18,8 @@ cat > "$TEST_DIR/test-nb/.working/.target.md" <<'EOF'
 - Implement feature X
 EOF
 
-# Run auto.sh with mock notebook
-NB_WORKSPACES_ROOT="$TEST_DIR" bash "$AUTO_SH" test-nb 2>/dev/null || true
+# Run auto.sh — auto-detect notebook from CWD
+(cd "$TEST_DIR/test-nb/.working" && NB_WORKSPACES_ROOT="$TEST_DIR" bash "$AUTO_SH" 2>/dev/null) || true
 
 # Red: auto.sh currently does NOT write phase field to .auto-signal
 SIGNAL_FILE="$TEST_DIR/test-nb/.working/.auto-signal"

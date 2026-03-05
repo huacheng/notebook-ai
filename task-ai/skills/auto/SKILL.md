@@ -16,9 +16,6 @@ triggers:
     User wants FULL lifecycle → auto.
     User wants ONE step manually → exec. User wants just the plan → plan.
 arguments:
-  - name: notebook
-    description: "Notebook name — optional, auto-detected from current context"
-    required: false
   - name: action
     description: "Action: start or stop"
     required: false
@@ -49,7 +46,7 @@ Semantic understanding of user message → execute phase-appropriate action
 ## Usage
 
 ```
-/task-ai:auto [notebook_name] [--stop]
+/task-ai:auto [--stop]
 ```
 
 ## Four-Phase Flow
