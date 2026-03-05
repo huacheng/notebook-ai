@@ -252,7 +252,7 @@ describe('compactionStrategy', () => {
     it('should pass when all files are valid', () => {
       fs.writeFileSync(
         path.join(tempDir, '.auto-signal'),
-        JSON.stringify({ step: 'exec', next: 'verify', iteration: 1, timestamp: new Date().toISOString() })
+        JSON.stringify({ step: 'exec', next: 'verify', iteration: 1, timestamp: new Date().toISOString(), phase: 'execution', phase_progress: 0.5, retry_count: 0 })
       );
       fs.writeFileSync(
         path.join(tempDir, '.index.json'),

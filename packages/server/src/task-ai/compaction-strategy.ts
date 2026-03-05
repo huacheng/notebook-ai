@@ -113,11 +113,27 @@ export function writeSummaryWithRecoveryHeader(
 // Recovery Validation
 // ============================================================================
 
+interface CheckScore {
+  overall?: number;
+  d1_correctness?: number;
+  d2_security?: number;
+  d3_reliability?: number;
+  d4_performance?: number;
+  d5_architecture?: number;
+  d6_maintainability?: number;
+}
+
 interface AutoSignal {
   step?: string;
+  result?: string;
   next?: string;
   iteration?: number;
   timestamp?: string;
+  phase?: string;
+  phase_progress?: number;
+  check_score?: CheckScore | null;
+  retry_count?: number;
+  delegation_failures?: string[];
 }
 
 interface IndexJson {
@@ -167,8 +183,8 @@ export function validateRecoveryReadiness(workingDir: string): ValidationResult 
   if (!signal) {
     errors.push('.auto-signal missing');
   } else {
-    for (const field of ['step', 'next', 'iteration', 'timestamp']) {
-      if (!(field in signal) || signal[field as keyof AutoSignal] === undefined) {
+    for (const field of ['step', 'next', 'iteration', 'timestamp', 'phase', 'phase_progress', 'retry_count']) {
+      if (!(field in signal) || (signal as Record<string, unknown>)[field] === undefined) {
         errors.push(`.auto-signal missing field: ${field}`);
       }
     }
