@@ -376,11 +376,11 @@ The daemon does **NOT** construct or send commands based on the signal.
 
 ### Signal File Ownership
 
-Each sub-command's SKILL.md includes a "write `.auto-signal`" step. In auto mode, the auto loop **subsumes** that step — Claude writes the signal once at step 3.5 (with `iteration` field). The sub-command's own signal-write instruction is skipped.
+Each sub-command's SKILL.md includes a "write `.auto-signal`" step. In auto mode, the auto loop **subsumes** that step — Claude writes the signal once at step 2.5 (with `iteration` field). The sub-command's own signal-write instruction is skipped.
 
 In manual (non-auto) execution, sub-commands write `.auto-signal` themselves (without `iteration` field).
 
-**How to detect auto mode** (for inline execution): Skip any step that says "Write `.auto-signal`". The auto loop's step 3.5 handles it. No env var or flag needed — auto mode always uses inline execution.
+**How to detect auto mode** (for inline execution): Skip any step that says "Write `.auto-signal`". The auto loop's step 2.5 handles it. No env var or flag needed — auto mode always uses inline execution.
 
 ### Signal Validation
 
@@ -465,21 +465,20 @@ Terminal: merge conflict → (stop, status stays executing — retryable)
 The auto skill runs this loop within a single Claude session:
 
 1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
-2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status. If any dependency not met, write `.auto-signal` with `result: "blocked"` and exit
-3. LOOP:
-   3.1. Check for .auto-stop file → if exists, break loop
-   3.2. Context check: if context window usage ≥ 82%, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`
-   3.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
+2. LOOP:
+   2.1. Check for .auto-stop file → if exists, break loop
+   2.2. Context check: if context window usage ≥ 82%, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`
+   2.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - Evaluate four delegation factors (phase, context dependency, complexity, execution history)
       - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.status.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
       - **If not delegatable**: Execute inline (Read SKILL.md steps, execute in main session)
-      — In both paths, SKIP the sub-command's own .auto-signal write step (auto loop handles it at step 3.5)
-   3.4. Evaluate result → determine next step (result-based routing)
-   3.5. Write .auto-signal (progress report for daemon, WITH iteration, phase, retry_count, delegation_failures fields)
-   3.6. Increment iteration counter
-   3.7. If next == "(stop)" → break loop
-   3.8. Set current step = next step → continue loop
-4. Cleanup: delete .auto-signal, report final status
+      — In both paths, SKIP the sub-command's own .auto-signal write step (auto loop handles it at step 2.5)
+   2.4. Evaluate result → determine next step (result-based routing)
+   2.5. Write .auto-signal (progress report for daemon, WITH iteration, phase, retry_count, delegation_failures fields)
+   2.6. Increment iteration counter
+   2.7. If next == "(stop)" → break loop
+   2.8. Set current step = next step → continue loop
+3. Cleanup: delete .auto-signal, report final status
 
 ## Detailed Loop Logic
 
