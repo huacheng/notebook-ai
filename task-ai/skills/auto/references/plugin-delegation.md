@@ -9,6 +9,17 @@ External plugin delegation for task-ai lifecycle skills. Enables runtime discove
 - **Graceful degradation** — no matching plugin or invocation failure falls back to existing inline logic
 - **Minimal intrusion** — each SKILL.md adds 2-4 delegation lines referencing this shared protocol
 
+## Slot Categories
+
+Plugins serve two fundamentally different roles:
+
+| Category | Role | Output | Integration |
+|----------|------|--------|-------------|
+| **Capability** | Supplementary guidance — returns findings/action items | <=500 char structured summary | Main session incorporates as input |
+| **Executor** | Execution engine replacement — takes over the step/plan execution loop | Deliverable files + signal | Main session reads results, writes `.auto-signal` |
+
+Capability slots provide advice; executor slots do the work. Both use the same three-level discovery algorithm and Task subagent isolation.
+
 ## Capability Slot Table
 
 | Slot | Semantic Description | Lifecycle Cut-in | Trigger Condition |
@@ -20,6 +31,74 @@ External plugin delegation for task-ai lifecycle skills. Enables runtime discove
 | `debugging` | Root cause analysis, trace interpretation, fix strategy | exec Per-Step step 2 | `type` contains `bugfix` or NEEDS_FIX resumption |
 | `tdd` | Test generation, coverage analysis, test-driven implementation | verify step 9 | `type` contains `software` and `.test/` criteria exist |
 | `domain-*` | Open-ended domain expertise (wildcard — any specialized capability) | exec Per-Step step 2 | No seed slot matches; semantic scan against all available plugins |
+
+## Executor Slot Table
+
+| Slot | Semantic Description | Lifecycle Cut-in | Trigger Condition |
+|------|---------------------|------------------|-------------------|
+| `plan-executor` | Plan-driven implementation engine — executes `.plan.md` steps with its own methodology (subagent-per-task, TDD cycle, review gates) | exec step 7 (before per-step loop) | Always evaluated; semantic match against `.target.md` + `.plan.md` characteristics (not rigid type string) |
+| `domain-executor-*` | Domain-specific execution engine — replaces inline execution for specific task types | exec step 7 | No `plan-executor` match; semantic match against task characteristics in `.target.md` + `.plan.md` + `type` field |
+
+### Executor Discovery & Selection
+
+Executor discovery runs **once per exec invocation**, before the per-step loop begins. It follows the same three-level algorithm (Seed Slot → Registry → Semantic Scan) with these additional rules:
+
+1. **Adaptive type matching**: The `type` field in `.index.json` is derived from dialog + `.target.md` content and may not map cleanly to predefined categories. Executor discovery uses **semantic matching** against three signal sources, not rigid type-string comparison:
+   - `.index.json` `type` field (primary hint)
+   - `.target.md` content (requirement descriptions, technology mentions, domain vocabulary)
+   - `.plan.md` step structure (test-driven steps → TDD executor affinity; document generation steps → doc executor affinity)
+
+   This allows executors to match tasks whose `type` is novel or compound (e.g., `software+documentation`, `api-integration`) by analyzing the actual task characteristics rather than relying on exact type strings.
+
+2. **Stability signal**: Executor slots use health-weighted scoring with a **higher threshold** — `combinedScore >= 0.70` required (vs 0.50 for capability slots). A new executor with < 5 invocations is NOT selected (sample penalty keeps score at 0.50)
+3. **User override**: `slotBindings` in user preferences can force a specific executor (e.g., `"plan-executor": "superpowers:subagent-driven-development"`)
+4. **Fallback guarantee**: If executor discovery fails or the executor plugin fails mid-execution, exec falls back to its native per-step inline loop. Partially completed steps (by the executor) are detected via `completed_steps` in `.index.json`
+
+### Executor Integration Contract
+
+When an executor plugin is selected, exec delegates via Task subagent with an extended prompt:
+
+```
+Task subagent prompt (executor class):
+
+You have access to the [{plugin_name}] skill/tool.
+
+**Task context**:
+- Module: {module_name}
+- Type: {task_type}
+- Working directory: {workdir}
+- Branch: {branch}
+
+**Plan file**: {full .plan.md content}
+
+**Target file**: {full .target.md content}
+
+**Current progress**: completed_steps={N}, resume from step {N+1}
+
+**Instructions**:
+1. Use [{plugin_name}] to execute the remaining plan steps
+2. For each completed step, update .index.json completed_steps
+3. Commit changes per step using: task-ai({module}):exec step N/M done
+4. On completion, write signal: { "step": "exec", "result": "(done)" }
+5. On significant issue, write signal: { "step": "exec", "result": "(mid-exec)" }
+
+**Constraints**:
+- Follow the plan steps in order
+- Do NOT skip security checks (invoke /task-ai:security verify-cmd for state-modifying commands)
+- Write .summary.md on completion with condensed context
+```
+
+**Key difference from capability delegation**: No 500-char output limit. The executor operates on the actual working directory, makes real file changes, and commits. The main session reads `.index.json`, `.auto-signal`, and `.summary.md` after the executor subagent completes.
+
+### Executor vs Capability: When to Use Which
+
+| Scenario | Slot Type | Rationale |
+|----------|-----------|-----------|
+| Need UI design guidance for a component | Capability (`frontend-design`) | Advice only — exec still writes the code |
+| Plan has 10 steps with clear test criteria | Executor (`plan-executor`) | Plugin drives the full TDD cycle per step |
+| Debugging a specific test failure | Capability (`debugging`) | Root cause analysis — exec applies the fix |
+| Task type is "documentation" with a specialized doc builder | Executor (`domain-executor-docs`) | Plugin handles doc generation workflow |
+| Code review after execution | Capability (`code-review`) | Findings feed into check verdict |
 
 ## Three-Level Discovery Algorithm
 
@@ -83,11 +162,12 @@ Created on first successful delegation. Updated on each new capability discovery
 ```markdown
 # Plugin Capability Registry
 
-| Slot | Semantic Description | Applicable Phases | Type Pattern | Last Matched Plugin | Updated |
-|------|---------------------|-------------------|--------------|--------------------:|---------|
-| doc-parse | Parse binary documents to markdown | research | * | document-skills:pdf | 2024-01-15 |
-| frontend-design | UI/UX component guidance | exec | frontend|web|ui | frontend-design:frontend-design | 2024-01-20 |
-| domain-audio-mastering | Audio loudness and EQ optimization | exec | dsp | example-audio-master | 2024-01-22 |
+| Slot | Category | Semantic Description | Applicable Phases | Match Signal | Last Matched Plugin | Updated |
+|------|----------|---------------------|-------------------|-------------|--------------------:|---------|
+| doc-parse | capability | Parse binary documents to markdown | research | extension:.pdf/.docx/.xlsx/.pptx | document-skills:pdf | 2024-01-15 |
+| frontend-design | capability | UI/UX component guidance | exec | type:frontend\|web\|ui | frontend-design:frontend-design | 2024-01-20 |
+| plan-executor | executor | Plan-driven implementation engine | exec | semantic:.plan.md has TDD steps + test criteria | superpowers:subagent-driven-development | 2024-01-25 |
+| domain-audio-mastering | capability | Audio loudness and EQ optimization | exec | semantic:.target.md mentions audio/DSP | example-audio-master | 2024-01-22 |
 ```
 
 **Write protection**: Acquire `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` before writing. Reuses the existing references lock to avoid proliferating lock files — the registry is a lightweight companion to `.memory/.references/`.
@@ -274,13 +354,14 @@ After writing, update `.notes/.summary.md` per standard protocol.
 
 Each lifecycle skill adds a small delegation check at its designated cut-in point:
 
-| Skill | Cut-in Step | Slot(s) | Condition |
-|-------|-------------|---------|-----------|
-| research | step 12 | `doc-parse` | Source file is .pdf/.docx/.xlsx/.pptx |
-| plan | step 14 | `brainstorm` | First plan (no `.plan.md`) |
-| exec | Per-Step step 2 | `frontend-design`, `debugging`, `tdd`, `domain-*` | Type/context match (see trigger conditions per slot) |
-| check | step 9 | `code-review` | post-exec checkpoint |
-| verify | step 9 | `tdd` | `type` contains `software` and `.test/` criteria exist (also checked by exec) |
+| Skill | Cut-in Step | Slot(s) | Category | Condition |
+|-------|-------------|---------|----------|-----------|
+| research | step 12 | `doc-parse` | capability | Source file is .pdf/.docx/.xlsx/.pptx |
+| plan | step 14 | `brainstorm` | capability | First plan (no `.plan.md`) |
+| exec | step 7 (pre-loop) | `plan-executor`, `domain-executor-*` | executor | Always evaluated; health score >= 0.70 required |
+| exec | Per-Step step 2 | `frontend-design`, `debugging`, `tdd`, `domain-*` | capability | Type/context match (see trigger conditions per slot) |
+| check | step 9 | `code-review` | capability | post-exec checkpoint |
+| verify | step 9 | `tdd` | capability | `type` contains `software` and `.test/` criteria exist |
 
 ## Delegation Metrics
 

@@ -275,6 +275,17 @@ model_tier → model
   light  → haiku
 ```
 
+#### Executor Plugin Delegation
+
+Beyond subagent delegation of individual sub-commands, exec supports **executor plugin delegation** — discovering and using execution engine plugins (e.g., `superpowers:subagent-driven-development`) to replace the default per-step inline loop. See `auto/references/plugin-delegation.md` §Executor Slot Table.
+
+This enables adaptive execution strategies:
+- Software tasks with clear test criteria → `subagent-driven-development` (fresh subagent per step + two-stage review)
+- Documentation tasks → domain-specific doc builder plugin
+- Any task type → if the plugin registry records a high-health executor for the type, use it
+
+The exec sub-command handles executor discovery at step 7 (before per-step loop). Auto mode does not need special handling — exec's executor delegation is transparent to auto's routing logic.
+
 #### Fault Tolerance
 
 - Subagent timeout → main session fallback to inline execution
@@ -282,6 +293,7 @@ model_tier → model
 - Subagent execution failure → fallback to inline
 - Subagent output files missing → alert + fallback
 - Subagent writes unexpected fields → main session only trusts subagent-scope fields (outputs + `result`/`next`); `phase`/`retry_count`/`check_score` maintained by main session
+- Executor plugin failure mid-execution → exec falls back to native per-step loop, resuming from `completed_steps + 1`
 
 ### Context Savings
 

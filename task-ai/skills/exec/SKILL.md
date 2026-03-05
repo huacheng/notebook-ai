@@ -100,27 +100,32 @@ For each implementation step:
 4. **Discover** all implementation steps from `.plan.md`
 5. **Detect completed steps**: read `completed_steps` field from `.index.json` to determine progress; skip steps ≤ `completed_steps`
 6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files, using the most recent file (by filename date) as the primary fix guidance. `.bugfix/` entries indicate mid-exec issues; `.analysis/` entries indicate post-exec issues. Address fix items before continuing remaining steps
-7. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
-8. **For each step** (follow Per-Step Execution flow above):
-   8.1. Read required files
-   8.2. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
-   8.3. Implement the change
-   8.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
-   8.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
-   8.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
-   8.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
-   8.8. Record result (include VFP cycle summary for software types)
-   8.9. Update `.index.json` `completed_steps` to current step number
-9. **After all steps** (or on failure):
-   - Update `.index.json` timestamp
-   - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
-   - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
-   - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
-   - If all steps complete: signal `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }`
-   - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-   - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-   - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
-10. **Report** execution summary with per-step results
+7. **Executor discovery** (before per-step loop): Follow `auto/references/plugin-delegation.md` executor slot discovery. Semantic match against three signal sources (`.index.json` type, `.target.md` content, `.plan.md` step structure) — not rigid type-string comparison. Check `plan-executor` seed slot first, then `domain-executor-*` registry/semantic scan. If a matching executor plugin is found with health score >= 0.70:
+   - Delegate entire remaining plan execution to the executor via Task subagent (see Executor Integration Contract in `plugin-delegation.md`)
+   - After executor completes: read `.index.json` `completed_steps`, `.auto-signal`, `.summary.md` to restore context
+   - If executor fails mid-execution: fall back to native per-step loop, resuming from `completed_steps + 1`
+   - If no executor matched or `--step N` is specified: proceed with native per-step loop below
+8. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
+9. **For each step** (follow Per-Step Execution flow above):
+   9.1. Read required files
+   9.2. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
+   9.3. Implement the change
+   9.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
+   9.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
+   9.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
+   9.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
+   9.8. Record result (include VFP cycle summary for software types)
+   9.9. Update `.index.json` `completed_steps` to current step number
+10. **After all steps** (or on failure):
+    - Update `.index.json` timestamp
+    - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
+    - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
+    - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
+    - If all steps complete: signal `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }`
+    - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
+    - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
+    - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
+11. **Report** execution summary with per-step results
 
 ## State Transitions
 
