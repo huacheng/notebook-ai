@@ -15,6 +15,7 @@ export const ToolUseOutputSchema = z.object({
   input: z.record(z.unknown()),
   result: z.string().optional(),
   is_error: z.boolean().optional(),
+  isActive: z.boolean().optional(), // For AskUserQuestion: true = waiting for answer, false = answered
   timestamp: z.string().optional(),
 });
 

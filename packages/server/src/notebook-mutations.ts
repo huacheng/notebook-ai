@@ -85,7 +85,8 @@ export function attachToolResult(
         const unresolved = !byId && out.result === undefined;
         if (byId || unresolved) {
           matched = true;
-          return { ...out, result: content, is_error: isError };
+          // Set isActive: false when answer is received (AskUserQuestion)
+          return { ...out, result: content, is_error: isError, isActive: false };
         }
         return out;
       });

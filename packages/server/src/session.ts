@@ -1155,6 +1155,8 @@ export class SessionManager {
               tool_use_id: block.id,
               name: block.name,
               input: block.input,
+              // AskUserQuestion: isActive true means waiting for user answer
+              ...(block.name === 'AskUserQuestion' && { isActive: true }),
               timestamp: new Date().toISOString(),
             };
             // Heartbeat: track pending tool execution (awaiting tool_result)

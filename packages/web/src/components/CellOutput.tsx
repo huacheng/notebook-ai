@@ -192,8 +192,9 @@ function InteractiveOptionsWrapper({ item, cellId }: { item: ToolItem; cellId?: 
   const questions = (item.input as { questions?: AskQuestion[] })?.questions ?? [];
 
   // If item.result exists AND it's not the Claude Code auto-response, the question has been answered
+  // Also check isActive: if isActive === false, the question is frozen (answered on another device/session)
   const isAutoResponse = isClaudeCodeAutoResponse(item.result, item.is_error);
-  const isAnswered = item.result !== undefined && !isAutoResponse;
+  const isAnswered = (item.result !== undefined && !isAutoResponse) || item.isActive === false;
 
   return (
     <InteractiveOptions
