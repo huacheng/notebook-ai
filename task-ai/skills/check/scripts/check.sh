@@ -497,14 +497,14 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
 **Reason**: $BLOCK_REASON
 
 ### Fix Suggestion
-$FIX_SUGGESTION
+$(printf '%b' "$FIX_SUGGESTION")
 
 ## Gate Progress
 | Gate | Dimension | Score | Threshold | Status |
 |------|-----------|-------|-----------|--------|
-| 1 | D2 Security | ${D2_SCORE:-N/A} | $GATE_THRESHOLD | $([ "${D2_SCORE:-0}" != "0" ] && (( $(echo "${D2_SCORE:-0} >= $GATE_THRESHOLD" | bc -l) )) && echo "✅ PASS" || echo "❌ FAIL") |
-| 2 | D1 Correctness | ${D1_SCORE:-N/A} | $GATE_THRESHOLD | $([ -n "${D1_SCORE:-}" ] && (( $(echo "${D1_SCORE:-0} >= $GATE_THRESHOLD" | bc -l) )) && echo "✅ PASS" || echo "⏸️ SKIP") |
-| 3 | D3 Reliability | ${D3_SCORE:-N/A} | $GATE_THRESHOLD | $([ -n "${D3_SCORE:-}" ] && (( $(echo "${D3_SCORE:-0} >= $GATE_THRESHOLD" | bc -l) )) && echo "✅ PASS" || echo "⏸️ SKIP") |
+| 1 | D2 Security | ${D2_SCORE:-N/A} | $GATE_THRESHOLD | $(if (( $(echo "${D2_SCORE:-0} >= $GATE_THRESHOLD" | bc -l) )); then echo "✅ PASS"; else echo "❌ FAIL"; fi) |
+| 2 | D1 Correctness | ${D1_SCORE:-N/A} | $GATE_THRESHOLD | $(if [[ -z "${D1_SCORE:-}" ]]; then echo "⏸️ SKIP"; elif (( $(echo "$D1_SCORE >= $GATE_THRESHOLD" | bc -l) )); then echo "✅ PASS"; else echo "❌ FAIL"; fi) |
+| 3 | D3 Reliability | ${D3_SCORE:-N/A} | $GATE_THRESHOLD | $(if [[ -z "${D3_SCORE:-}" ]]; then echo "⏸️ SKIP"; elif (( $(echo "$D3_SCORE >= $GATE_THRESHOLD" | bc -l) )); then echo "✅ PASS"; else echo "❌ FAIL"; fi) |
 | 4 | D4+D5+D6 | - | - | ⏸️ SKIP |
 
 ## Next Steps
@@ -765,9 +765,9 @@ if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
 - **Trust Tier**: $L3_NEXT_TIER
 
 ## Issues Found
-${L3_D1_ISSUES:-None}
-${L3_D2_ISSUES:-None}
-${L3_D3_ISSUES:-None}
+$(printf '%b' "${L3_D1_ISSUES:-None}")
+$(printf '%b' "${L3_D2_ISSUES:-None}")
+$(printf '%b' "${L3_D3_ISSUES:-None}")
 
 ## Next Steps
 $(if [[ "$L3_VERDICT" == "PROMOTE" ]]; then

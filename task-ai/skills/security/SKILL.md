@@ -21,7 +21,7 @@ arguments:
     required: false
   - name: action
     description: "Action to perform: audit-plan, verify-cmd, or scan-skill"
-    required: false
+    required: true
   - name: payload
     description: "Command string (required for verify-cmd) or file path (required for scan-skill). Must not be empty for these actions."
     required: false

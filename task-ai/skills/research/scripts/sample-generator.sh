@@ -32,12 +32,11 @@ if [[ -z "$OUTPUT_DIR" ]]; then
     exit 1
 fi
 
-# Validate domain
-VALID_DOMAINS=("security" "sanitization" "audit")
-if [[ ! " ${VALID_DOMAINS[*]} " =~ " $DOMAIN " ]]; then
-    echo "[ERROR] Invalid domain: $DOMAIN" >&2
-    exit 1
-fi
+# Validate domain (D2: use case statement for exact match, not regex)
+case "$DOMAIN" in
+    security|sanitization|audit) ;;
+    *) echo "[ERROR] Invalid domain: $DOMAIN" >&2; exit 1 ;;
+esac
 
 echo "[sample-generator] Domain: $DOMAIN, Output: $OUTPUT_DIR"
 
@@ -58,6 +57,10 @@ create_positive_sample() {
     local pattern="$1"
     local description="$2"
     local sample_id="$3"
+
+    # D1: Escape $ in pattern/description to prevent shell expansion in heredoc
+    local safe_pattern="${pattern//\$/\\\$}"
+    local safe_description="${description//\$/\\\$}"
 
     local sample_file="$OUTPUT_DIR/$DOMAIN/positive/${sample_id}.md"
 
@@ -81,14 +84,14 @@ create_positive_sample() {
 
 # Positive Sample: $sample_id
 # Domain: $DOMAIN
-# Description: $description
+# Description: $safe_description
 # Expected: Should MATCH the security rule pattern
 # Generated: $(date -Iseconds)
 
 ## Dangerous Pattern
 
 \`\`\`
-$pattern
+$safe_pattern
 \`\`\`
 
 ## Why This Is Dangerous
@@ -106,6 +109,10 @@ create_negative_sample() {
     local description="$2"
     local sample_id="$3"
 
+    # D1: Escape $ in pattern/description to prevent shell expansion in heredoc
+    local safe_pattern="${pattern//\$/\\\$}"
+    local safe_description="${description//\$/\\\$}"
+
     local sample_file="$OUTPUT_DIR/$DOMAIN/negative/${sample_id}.md"
 
     # D3: Check if file already exists - skip to avoid overwrite
@@ -122,14 +129,14 @@ create_negative_sample() {
     cat > "$sample_file" <<EOF
 # Negative Sample: $sample_id
 # Domain: $DOMAIN
-# Description: $description
+# Description: $safe_description
 # Expected: Should NOT match (safe pattern, no false positive)
 # Generated: $(date -Iseconds)
 
 ## Safe Pattern
 
 \`\`\`
-$pattern
+$safe_pattern
 \`\`\`
 
 ## Why This Is Safe

@@ -66,6 +66,7 @@ _rules_need_reload() {
     current_mtime=$(stat -c %Y "$rules_dir" 2>/dev/null || stat -f %m "$rules_dir" 2>/dev/null || echo 0)
     local newest_file_mtime
     newest_file_mtime=$(find "$rules_dir" -maxdepth 1 \( -name "*.yaml" -o -name "*.yml" \) -exec stat -c %Y {} + 2>/dev/null | sort -rn | head -1 || echo 0)
+    [[ -z "$newest_file_mtime" ]] && newest_file_mtime=0
     local composite_mtime="${current_mtime}:${newest_file_mtime}"
     local cached_mtime="${_RULES_CACHE_MTIME[$domain]:-0:0}"
 
@@ -151,6 +152,7 @@ load_rules_from_domain() {
         local _dir_mt _file_mt
         _dir_mt=$(stat -c %Y "$rules_dir" 2>/dev/null || stat -f %m "$rules_dir" 2>/dev/null || echo 0)
         _file_mt=$(find "$rules_dir" -maxdepth 1 \( -name "*.yaml" -o -name "*.yml" \) -exec stat -c %Y {} + 2>/dev/null | sort -rn | head -1 || echo 0)
+        [[ -z "$_file_mt" ]] && _file_mt=0
         _RULES_CACHE_MTIME[$domain]="${_dir_mt}:${_file_mt}"
         return 0
     fi
@@ -199,6 +201,7 @@ load_rules_from_domain() {
     local _dir_mt _file_mt
     _dir_mt=$(stat -c %Y "$rules_dir" 2>/dev/null || stat -f %m "$rules_dir" 2>/dev/null || echo 0)
     _file_mt=$(find "$rules_dir" -maxdepth 1 \( -name "*.yaml" -o -name "*.yml" \) -exec stat -c %Y {} + 2>/dev/null | sort -rn | head -1 || echo 0)
+    [[ -z "$_file_mt" ]] && _file_mt=0
     _RULES_CACHE_MTIME[$domain]="${_dir_mt}:${_file_mt}"
 }
 

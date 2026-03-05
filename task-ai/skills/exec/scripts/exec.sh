@@ -87,7 +87,10 @@ if [[ ! -f "$STATE_PY" ]]; then
 fi
 
 # D3/D2: Concurrency — acquire .working/.lock before proceeding (per SKILL.md)
-LOCK_FILE="$WORK_DIR/.lock"
+# Uses mkdir-based lock (same mechanism as verify.sh) so they interlock correctly
+LOCK_DIR="$WORK_DIR/.working"
+LOCK_FILE="$LOCK_DIR/.lock"
+mkdir -p "$LOCK_DIR"
 cleanup_exec() {
     local exit_code=$?
     # D3: On unexpected exit (non-zero, non-caught), write mid-exec signal so auto mode can route
@@ -105,16 +108,21 @@ cleanup_exec() {
 TRAP_EOF
         mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE" 2>/dev/null || true
     fi
-    rm -f "$LOCK_FILE"
+    rm -rf "$LOCK_FILE" 2>/dev/null || true
+    rm -f "$WORK_DIR"/.auto-signal.tmp "$WORK_DIR"/.summary.md.tmp 2>/dev/null || true
+    rm -f "$NOTES_DIR"/*.tmp 2>/dev/null || true
 }
-trap cleanup_exec EXIT
-if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+trap cleanup_exec EXIT INT TERM
+if ! mkdir "$LOCK_FILE" 2>/dev/null; then
     # D3: Stale lock recovery — check if holding PID is still alive
-    existing_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-    if [[ -n "$existing_pid" ]] && ! kill -0 "$existing_pid" 2>/dev/null; then
-        echo "[WARN] Removing stale .lock (PID $existing_pid is dead)" >&2
-        rm -f "$LOCK_FILE"
-        if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+    LOCK_PID_FILE="$LOCK_FILE/pid"
+    if [[ -f "$LOCK_PID_FILE" ]]; then
+        existing_pid=$(cat "$LOCK_PID_FILE" 2>/dev/null || echo "")
+        if [[ -n "$existing_pid" ]] && ! kill -0 "$existing_pid" 2>/dev/null; then
+            echo "[WARN] Removing stale .lock (PID $existing_pid is dead)" >&2
+            rm -rf "$LOCK_FILE"
+            mkdir "$LOCK_FILE" 2>/dev/null || { echo "[ERROR] Failed to reclaim lock" >&2; exit 1; }
+        else
             echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
             exit 1
         fi
@@ -123,6 +131,8 @@ if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
         exit 1
     fi
 fi
+# D3: Record owning PID for stale lock detection
+echo $$ > "$LOCK_FILE/pid"
 
 # D1: Step 1 — Validate status is 'review' or 'executing'
 CURRENT_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "")

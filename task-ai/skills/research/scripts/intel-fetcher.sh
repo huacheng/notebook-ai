@@ -67,15 +67,18 @@ create_candidate_rule() {
     local source_name="$5"
     local output_file="$6"
 
-    # D2: Sanitize YAML string values — escape backslashes, double-quotes, newlines
+    # D2: Sanitize YAML string values — escape backslashes, double-quotes, $, newlines
     local safe_name="${name//\\/\\\\}"
     safe_name="${safe_name//\"/\\\"}"
+    safe_name="${safe_name//\$/\\\$}"
     safe_name="${safe_name//$'\n'/ }"
     local safe_pattern="${pattern//\\/\\\\}"
     safe_pattern="${safe_pattern//\"/\\\"}"
+    safe_pattern="${safe_pattern//\$/\\\$}"
     safe_pattern="${safe_pattern//$'\n'/ }"
     local safe_source="${source_name//\\/\\\\}"
     safe_source="${safe_source//\"/\\\"}"
+    safe_source="${safe_source//\$/\\\$}"
     safe_source="${safe_source//$'\n'/ }"
 
     cat > "$output_file" <<EOF
@@ -113,6 +116,10 @@ create_positive_sample() {
         return 0
     fi
 
+    # D1: Escape $ in pattern/description to prevent shell expansion in heredoc
+    local safe_pat="${pattern//\$/\\\$}"
+    local safe_desc="${description//\$/\\\$}"
+
     local sample_dir="$TEST_CORPUS_DIR/$domain/positive"
     mkdir -p "$sample_dir"
     local sample_file="$sample_dir/${sample_id}.md"
@@ -132,14 +139,14 @@ create_positive_sample() {
 
 # Positive Sample: $sample_id
 # Domain: $domain
-# Description: $description
+# Description: $safe_desc
 # Expected: Should MATCH the security rule pattern
 # Generated: $(date -Iseconds)
 
 ## Dangerous Pattern
 
 \`\`\`
-$pattern
+$safe_pat
 \`\`\`
 
 ## Why This Is Dangerous
@@ -162,6 +169,10 @@ create_negative_sample() {
         return 0
     fi
 
+    # D1: Escape $ in pattern/description to prevent shell expansion in heredoc
+    local safe_pat="${safe_pattern//\$/\\\$}"
+    local safe_desc="${description//\$/\\\$}"
+
     local sample_dir="$TEST_CORPUS_DIR/$domain/negative"
     mkdir -p "$sample_dir"
     local sample_file="$sample_dir/${sample_id}.md"
@@ -174,7 +185,7 @@ create_negative_sample() {
 
     cat > "$sample_file" <<EOF
 # Negative Sample: $sample_id
-# Description: $description
+# Description: $safe_desc
 # Expected: Should NOT match rule pattern (safe code)
 # Generated: $(date -Iseconds)
 
@@ -183,7 +194,7 @@ create_negative_sample() {
 This file contains a safe pattern that should NOT trigger false positives:
 
 \`\`\`
-$safe_pattern
+$safe_pat
 \`\`\`
 
 This represents normal, safe code that should pass security checks.

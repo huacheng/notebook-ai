@@ -73,22 +73,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# D2: Validate argument values against allowed lists
-if [[ -n "$CALLER" ]] && [[ ! " $VALID_CALLERS " =~ " $CALLER " ]]; then
-    echo "[ERROR] Invalid --caller value: $CALLER" >&2
-    echo "Allowed: $VALID_CALLERS" >&2
-    exit 1
+# D2: Validate argument values via exact match (case statement prevents regex injection)
+if [[ -n "$CALLER" ]]; then
+    case "$CALLER" in
+        target|plan|test|verify|check|exec|library|audit) ;;
+        *) echo "[ERROR] Invalid --caller value: $CALLER" >&2; echo "Allowed: $VALID_CALLERS" >&2; exit 1 ;;
+    esac
 fi
-if [[ -n "$PHASE" ]] && [[ ! " $VALID_PHASES " =~ " $PHASE " ]]; then
-    echo "[ERROR] Invalid --phase value: $PHASE" >&2
-    echo "Allowed: $VALID_PHASES" >&2
-    exit 1
+if [[ -n "$PHASE" ]]; then
+    case "$PHASE" in
+        objective|requirements) ;;
+        *) echo "[ERROR] Invalid --phase value: $PHASE" >&2; echo "Allowed: $VALID_PHASES" >&2; exit 1 ;;
+    esac
 fi
-if [[ ! " $VALID_SCOPES " =~ " $SCOPE " ]]; then
-    echo "[ERROR] Invalid --scope value: $SCOPE" >&2
-    echo "Allowed: $VALID_SCOPES" >&2
-    exit 1
-fi
+case "$SCOPE" in
+    gap|deep) ;;
+    *) echo "[ERROR] Invalid --scope value: $SCOPE" >&2; echo "Allowed: $VALID_SCOPES" >&2; exit 1 ;;
+esac
 
 # Try to resolve notebook context (may fail if standalone topic research)
 WORK_DIR=""

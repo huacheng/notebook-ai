@@ -97,7 +97,9 @@ cleanup() {
         git branch -D "$CLEANUP_BRANCH" 2>/dev/null || true
     fi
 }
-trap cleanup ERR INT TERM
+# D3: Include EXIT so explicit exit-1 calls (e.g., git-add failure) also trigger rollback.
+# Success path clears CLEANUP_* vars before exit, so the handler becomes a no-op.
+trap cleanup EXIT ERR INT TERM
 
 # 4. Git Operations (SKILL.md Steps 7-9)
 git branch "$BRANCH_NAME" || { echo "[ERROR] Failed to create branch $BRANCH_NAME" >&2; exit 1; }
@@ -187,6 +189,9 @@ mkdir -p "$WORKING_DIR"
 TITLE=$(printf '%s' "$TITLE" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr -d '[:cntrl:]')
 SAFE_TITLE="${TITLE//\\/\\\\}"
 SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
+# D2: Neutralize $ and backticks to prevent shell expansion in heredocs
+SAFE_TITLE="${SAFE_TITLE//\$/\\$}"
+SAFE_TITLE="${SAFE_TITLE//\`/\\\`}"
 # D3: pre-compute worktree relative path (avoids && || antipattern in heredoc)
 if [[ $USE_WORKTREE -eq 1 ]]; then
   WORKTREE_REL=".worktrees/task-$NOTEBOOK_NAME"
@@ -250,7 +255,7 @@ if ! "${GIT_CMD[@]}" commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook
 fi
 
 # Success - disable cleanup trap
-trap - ERR INT TERM
+trap - EXIT ERR INT TERM
 CLEANUP_BRANCH=""
 CLEANUP_WORKTREE=""
 CLEANUP_DIR=""

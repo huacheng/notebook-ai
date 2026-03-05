@@ -254,7 +254,8 @@ audit_plan() {
     fi
 
     # Injection / obfuscation patterns
-    if printf '%s\n' "$content" | grep -qE 'eval\s*\(|base64\s+-d|<system>|ignore previous|forget.*instruction'; then
+    # D1: Combines prompt injection (plan-specific) + obfuscation (parity with verify_cmd rule 8)
+    if printf '%s\n' "$content" | grep -qE 'eval\s*\(|base64\s+-d|<system>|ignore previous|forget.*instruction|\\x[0-9a-fA-F]{2}.*\\x[0-9a-fA-F]{2}|\$\{IFS\}'; then
         risk="high"
         findings+=("injection_or_obfuscation")
     fi
@@ -539,8 +540,5 @@ case "$ACTION" in
         fi
         scan_skill "$PAYLOAD"
         ;;
-    *)
-        echo "[ERROR] Unknown action: $ACTION" >&2
-        exit 1
-        ;;
+    # D6: No default branch needed — action already validated at lines 30-33
 esac
