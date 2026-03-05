@@ -21,6 +21,12 @@ arguments:
   - name: generate
     description: "Generate or regenerate the implementation plan (flag, no value). Default behavior when invoked — the flag exists for explicitness in auto mode commands"
     required: false
+  - name: --refine
+    description: "Append a refinement to existing plan (used by agent during plan-refinement phase)"
+    required: false
+  - name: --finalize
+    description: "Exit plan-refinement phase, signal plan is ready for execution"
+    required: false
 ---
 
 # /task-ai:plan — Plan Generation
@@ -29,11 +35,59 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 
 ## Usage
 
-```
+```bash
+# Generate mode: create/regenerate plan, enter plan-refinement phase
 /task-ai:plan <notebook_name> [--generate]
+
+# Refine mode: append refinement (agent calls this during conversation)
+/task-ai:plan --refine "Add caching layer between API and database"
+
+# Finalize mode: exit plan-refinement phase
+/task-ai:plan --finalize
 ```
 
 `--generate` is the default behavior — the flag exists for explicitness when invoked from auto mode or scripts. Omitting it has the same effect.
+
+## Plan-Refinement Phase
+
+When `/plan` generates a plan, the system enters **plan-refinement phase**:
+
+1. **Entry**: `/plan` writes `.plan.md` and creates `.session-context` with `phase: plan-refinement`
+2. **During phase**: Agent monitors conversation for plan refinements
+   - Agent detects user refining the plan → automatically calls `plan --refine "content"`
+   - Refinements are appended to `## Refinements` section in `.plan.md`
+3. **Exit**: `/exec` or `/plan --finalize` clears `.session-context`
+
+### Agent Behavior (Prompt Injection)
+
+When `.session-context` exists with `phase: plan-refinement`, the agent receives:
+```
+You are in plan-refinement phase.
+Current plan: <content of .plan.md>
+
+When user's conversation refines, adjusts, or adds steps to the plan,
+automatically call: /task-ai:plan --refine "<extracted refinement>"
+No explicit command needed from user.
+```
+
+### .plan.md Structure with Refinements
+
+```markdown
+# Implementation Plan: notebook-name
+
+## Step 1: Initialize Project
+- Setup basic structure
+[VH: test-init]
+
+## Step 2: Implement Core Logic
+- Write main functions
+[VH: test-core]
+
+## Refinements
+
+- [2026-03-04 10:15] Add caching layer between API and database
+- [2026-03-04 10:20] Use Redis for session storage instead of memory
+```
 
 ## Execution Steps
 

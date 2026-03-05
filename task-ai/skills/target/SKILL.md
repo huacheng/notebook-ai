@@ -19,6 +19,12 @@ arguments:
   - name: objective
     description: "The task goal, requirements, and constraints (optional — omit to read current target)"
     required: false
+  - name: --refine
+    description: "Append a refinement to existing target (used by agent during target-refinement phase)"
+    required: false
+  - name: --finalize
+    description: "Exit target-refinement phase, signal target is ready for planning"
+    required: false
 ---
 
 # /task-ai:target — Define and Review Task Objective
@@ -27,8 +33,60 @@ Define or review the core mission for a notebook. This command acts as the cogni
 
 ## Usage
 
-- **Write Mode**: `/task-ai:target "Objective content..."` — Updates `.target.md` and commits the change.
-- **Read Mode**: `/task-ai:target` — Reads and displays the current `.target.md` to ensure common understanding.
+```bash
+# Write mode: define/update objective, enter target-refinement phase
+/task-ai:target "Build a JWT authentication system"
+
+# Read mode: display current target
+/task-ai:target
+
+# Refine mode: append refinement (agent calls this during conversation)
+/task-ai:target --refine "Use refresh tokens for session extension"
+
+# Finalize mode: exit target-refinement phase
+/task-ai:target --finalize
+```
+
+## Target-Refinement Phase
+
+When `/target "..."` is called with content, the system enters **target-refinement phase**:
+
+1. **Entry**: `/target "objective"` writes to `.target.md` and creates `.session-context`
+2. **During phase**: Agent monitors conversation for objective refinements
+   - Agent detects user refining the goal → automatically calls `target --refine "content"`
+   - Refinements are appended to `## Refinements` section in `.target.md`
+3. **Exit**: `/plan` or `/target --finalize` clears `.session-context`
+
+### Agent Behavior (Prompt Injection)
+
+When `.session-context` exists with `phase: target-refinement`, the agent receives:
+```
+You are in target-refinement phase.
+Current target: <content of .target.md>
+
+When user's conversation refines, clarifies, or adjusts the objective,
+automatically call: /task-ai:target --refine "<extracted refinement>"
+No explicit command needed from user.
+```
+
+### .target.md Structure
+
+```markdown
+# Task Target: notebook-name
+
+## Objective
+
+Build a JWT authentication system
+
+## Refinements
+
+- [2026-03-04 10:05] Use refresh tokens for session extension
+- [2026-03-04 10:08] Support OAuth login via Google
+
+## Requirements
+
+<!-- ... -->
+```
 
 ## Execution Steps
 

@@ -55,7 +55,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 /task-ai:library search "<query>" [--type <type>] [--topic <topic>]
 /task-ai:library list [--type <type>]
 /task-ai:library status
-/task-ai:library maintain [--rebuild-index] [--compact] [--check-staleness] [--all]
+/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--compact] [--check-staleness] [--all]
 ```
 
 ## Library Directory Structure
@@ -185,6 +185,32 @@ Audit library health across six dimensions.
 ### 4. `maintain`
 
 Maintenance operations. `report` automatically triggers a lightweight compact-check (step count only, no I/O) after its own `.auto-signal` write.
+
+#### `--mode quick` (default when called from research)
+
+Lightweight incremental maintenance — processes only new changelog entries since last run.
+
+**Triggered automatically** by `research` after writing to library. No manual invocation needed.
+
+**Detailed Steps:**
+
+1.  **Read** `.last-maintained` timestamp (default 0 if missing)
+2.  **Scan** `.changelog` for entries with `ts > .last-maintained`
+3.  **For each new entry**: validate file exists, check for duplicates against existing content
+4.  **Update** `.last-maintained` to current timestamp
+5.  **No git commit** (files already committed by research)
+
+**Files:**
+- `.last-maintained` — timestamp of last quick maintenance run (epoch ms)
+
+#### `--mode audit`
+
+Full library audit — equivalent to `--all`. Use for scheduled maintenance.
+
+```bash
+/task-ai:library maintain --mode audit
+# Equivalent to: maintain --rebuild-index --compact --check-staleness
+```
 
 #### `--rebuild-index`
 

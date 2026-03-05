@@ -17,14 +17,17 @@ triggers:
     Ambiguous word "需求": user ANALYZING requirement gaps or proposing missing ones → research --phase requirements.
 arguments:
   - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
+    description: "Notebook name (optional, auto-detected from .working/ or task/* branch)"
+    required: false
+  - name: topic
+    description: "Natural language topic to research (for standalone mode without notebook context)"
     required: false
   - name: scope
-    description: "Research scope: full (default, comprehensive collection) or gap (incremental, fill missing topics only)"
+    description: "Research scope: gap (default, incremental — searches library first) or deep (force refresh existing content)"
     required: false
-    default: full
+    default: gap
   - name: caller
-    description: "Calling phase: target (default), plan, test, verify, check, or exec — determines .auto-signal next routing"
+    description: "Calling phase: target (default), plan, test, verify, check, exec, or library — determines output routing"
     required: false
     default: target
   - name: phase
@@ -37,14 +40,34 @@ arguments:
 
 Collect external domain knowledge and organize it into `$NB_WORKSPACES_LIBRARY/.memory/.references/` to support all lifecycle phases: planning (implementation strategy), verification (testing tools and criteria), evaluation (domain standards), and execution (technical details). Acts as the intelligence arm of the task lifecycle — separating research from other phases for clearer logic.
 
+**Key behaviors:**
+- **Library-first**: Always calls `library search` before researching to avoid redundant collection
+- **Incremental by default**: `--scope gap` only researches missing topics
+- **Auto-maintenance**: Triggers `library maintain --mode quick` after writing to library
+
 ## Usage
 
+```bash
+# Standalone topic research (no notebook context)
+/task-ai:research "OAuth 2.0 PKCE flow"
+/task-ai:research "React Server Components" --scope deep
+
+# Notebook context (auto-detected or explicit)
+/task-ai:research [notebook] [--caller target|plan|test|verify|check|exec] [--phase objective|requirements] [--scope gap|deep]
 ```
-/task-ai:research <notebook_name> [--caller target|plan|test|verify|check|exec] [--phase objective|requirements] [--scope full|gap]
-```
+
+### Scope Modes
+
+| --scope | Behavior | Use Case |
+|---------|----------|----------|
+| `gap` (default) | Search library first → only research missing topics | Daily use, avoid redundant collection |
+| `deep` | Skip library search → force refresh, archive existing | Content outdated, need latest information |
+
+### Caller Modes
 
 | --caller | --phase | 触发时机 | 产出 | next |
 |---------|---------|---------|------|------|
+| (standalone) | — | 直接话题研究 | `.references/<topic>.md` + 对话输出 | — |
 | `target`（默认） | `objective`（默认） | init 后，3 阶段渐进深化 | `.target.md` ← O1/O2/O3 分阶段 Insights | `(stop)` |
 | `target` | `requirements` | O3 确认后 | `.target.md` ← Proposed Requirements | `plan` |
 | `plan` | — | plan 前 / plan 内部 | `.references/<topic>.md` | `plan` |

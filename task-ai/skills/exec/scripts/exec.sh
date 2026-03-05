@@ -27,9 +27,16 @@ if [[ ! -d "$WORK_DIR" ]]; then
 fi
 
 INDEX_JSON="$WORK_DIR/.index.json"
+SESSION_CONTEXT="$WORK_DIR/.session-context"
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
 mkdir -p "$NOTES_DIR"
+
+# Exit plan-refinement phase (if active)
+if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: plan-refinement" "$SESSION_CONTEXT"; then
+    rm -f "$SESSION_CONTEXT"
+    echo "[exec] Exited plan-refinement phase."
+fi
 
 # 1. Step Discovery (from .plan.md)
 PLAN_MD="$WORK_DIR/.plan.md"

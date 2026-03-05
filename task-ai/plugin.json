@@ -1,7 +1,7 @@
 {
   "name": "task-ai",
-  "version": "0.9.6",
-  "description": "Structured task lifecycle management with 18 skills for AI-driven development — project/notebook hierarchy, domain-aware verification, knowledge library, and autonomous execution",
+  "version": "0.9.8",
+  "description": "Structured task lifecycle management with 18 skills for AI-driven development — project/notebook hierarchy, domain-aware verification, knowledge library, conversational refinement phases, and autonomous execution",
   "author": {
     "name": "huacheng"
   },
@@ -13,6 +13,8 @@
     "annotation",
     "plan",
     "execution",
+    "library",
+    "refinement",
     "ai-cli-online"
   ],
   "commands": "./commands/",
