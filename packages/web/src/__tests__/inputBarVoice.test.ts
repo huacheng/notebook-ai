@@ -100,7 +100,6 @@ describe('InputBar existing functionality (regression)', () => {
   it('should still have command buttons', () => {
     const src = getSrc();
     expect(src).toContain('task-ai:target');
-    expect(src).toContain('task-ai:auto');
     expect(src).toContain('task-ai:highlight');
   });
 

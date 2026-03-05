@@ -260,7 +260,6 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     { cmd: 'task-ai:research', icon: '🔍' },
     { cmd: 'task-ai:target', icon: '🎯' },
     { cmd: 'task-ai:plan', icon: '📝' },
-    { cmd: 'task-ai:auto', icon: '🤖' },
     { cmd: 'task-ai:read', icon: '📖' },
     { cmd: 'task-ai:highlight', icon: '💡' },
     { cmd: 'task-ai:check', icon: '✅' },
