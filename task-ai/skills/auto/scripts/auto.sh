@@ -6,6 +6,20 @@ set -euo pipefail
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
+source "$SCRIPT_DIR/signal-writer.sh"
+
+# Derive conversational phase from .index.json status
+derive_phase() {
+    local status="$1"
+    case "$status" in
+        draft) echo "target" ;;
+        planning|re-planning) echo "planning" ;;
+        review|executing) echo "execution" ;;
+        blocked) echo "execution" ;;
+        complete|stage-done) echo "finalization" ;;
+        *) echo "target" ;;
+    esac
+}
 
 
 NOTEBOOK="${1:-}"
@@ -62,7 +76,8 @@ esac
 # 2. Entry Point Routing (Simulated)
 # D3: python3 call with error handling
 STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status 2>/dev/null || echo "unknown")
-echo "Auto-mode: Starting loop from status: $STATUS"
+PHASE=$(derive_phase "$STATUS")
+echo "Auto-mode: Starting loop from status: $STATUS (phase: $PHASE)"
 
 # 2. Simulated Loop (Executing one step for plumbing)
 ITERATION=1
@@ -108,6 +123,11 @@ if ! cat > "$SIGNAL_FILE" <<EOF
   "next": "$NEXT_STEP",
   "iteration": $ITERATION,
   "compaction_count": $COMPACTION,
+  "phase": "$PHASE",
+  "phase_progress": 0.0,
+  "check_score": null,
+  "retry_count": 0,
+  "delegation_failures": [],
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 }
 EOF
