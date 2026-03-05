@@ -6,6 +6,7 @@ import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
 import { PromptQueue } from './PromptQueue';
+import { PhaseProgressBar, ScorePanel, StageIndicator } from './AutoStatusBar';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -386,6 +387,8 @@ export function Notebook() {
   const clearSessionNotice = useStore((s) => s.clearSessionNotice);
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
+  const autoStatus = useStore((s) => s.autoStatus);
+  const [scoreExpanded, setScoreExpanded] = useState(false);
   const cells = notebook?.cells ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
   const cellsContainerRef = useRef<HTMLDivElement>(null);
@@ -439,6 +442,20 @@ export function Notebook() {
   return (
     <div className="notebook-container">
       <NotebookStatusBar />
+      {autoStatus.phase && (
+        <div className="auto-status-container">
+          <StageIndicator stage={autoStatus.stage} />
+          <PhaseProgressBar
+            phase={autoStatus.phase}
+            phaseProgress={autoStatus.phaseProgress}
+          />
+          <ScorePanel
+            checkScore={autoStatus.checkScore}
+            expanded={scoreExpanded}
+            onToggle={() => setScoreExpanded(!scoreExpanded)}
+          />
+        </div>
+      )}
       {sessionNotice && (
         <div className="session-notice">
           <span>{sessionNotice}</span>

@@ -1,0 +1,137 @@
+/* Auto Status Container */
+.auto-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px var(--space-xl);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-page);
+}
+
+/* Auto Status Bar — Phase Progress */
+.auto-phase-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+}
+
+.auto-phase-step {
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-cell-hover);
+}
+
+.auto-phase-complete {
+  color: var(--color-completed);
+  background: rgba(21, 128, 61, 0.08);
+}
+
+.auto-phase-current {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  font-weight: 600;
+}
+
+.auto-phase-arrow {
+  color: var(--text-secondary);
+  margin: 0 2px;
+  opacity: 0.5;
+}
+
+.auto-phase-check {
+  margin-right: 2px;
+}
+
+.auto-phase-progress {
+  margin-left: 4px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* Score Panel */
+.auto-score-panel {
+  position: relative;
+}
+
+.auto-score-toggle {
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.auto-score-toggle:hover {
+  background: var(--bg-cell-hover);
+}
+
+.auto-score-caret {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+.auto-score-details {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  background: var(--bg-cell);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 280px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 4px;
+}
+
+.auto-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.auto-score-label {
+  min-width: 120px;
+  color: var(--text-secondary);
+}
+
+.auto-score-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-cell-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.auto-score-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.auto-score-value {
+  min-width: 36px;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* Stage Indicator */
+.auto-stage-indicator {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-cell-hover);
+}

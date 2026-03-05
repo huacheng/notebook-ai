@@ -6,6 +6,7 @@ import { createProjectSlice } from './store/projectSlice';
 import { createUiSlice } from './store/uiSlice';
 import { createWsSlice } from './store/wsSlice';
 import { createMobileSlice } from './store/mobileSlice';
+import { createAutoStatusSlice } from './store/autoStatusSlice';
 import { _persistNotebook } from './store/cacheHelpers';
 
 export type { NotebookStore } from './store/types';
@@ -18,6 +19,7 @@ export const useStore = create<import('./store/types').NotebookStore>()((...a) =
   ...createUiSlice(...a),
   ...createWsSlice(...a),
   ...createMobileSlice(...a),
+  ...createAutoStatusSlice(...a),
 }));
 
 // Auto-persist notebook to localStorage whenever it changes

@@ -12,6 +12,7 @@ import {
   setCellGitDiffInNotebook,
 } from './notebookMutations';
 import { handleFilesPush } from '../utils/wsFilesPush';
+import { applyAutoStatus } from './autoStatusSlice';
 
 // Module-level tracker for WS in CONNECTING state (not yet stored in zustand).
 // Prevents race conditions when connectWebSocket is called multiple times.
@@ -569,6 +570,12 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           set({ sessionNotice: `ℹ️ Tool execution in progress (${mins}+ min)...` });
           break;
         }
+        case 'auto_status': {
+          set((state) => ({
+            autoStatus: applyAutoStatus(state.autoStatus, parsed),
+          }));
+          break;
+        }
         case 'error':
           if (parsed.cell_id) {
             const errorOutput = { type: 'error' as const, message: parsed.message, timestamp: new Date().toISOString() };
@@ -624,6 +631,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         msg.resume_after = lastEventIndex[sessionId];
       }
       ws.send(JSON.stringify(msg));
+      ws.send(JSON.stringify({ type: 'auto_subscribe', session_id: sessionId }));
     }
   },
 

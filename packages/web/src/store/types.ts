@@ -12,6 +12,7 @@ import type {
 import type { ProjectListItem } from './projectSlice';
 import type { PluginStatusResponse } from '../api/plugin';
 import type { Command } from '../mention/types';
+import type { AutoStatusState, AutoStatusMessage } from './autoStatusSlice';
 
 /**
  * Full combined store interface.
@@ -94,6 +95,10 @@ export interface NotebookStore {
   mobileFileViewerOpen: boolean;
   mobileFileViewerPath: string | null;
   mobileFileViewerSource: 'workspace' | 'library' | 'deliverables' | null;
+
+  // ── Auto status state ─────────────────────────────────────────────────
+  autoStatus: AutoStatusState;
+  setAutoStatus: (msg: AutoStatusMessage) => void;
 
   // ── WebSocket state ────────────────────────────────────────────────────
   ws: WebSocket | null;
