@@ -284,13 +284,30 @@ function AnnotationEditFloat({ x, y, initialContent, onSave, onCancel }: {
   const t = useT();
   const [text, setText] = useState(initialContent ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
+  const floatRef = useRef<HTMLDivElement>(null);
+  const [adjustedX, setAdjustedX] = useState(x);
 
   useEffect(() => {
     requestAnimationFrame(() => ref.current?.focus({ preventScroll: false }));
   }, []);
 
+  // Clamp position so the float doesn't overflow the container
+  useEffect(() => {
+    const el = floatRef.current;
+    const parent = el?.offsetParent as HTMLElement | null;
+    if (!el || !parent) return;
+    const parentWidth = parent.clientWidth;
+    const elWidth = el.offsetWidth;
+    if (x + elWidth > parentWidth - 8) {
+      setAdjustedX(Math.max(8, parentWidth - elWidth - 8));
+    }
+  }, [x]);
+
+  const touchSave = (e: React.TouchEvent | React.MouseEvent) => { e.preventDefault(); onSave(text); };
+  const touchCancel = (e: React.TouchEvent | React.MouseEvent) => { e.preventDefault(); onCancel(); };
+
   return (
-    <div className="fv-edit-float" style={{ top: y, left: x }}>
+    <div ref={floatRef} className="fv-edit-float" style={{ top: y, left: adjustedX }}>
       <textarea
         ref={ref}
         className="fv-edit-float__textarea"
@@ -304,8 +321,8 @@ function AnnotationEditFloat({ x, y, initialContent, onSave, onCancel }: {
         placeholder={t('fv.editPlaceholder')}
       />
       <div className="fv-edit-float__actions">
-        <button className="fv-edit-float__btn" onMouseDown={(e) => { e.preventDefault(); onSave(text); }}>{t('fv.save')}</button>
-        <button className="fv-edit-float__btn fv-edit-float__btn--cancel" onMouseDown={(e) => { e.preventDefault(); onCancel(); }}>{t('fv.cancel')}</button>
+        <button className="fv-edit-float__btn" onMouseDown={touchSave} onTouchStart={touchSave}>{t('fv.save')}</button>
+        <button className="fv-edit-float__btn fv-edit-float__btn--cancel" onMouseDown={touchCancel} onTouchStart={touchCancel}>{t('fv.cancel')}</button>
       </div>
     </div>
   );

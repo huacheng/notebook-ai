@@ -5314,6 +5314,10 @@ button:focus-visible {
   line-height: 1;
 }
 .fv-sf-btn:hover { background: rgba(255,255,255,0.12); }
+@media (max-width: 768px) {
+  .fv-sf-btn { padding: 8px 12px; font-size: 16px; }
+  .fv-edit-float__btn { padding: 8px 16px; font-size: 14px; }
+}
 .fv-sf-delete:hover { color: var(--color-error); }
 .fv-sf-replace:hover { color: var(--color-primary); }
 .fv-sf-comment:hover { color: var(--text-secondary); }
@@ -5329,6 +5333,7 @@ button:focus-visible {
   padding: 8px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   width: 300px;
+  max-width: calc(100% - 16px);
   display: flex;
   flex-direction: column;
   gap: 6px;
