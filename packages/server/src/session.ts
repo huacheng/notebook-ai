@@ -22,6 +22,7 @@ import {
   findRunningCellId,
   findCellByToolUseId,
 } from './notebook-mutations.js';
+import { getDaemon } from './routes/task-auto.js';
 
 // ── Prompt Queue Limits ───────────────────────────────────────────────────────
 
@@ -1181,6 +1182,16 @@ export class SessionManager {
           if (output) {
             // Heartbeat: update last output time
             session._lastOutputTime = Date.now();
+
+            // Notify auto daemon of stream activity (for stall detection)
+            if (output.type === 'text' || output.type === 'thinking') {
+              const autoDaemon = getDaemon(session.id);
+              if (autoDaemon) {
+                autoDaemon.reportStreamActivity(
+                  output.type === 'text' ? (output as { content: string }).content : undefined,
+                );
+              }
+            }
 
             // D1: Only persist AskUserQuestion tool calls (user choices must survive reload)
             const shouldPersist = output.type !== 'tool_use' ||

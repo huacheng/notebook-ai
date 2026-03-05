@@ -2,10 +2,42 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import { existsSync, unlinkSync } from 'fs';
 import path from 'path';
 import type { NotebookDb } from '../db.js';
-import { TaskAutoDaemon } from '../task-ai/task-auto-daemon.js';
+import { TaskAutoDaemon, type StallRecoveryAction } from '../task-ai/task-auto-daemon.js';
 
 // Active daemons keyed by session_name
 const daemons = new Map<string, TaskAutoDaemon>();
+
+/**
+ * Wire daemon events to send recovery prompts through the agent session.
+ * Called when creating or recovering a daemon.
+ */
+export function wireDaemonToSession(
+  daemon: TaskAutoDaemon,
+  sessionManager: { getSession: (id: string) => { agentProcess: { sendPrompt: (msg: string) => void; isAlive: () => boolean } } | undefined },
+): void {
+  const sendToAgent = (message: string) => {
+    const session = sessionManager.getSession(daemon.sessionId);
+    if (!session?.agentProcess?.isAlive()) return;
+    session.agentProcess.sendPrompt(message);
+  };
+
+  daemon.on('compaction-recovery', (signal: { type: string; message: string }) => {
+    sendToAgent(signal.message);
+  });
+
+  daemon.on('stall-recovery', (action: StallRecoveryAction) => {
+    if (action.message) {
+      sendToAgent(action.message);
+    }
+  });
+}
+
+// Stored reference for wiring daemons to sessions
+let _sessionManager: Parameters<typeof wireDaemonToSession>[1] | null = null;
+
+export function setSessionManager(sm: Parameters<typeof wireDaemonToSession>[1]): void {
+  _sessionManager = sm;
+}
 
 export function createTaskAutoRouter(db: NotebookDb): IRouter {
   const router = Router();
@@ -64,6 +96,10 @@ export function createTaskAutoRouter(db: NotebookDb): IRouter {
       daemons.delete(sessionId);
       try { db.stopAuto(sessionId); } catch { /* best effort */ }
     });
+
+    if (_sessionManager) {
+      wireDaemonToSession(daemon, _sessionManager);
+    }
 
     daemon.start();
     daemons.set(sessionId, daemon);
@@ -132,6 +168,11 @@ export function createTaskAutoRouter(db: NotebookDb): IRouter {
   return router;
 }
 
+/** Get a daemon by session ID (for stream integration) */
+export function getDaemon(sessionId: string): TaskAutoDaemon | undefined {
+  return daemons.get(sessionId);
+}
+
 /** Stop all active daemons (for server shutdown) */
 export function stopAllDaemons(): void {
   for (const daemon of daemons.values()) {
@@ -178,6 +219,10 @@ export function recoverDaemons(db: NotebookDb): number {
       daemons.delete(row.session_name);
       try { db.stopAuto(row.session_name); } catch { /* best effort */ }
     });
+
+    if (_sessionManager) {
+      wireDaemonToSession(daemon, _sessionManager);
+    }
 
     daemon.start();
     daemons.set(row.session_name, daemon);

@@ -19,7 +19,7 @@ import { createProjectsRouter } from './routes/projects.js';
 import { createGitRouter } from './routes/git.js';
 import { createPluginRouter } from './routes/plugin.js';
 import commandsRouter from './routes/commands.js';
-import { createTaskAutoRouter, recoverDaemons } from './routes/task-auto.js';
+import { createTaskAutoRouter, recoverDaemons, setSessionManager } from './routes/task-auto.js';
 import { setupWebSocket } from './ws-handler.js';
 import { authMiddleware } from './auth.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
@@ -107,6 +107,9 @@ const sessionManager = new SessionManager();
 const notebookStore = new NotebookStore();
 const db = new NotebookDb();
 const workspaceRoot = process.env['NB_WORKSPACES_ROOT'] ?? path.join(os.homedir(), 'nb-workspaces');
+
+// Wire session manager to task-auto daemon for recovery signals
+setSessionManager(sessionManager);
 
 // Wire auto-save: when a cell completes, sync cell_count + updated_at to DB.
 sessionManager.onAutoSave = (notebookDbId, cellCount) => {
