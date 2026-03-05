@@ -13,22 +13,23 @@ write_check_score() {
         return 1
     fi
 
-    python3 -c "
-import json
-with open('$signal_file', 'r') as f:
+    # D2: Pass values as arguments to python, not inline interpolation
+    python3 - "$signal_file" "$overall" "$d1" "$d2" "$d3" "$d4" "$d5" "$d6" <<'PYEOF'
+import json, sys, os
+signal_file, overall, d1, d2, d3, d4, d5, d6 = sys.argv[1], *[float(x) for x in sys.argv[2:9]]
+with open(signal_file, 'r') as f:
     signal = json.load(f)
 signal['check_score'] = {
-    'overall': $overall,
-    'd1_correctness': $d1,
-    'd2_security': $d2,
-    'd3_reliability': $d3,
-    'd4_performance': $d4,
-    'd5_architecture': $d5,
-    'd6_maintainability': $d6
+    'overall': overall, 'd1_correctness': d1, 'd2_security': d2,
+    'd3_reliability': d3, 'd4_performance': d4, 'd5_architecture': d5,
+    'd6_maintainability': d6,
 }
-with open('$signal_file', 'w') as f:
+# D3: Atomic write via temp file + rename
+tmp = signal_file + '.tmp'
+with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)
-"
+os.rename(tmp, signal_file)
+PYEOF
 }
 
 # Write phase and phase_progress to .auto-signal
@@ -43,15 +44,19 @@ write_phase() {
         return 1
     fi
 
-    python3 -c "
-import json
-with open('$signal_file', 'r') as f:
+    # D2: Pass values as arguments to python, not inline interpolation
+    python3 - "$signal_file" "$phase" "$progress" <<'PYEOF'
+import json, sys, os
+signal_file, phase, progress = sys.argv[1], sys.argv[2], float(sys.argv[3])
+with open(signal_file, 'r') as f:
     signal = json.load(f)
-signal['phase'] = '$phase'
-signal['phase_progress'] = $progress
-with open('$signal_file', 'w') as f:
+signal['phase'] = phase
+signal['phase_progress'] = progress
+tmp = signal_file + '.tmp'
+with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)
-"
+os.rename(tmp, signal_file)
+PYEOF
 }
 
 # Increment retry_count in .auto-signal
@@ -64,14 +69,17 @@ increment_retry() {
         return 1
     fi
 
-    python3 -c "
-import json
-with open('$signal_file', 'r') as f:
+    python3 - "$signal_file" <<'PYEOF'
+import json, sys, os
+signal_file = sys.argv[1]
+with open(signal_file, 'r') as f:
     signal = json.load(f)
 signal['retry_count'] = signal.get('retry_count', 0) + 1
-with open('$signal_file', 'w') as f:
+tmp = signal_file + '.tmp'
+with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)
-"
+os.rename(tmp, signal_file)
+PYEOF
 }
 
 # Append delegation failure to .auto-signal
@@ -85,15 +93,19 @@ append_delegation_failure() {
         return 1
     fi
 
-    python3 -c "
-import json
-with open('$signal_file', 'r') as f:
+    # D2: Pass failure string as argument, not inline interpolation
+    python3 - "$signal_file" "$failure" <<'PYEOF'
+import json, sys, os
+signal_file, failure = sys.argv[1], sys.argv[2]
+with open(signal_file, 'r') as f:
     signal = json.load(f)
 failures = signal.get('delegation_failures', [])
-if '$failure' not in failures:
-    failures.append('$failure')
+if failure not in failures:
+    failures.append(failure)
 signal['delegation_failures'] = failures
-with open('$signal_file', 'w') as f:
+tmp = signal_file + '.tmp'
+with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)
-"
+os.rename(tmp, signal_file)
+PYEOF
 }

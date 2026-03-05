@@ -483,6 +483,7 @@ export const QueueReorderSchema = z.object({
 export const AutoSubscribeSchema = z.object({
   type: z.literal('auto_subscribe'),
   session_id: z.string(),
+  task_dir: z.string().optional(),
 });
 
 export const WSClientMessageSchema = z.discriminatedUnion('type', [

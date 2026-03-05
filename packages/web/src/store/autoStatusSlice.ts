@@ -1,15 +1,9 @@
 import type { StateCreator } from 'zustand';
 import type { NotebookStore } from './types';
+import type { CheckScore, AutoStatusMessage as SharedAutoStatusMessage } from '@notebook-ai/shared';
 
-export interface CheckScore {
-  overall: number;
-  d1_correctness: number;
-  d2_security: number;
-  d3_reliability: number;
-  d4_performance: number;
-  d5_architecture: number;
-  d6_maintainability: number;
-}
+export type { CheckScore } from '@notebook-ai/shared';
+export type AutoStatusMessage = SharedAutoStatusMessage;
 
 export interface AutoStatusState {
   phase: 'target' | 'planning' | 'execution' | 'finalization' | null;
@@ -32,19 +26,6 @@ export const initialAutoStatus: AutoStatusState = {
   retryCount: 0,
   iteration: 0,
 };
-
-export interface AutoStatusMessage {
-  type: 'auto_status';
-  session_id: string;
-  phase: string | null;
-  phase_progress: number | null;
-  step: string | null;
-  next: string | null;
-  stage: { current: number; total: number } | null;
-  check_score: CheckScore | null;
-  retry_count: number;
-  iteration: number;
-}
 
 export function applyAutoStatus(
   _state: AutoStatusState,

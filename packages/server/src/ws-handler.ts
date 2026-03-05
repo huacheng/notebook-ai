@@ -1106,13 +1106,37 @@ export function setupWebSocket(
           const session = sessionManager.getSession(sessionId);
           if (!session) break;
 
-          const workDir = session.cwd;
-          if (!workDir) break;
-
-          const signalPath = path.join(workDir, '.auto-signal');
-          const signalDir = path.dirname(signalPath);
+          // D1-4: Accept task_dir from message, fall back to session.cwd/.working/
+          const taskDir: string | undefined = msg.task_dir;
+          let signalDir: string;
+          let signalPath: string;
+          if (taskDir && existsSync(taskDir)) {
+            signalDir = taskDir;
+            signalPath = path.join(taskDir, '.auto-signal');
+          } else {
+            // Fallback: if cwd already ends with .working, use it directly;
+            // otherwise check .working/ subdirectory, then cwd
+            const cwd = session.cwd;
+            if (path.basename(cwd) === '.working') {
+              signalDir = cwd;
+              signalPath = path.join(cwd, '.auto-signal');
+            } else {
+              const workingDir = path.join(cwd, '.working');
+              if (existsSync(workingDir)) {
+                signalDir = workingDir;
+                signalPath = path.join(workingDir, '.auto-signal');
+              } else {
+                signalDir = cwd;
+                signalPath = path.join(cwd, '.auto-signal');
+              }
+            }
+          }
 
           if (!fileWatcher) break;
+
+          // D3-4: Prevent duplicate subscriptions — unsubscribe previous auto watcher
+          const prevAutoUnsub = watchSubscriptions.get(`auto:${sessionId}`);
+          if (prevAutoUnsub) prevAutoUnsub();
 
           // Watch the directory containing .auto-signal for changes
           const autoUnsub = fileWatcher.subscribe(signalDir, () => {
@@ -1152,9 +1176,16 @@ export function setupWebSocket(
               // Ignore parse errors (partial writes)
             }
           });
+          watchSubscriptions.set(`auto:${sessionId}`, autoUnsub);
 
           // Clean up on disconnect
-          ws.on('close', () => autoUnsub());
+          ws.on('close', () => {
+            const unsub = watchSubscriptions.get(`auto:${sessionId}`);
+            if (unsub) {
+              unsub();
+              watchSubscriptions.delete(`auto:${sessionId}`);
+            }
+          });
           break;
         }
 
