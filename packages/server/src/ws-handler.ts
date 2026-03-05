@@ -48,11 +48,12 @@ export function sanitizeErrorForClient(err: unknown): string {
 }
 import crypto from 'crypto';
 import fs from 'fs/promises';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync, readFileSync } from 'fs';
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import {
   WSClientMessageSchema,
+  AutoSignalSchema,
   type Notebook,
 } from '@notebook-ai/shared';
 import type { SessionManager } from './session.js';
@@ -1097,6 +1098,63 @@ export function setupWebSocket(
             unsub();
             watchSubscriptions.delete(watch_id);
           }
+          break;
+        }
+
+        case 'auto_subscribe': {
+          const sessionId = msg.session_id;
+          const session = sessionManager.getSession(sessionId);
+          if (!session) break;
+
+          const workDir = session.cwd;
+          if (!workDir) break;
+
+          const signalPath = path.join(workDir, '.auto-signal');
+          const signalDir = path.dirname(signalPath);
+
+          if (!fileWatcher) break;
+
+          // Watch the directory containing .auto-signal for changes
+          const autoUnsub = fileWatcher.subscribe(signalDir, () => {
+            try {
+              if (!existsSync(signalPath)) {
+                // Signal file deleted = auto loop ended
+                sendToClient(ws, {
+                  type: 'auto_status',
+                  session_id: sessionId,
+                  phase: null,
+                  phase_progress: null,
+                  step: null,
+                  next: null,
+                  stage: null,
+                  check_score: null,
+                  retry_count: 0,
+                  iteration: 0,
+                });
+                return;
+              }
+              const raw = JSON.parse(readFileSync(signalPath, 'utf-8'));
+              const signal = AutoSignalSchema.parse(raw);
+
+              sendToClient(ws, {
+                type: 'auto_status',
+                session_id: sessionId,
+                phase: signal.phase ?? null,
+                phase_progress: signal.phase_progress ?? null,
+                step: signal.step ?? null,
+                next: signal.next ?? null,
+                stage: signal.stage ?? null,
+                check_score: signal.check_score ?? null,
+                retry_count: signal.retry_count ?? 0,
+                iteration: signal.iteration ?? 0,
+              });
+            } catch {
+              // Ignore parse errors (partial writes)
+            }
+          });
+
+          // Clean up on disconnect
+          ws.on('close', () => autoUnsub());
           break;
         }
 
