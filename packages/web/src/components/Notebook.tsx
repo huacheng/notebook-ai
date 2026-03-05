@@ -6,7 +6,8 @@ import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
 import { PromptQueue } from './PromptQueue';
-import { PhaseProgressBar, ScorePanel, StageIndicator } from './AutoStatusBar';
+import { PhaseProgressBar, ScorePanel, StageIndicator, AutoStopButton } from './AutoStatusBar';
+import { stopAutoMode } from '../api/task-auto';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -387,8 +388,11 @@ export function Notebook() {
   const clearSessionNotice = useStore((s) => s.clearSessionNotice);
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
+  const sessionId = useStore((s) => s.sessionId);
   const autoStatus = useStore((s) => s.autoStatus);
+  const authToken = useStore((s) => s.authToken);
   const [scoreExpanded, setScoreExpanded] = useState(false);
+  const [stoppingAuto, setStoppingAuto] = useState(false);
   const cells = notebook?.cells ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
   const cellsContainerRef = useRef<HTMLDivElement>(null);
@@ -453,6 +457,18 @@ export function Notebook() {
             checkScore={autoStatus.checkScore}
             expanded={scoreExpanded}
             onToggle={() => setScoreExpanded(!scoreExpanded)}
+          />
+          <AutoStopButton
+            disabled={stoppingAuto}
+            onStop={async () => {
+              if (!sessionId) return;
+              setStoppingAuto(true);
+              try {
+                await stopAutoMode(sessionId, authToken);
+              } finally {
+                setStoppingAuto(false);
+              }
+            }}
           />
         </div>
       )}

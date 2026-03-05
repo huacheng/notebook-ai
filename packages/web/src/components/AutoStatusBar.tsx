@@ -116,3 +116,21 @@ export function StageIndicator({ stage }: StageIndicatorProps) {
     </span>
   );
 }
+
+interface AutoStopButtonProps {
+  onStop: () => void;
+  disabled?: boolean;
+}
+
+export function AutoStopButton({ onStop, disabled }: AutoStopButtonProps) {
+  return (
+    <button
+      className="auto-stop-btn"
+      onClick={onStop}
+      disabled={disabled}
+      title="Stop auto mode"
+    >
+      Stop
+    </button>
+  );
+}
