@@ -214,7 +214,7 @@ export function MobileNotebookView() {
                 authToken={authToken}
                 onFileClick={handleWorkspaceFileClick}
                 refreshKey={workspaceRefreshKey}
-                noDeleteFilter={(name, subPath) => name === '.MEMORY.md' || name === '.index.json' || name === '.working' || name === '.claude' || subPath?.startsWith('.claude/')}
+                noDeleteFilter={(name, subPath) => name === '.MEMORY.md' || name === '.status.json' || name === '.working' || name === '.claude' || subPath?.startsWith('.claude/')}
               />
             ) : (
               <p className="mobile-drawer-placeholder">{t('sidebar.noProject')}</p>

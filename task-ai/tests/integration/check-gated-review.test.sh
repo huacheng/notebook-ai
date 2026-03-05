@@ -16,7 +16,7 @@ export NB_WORKSPACES_LIBRARY="$TEST_DIR/.library"
 
 # Setup
 mkdir -p "$TEST_DIR/_test/.working/.analysis"
-cat > "$TEST_DIR/_test/.working/.index.json" <<EOF
+cat > "$TEST_DIR/_test/.working/.status.json" <<EOF
 {"notebook": "_test", "status": "review"}
 EOF
 

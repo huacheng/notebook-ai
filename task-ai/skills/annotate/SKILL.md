@@ -70,14 +70,14 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 1. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once
 2. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. Reject if any path escapes (prevents path traversal)
 3. **Determine file layer** for each annotation (Requirement / Planning / Evaluation / Methodology / Information)
-4. **Read `.index.json`** — validate status is not terminal (`complete` / `cancelled` / `stage-done`). If terminal, REJECT
+4. **Read `.status.json`** — validate status is not terminal (`complete` / `cancelled` / `stage-done`). If terminal, REJECT
 5. **Read context files**: `.target.md` + `.plan.md` + `.test/` (latest criteria)
 6. **Read** the annotated source file(s)
 7. **Content sanitization**: strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (U+0000–U+001F except `\n` and `\t`, and U+007F) from annotation content before writing. Preserve markdown formatting and visible text
 8. **Triage** each annotation by type × file layer
 9. **Cross-impact assessment** (based on file layer × annotation type — see §Cross-Impact Assessment)
 10. **Execute changes**: write to source file. Comment annotations append `> 💬`/`> 📝` blockquotes — never modify existing content
-11. **Update `.index.json`** per State Transitions (two-dimensional: `status × file_layer × annotation_type`):
+11. **Update `.status.json`** per State Transitions (two-dimensional: `status × file_layer × annotation_type`):
     - If new status is `re-planning`, set `phase: needs-check`
     - Otherwise clear `phase` to `""`
     - Update `updated` timestamp

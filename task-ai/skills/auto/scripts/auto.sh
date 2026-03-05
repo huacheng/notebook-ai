@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:auto implementation
-# Usage: auto.sh <notebook> [--start|--stop|--status]
+# Usage: auto.sh <notebook> [--stop|--status]
 
 set -euo pipefail
 # Load context discovery from lib.sh
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 source "$SCRIPT_DIR/signal-writer.sh"
 
-# Derive conversational phase from .index.json status
+# Derive conversational phase from .status.json status
 derive_phase() {
     local status="$1"
     case "$status" in
@@ -29,13 +29,12 @@ ACTION="start"  # Default action
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --start)  ACTION="start"; shift ;;
     --stop)   ACTION="stop"; shift ;;
     --status) ACTION="status"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-INDEX_JSON="$WORK_DIR/.index.json"
+STATUS_JSON="$WORK_DIR/.status.json"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 STOP_FILE="$WORK_DIR/.auto-stop"
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
@@ -85,7 +84,7 @@ esac
 
 # 2. Entry Point Routing (per SKILL.md §Entry Point)
 # D3: python3 call with error handling
-STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status 2>/dev/null || echo "unknown")
+STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "unknown")
 PHASE=$(derive_phase "$STATUS")
 echo "Auto-mode: Starting loop from status: $STATUS (phase: $PHASE)"
 
@@ -123,7 +122,7 @@ case "$STATUS" in
     ;;
   re-planning)
     # Phase 2: Check phase field to determine sub-step
-    RE_PHASE=$(python3 "$STATE_PY" get "$INDEX_JSON" phase 2>/dev/null || echo "")
+    RE_PHASE=$(python3 "$STATE_PY" get "$STATUS_JSON" phase 2>/dev/null || echo "")
     case "$RE_PHASE" in
       needs-check)
         STEP="verify"

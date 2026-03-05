@@ -11,13 +11,13 @@ trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 
 # Setup: Create a real git branch to merge
 rm -rf "$NB_WORKSPACES_ROOT" && mkdir -p "$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working"
-INDEX_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.index.json"
+STATUS_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.status.json"
 
 # Create branch
 BRANCH="task/$TEST_NB"
 git branch "$BRANCH" > /dev/null 2>&1
 
-cat > "$INDEX_JSON" <<EOF
+cat > "$STATUS_JSON" <<EOF
 {
   "status": "executing",
   "branch": "$BRANCH",
@@ -35,7 +35,7 @@ STATE_PY="$TASK_AI_ROOT/core/state.py"
 # ============================================================
 
 # 1.1 Status should be complete
-STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status)
+STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status)
 if [[ "$STATUS" == "complete" ]]; then
     emit_pass "merge: updated status to complete"
 else
@@ -47,7 +47,7 @@ fi
 # ============================================================
 
 # 2.1 Branch metadata should be RETAINED (not cleared)
-BRANCH_META=$(python3 "$STATE_PY" get "$INDEX_JSON" branch)
+BRANCH_META=$(python3 "$STATE_PY" get "$STATUS_JSON" branch)
 if [[ "$BRANCH_META" == "$BRANCH" ]]; then
     emit_pass "merge: retained branch metadata"
 else

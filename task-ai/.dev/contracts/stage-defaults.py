@@ -4,7 +4,7 @@
 Tests:
   1. task-ai.md master doc contains stage field definition
   2. task-ai.md contains stage-done in status state machine
-  3. init/SKILL.md .index.json schema includes stage field
+  3. init/SKILL.md .status.json schema includes stage field
   4. expected-states.json includes stage-done
   5. state.py VALID_STATUSES includes stage-done
 """
@@ -28,9 +28,9 @@ else:
 # --- Test 3: init/SKILL.md has stage in schema ---
 init_skill = (TASK_AI_ROOT / 'skills' / 'init' / 'SKILL.md').read_text()
 if '"stage"' in init_skill and '"current": 1' in init_skill and '"total": 1' in init_skill:
-    emit_pass('init/SKILL.md: stage field in .index.json schema')
+    emit_pass('init/SKILL.md: stage field in .status.json schema')
 else:
-    emit_fail('init/SKILL.md: stage field missing from .index.json schema')
+    emit_fail('init/SKILL.md: stage field missing from .status.json schema')
 
 # --- Test 4: expected-states.json has stage-done ---
 expected = load_fixture('expected-states.json')

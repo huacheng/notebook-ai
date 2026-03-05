@@ -86,7 +86,7 @@ export function detectCompaction(output: string): boolean {
 const RECOVERY_HEADER = `<!-- TASK-AI RECOVERY CONTEXT -->
 <!-- If you see this after context compaction, execute recovery protocol: -->
 <!-- 1. Read .auto-signal for loop position -->
-<!-- 2. Read .index.json for status -->
+<!-- 2. Read .status.json for status -->
 <!-- 3. Resume from \`next\` step -->
 
 `;
@@ -136,7 +136,7 @@ interface AutoSignal {
   delegation_failures?: string[];
 }
 
-interface IndexJson {
+interface StatusJson {
   status?: string;
   title?: string;
   type?: string;
@@ -153,8 +153,8 @@ function readAutoSignal(workingDir: string): AutoSignal | null {
   }
 }
 
-function readIndexJson(workingDir: string): IndexJson | null {
-  const filePath = path.join(workingDir, '.index.json');
+function readStatusJson(workingDir: string): StatusJson | null {
+  const filePath = path.join(workingDir, '.status.json');
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(content);
@@ -190,14 +190,14 @@ export function validateRecoveryReadiness(workingDir: string): ValidationResult 
     }
   }
 
-  // 2. .index.json exists and contains required fields
-  const index = readIndexJson(workingDir);
+  // 2. .status.json exists and contains required fields
+  const index = readStatusJson(workingDir);
   if (!index) {
-    errors.push('.index.json missing');
+    errors.push('.status.json missing');
   } else {
     for (const field of ['status', 'title', 'type', 'branch']) {
-      if (!(field in index) || index[field as keyof IndexJson] === undefined) {
-        errors.push(`.index.json missing field: ${field}`);
+      if (!(field in index) || index[field as keyof StatusJson] === undefined) {
+        errors.push(`.status.json missing field: ${field}`);
       }
     }
   }
@@ -229,7 +229,7 @@ export function buildRecoverySignal(workingDir: string): RecoverySignal {
     message: `Context compacted by system. Execute recovery protocol:
 
 1. Read ${workingDir}/.auto-signal — get iteration, step, next
-2. Read ${workingDir}/.index.json — confirm status
+2. Read ${workingDir}/.status.json — confirm status
 3. Read ${workingDir}/.summary.md — restore task context
 4. Resume auto loop from \`next\` step
 

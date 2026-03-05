@@ -10,8 +10,8 @@ trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 TEST_NB="security-test-nb"
 
 rm -rf "$NB_WORKSPACES_ROOT" && mkdir -p "$NB_WORKSPACES_ROOT/$TEST_NB/.working"
-INDEX_JSON="$NB_WORKSPACES_ROOT/$TEST_NB/.working/.index.json"
-echo '{"status": "executing"}' > "$INDEX_JSON"
+STATUS_JSON="$NB_WORKSPACES_ROOT/$TEST_NB/.working/.status.json"
+echo '{"status": "executing"}' > "$STATUS_JSON"
 
 # Assert: Safe command passes
 OUTPUT_SAFE=$("$SECURITY_SH" "$TEST_NB" verify-cmd "ls -la" 2>&1)

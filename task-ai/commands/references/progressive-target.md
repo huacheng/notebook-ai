@@ -4,7 +4,7 @@ Multi-stage target support for complex tasks that span multiple plan→exec→me
 
 ## Overview
 
-The `stage` field in `.index.json` enables progressive task execution. A task with `stage.total > 1` proceeds through multiple stages, each following the full lifecycle: `planning → review → executing → stage-done`, before advancing to the next stage.
+The `stage` field in `.status.json` enables progressive task execution. A task with `stage.total > 1` proceeds through multiple stages, each following the full lifecycle: `planning → review → executing → stage-done`, before advancing to the next stage.
 
 ## Stage Lifecycle
 

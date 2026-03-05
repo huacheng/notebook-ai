@@ -43,8 +43,8 @@ Capability slots provide advice; executor slots do the work. Both use the same t
 
 Executor discovery runs **once per exec invocation**, before the per-step loop begins. It follows the same three-level algorithm (Seed Slot → Registry → Semantic Scan) with these additional rules:
 
-1. **Adaptive type matching**: The `type` field in `.index.json` is derived from dialog + `.target.md` content and may not map cleanly to predefined categories. Executor discovery uses **semantic matching** against three signal sources, not rigid type-string comparison:
-   - `.index.json` `type` field (primary hint)
+1. **Adaptive type matching**: The `type` field in `.status.json` is derived from dialog + `.target.md` content and may not map cleanly to predefined categories. Executor discovery uses **semantic matching** against three signal sources, not rigid type-string comparison:
+   - `.status.json` `type` field (primary hint)
    - `.target.md` content (requirement descriptions, technology mentions, domain vocabulary)
    - `.plan.md` step structure (test-driven steps → TDD executor affinity; document generation steps → doc executor affinity)
 
@@ -52,7 +52,7 @@ Executor discovery runs **once per exec invocation**, before the per-step loop b
 
 2. **Stability signal**: Executor slots use health-weighted scoring with a **higher threshold** — `combinedScore >= 0.70` required (vs 0.50 for capability slots). A new executor with < 5 invocations is NOT selected (sample penalty keeps score at 0.50)
 3. **User override**: `slotBindings` in user preferences can force a specific executor (e.g., `"plan-executor": "superpowers:subagent-driven-development"`)
-4. **Fallback guarantee**: If executor discovery fails or the executor plugin fails mid-execution, exec falls back to its native per-step inline loop. Partially completed steps (by the executor) are detected via `completed_steps` in `.index.json`
+4. **Fallback guarantee**: If executor discovery fails or the executor plugin fails mid-execution, exec falls back to its native per-step inline loop. Partially completed steps (by the executor) are detected via `completed_steps` in `.status.json`
 
 ### Executor Integration Contract
 
@@ -77,7 +77,7 @@ You have access to the [{plugin_name}] skill/tool.
 
 **Instructions**:
 1. Use [{plugin_name}] to execute the remaining plan steps
-2. For each completed step, update .index.json completed_steps
+2. For each completed step, update .status.json completed_steps
 3. Commit changes per step using: task-ai({module}):exec step N/M done
 4. On completion, write signal: { "step": "exec", "result": "(done)" }
 5. On significant issue, write signal: { "step": "exec", "result": "(mid-exec)" }
@@ -88,7 +88,7 @@ You have access to the [{plugin_name}] skill/tool.
 - Write .summary.md on completion with condensed context
 ```
 
-**Key difference from capability delegation**: No 500-char output limit. The executor operates on the actual working directory, makes real file changes, and commits. The main session reads `.index.json`, `.auto-signal`, and `.summary.md` after the executor subagent completes.
+**Key difference from capability delegation**: No 500-char output limit. The executor operates on the actual working directory, makes real file changes, and commits. The main session reads `.status.json`, `.auto-signal`, and `.summary.md` after the executor subagent completes.
 
 ### Executor vs Capability: When to Use Which
 

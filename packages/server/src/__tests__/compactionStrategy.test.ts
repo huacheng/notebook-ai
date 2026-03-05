@@ -92,7 +92,7 @@ describe('compactionStrategy', () => {
 
       expect(result).toContain('TASK-AI RECOVERY CONTEXT');
       expect(result).toContain('Read .auto-signal');
-      expect(result).toContain('Read .index.json');
+      expect(result).toContain('Read .status.json');
     });
 
     it('should include status line', () => {
@@ -161,9 +161,9 @@ describe('compactionStrategy', () => {
     });
 
     it('should fail when .auto-signal is missing', () => {
-      // Create only .index.json and .summary.md
+      // Create only .status.json and .summary.md
       fs.writeFileSync(
-        path.join(tempDir, '.index.json'),
+        path.join(tempDir, '.status.json'),
         JSON.stringify({ status: 'executing', title: 'Test', type: 'software', branch: 'test' })
       );
       fs.writeFileSync(
@@ -177,7 +177,7 @@ describe('compactionStrategy', () => {
       expect(result.errors).toContain('.auto-signal missing');
     });
 
-    it('should fail when .index.json is missing', () => {
+    it('should fail when .status.json is missing', () => {
       fs.writeFileSync(
         path.join(tempDir, '.auto-signal'),
         JSON.stringify({ step: 'exec', next: 'verify', iteration: 1, timestamp: new Date().toISOString() })
@@ -190,7 +190,7 @@ describe('compactionStrategy', () => {
       const result = validateRecoveryReadiness(tempDir);
 
       expect(result.ready).toBe(false);
-      expect(result.errors).toContain('.index.json missing');
+      expect(result.errors).toContain('.status.json missing');
     });
 
     it('should fail when .summary.md is missing', () => {
@@ -199,7 +199,7 @@ describe('compactionStrategy', () => {
         JSON.stringify({ step: 'exec', next: 'verify', iteration: 1, timestamp: new Date().toISOString() })
       );
       fs.writeFileSync(
-        path.join(tempDir, '.index.json'),
+        path.join(tempDir, '.status.json'),
         JSON.stringify({ status: 'executing', title: 'Test', type: 'software', branch: 'test' })
       );
 
@@ -215,7 +215,7 @@ describe('compactionStrategy', () => {
         JSON.stringify({ step: 'exec', next: 'verify' }) // missing iteration and timestamp
       );
       fs.writeFileSync(
-        path.join(tempDir, '.index.json'),
+        path.join(tempDir, '.status.json'),
         JSON.stringify({ status: 'executing', title: 'Test', type: 'software', branch: 'test' })
       );
       fs.writeFileSync(
@@ -235,7 +235,7 @@ describe('compactionStrategy', () => {
         JSON.stringify({ step: 'exec', next: 'verify', iteration: 1, timestamp: new Date().toISOString() })
       );
       fs.writeFileSync(
-        path.join(tempDir, '.index.json'),
+        path.join(tempDir, '.status.json'),
         JSON.stringify({ status: 'executing', title: 'Test', type: 'software', branch: 'test' })
       );
       fs.writeFileSync(
@@ -255,7 +255,7 @@ describe('compactionStrategy', () => {
         JSON.stringify({ step: 'exec', next: 'verify', iteration: 1, timestamp: new Date().toISOString(), phase: 'execution', phase_progress: 0.5, retry_count: 0 })
       );
       fs.writeFileSync(
-        path.join(tempDir, '.index.json'),
+        path.join(tempDir, '.status.json'),
         JSON.stringify({ status: 'executing', title: 'Test', type: 'software', branch: 'test' })
       );
       fs.writeFileSync(

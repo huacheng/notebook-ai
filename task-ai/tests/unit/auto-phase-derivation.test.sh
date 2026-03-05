@@ -9,7 +9,7 @@ AUTO_SH="$SCRIPT_DIR/skills/auto/scripts/auto.sh"
 
 # Create mock notebook with .working subdirectory (resolve_workdir sets WORK_DIR=nb_dir/.working)
 mkdir -p "$TEST_DIR/test-nb/.working"
-cat > "$TEST_DIR/test-nb/.working/.index.json" <<'EOF'
+cat > "$TEST_DIR/test-nb/.working/.status.json" <<'EOF'
 {"name": "test-nb", "status": "planning", "type": "software"}
 EOF
 cat > "$TEST_DIR/test-nb/.working/.target.md" <<'EOF'
@@ -19,7 +19,7 @@ cat > "$TEST_DIR/test-nb/.working/.target.md" <<'EOF'
 EOF
 
 # Run auto.sh with mock notebook
-NB_WORKSPACES_ROOT="$TEST_DIR" bash "$AUTO_SH" test-nb --start 2>/dev/null || true
+NB_WORKSPACES_ROOT="$TEST_DIR" bash "$AUTO_SH" test-nb 2>/dev/null || true
 
 # Red: auto.sh currently does NOT write phase field to .auto-signal
 SIGNAL_FILE="$TEST_DIR/test-nb/.working/.auto-signal"

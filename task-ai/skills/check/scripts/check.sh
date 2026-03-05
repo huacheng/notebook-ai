@@ -47,7 +47,7 @@ else
     # Normal notebook-context checkpoints
     resolve_workdir "$NOTEBOOK"
     NOTEBOOK="$NB_NOTEBOOK"
-    INDEX_JSON="$WORK_DIR/.index.json"
+    STATUS_JSON="$WORK_DIR/.status.json"
 
     if [[ ! -d "$WORK_DIR" ]]; then
         echo "[ERROR] Working directory not found." >&2
@@ -776,7 +776,7 @@ $AUDIT_OUTPUT
 Review and revise the plan to remove dangerous operations.
 EOF
             # D3: python3 call with error handling
-            if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status re-planning --phase needs-plan 2>&1; then
+            if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>&1; then
                 echo "[WARN] Failed to transition status to re-planning" >&2
             fi
             echo "Check completed. Security blocked. Analysis: $ANALYSIS_FILE"
@@ -807,7 +807,7 @@ if [[ "$CHECKPOINT" == "pre-merge" ]]; then
     fi
 
     # Verify status is executing (pre-merge only after post-exec ACCEPT)
-    CURRENT_STATUS=$(python3 -c "import json; print(json.load(open('$INDEX_JSON'))['status'])" 2>/dev/null || echo "unknown")
+    CURRENT_STATUS=$(python3 -c "import json; print(json.load(open('$STATUS_JSON'))['status'])" 2>/dev/null || echo "unknown")
     if [[ "$CURRENT_STATUS" != "executing" ]]; then
         echo "[ERROR] pre-merge requires status=executing, got $CURRENT_STATUS" >&2
         exit 1
@@ -954,7 +954,7 @@ echo "Checking $NOTEBOOK at $CHECKPOINT... Verdict: $VERDICT"
 # D3: python3 calls with error handling
 case "$VERDICT" in
   PASS)
-    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status review 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status review 2>&1; then
         echo "[WARN] Failed to transition status to review" >&2
     fi
     ;;
@@ -962,12 +962,12 @@ case "$VERDICT" in
     # ACCEPT keeps 'executing' status but signals 'merge'
     ;;
   REPLAN)
-    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status re-planning --phase needs-plan 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>&1; then
         echo "[WARN] Failed to transition status to re-planning" >&2
     fi
     ;;
   BLOCKED)
-    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status blocked 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status blocked 2>&1; then
         echo "[WARN] Failed to transition status to blocked" >&2
     fi
     ;;

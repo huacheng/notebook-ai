@@ -58,7 +58,7 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-INDEX_JSON="$WORK_DIR/.index.json"
+STATUS_JSON="$WORK_DIR/.status.json"
 SESSION_CONTEXT="$WORK_DIR/.session-context"
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
@@ -88,7 +88,7 @@ if [[ "$TOTAL_STEPS" -eq 0 ]]; then
     echo "[ERROR] No steps found in .plan.md" >&2
     exit 1
 fi
-COMPLETED=$(python3 "$STATE_PY" get "$INDEX_JSON" completed_steps 2>/dev/null || echo "0")
+COMPLETED=$(python3 "$STATE_PY" get "$STATUS_JSON" completed_steps 2>/dev/null || echo "0")
 COMPLETED=${COMPLETED:-0}
 # D2: Validate COMPLETED contains only digits
 if [[ ! "$COMPLETED" =~ ^[0-9]+$ ]]; then
@@ -121,7 +121,7 @@ echo "--- Executing Step $NEXT_STEP ---"
 
 # 3. VFP Cycle Simulation (Software only)
 # D3: python3 call with fallback
-TYPE=$(python3 "$STATE_PY" get "$INDEX_JSON" type 2>/dev/null || echo "")
+TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
 TYPE=${TYPE:-"software"}  # Default to software if not set
 if [[ "$TYPE" == *"software"* ]]; then
     echo "[VFP] Red (VH) confirmed."
@@ -143,7 +143,7 @@ fi
 
 # 5. Update Progress
 # D3: python3 call with error handling
-if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status executing --completed-steps $NEXT_STEP 2>&1; then
+if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --completed-steps $NEXT_STEP 2>&1; then
     echo "[WARN] Failed to update progress in index" >&2
 fi
 

@@ -67,17 +67,17 @@ If merge conflict detected:
 
 On successful merge:
 
-1. **Read** `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing)
+1. **Read** `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing)
 2. **IF `stage.current > stage.total`** (data inconsistency):
    - Log warning to `.summary.md`: `⚠ stage.current (N) > stage.total (M) — treating as final stage`
    - Proceed as final stage (step 4 below)
 3. **ELIF `stage.current < stage.total`** (intermediate stage complete):
    a. **Write** `.summary.md` with stage completion summary: completed steps, key changes, verification outcome, lessons learned
    b. **Update** `.target.md`: mark current Stage `[ACTIVE]` → `[COMPLETE]`, fill `### Results` section (extract from `.summary.md`)
-   c. **Update** `.index.json`: status → `stage-done`, push to `stage.completed` array `{ "stage": <current>, "name": "<stage name>", "completed_at": "<ISO timestamp>" }` — **retain** `branch` and `worktree` values
+   c. **Update** `.status.json`: status → `stage-done`, push to `stage.completed` array `{ "stage": <current>, "name": "<stage name>", "completed_at": "<ISO timestamp>" }` — **retain** `branch` and `worktree` values
    d. **Git commit** state: `task-ai(<notebook>):merge stage <N> completed`
 4. **ELSE** (`stage.current == stage.total`, or data inconsistency from step 2):
-   a. **Update** `.index.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
+   a. **Update** `.status.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
    b. **Write** `.summary.md` with final task summary
    c. **Git commit** state: `task-ai(<notebook>):merge task completed`
 
@@ -87,8 +87,8 @@ On successful merge:
 
 ## Execution Steps
 
-1. **Read** `.index.json` — validate status is `executing`
-2. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
+1. **Read** `.status.json` — validate status is `executing`
+2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
 3. **Verify** ACCEPT verdict: check latest `.analysis/` file for `post-exec-accept`
 4. **Read** `.summary.md` for task context (plan overview, completed steps, key decisions)
 5. **Phase 1**: Task-level refactoring on task branch
@@ -99,7 +99,7 @@ On successful merge:
    7.3. Each resolution: fix conflicts → verify (build + test) → if pass commit, if fail abort and retry
    7.4. If all 3 attempts fail → stay `executing`, abort merge, report unresolvable conflicts
    7.5. If conflicts were resolved: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value, only when conflicts occurred). Capture conflict resolution strategy reasoning. Inline call failure MUST NOT block merge's main flow
-8. **Phase 4**: Post-merge finalization — read `stage` field from `.index.json` (default `{ current: 1, total: 1, completed: [] }` if missing):
+8. **Phase 4**: Post-merge finalization — read `stage` field from `.status.json` (default `{ current: 1, total: 1, completed: [] }` if missing):
    - **If `stage.current > stage.total`**: log warning to `.summary.md`, then treat as final stage
    - **Elif `stage.current < stage.total`**: write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `stage-done` with stage.completed push → git commit `stage <N> completed`
    - **Else** (`current == total` or data inconsistency): status → `complete` with branch/worktree retained → write `.summary.md` → git commit `task completed`
@@ -140,7 +140,7 @@ On successful merge:
 - The 3-attempt limit prevents infinite resolution loops
 - Each resolution attempt includes full verification (build + test) to ensure resolved code is correct
 - On merge failure, status stays `executing` (not `blocked`) so merge can be retried. The user should manually resolve conflicts and then run `/task-ai:merge` again
-- After manual resolution, if the user has already merged manually, they can update `.index.json` status to `complete` directly
+- After manual resolution, if the user has already merged manually, they can update `.status.json` status to `complete` directly
 - Pre-merge refactoring is optional — if no cleanup needed, skip directly to merge
 - Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
 - **Concurrency**: Merge acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)

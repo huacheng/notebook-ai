@@ -91,7 +91,7 @@ No explicit command needed from user.
 
 ## Execution Steps
 
-1. Read `.target.md` for requirements. **Stage awareness**: read `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing). If `stage.total > 1` (multi-stage mode):
+1. Read `.target.md` for requirements. **Stage awareness**: read `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing). If `stage.total > 1` (multi-stage mode):
    - Only read the current `[ACTIVE]` stage's Objective/Requirements/Constraints from `.target.md` — plan scope is limited to the current stage
    - Also read prior `[COMPLETE]` stages' `### Results` sections as context (already-implemented capabilities)
    - Library context loading (steps 9-11) naturally includes prior-stage experience files distilled by highlight
@@ -102,8 +102,8 @@ No explicit command needed from user.
      - **If `## Research Insights` present**: invoke research with `--scope gap --caller plan` — target research already provided comprehensive coverage, only fill plan-specific gaps
      - **If no `## Research Insights`**: invoke research with `--scope full --caller plan` — full collection (backward compatible, works when user skips target research)
    - **Re-plan** (status `re-planning`/`review`/`executing`): invoke research with `--scope gap --caller plan` — incremental type refinement and reference collection
-3. **Read** `.type-profile.md` — research has created or updated this. Verify the type classification makes sense in context. If plan disagrees with research's classification, update `.type-profile.md` with rationale and adjust `type` in `.index.json`
-4. Validate type value: each pipe-separated segment matches `[a-zA-Z0-9_:-]+`, full field matches `[a-zA-Z0-9_:|-]+`. Ensure `type` in `.index.json` is set
+3. **Read** `.type-profile.md` — research has created or updated this. Verify the type classification makes sense in context. If plan disagrees with research's classification, update `.type-profile.md` with rationale and adjust `type` in `.status.json`
+4. Validate type value: each pipe-separated segment matches `[a-zA-Z0-9_:-]+`, full field matches `[a-zA-Z0-9_:|-]+`. Ensure `type` in `.status.json` is set
 5. Read `.summary.md` if exists (condensed context from prior runs — primary context source)
 6. Read `.analysis/` latest file only if exists (address check feedback from NEEDS_REVISION)
 7. Read `.bugfix/` latest file only if exists (address most recent mid-exec issue from REPLAN)
@@ -118,7 +118,7 @@ No explicit command needed from user.
     - **Optional delegation — brainstorm**: On first plan generation (no existing `.plan.md`), follow `auto/references/plugin-delegation.md` to attempt matching the `brainstorm` capability slot. If matched, invoke via Task subagent — exploration results serve as supplementary planning input. No match or failure → continue normally
 16. Write plan to `.plan.md` in the task module
 17. Write `.test/<YYYY-MM-DD>-plan-criteria.md` with **domain-appropriate** verification criteria: acceptance criteria from `.target.md` + per-step test cases using methods standard in the task domain. On re-plan, write `.test/<YYYY-MM-DD>-replan-criteria.md` incorporating lessons from previous `.test/` results files
-18. **VH stub generation** (software types only): When `type` (from `.index.json`) contains `software`, generate executable failing verification hypothesis stubs from the criteria:
+18. **VH stub generation** (software types only): When `type` (from `.status.json`) contains `software`, generate executable failing verification hypothesis stubs from the criteria:
     - Extract each plan step's verification points from the criteria file written in step 17
     - Generate `<workspace>/.test/<YYYY-MM-DD>-vh-stubs.test.*` (language/framework determined by `.type-profile.md` or project conventions)
     - Each stub contains: test description, assertion placeholder, expected failure marker `// VH: not implemented`
@@ -130,7 +130,7 @@ No explicit command needed from user.
 20. Create `.notes/<YYYY-MM-DD>-<summary>-plan.md` with research findings and key decisions
 21. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
 22. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
-23. Update `.index.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
+23. Update `.status.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
 24. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
 25. **L1 六维自审** — scan `.plan.md` against `.target.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
     - Read `.plan.md`, `.target.md`, `.type-profile.md` (if exists)

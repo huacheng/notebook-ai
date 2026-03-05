@@ -28,7 +28,7 @@ fi
 
 echo "Generating report for $NOTEBOOK..."
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
-INDEX_JSON="$WORK_DIR/.index.json"
+STATUS_JSON="$WORK_DIR/.status.json"
 
 # D3: Check state.py existence before calling
 if [[ ! -f "$STATE_PY" ]]; then
@@ -38,11 +38,11 @@ fi
 
 # 1. Gather Metadata
 # D3: python3 calls with error handling
-TITLE=$(python3 "$STATE_PY" get "$INDEX_JSON" title 2>/dev/null || echo "$NOTEBOOK")
-STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status 2>/dev/null || echo "unknown")
-CREATED=$(python3 "$STATE_PY" get "$INDEX_JSON" created 2>/dev/null || echo "unknown")
+TITLE=$(python3 "$STATE_PY" get "$STATUS_JSON" title 2>/dev/null || echo "$NOTEBOOK")
+STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "unknown")
+CREATED=$(python3 "$STATE_PY" get "$STATUS_JSON" created 2>/dev/null || echo "unknown")
 COMPLETED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-TYPE=$(python3 "$STATE_PY" get "$INDEX_JSON" type 2>/dev/null || echo "")
+TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
 TYPE=${TYPE:-generic}
 
 # D2: Validate FORMAT parameter

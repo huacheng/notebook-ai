@@ -13,14 +13,14 @@ trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"
 mkdir -p "$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working"
-INDEX_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.index.json"
-echo '{"status":"planning"}' > "$INDEX_JSON"
+STATUS_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.status.json"
+echo '{"status":"planning"}' > "$STATUS_JSON"
 
 # Act: post-plan PASS
 "$CHECK_SH" "$TEST_NB" --checkpoint post-plan > /dev/null
 
 # 1. Assert: Status changed to review
-NEW_STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status)
+NEW_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status)
 if [[ "$NEW_STATUS" == "review" ]]; then
     emit_pass "check: post-plan PASS transitioned to review"
 else

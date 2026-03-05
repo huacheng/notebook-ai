@@ -124,7 +124,7 @@ find_nb_context() {
   # 1. Path-based discovery: look for .working/ in current or parent directories
   local cur="$PWD"
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -d "$cur/.working" && -f "$cur/.working/.index.json" ]]; then
+    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
       export NB_WORKING="$cur/.working"
       export NB_NOTEBOOK=$(basename "$cur")
       return 0

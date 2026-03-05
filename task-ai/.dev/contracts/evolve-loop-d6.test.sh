@@ -1195,7 +1195,7 @@ test_AU3_auto_signal_write_error_handling() {
 # AU4: auto.sh ACTION parameter should be used (D1/D6)
 # ─────────────────────────────────────────────────────────────────────────────
 test_AU4_action_parameter_used() {
-    # ACTION is parsed (--start/--stop/--status), should be used
+    # ACTION is parsed (--stop/--status), should be used
     if grep -qE 'case.*ACTION|if.*ACTION|\$ACTION' \
         "$TASK_AI_ROOT/skills/auto/scripts/auto.sh"; then
         pass "AU4: auto.sh ACTION parameter is used"
@@ -1411,6 +1411,42 @@ test_MT5_git_commit_error_handling() {
     fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MT6: maintain.sh compact cat append should have error handling (D3)
+# ─────────────────────────────────────────────────────────────────────────────
+test_MT6_compact_cat_error_handling() {
+    if grep -qE 'if.*cat.*CHANGELOG.*>>|if ! cat.*CHANGELOG|cat.*ARCHIVE.*\|\|' \
+        "$TASK_AI_ROOT/skills/library/scripts/maintain.sh"; then
+        pass "MT6: maintain.sh compact cat append has error handling"
+    else
+        fail "MT6: maintain.sh compact cat append lacks error handling"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MT7: maintain.sh compact mv should have error handling (D3)
+# ─────────────────────────────────────────────────────────────────────────────
+test_MT7_compact_mv_error_handling() {
+    if grep -qE 'if.*mv.*CHANGELOG.*ARCHIVE|if ! mv.*CHANGELOG|mv.*ARCHIVE.*\|\|' \
+        "$TASK_AI_ROOT/skills/library/scripts/maintain.sh"; then
+        pass "MT7: maintain.sh compact mv has error handling"
+    else
+        fail "MT7: maintain.sh compact mv lacks error handling"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MT8: maintain.sh evolve-rules.sh execution should have error handling (D3)
+# ─────────────────────────────────────────────────────────────────────────────
+test_MT8_evolve_error_handling() {
+    if grep -qE 'if.*bash.*EVOLVE_SCRIPT|bash.*EVOLVE_SCRIPT.*\|\||if ! bash.*EVOLVE' \
+        "$TASK_AI_ROOT/skills/library/scripts/maintain.sh"; then
+        pass "MT8: maintain.sh evolve-rules execution has error handling"
+    else
+        fail "MT8: maintain.sh evolve-rules execution lacks error handling"
+    fi
+}
+
 # Run tests
 echo "=== Evolve Loop D6 Tests ==="
 test_R1_auto_signal_handles_empty_workdir
@@ -1513,10 +1549,14 @@ test_PR1_mkdir_error_handling
 test_PR2_candidate_mkdir_error_handling
 test_PR3_file_write_error_handling
 test_PR4_changelog_error_handling
+test_PR5_target_argument_validated
 test_MT1_rebuild_index_error_handling
 test_MT2_rebuild_relations_error_handling
 test_MT3_compact_mkdir_error_handling
 test_MT4_git_add_error_handling
 test_MT5_git_commit_error_handling
+test_MT6_compact_cat_error_handling
+test_MT7_compact_mv_error_handling
+test_MT8_evolve_error_handling
 echo ""
 echo "All tests passed."

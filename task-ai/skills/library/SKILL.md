@@ -344,7 +344,7 @@ All external content written to `.library/.memory/.references/` MUST be sanitise
 | 3 | Unicode hidden attacks | Zero-width chars, bidirectional control chars (U+202A–U+202E), C0/C1 control chars, NFC normalisation bypass | medium–high |
 | 4 | ANSI / terminal sequences | Terminal control codes (`\x1b[...`) | medium |
 | 5 | Resource exhaustion | Files > 50KB hard limit; repeated content blocks > 3 repetitions → fold | low–medium |
-| 6 | System format impersonation | Strings matching `.auto-signal` JSON structure, `task-ai(` commit prefix, `.index.json` schema fields | high |
+| 6 | System format impersonation | Strings matching `.auto-signal` JSON structure, `task-ai(` commit prefix, `.status.json` schema fields | high |
 | 7 | Encoding obfuscation | Base64 string (> 30 chars) adjacent to `decode`/`eval`/`exec`/`base64 -d`; hex-encoded commands (`\x41\x42…`); split-string concatenation forming shell commands | high (non-degradable) |
 | 8 | Two-stage loading | `curl \| bash`, `wget \| sh`, `eval $(curl …)`, download + `chmod +x` + execute chains; embedded `#!/bin/bash` inside document code blocks | high (non-degradable) |
 | 9 | Cross-document domain convergence | Source three-tier classification at fetch time; IOC tracking in `.ioc.md` at maintain time | medium–high |

@@ -48,16 +48,16 @@ Output a summary table of all notebooks:
 | Column | Source |
 |--------|--------|
 | Notebook | directory name |
-| Title | `.index.json` → `title` |
-| Status | `.index.json` → `status` |
-| Phase | `.index.json` → `phase` (if non-empty) |
-| Progress | `.index.json` → `completed_steps` |
-| Type | `.index.json` → `type` |
-| Updated | `.index.json` → `updated` |
+| Title | `.status.json` → `title` |
+| Status | `.status.json` → `status` |
+| Phase | `.status.json` → `phase` (if non-empty) |
+| Progress | `.status.json` → `completed_steps` |
+| Type | `.status.json` → `type` |
+| Updated | `.status.json` → `updated` |
 
 ### 2. Single Notebook Details (`<notebook_name>`)
 
-Output all fields from `<notebook_name>/.working/.index.json` plus:
+Output all fields from `<notebook_name>/.working/.status.json` plus:
 - `.summary.md` content (if exists) — condensed context
 - `.target.md` first 10 lines — requirements preview
 - File listing of task module directory
@@ -89,8 +89,8 @@ Parse commit messages to reconstruct the timeline of status changes with timesta
 
 ## Execution Steps
 
-1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories, then within each project list notebook directories that contain `.working/.index.json` to discover notebooks
-2. **Metadata extraction**: For each discovered notebook, read `.working/.index.json` to extract `title`, `status`, `type`, and `branch`.
+1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories, then within each project list notebook directories that contain `.working/.status.json` to discover notebooks
+2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json` to extract `title`, `status`, `type`, and `branch`.
 3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: extract history via `git log --oneline --grep="task-ai(<notebook>)"`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
 

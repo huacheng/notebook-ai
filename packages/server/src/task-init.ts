@@ -1,7 +1,7 @@
 import { writeFile, mkdir, readFile, appendFile, stat } from 'fs/promises';
 import path from 'path';
 
-export interface TaskIndexJson {
+export interface TaskStatusJson {
   title: string;
   type: string;
   status: 'draft';
@@ -20,11 +20,11 @@ export async function initTaskWorkingDir(opts: {
   nbSlug: string;
   title: string;
   branchName: string;
-}): Promise<TaskIndexJson> {
+}): Promise<TaskStatusJson> {
   const workingDir = path.join(opts.worktreePath, '.working');
   const now = new Date().toISOString();
 
-  const index: TaskIndexJson = {
+  const index: TaskStatusJson = {
     title: opts.title,
     type: '',
     status: 'draft',
@@ -39,7 +39,7 @@ export async function initTaskWorkingDir(opts: {
   };
 
   await writeFile(
-    path.join(workingDir, '.index.json'),
+    path.join(workingDir, '.status.json'),
     JSON.stringify(index, null, 2),
     'utf-8',
   );

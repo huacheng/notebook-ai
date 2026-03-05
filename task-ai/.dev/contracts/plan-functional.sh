@@ -12,8 +12,8 @@ trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"
 mkdir -p "$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working"
-INDEX_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.index.json"
-echo '{"title":"Test Task", "type":"software"}' > "$INDEX_JSON"
+STATUS_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.status.json"
+echo '{"title":"Test Task", "type":"software"}' > "$STATUS_JSON"
 
 # Act
 "$PLAN_SH" "$TEST_NB" > /dev/null

@@ -54,7 +54,7 @@ beforeEach(async () => {
   await mkdir(path.join(projectDir, '.git'), { recursive: true });
   await mkdir(path.join(projectDir, '.working'), { recursive: true });
   await mkdir(path.join(projectDir, 'docs'), { recursive: true });
-  await writeFile(path.join(projectDir, '.index.json'), '{}');
+  await writeFile(path.join(projectDir, '.status.json'), '{}');
 
   const db = createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test Project' });
   const router = createProjectsRouter(db, mockSessionManager, mockNotebookStore, tmpDir);
@@ -143,13 +143,13 @@ describe('GET /:projectId/files — dotfile filter', () => {
     expect(names).not.toContain('.deliverables');
   });
 
-  it('shows .index.json in project root listing', async () => {
+  it('shows .status.json in project root listing', async () => {
     const res = await request(app)
       .get(`/api/projects/${PROJECT_ID}/files`)
       .expect(200);
 
     const names = res.body.files.map((f: any) => f.name);
-    expect(names).toContain('.index.json');
+    expect(names).toContain('.status.json');
   });
 
   it('hides .git directory', async () => {
@@ -496,7 +496,7 @@ describe('POST /import — import project from tar.gz', () => {
     // Create a fake project directory to export, then tar.gz it
     const srcDir = path.join(tmpDir, 'export-src');
     await mkdir(srcDir, { recursive: true });
-    await writeFile(path.join(srcDir, '.index.json'), JSON.stringify({
+    await writeFile(path.join(srcDir, '.status.json'), JSON.stringify({
       id: 'old-id', title: 'Exported Project', status: 'active',
     }));
     await writeFile(path.join(srcDir, 'readme.md'), 'hello from export');
@@ -531,11 +531,11 @@ describe('POST /import — import project from tar.gz', () => {
     expect(created.length).toBe(1);
   });
 
-  it('falls back to filename when .index.json has no title', async () => {
-    // Create archive without title in .index.json
+  it('falls back to filename when .status.json has no title', async () => {
+    // Create archive without title in .status.json
     const srcDir2 = path.join(tmpDir, 'export-src2');
     await mkdir(srcDir2, { recursive: true });
-    await writeFile(path.join(srcDir2, '.index.json'), JSON.stringify({ id: 'x' }));
+    await writeFile(path.join(srcDir2, '.status.json'), JSON.stringify({ id: 'x' }));
     const archivePath2 = path.join(tmpDir, 'my-cool-project.tar.gz');
     execSync(`tar czf "${archivePath2}" -C "${srcDir2}" .`);
 

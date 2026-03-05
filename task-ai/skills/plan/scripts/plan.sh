@@ -40,7 +40,7 @@ done
 resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
-INDEX_JSON="$WORK_DIR/.index.json"
+STATUS_JSON="$WORK_DIR/.status.json"
 SESSION_CONTEXT="$WORK_DIR/.session-context"
 PLAN_FILE="$WORK_DIR/.plan.md"
 
@@ -123,10 +123,10 @@ fi
 # 1. Invoke Research for Type Discovery (Simulated)
 # In real execution, this would call research.sh. For plumbing:
 # D3: python3 calls with error handling
-TYPE=$(python3 "$STATE_PY" get "$INDEX_JSON" type 2>&1) || TYPE=""
+TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>&1) || TYPE=""
 if [[ -z "$TYPE" ]]; then
     TYPE="software" # Default for plan testing
-    if ! python3 "$STATE_PY" set "$INDEX_JSON" type "$TYPE" 2>&1; then
+    if ! python3 "$STATE_PY" set "$STATUS_JSON" type "$TYPE" 2>&1; then
         echo "[WARN] Failed to set type in index" >&2
     fi
 fi
@@ -193,7 +193,7 @@ fi
 
 # 4. Update Index Status
 # D3: python3 call with error handling
-if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status planning 2>&1; then
+if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status planning 2>&1; then
     echo "[WARN] Failed to transition status to planning" >&2
 fi
 
@@ -210,7 +210,7 @@ fi
 
 # D1: Commit generated plan (consistent with refine mode)
 # D3: git with error handling
-if ! git add "$PLAN_FILE" "$INDEX_JSON" 2>&1; then
+if ! git add "$PLAN_FILE" "$STATUS_JSON" 2>&1; then
     echo "[WARN] git add failed" >&2
 fi
 if ! git commit -m "task-ai($NOTEBOOK):plan generate" 2>&1; then

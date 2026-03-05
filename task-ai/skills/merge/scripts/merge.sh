@@ -18,7 +18,7 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-INDEX_JSON="$WORK_DIR/.index.json"
+STATUS_JSON="$WORK_DIR/.status.json"
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 
 # D3: Check state.py existence before calling
@@ -30,7 +30,7 @@ fi
 echo "Merging task: $NOTEBOOK"
 
 # 1. Resolve task branch
-TASK_BRANCH=$(python3 "$STATE_PY" get "$INDEX_JSON" branch 2>/dev/null || echo "")
+TASK_BRANCH=$(python3 "$STATE_PY" get "$STATUS_JSON" branch 2>/dev/null || echo "")
 
 if [[ -z "$TASK_BRANCH" ]]; then
     TASK_BRANCH="task/$NOTEBOOK"
@@ -40,8 +40,8 @@ fi
 MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
 
 # 3. Check for multi-stage tasks
-STAGE_CURRENT=$(python3 "$STATE_PY" get "$INDEX_JSON" stage.current 2>/dev/null || echo "1")
-STAGE_TOTAL=$(python3 "$STATE_PY" get "$INDEX_JSON" stage.total 2>/dev/null || echo "1")
+STAGE_CURRENT=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.current 2>/dev/null || echo "1")
+STAGE_TOTAL=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.total 2>/dev/null || echo "1")
 
 # D2: Validate STAGE numbers contain only digits
 if [[ ! "$STAGE_CURRENT" =~ ^[0-9]+$ ]]; then
@@ -54,7 +54,7 @@ fi
 if [[ "$STAGE_CURRENT" -lt "$STAGE_TOTAL" ]]; then
     echo "[STAGE] Stage $STAGE_CURRENT/$STAGE_TOTAL complete. Advancing to next stage."
     # D3: stage-done transition with error handling
-    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status stage-done 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status stage-done 2>&1; then
         echo "[WARN] Failed to update status to stage-done" >&2
     fi
     # D1: Write .auto-signal for stage-done (consistent with SKILL.md)
@@ -66,7 +66,7 @@ EOF
     fi
     # D1: Git commit stage state (per SKILL.md)
     cd "$WORK_DIR" || true
-    if ! git add .index.json .auto-signal 2>&1; then
+    if ! git add .status.json .auto-signal 2>&1; then
         echo "[WARN] git add failed for stage state" >&2
     fi
     if ! git commit -m "task-ai($NOTEBOOK):merge stage $STAGE_CURRENT completed" 2>&1; then
@@ -96,7 +96,7 @@ fi
 
 # 6. Update status to complete
 # D3: complete transition with error handling
-if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status complete 2>&1; then
+if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status complete 2>&1; then
     echo "[WARN] Failed to update status to complete" >&2
 fi
 
@@ -114,7 +114,7 @@ fi
 
 # 9. Git commit task state (D1: per SKILL.md)
 cd "$WORK_DIR" || true
-if ! git add .index.json .auto-signal 2>&1; then
+if ! git add .status.json .auto-signal 2>&1; then
     echo "[WARN] git add failed for task state" >&2
 fi
 if ! git commit -m "task-ai($NOTEBOOK):merge task completed" 2>&1; then

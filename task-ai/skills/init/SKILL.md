@@ -55,16 +55,16 @@ $NB_WORKSPACES_ROOT/
 │   └── .memory/                       # 系统管理知识库（子目录惰性创建）
 │
 └── <project_name>/
-    ├── .index.json                    # Project metadata
+    ├── .status.json                    # Project metadata
     └── <notebook_name>/
         └── .working/
-            ├── .index.json            # Task metadata (JSON) — machine-readable
+            ├── .status.json            # Task metadata (JSON) — machine-readable
             └── .target.md             # Task target / requirements — human-authored
 ```
 
-## .index.json JSON Schema
+## .status.json JSON Schema
 
-The `.index.json` file uses JSON as the single source of truth for task state:
+The `.status.json` file uses JSON as the single source of truth for task state:
 
 ```json
 {
@@ -116,7 +116,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 
 | File | Purpose | Created by |
 |------|---------|-----------|
-| `.index.json` | Task metadata, state machine | `init` (always) |
+| `.status.json` | Task metadata, state machine | `init` (always) |
 | `.target.md` | Task requirements / objectives | `init` (always) |
 | `.analysis/` | Evaluation history (one file per assessment) | `check` (on demand) |
 | `.test/` | Test criteria & results (one file per phase) | `plan`/`exec`/`check` (on demand) |
@@ -132,7 +132,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 
 1. **Validate** project_name and notebook_name: both must match `[a-zA-Z0-9_-]+` (ASCII letters, digits, hyphens, underscores), no whitespace, no leading dot, no path separators
 2. **Check** `$NB_WORKSPACES_ROOT/` directory exists; create if missing. Check `$NB_WORKSPACES_LIBRARY/` (= `$NB_WORKSPACES_ROOT/.library/`) exists; if missing, create the library skeleton: `.changelog` (empty file), `.changelog-archive/` (empty directory — git won't track it until `maintain --compact` writes the first archive file), `.master-index.md` (empty table header), `.type-registry.md` (initialized from seed types — read `references/seed-types/.summary.md`; see `plan/references/type-profiling.md` for registry format), `.memory/` (empty directory — the four system sub-directories `.memory/.references/`, `.memory/.experiences/`, `.memory/.type-profiles/`, `.memory/.thinking/` are created lazily by each sub-command on first write). `.plugin-registry.md` is created lazily by the `auto` sub-command on first successful plugin delegation. **First-time setup**: if `$NB_WORKSPACES_ROOT/` was just created, append gitignore entries to project `.gitignore` (create if missing): `.worktrees/`, `**/.working/.auto-signal`, `**/.working/.auto-signal.tmp`, `**/.working/.auto-stop`, `**/.working/.lock`, `**/.working/.library-state.json`, `.library/.changelog`, `.library/.changelog-archive/.lock`, `.library/.memory/.thinking/raw/`, `.library/.memory/.thinking/patterns/.lock`, `.library/.inconsistency.log`, `.library/.ioc.md`, `**/.lock`, `**/.lock.stale.*`
-3. **Check** `$NB_WORKSPACES_ROOT/<project_name>/` exists; create if missing (with `.index.json`)
+3. **Check** `$NB_WORKSPACES_ROOT/<project_name>/` exists; create if missing (with `.status.json`)
 4. **Check** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/` does not already exist; abort with error if it does
 5. **Check branch collision**: verify `task/<notebook_name>` branch does not already exist (`git branch --list task/<notebook_name>`). If exists, abort with error suggesting `--cleanup` the old task or choose a different name
 6. **Check working tree clean**: verify no uncommitted changes to tracked files (`git status --porcelain` then filter out `??` untracked entries). Untracked and gitignored files (e.g., stale `.auto-signal`, `$NB_WORKSPACES_ROOT/` ephemeral files) do NOT block init. If tracked files have modifications, abort with error — branch should be created from a clean state to avoid mixing unrelated changes. User should commit or stash first
@@ -140,7 +140,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 8. **If `--worktree`**: `git worktree add .worktrees/task-<notebook_name> task/<notebook_name>`
 9. **If not worktree**: `git checkout task/<notebook_name>`
 10. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.working/` directory (in worktree if applicable)
-11. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.working/.index.json` with JSON:
+11. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.working/.status.json` with JSON:
    - `title`: from `--title` argument or notebook_name
    - `status`: `draft`
    - `phase`: `""` (empty)

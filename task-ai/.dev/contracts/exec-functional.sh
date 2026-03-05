@@ -13,14 +13,14 @@ trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"
 mkdir -p "$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working"
-INDEX_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.index.json"
-echo '{"completed_steps":0, "type":"software"}' > "$INDEX_JSON"
+STATUS_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.status.json"
+echo '{"completed_steps":0, "type":"software"}' > "$STATUS_JSON"
 
 # Act: Run Step 1
 "$EXEC_SH" "$TEST_NB" > /dev/null
 
 # 1. Assert: Progress is 1
-CUR_PROG=$(python3 "$STATE_PY" get "$INDEX_JSON" completed_steps)
+CUR_PROG=$(python3 "$STATE_PY" get "$STATUS_JSON" completed_steps)
 if [[ "$CUR_PROG" == "1" ]]; then
     emit_pass "exec: incremented progress to 1"
 else
@@ -39,7 +39,7 @@ fi
 "$EXEC_SH" "$TEST_NB" > /dev/null
 
 # 3. Assert: Progress is 2
-CUR_PROG=$(python3 "$STATE_PY" get "$INDEX_JSON" completed_steps)
+CUR_PROG=$(python3 "$STATE_PY" get "$STATUS_JSON" completed_steps)
 if [[ "$CUR_PROG" == "2" ]]; then
     emit_pass "exec: incremented progress to 2"
 else

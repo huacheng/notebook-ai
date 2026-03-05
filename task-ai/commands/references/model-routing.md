@@ -39,7 +39,7 @@ When the auto loop reaches step 2c (execute current step), it reads the target s
 
 - **`auto_delegatable: false`**: Execute inline (current behavior — Read SKILL.md steps, execute in main session)
 - **`auto_delegatable: true`**: Invoke via Task subagent with `model = tier_to_model(model_tier)`:
-  1. Subagent receives: SKILL.md content + `.summary.md` + `.index.json` + relevant input files per skill's "Reads" specification
+  1. Subagent receives: SKILL.md content + `.summary.md` + `.status.json` + relevant input files per skill's "Reads" specification
   2. Subagent executes the numbered steps from SKILL.md, writes output files to the task module
   3. Subagent returns a <=500 char structured summary (same format as plugin delegation output contract)
   4. Main session reads the subagent summary + output files (`.auto-signal`, `.summary.md`, result files) to restore context

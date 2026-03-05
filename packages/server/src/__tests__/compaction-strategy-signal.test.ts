@@ -76,9 +76,9 @@ describe('compaction-strategy reads new .auto-signal format', () => {
     };
     fs.writeFileSync(path.join(tmpDir, '.auto-signal'), JSON.stringify(signal));
 
-    // Write .index.json
+    // Write .status.json
     fs.writeFileSync(
-      path.join(tmpDir, '.index.json'),
+      path.join(tmpDir, '.status.json'),
       JSON.stringify({ status: 'running', title: 'Test', type: 'task', branch: 'main' })
     );
 
@@ -108,9 +108,9 @@ describe('compaction-strategy reads new .auto-signal format', () => {
     };
     fs.writeFileSync(path.join(tmpDir, '.auto-signal'), JSON.stringify(signal));
 
-    // Write .index.json
+    // Write .status.json
     fs.writeFileSync(
-      path.join(tmpDir, '.index.json'),
+      path.join(tmpDir, '.status.json'),
       JSON.stringify({ status: 'running', title: 'Test', type: 'task', branch: 'main' })
     );
 

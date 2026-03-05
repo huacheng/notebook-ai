@@ -68,7 +68,7 @@ echo -n "Test 5: Setup working directory... "
 MOCK_NB_DIR="$TEST_DIR/_evolve"
 MOCK_WORK_DIR="$MOCK_NB_DIR/.working"
 mkdir -p "$MOCK_WORK_DIR/.analysis"
-cat > "$MOCK_WORK_DIR/.index.json" <<EOF
+cat > "$MOCK_WORK_DIR/.status.json" <<EOF
 {"notebook": "_evolve", "status": "review"}
 EOF
 cat > "$MOCK_WORK_DIR/.target.md" <<EOF

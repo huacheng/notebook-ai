@@ -4,7 +4,7 @@
 Tests:
   1. stage-done is in VALID_STATUSES
   2. stage-done is NOT a terminal state
-  3. set status=stage-done succeeds on a valid .index.json
+  3. set status=stage-done succeeds on a valid .status.json
   4. transition --status stage-done succeeds
   5. stage-done -> planning transition succeeds (via target advance)
 """
@@ -40,7 +40,7 @@ else:
 
 # --- Test 3: set status=stage-done succeeds ---
 with tempfile.TemporaryDirectory() as tmpdir:
-    index_path = os.path.join(tmpdir, '.index.json')
+    index_path = os.path.join(tmpdir, '.status.json')
     with open(index_path, 'w') as f:
         json.dump({
             "title": "test", "status": "executing", "phase": "",
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
 # --- Test 4: transition --status stage-done succeeds ---
 with tempfile.TemporaryDirectory() as tmpdir:
-    index_path = os.path.join(tmpdir, '.index.json')
+    index_path = os.path.join(tmpdir, '.status.json')
     with open(index_path, 'w') as f:
         json.dump({
             "title": "test", "status": "executing", "phase": "",
@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
 # --- Test 5: stage-done -> planning transition succeeds ---
 with tempfile.TemporaryDirectory() as tmpdir:
-    index_path = os.path.join(tmpdir, '.index.json')
+    index_path = os.path.join(tmpdir, '.status.json')
     with open(index_path, 'w') as f:
         json.dump({
             "title": "test", "status": "stage-done", "phase": "",

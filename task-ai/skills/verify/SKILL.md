@@ -44,7 +44,7 @@ Run domain-adapted tests and verification procedures for a task module, producin
 
 ## Execution Steps
 
-1. **Read** `.index.json` — get `type`, `status`. Validate status is not terminal (`complete` or `cancelled`)
+1. **Read** `.status.json` — get `type`, `status`. Validate status is not terminal (`complete` or `cancelled`)
 2. **Read** `.type-profile.md` if exists — "Verification Standards" section is the **primary** source for testing approach, quality metrics, and acceptance criteria for this task (see `plan/references/type-profiling.md` for type system details)
 3. **Read** `.test/` latest criteria file — determine what to verify. For software types, also locate `vh-stubs.test.*` and `vh-baseline.md` for VFP verification
 4. **Read** `.target.md` — extract acceptance criteria

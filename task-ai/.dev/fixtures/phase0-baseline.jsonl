@@ -223,7 +223,7 @@
 {"test":"L1-naming-conventions:skills/research","status":"PASS","detail":"skills/research: valid directory name"}
 {"test":"L1-naming-conventions:skills/summarize","status":"PASS","detail":"skills/summarize: valid directory name"}
 {"test":"L1-naming-conventions:skills/verify","status":"PASS","detail":"skills/verify: valid directory name"}
-{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .index.json"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .status.json"}
 {"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .target.md"}
 {"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .plan.md"}
 {"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .summary.md"}

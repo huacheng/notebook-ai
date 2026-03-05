@@ -24,8 +24,8 @@ git init -q
 git config user.email "test@test.com"
 git config user.name "Test"
 
-# Create minimal .index.json
-cat > "$WORK_DIR/.index.json" << 'EOF'
+# Create minimal .status.json
+cat > "$WORK_DIR/.status.json" << 'EOF'
 {
   "status": "draft",
   "stage": { "current": 1, "total": 1 }
@@ -75,7 +75,7 @@ fi
 echo "Test 3: plan clears .session-context"
 
 # Update status to planning for plan to work
-cat > "$WORK_DIR/.index.json" << 'EOF'
+cat > "$WORK_DIR/.status.json" << 'EOF'
 {
   "status": "planning",
   "stage": { "current": 1, "total": 1 }
@@ -112,7 +112,7 @@ echo "Test 5: exec clears plan-refinement phase"
 EXEC_SCRIPT="$TASK_AI_ROOT/skills/exec/scripts/exec.sh"
 
 # Update status to executing for exec to work
-cat > "$WORK_DIR/.index.json" << 'EOF'
+cat > "$WORK_DIR/.status.json" << 'EOF'
 {
   "status": "review",
   "type": "software",

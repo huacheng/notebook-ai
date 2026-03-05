@@ -53,8 +53,8 @@ export function createProjectsRouter(
       // Create directory structure
       await mkdir(path.join(projectPath, '.deliverables'), { recursive: true });
 
-      // Write project .index.json
-      await writeFile(path.join(projectPath, '.index.json'), JSON.stringify({
+      // Write project .status.json
+      await writeFile(path.join(projectPath, '.status.json'), JSON.stringify({
         id, title, status: 'active', created_at: now, updated_at: now,
       }, null, 2));
 
@@ -595,13 +595,13 @@ export function createProjectsRouter(
       }
       await execFileAsync('tar', ['xzf', file.path, '-C', tmpExtract]);
 
-      // Read .index.json for title (fallback to filename)
+      // Read .status.json for title (fallback to filename)
       let title = '';
-      const indexPath = path.join(tmpExtract, '.index.json');
+      const statusPath = path.join(tmpExtract, '.status.json');
       try {
-        const indexData = JSON.parse(await readFile(indexPath, 'utf-8'));
-        title = indexData.title || '';
-      } catch (_err: unknown) { /* no .index.json or invalid */ }
+        const statusData = JSON.parse(await readFile(statusPath, 'utf-8'));
+        title = statusData.title || '';
+      } catch (_err: unknown) { /* no .status.json or invalid */ }
 
       if (!title) {
         // Derive title from uploaded filename: "my-project.tar.gz" → "my-project"
@@ -627,8 +627,8 @@ export function createProjectsRouter(
         tmpExtract + '/', projectPath + '/',
       ]);
 
-      // Rewrite .index.json with new id and timestamps
-      await writeFile(path.join(projectPath, '.index.json'), JSON.stringify({
+      // Rewrite .status.json with new id and timestamps
+      await writeFile(path.join(projectPath, '.status.json'), JSON.stringify({
         id, title, status: 'active', created_at: now, updated_at: now,
       }, null, 2));
 

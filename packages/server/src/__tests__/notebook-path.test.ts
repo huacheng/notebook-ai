@@ -5,7 +5,7 @@
  * 1. notebook.json exists at worktreePath/{slug}.notebook.json (not project/{slug}/)
  * 2. project/{slug}/ directory does NOT exist
  * 3. worktreePath/.deliverables/ directory exists
- * 4. worktreePath/.working/.index.json exists
+ * 4. worktreePath/.working/.status.json exists
  * 5. DB notebook_path points to worktree path
  */
 
@@ -153,7 +153,7 @@ describe('notebook path in worktree (Step 3)', () => {
     expect(existsSync(path.join(worktreePath, '.deliverables'))).toBe(true);
   });
 
-  it('worktreePath/.working/.index.json exists', async () => {
+  it('worktreePath/.working/.status.json exists', async () => {
     const res = await request(app)
       .post('/projects/proj-1/notebooks')
       .send({ title: 'My Task' })
@@ -162,7 +162,7 @@ describe('notebook path in worktree (Step 3)', () => {
     const projectPath = db.projects[0].path;
     const worktreePath = path.join(projectPath, '.worktrees', 'task-my-task');
 
-    expect(existsSync(path.join(worktreePath, '.working', '.index.json'))).toBe(true);
+    expect(existsSync(path.join(worktreePath, '.working', '.status.json'))).toBe(true);
   });
 
   it('DB notebook_path points to worktree path', async () => {

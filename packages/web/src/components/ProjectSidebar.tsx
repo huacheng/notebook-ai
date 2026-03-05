@@ -762,11 +762,11 @@ function FileBrowser() {
         refreshKey={fileRefreshKey}
         noDeleteFilter={(name, subPath) => {
           // Hide delete for protected system files:
-          // - .index.json (project metadata)
+          // - .status.json (project metadata)
           // - .working directory
           // - .MEMORY.md (notebook environment config, read-only)
           // - .claude directory (Claude settings, hooks)
-          return name === '.index.json'
+          return name === '.status.json'
             || name === '.working'
             || name === '.MEMORY.md'
             || name === '.claude'

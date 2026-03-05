@@ -32,6 +32,39 @@ When stall is suspected, check the **last stream-json messages** for known stall
 | **Quota exhausted** | Last `assistant` or `system` message contains `rate limit`, `quota exceeded`, `usage limit`, `token limit`, `try again later` (case-insensitive) | **NOT a stall** — reset `stall_count` to 0, enter quota-wait mode (see `references/context-quota.md`) |
 | No recognizable pattern | — | Log warning, increment `stall_count`, continue polling |
 
+## Content-Level Detection
+
+Time-based idle detection misses scenarios where Claude produces output but makes no progress (reasoning loops, repeated responses). These require content-level analysis:
+
+### Output Deduplication
+
+Track hashes of recent `assistant` stream-json messages:
+
+1. Maintain a rolling window of the last 5 `assistant` message content hashes
+2. If 3 consecutive hashes are identical → suspected reasoning loop
+3. Recovery: send `{"type":"human","message":"You appear to be in a loop. Stop current approach. Re-read .auto-signal and .status.json to determine your next step, then proceed."}` via stream-json stdin
+4. If dedup recovery fails twice consecutively → write `.auto-stop` with reason `"reasoning_loop"`
+
+### Single-Step Timeout
+
+Monitor `.auto-signal` file timestamp independently of stream activity:
+
+1. Record `last_signal_update = mtime(.auto-signal)` on each `fs.watch` event
+2. If `now - last_signal_update > 10 minutes` AND stream is still active → step is taking too long
+3. Recovery: send `{"type":"human","message":"Current step has exceeded 10 minutes without signal update. Write .auto-signal with current progress and either complete or skip to next step."}` via stream-json stdin
+4. If no signal update within 3 minutes after prompt → increment stall recovery count (same limits as idle recovery)
+
+### Combined Detection Priority
+
+| Priority | Detection | Condition | Action |
+|----------|-----------|-----------|--------|
+| 1 | Quota exhaustion | Message contains rate limit keywords | Enter quota-wait (NOT a stall) |
+| 2 | Process exit | Stream ended | Restart session |
+| 3 | Output dedup | 3 identical consecutive hashes | Send loop-break prompt |
+| 4 | Single-step timeout | Signal unchanged > 10min | Send timeout prompt |
+| 5 | Idle detection | No output > 3min | Pattern match recovery |
+| 6 | No pattern match | Idle but unrecognizable | Log + continue polling |
+
 ## Recovery Limits
 
 | Limit | Value | Action on Exceed |

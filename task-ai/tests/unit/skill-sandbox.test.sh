@@ -20,7 +20,7 @@ mkdir -p "$NB_WORKSPACES_LIBRARY/skills"
 
 # Create a test notebook working directory
 mkdir -p "$TEST_TMP/test/skill-test/.working"
-echo '{"status":"draft","phase":"needs-plan"}' > "$TEST_TMP/test/skill-test/.working/.index.json"
+echo '{"status":"draft","phase":"needs-plan"}' > "$TEST_TMP/test/skill-test/.working/.status.json"
 
 # ============================================
 # L1: Static Analysis Tests (security scan-skill)

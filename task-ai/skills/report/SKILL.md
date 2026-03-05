@@ -90,7 +90,7 @@ The report is written to `[deliverables-dir]/.report.md` (the notebook's deliver
 
 ## Execution Steps
 
-1. **Read** `.index.json` for task metadata (including `completed_steps`)
+1. **Read** `.status.json` for task metadata (including `completed_steps`)
 2. **Read** `.target.md` for objectives
 3. **Read** `.plan.md` for implementation approach
 4. **Read** `.summary.md` if exists (condensed context overview)

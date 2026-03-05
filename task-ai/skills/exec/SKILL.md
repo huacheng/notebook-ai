@@ -62,7 +62,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 
 ### Per-Step Execution
 
-Read the `type` field from `.index.json` to determine the task domain. Execution strategy MUST adapt to the task type — different domains use fundamentally different tools, verification methods, and workflows.
+Read the `type` field from `.status.json` to determine the task domain. Execution strategy MUST adapt to the task type — different domains use fundamentally different tools, verification methods, and workflows.
 
 For each implementation step:
 
@@ -94,15 +94,15 @@ For each implementation step:
 
 ## Execution Steps
 
-1. **Read** `.index.json` — validate status is `review` or `executing`
-2. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
-3. **Update** `.index.json` status to `executing`, clear `phase` to `""`, update timestamp
+1. **Read** `.status.json` — validate status is `review` or `executing`
+2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
+3. **Update** `.status.json` status to `executing`, clear `phase` to `""`, update timestamp
 4. **Discover** all implementation steps from `.plan.md`
-5. **Detect completed steps**: read `completed_steps` field from `.index.json` to determine progress; skip steps ≤ `completed_steps`
+5. **Detect completed steps**: read `completed_steps` field from `.status.json` to determine progress; skip steps ≤ `completed_steps`
 6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files, using the most recent file (by filename date) as the primary fix guidance. `.bugfix/` entries indicate mid-exec issues; `.analysis/` entries indicate post-exec issues. Address fix items before continuing remaining steps
-7. **Executor discovery** (before per-step loop): Follow `auto/references/plugin-delegation.md` executor slot discovery. Semantic match against three signal sources (`.index.json` type, `.target.md` content, `.plan.md` step structure) — not rigid type-string comparison. Check `plan-executor` seed slot first, then `domain-executor-*` registry/semantic scan. If a matching executor plugin is found with health score >= 0.70:
+7. **Executor discovery** (before per-step loop): Follow `auto/references/plugin-delegation.md` executor slot discovery. Semantic match against three signal sources (`.status.json` type, `.target.md` content, `.plan.md` step structure) — not rigid type-string comparison. Check `plan-executor` seed slot first, then `domain-executor-*` registry/semantic scan. If a matching executor plugin is found with health score >= 0.70:
    - Delegate entire remaining plan execution to the executor via Task subagent (see Executor Integration Contract in `plugin-delegation.md`)
-   - After executor completes: read `.index.json` `completed_steps`, `.auto-signal`, `.summary.md` to restore context
+   - After executor completes: read `.status.json` `completed_steps`, `.auto-signal`, `.summary.md` to restore context
    - If executor fails mid-execution: fall back to native per-step loop, resuming from `completed_steps + 1`
    - If no executor matched or `--step N` is specified: proceed with native per-step loop below
 8. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
@@ -115,9 +115,9 @@ For each implementation step:
    9.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
    9.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
    9.8. Record result (include VFP cycle summary for software types)
-   9.9. Update `.index.json` `completed_steps` to current step number
+   9.9. Update `.status.json` `completed_steps` to current step number
 10. **After all steps** (or on failure):
-    - Update `.index.json` timestamp
+    - Update `.status.json` timestamp
     - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
     - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
     - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
@@ -137,12 +137,12 @@ For each implementation step:
 
 ## Progress Tracking
 
-Execution progress is tracked via `.index.json` fields:
+Execution progress is tracked via `.status.json` fields:
 - `completed_steps`: integer, incremented after each step completes successfully. Reset to `0` when plan changes (by `plan` sub-command on re-plan). **Validation**: must be integer >= 0. If value is invalid (negative, non-integer), reset to 0 with warning
 - `updated`: timestamp of last execution activity
 
 For long-running executions, intermediate progress can be observed by:
-- Reading `completed_steps` in `.index.json`
+- Reading `completed_steps` in `.status.json`
 - Reading `.summary.md` for condensed context
 - Checking git diff for code changes made so far
 

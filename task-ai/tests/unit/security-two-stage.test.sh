@@ -8,7 +8,7 @@ SECURITY_SH="$TASK_AI_ROOT/skills/security/scripts/security.sh"
 # Setup mock workspace
 MOCK_ROOT=$(mktemp -d)
 mkdir -p "$MOCK_ROOT/test-notebook/.working"
-echo '{"status":"draft"}' > "$MOCK_ROOT/test-notebook/.working/.index.json"
+echo '{"status":"draft"}' > "$MOCK_ROOT/test-notebook/.working/.status.json"
 export NB_WORKSPACES_ROOT="$MOCK_ROOT"
 
 cleanup() { rm -rf "$MOCK_ROOT"; }

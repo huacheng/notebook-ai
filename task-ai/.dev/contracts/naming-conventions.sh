@@ -32,7 +32,7 @@ done < <(find "$TASK_AI_ROOT/skills" -mindepth 1 -maxdepth 1 -type d | sort)
 dir_conv="$TASK_AI_ROOT/commands/references/directory-convention.md"
 if [[ -f "$dir_conv" ]]; then
   # Verify key file patterns are documented
-  for pattern in ".index.json" ".target.md" ".plan.md" ".summary.md" ".auto-signal" ".type-profile.md"; do
+  for pattern in ".status.json" ".target.md" ".plan.md" ".summary.md" ".auto-signal" ".type-profile.md"; do
     if grep -qF "$pattern" "$dir_conv"; then
       emit_pass "directory-convention: documents $pattern"
     else

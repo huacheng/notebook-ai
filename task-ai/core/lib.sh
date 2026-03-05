@@ -47,7 +47,7 @@ ensure_library() {
 find_nb_context() {
   local cur="$PWD"
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -d "$cur/.working" && -f "$cur/.working/.index.json" ]]; then
+    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
       export NB_WORKING="$cur/.working"
       export NB_NOTEBOOK=$(basename "$cur")
       return 0

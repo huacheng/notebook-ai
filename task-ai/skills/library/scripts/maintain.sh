@@ -101,7 +101,10 @@ while [[ $# -gt 0 ]]; do
     --evolve)
       EVOLVE_SCRIPT="$SCRIPT_DIR/evolve-rules.sh"
       if [[ -f "$EVOLVE_SCRIPT" ]]; then
-          bash "$EVOLVE_SCRIPT" --domain "${2:-all}" --mode auto
+          # D3: evolve-rules execution with error handling
+          if ! bash "$EVOLVE_SCRIPT" --domain "${2:-all}" --mode auto 2>&1; then
+              echo "[WARN] evolve-rules.sh failed" >&2
+          fi
           shift 2 2>/dev/null || shift
       else
           echo "[ERROR] evolve-rules.sh not found" >&2
@@ -121,11 +124,19 @@ while [[ $# -gt 0 ]]; do
           ARCHIVE_FILE="$ARCHIVE_DIR/$DATE_STR.md"
           # H-MAINTAIN-1: Append to existing archive instead of overwriting
           if [[ -f "$ARCHIVE_FILE" ]]; then
-              cat "$CHANGELOG" >> "$ARCHIVE_FILE"
-              echo "Changelog appended to existing $ARCHIVE_FILE"
+              # D3: cat append with error handling
+              if ! cat "$CHANGELOG" >> "$ARCHIVE_FILE" 2>&1; then
+                  echo "[WARN] Failed to append changelog to archive" >&2
+              else
+                  echo "Changelog appended to existing $ARCHIVE_FILE"
+              fi
           else
-              mv "$CHANGELOG" "$ARCHIVE_FILE"
-              echo "Changelog compacted to $ARCHIVE_FILE"
+              # D3: mv with error handling
+              if ! mv "$CHANGELOG" "$ARCHIVE_FILE" 2>&1; then
+                  echo "[WARN] Failed to move changelog to archive" >&2
+              else
+                  echo "Changelog compacted to $ARCHIVE_FILE"
+              fi
           fi
           touch "$CHANGELOG"
       fi

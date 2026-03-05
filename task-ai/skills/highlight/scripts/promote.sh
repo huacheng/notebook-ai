@@ -28,7 +28,7 @@ TARGET_FILE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run) DRY_RUN=true; shift ;;
-        --target)  TARGET_FILE="$2"; shift 2 ;;
+        --target)  TARGET_FILE="${2:-}"; shift 2 2>/dev/null || shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done

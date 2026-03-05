@@ -13,10 +13,10 @@ trap 'rm -rf "$NB_WORKSPACES_ROOT"' EXIT
 # Setup
 rm -rf "$NB_WORKSPACES_ROOT"
 mkdir -p "$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working"
-INDEX_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.index.json"
+STATUS_JSON="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.status.json"
 
 # --- Test 1: Draft Entry ---
-echo '{"status":"draft"}' > "$INDEX_JSON"
+echo '{"status":"draft"}' > "$STATUS_JSON"
 "$AUTO_SH" "$TEST_NB" > /dev/null
 SIGNAL_FILE="$NB_WORKSPACES_ROOT/proj/$TEST_NB/.working/.auto-signal"
 NEXT=$(python3 "$JSON_GET" "$SIGNAL_FILE" next)
@@ -27,7 +27,7 @@ else
 fi
 
 # --- Test 2: Planning Entry ---
-echo '{"status":"planning"}' > "$INDEX_JSON"
+echo '{"status":"planning"}' > "$STATUS_JSON"
 "$AUTO_SH" "$TEST_NB" > /dev/null
 NEXT=$(python3 "$JSON_GET" "$SIGNAL_FILE" next)
 if [[ "$NEXT" == "check" ]]; then

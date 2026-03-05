@@ -151,6 +151,6 @@ Writers append one row after each write (step 5 extended for master index). `mai
 | Overwrite file | `.tmp → rename` (POSIX `rename(2)` is atomic within same filesystem) |
 | Append to file | `O_APPEND` flag (POSIX: single write ≤ PIPE_BUF bytes is atomic) |
 | Lock acquisition | `O_CREAT \| O_EXCL` (POSIX: atomic create-if-not-exists) |
-| `.index.json` (task module) | `.tmp → rename` (same convention as library files) |
+| `.status.json` (task module) | `.tmp → rename` (same convention as library files) |
 
 Keep individual O_APPEND writes under 4096 bytes (PIPE_BUF on Linux) to guarantee atomicity.

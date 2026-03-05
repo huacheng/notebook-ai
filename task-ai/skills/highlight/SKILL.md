@@ -38,7 +38,7 @@ Unified protocol for experience and thinking library writes. Defines 6 scopes co
 **Parameter routing:**
 - `highlight <notebook>` → scope=complete (independent execution, comprehensive distillation of a notebook)
 - `highlight "<description>"` → scope=adhoc (conversation experience capture)
-- No arguments → if in notebook context (CWD has `.working/.index.json`), equivalent to `highlight <current-notebook>`; otherwise error
+- No arguments → if in notebook context (CWD has `.working/.status.json`), equivalent to `highlight <current-notebook>`; otherwise error
 
 ## Architecture
 
@@ -106,7 +106,7 @@ From exec's current context:
 quality_status: provisional
 completeness: partial
 source: highlight-exec
-type: <from .index.json>
+type: <from .status.json>
 notebook: <notebook-name>
 created_at: <ISO-8601>
 topic_keywords: [keyword1, keyword2]
@@ -186,7 +186,7 @@ From verify's current context (type-adaptive, not limited to software):
 quality_status: provisional
 completeness: partial
 source: highlight-verify
-type: <from .index.json>
+type: <from .status.json>
 notebook: <notebook-name>
 created_at: <ISO-8601>
 topic_keywords: [keyword1, keyword2]
@@ -368,7 +368,7 @@ input_files = [.target.md, .plan.md, .summary.md, *-impl.md, *-verify.md, ...]
 latest_input_mtime = max(mtime(f) for f in input_files if exists(f))
 
 # Stage-aware output filename
-Read .index.json stage field (default { current: 1, total: 1, completed: [] }):
+Read .status.json stage field (default { current: 1, total: 1, completed: [] }):
   IF stage.total > 1 AND status == "stage-done":
     filename = "<notebook>-stage-<stage.current>-complete.md"
   ELSE:
@@ -388,7 +388,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 | Input File | Purpose |
 |-----------|---------|
-| `.index.json` | Task metadata (type, status, completed_steps) |
+| `.status.json` | Task metadata (type, status, completed_steps) |
 | `.target.md` | Objective definition |
 | `.plan.md` | Implementation approach |
 | `.summary.md` | Task context summary |
@@ -402,7 +402,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 #### Output A — Experience Distillation
 
-**Stage-aware file naming** — read `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing):
+**Stage-aware file naming** — read `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing):
 
 | Scenario | Target filename |
 |----------|----------------|
@@ -422,7 +422,7 @@ For multi-type (e.g., `data-pipeline|ml`), write one file per pipe segment. Segm
 
 **Final stage distillation** (last stage merge → `complete`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
 
-**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.index.json` > `.target.md` > `.summary.md` > `.plan.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
+**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.status.json` > `.target.md` > `.summary.md` > `.plan.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
 
 Frontmatter:
 
@@ -504,7 +504,7 @@ Steps:
 
 #### Complete Execution Steps
 
-1. **Read** `.index.json` — get type, status, notebook metadata
+1. **Read** `.status.json` — get type, status, notebook metadata
 2. **Read** all input files (see table above), respecting the context budget guard: read in priority order, stop or truncate when approaching the ~50k token budget
 3. **Absorb** existing provisional experience (`-impl.md`, `-verify.md`), integrate into final distillation
 4. **Output A** — Experience distillation, per type segment:
@@ -555,8 +555,8 @@ Identify from user's natural language:
 **Step 2 — Type Determination**
 
 ```
-if in notebook context (CWD has .working/.index.json):
-    type = .index.json type field
+if in notebook context (CWD has .working/.status.json):
+    type = .status.json type field
 elif user specified a domain in instruction:
     type = user-specified domain, match .type-registry.md existing types
 else:
@@ -651,7 +651,7 @@ adhoc mode does not participate in auto loop, does not write .auto-signal.
 
 ## State Transitions
 
-highlight **does not change notebook status**. Regardless of scope, `.index.json` status is unaffected.
+highlight **does not change notebook status**. Regardless of scope, `.status.json` status is unaffected.
 
 | scope | Status impact |
 |-------|-------------|

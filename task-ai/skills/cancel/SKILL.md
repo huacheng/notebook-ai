@@ -20,7 +20,7 @@ arguments:
     description: "Notebook name (e.g., auth-refactor)"
     required: false
   - name: reason
-    description: "Cancellation reason (recorded in .index.json)"
+    description: "Cancellation reason (recorded in .status.json)"
     required: false
   - name: cleanup
     description: "Also remove git worktree and delete the task branch (flag, no value)"
@@ -40,12 +40,12 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 ## Arguments
 
 - **notebook** (required): notebook name
-- **--reason** (optional): cancellation reason, recorded in `.index.json` body
+- **--reason** (optional): cancellation reason, recorded in `.status.json` body
 - **--cleanup** (optional): also remove the git worktree and delete the task branch
 
 ## Execution Steps
 
-1. **Read** `.index.json` — get current status
+1. **Read** `.status.json` — get current status
 2. **Stop auto** if running:
    - Call `GET /api/task-auto/lookup?taskDir=<notebook_working_dir>` to find the session running this task's auto loop
    - If found (200): call `DELETE /api/sessions/<session_name>/task-auto`
@@ -55,7 +55,7 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
    - Delete `.lock` file if exists — first read lock content and verify the holder: (a) if holder `pid` is dead → delete lock (stale); (b) if holder `session` matches the auto session being cancelled → delete lock (same session); (c) if held by a **different live session** → REJECT with error identifying the holding session — user must stop that session first or use `cancel` from the holding session. Cancel does NOT force-override locks held by other live sessions to prevent concurrent write corruption
 3. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`). If lock is held by a different live session (not the auto session stopped in step 2), REJECT — user must stop that session first
 4. **If uncommitted changes exist**, git commit snapshot: `task-ai(<notebook>):cancel pre-cancel snapshot`
-5. **Update** `.index.json`:
+5. **Update** `.status.json`:
    - Set `status` to `cancelled`
    - Update `updated` timestamp
    - Append cancellation reason to body (if provided)

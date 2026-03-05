@@ -31,10 +31,10 @@ Dialog-driven four-phase flow: Target → Planning → Execution → Finalizatio
 
 ## Core Principle
 
-**No auto mode to activate.** Notebook existence IS the context. Claude reads `.index.json` + `.auto-signal` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
+**No auto mode to activate.** Notebook existence IS the context. Claude reads `.status.json` + `.auto-signal` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
 
 ```
-Frontend UI: init (create notebook) → .index.json status=draft
+Frontend UI: init (create notebook) → .status.json status=draft
   │
   ▼
 User says anything in conversation
@@ -49,7 +49,7 @@ Semantic understanding of user message → execute phase-appropriate action
 ## Usage
 
 ```
-/task-ai:auto <notebook_name> [--start|--stop|--status]
+/task-ai:auto <notebook_name> [--stop|--status]
 ```
 
 ## Four-Phase Flow
@@ -67,9 +67,9 @@ Deliverables + .target.md + .plan.md → check(D1-D6 scoring) → overall ≥ th
                                                              → overall < threshold → replan/fix based on failing dimensions
 ```
 
-### Phase Derivation from `.index.json` Status
+### Phase Derivation from `.status.json` Status
 
-| `.index.json` status | Derived Phase | Description |
+| `.status.json` status | Derived Phase | Description |
 |----------------------|---------------|-------------|
 | `draft` | `target` | Defining objectives, user in the loop |
 | `planning` / `re-planning` | `planning` | Generating/revising plan |
@@ -169,7 +169,7 @@ User can override via dialog (`/task-ai:check`) or frontend toolbar button — b
 Behavior:
 1. auto yields control (after current step completes, not mid-step)
 2. Sub-command executes full flow independently
-3. Sub-command writes `.auto-signal` / updates `.index.json`
+3. Sub-command writes `.auto-signal` / updates `.status.json`
 4. auto reads latest state on next trigger (user message / daemon continuation)
 5. auto re-routes from new state
 
@@ -184,7 +184,7 @@ Auto mode runs as a **single long-lived Claude session**. The daemon monitors ex
 │  the agent (single session)                     │
 │                                                 │
 │  /task-ai:auto <module>                         │
-│    ├→ derive phase from .index.json ─┐          │
+│    ├→ derive phase from .status.json ─┐          │
 │    ├→ execute plan logic              │ internal │
 │    ├→ execute check logic             │ loop     │
 │    ├→ execute exec logic              │ (shared  │
@@ -226,7 +226,7 @@ SKILL.md `auto_delegatable` and `model_tier` are **default hints**. Actual deleg
 
 | Factor | Signal Source | Logic | Example |
 |--------|-------------|-------|---------|
-| **Current phase** | `.index.json` status | Different status → different delegation strategy for same sub-command | status=draft: research NOT delegated (O1/O2/O3 need dialog); status=planning: research CAN delegate |
+| **Current phase** | `.status.json` status | Different status → different delegation strategy for same sub-command | status=draft: research NOT delegated (O1/O2/O3 need dialog); status=planning: research CAN delegate |
 | **Context dependency** | (1) Unpersisted decisions in dialog (2) `.summary.md` freshness (3) `git diff --stat` from prior steps | High dependency → don't delegate | exec just refactored 5 files + dialog tradeoffs → verify inline; exec changed 1 file + no discussion → verify can delegate |
 | **Task complexity** | (1) `.plan.md` step description length + file count (2) Test type (unit/integration/e2e) (3) `.target.md` complexity markers | Simple → light tier; Complex → medium/heavy | verify runs lint → haiku; verify runs e2e → sonnet |
 | **Execution history** | `.auto-signal` `delegation_failures` array | Same sub-command failed as subagent before → inline from now on | `"delegation_failures": ["verify@iter3"]` → verify never delegates again |
@@ -310,8 +310,8 @@ Delegation:     target(dialog) + plan + check + exec + [verify→subagent] + che
 User returns and says "continue":
 
 1. Read `.auto-signal` → iteration, step, next, retry_count, delegation_failures
-   - If `.auto-signal` absent → entry-point routing from `.index.json` status
-2. Read `.index.json` → status, stage
+   - If `.auto-signal` absent → entry-point routing from `.status.json` status
+2. Read `.status.json` → status, stage
 3. Read `.summary.md` → context summary
    - If `.summary.md` absent → read `.target.md` + `.plan.md` to rebuild minimal context
 4. Resume from interruption point
@@ -361,9 +361,9 @@ Fields:
 - `iteration`: current iteration count. **Auto-mode only** — absent in manual execution
 - `compaction_count`: context compaction invocations within current iteration. **Auto-mode only**. Reset to `0` each iteration. If `>= 3` → stop with warning (see Compaction frequency limit)
 - `vfp_cycles_completed`: VH→HS cycles completed during Phase 3 execution. **Auto-mode only**, software types only
-- `phase`: derived from `.index.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (complete/stage-done)
+- `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (complete/stage-done)
 - `phase_progress`: float 0-1, progress within current phase
-- `stage`: `{ current, total }` multi-stage position, synced from `.index.json`
+- `stage`: `{ current, total }` multi-stage position, synced from `.status.json`
 - `check_score`: last check D1-D6 scores + overall, or null if no check has run. Written by check, not auto
 - `retry_count`: retries at current checkpoint, reset to 0 on phase transition
 - `delegation_failures`: subagent failure records (`"cmd@iterN"`), cleared on phase transition
@@ -467,14 +467,14 @@ Terminal: merge conflict → (stop, status stays executing — retryable)
 
 The auto skill runs this loop within a single Claude session:
 
-1. Read .index.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
-2. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status. If any dependency not met, write `.auto-signal` with `result: "blocked"` and exit
+1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
+2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status. If any dependency not met, write `.auto-signal` with `result: "blocked"` and exit
 3. LOOP:
    3.1. Check for .auto-stop file → if exists, break loop
    3.2. Context check: if context window usage ≥ 82%, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`
    3.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - Evaluate four delegation factors (phase, context dependency, complexity, execution history)
-      - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.index.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
+      - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.status.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
       - **If not delegatable**: Execute inline (Read SKILL.md steps, execute in main session)
       — In both paths, SKIP the sub-command's own .auto-signal write step (auto loop handles it at step 3.5)
    3.4. Evaluate result → determine next step (result-based routing)
@@ -547,7 +547,7 @@ The `.summary.md` file is still written by each sub-command as a **compaction sa
 
 ## Stall Detection & Recovery
 
-Claude may stall mid-execution. The daemon detects stalls via heartbeat polling (60s interval, 3 consecutive unchanged captures = suspected stall) and recovers via pattern matching (continuation prompts, y/n prompts, shell prompt restart). Recovery limits: 3 per iteration, 10 total.
+Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle captures = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.auto-signal` update for 10 minutes). Recovery limits: 3 per iteration, 10 total.
 
 > **See `references/stall-detection.md`** for the full heartbeat polling logic, stall determination rules, pattern matching recovery table, and recovery limits.
 
@@ -556,7 +556,7 @@ Claude may stall mid-execution. The daemon detects stalls via heartbeat polling 
 Proactive **structured compaction** prevents overflow. Strategy: **single active compaction + file-based recovery**:
 
 1. **First compaction at ≥ 82%**: Send the Structured Compaction Prompt (template below)
-2. **No subsequent active compaction**: After first, rely on `.summary.md` + `.auto-signal` + `.index.json` for recovery
+2. **No subsequent active compaction**: After first, rely on `.summary.md` + `.auto-signal` + `.status.json` for recovery
 3. **Daemon detection**: If Claude's system compaction is detected, daemon sends recovery signal
 
 #### Structured Compaction Prompt Template
@@ -581,14 +581,14 @@ Summarize and compress our conversation context for continuation. Task identity 
 ## Error Context
 {Active NEEDS_FIX/NEEDS_REVISION feedback, or "none". Include the specific fix guidance if present}
 
-Discard all other conversation detail. Task identity, iteration count, and file paths are recovered from .auto-signal / .index.json / .summary.md during the recovery protocol.
+Discard all other conversation detail. Task identity, iteration count, and file paths are recovered from .auto-signal / .status.json / .summary.md during the recovery protocol.
 ```
 
 **Compaction frequency limit**: If 3+ compactions within same iteration → stop with warning: "context budget insufficient for this task — consider breaking into smaller sub-tasks". Count tracked in `.auto-signal` `compaction_count` field.
 
 **Compaction recovery**: If context compaction occurs mid-loop:
 1. Read `.auto-signal` — `iteration`, `compaction_count`, `step`, `next` for position recovery. If missing: fall back to step 2, start iteration/compaction from 0
-2. Read `.index.json` — status confirms lifecycle phase
+2. Read `.status.json` — status confirms lifecycle phase
 3. Read `.summary.md` — condensed task context
 4. Resume loop from `next` step at `iteration + 1`. Increment `compaction_count` by 1
 

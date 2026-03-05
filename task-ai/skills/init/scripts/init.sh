@@ -96,12 +96,12 @@ CLEANUP_DIR="$WORKING_DIR"
 # 4. Directory Creation
 mkdir -p "$WORKING_DIR"
 
-# 5. Metadata Creation (.index.json)
+# 5. Metadata Creation (.status.json)
 # Sanitize TITLE: strip all control characters and ANSI escape residue, then escape for JSON
 TITLE=$(printf '%s' "$TITLE" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr -d '[:cntrl:]')
 SAFE_TITLE="${TITLE//\\/\\\\}"
 SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
-cat > "$WORKING_DIR/.index.json" <<EOF
+cat > "$WORKING_DIR/.status.json" <<EOF
 {
   "title": "$SAFE_TITLE",
   "type": "",
@@ -138,7 +138,7 @@ EOF
 
 # 7. Git Commit
 # D3: git with error handling
-if ! git add "$WORKING_DIR/.index.json" "$WORKING_DIR/.target.md" 2>&1; then
+if ! git add "$WORKING_DIR/.status.json" "$WORKING_DIR/.target.md" 2>&1; then
     echo "[ERROR] git add failed" >&2
     exit 1
 fi

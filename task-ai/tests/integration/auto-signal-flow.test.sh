@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Create minimal notebook structure
 mkdir -p "$TEST_DIR/test-nb"
-cat > "$TEST_DIR/test-nb/.index.json" <<'EOF'
+cat > "$TEST_DIR/test-nb/.status.json" <<'EOF'
 {"name": "test-nb", "status": "planning", "type": "software"}
 EOF
 cat > "$TEST_DIR/test-nb/.target.md" <<'EOF'

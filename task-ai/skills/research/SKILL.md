@@ -122,7 +122,7 @@ Each phase reads `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` at ent
 /task-ai:research <notebook_name> --caller test
 ```
 
-根据 `.index.json` status 自动路由：
+根据 `.status.json` status 自动路由：
 
 | status | 聚焦 | 产出 | next |
 |--------|------|------|------|
@@ -140,7 +140,7 @@ Callable independently for preparatory research before any phase, or to suppleme
 
 ## Execution Steps
 
-1. **Read** `.index.json` — get task `type`, `status`, validate not `complete`/`cancelled`
+1. **Read** `.status.json` — get task `type`, `status`, validate not `complete`/`cancelled`
 2. **Read** `.target.md` — extract requirements, key technologies, domain keywords
 3. **Read** `.type-profile.md` if exists — current domain classification, methodology, confidence level
 4. **Read** `.plan.md` if exists — understand current approach (for re-plan context)
@@ -148,7 +148,7 @@ Callable independently for preparatory research before any phase, or to suppleme
 6. **Read** `.analysis/` latest file if exists — understand evaluation feedback (for re-plan gap targeting)
 7. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — inventory of existing references
 8. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`). This ensures type-profile and experience updates from concurrent tasks are visible before type discovery begins
-9. **Acquire `.working/.lock`** if type discovery will write to `.index.json` or `.type-profile.md` (i.e., `--caller plan` with missing/low-confidence type, or `--caller verify|check|exec` with type reclassification). Follow the lock protocol in `commands/task-ai.md` Concurrency Protection. Released in step 11 after type discovery completes. Skip lock if step 10 is read-only (type already settled and no updates needed)
+9. **Acquire `.working/.lock`** if type discovery will write to `.status.json` or `.type-profile.md` (i.e., `--caller plan` with missing/low-confidence type, or `--caller verify|check|exec` with type reclassification). Follow the lock protocol in `commands/task-ai.md` Concurrency Protection. Released in step 11 after type discovery completes. Skip lock if step 10 is read-only (type already settled and no updates needed)
 10. **Type discovery & refinement** (see `plan/references/type-profiling.md`):
    10.1. **Read** `$NB_WORKSPACES_LIBRARY/.type-registry.md` if exists — known types (seed + previously discovered). If missing, read `init/references/seed-types/.summary.md` as fallback
    10.2. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` if exists — shared profile from prior tasks (check for each pipe segment of current type; apply directory-safe transform: `:` → `-` in type for filename). This provides a starting point, eliminating redundant web searches
@@ -159,15 +159,15 @@ Callable independently for preparatory research before any phase, or to suppleme
      - For hybrid tasks: write type as `A|B` pipe-separated format (e.g., `data-pipeline|ml`)
      - For novel domains: **register** new type in `$NB_WORKSPACES_LIBRARY/.type-registry.md` (append row with date + source task)
    10.4. **Write** or update `.type-profile.md` with all sections including **Phase Intelligence** and **Audit Adaptation** (per-dimension domain checkpoints — use seed tables from `check/references/six-dimension-audit.md` Domain Adaptation as starting point, supplement with web research for novel types)
-   10.5. **Update** `type` in `.index.json` (use `A|B` format for hybrids)
+   10.5. **Update** `type` in `.status.json` (use `A|B` format for hybrids)
    10.6. **Sync to shared**: copy `.type-profile.md` to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (acquire `.memory/.type-profiles/.lock` first; apply directory-safe transform: replace `:` with `-` in type segment when used as filename, e.g., `science:astro` → `science-astro`). For ALL types — seed types also benefit from cross-task profile accumulation. Release lock after write
    10.7. **If `--caller verify|check|exec`** and `.type-profile.md` exists:
      - Check if current phase's section in profile is adequate (e.g., verify caller → "Verification Standards" section; check caller → "Audit Adaptation" + "Verification Standards" sections)
      - If inadequate or missing: web search for domain-specific methodology for this phase
-     - If type classification changed (e.g., discovered secondary domain): update type in `.index.json` to `A|B` format, register new type if needed
+     - If type classification changed (e.g., discovered secondary domain): update type in `.status.json` to `A|B` format, register new type if needed
      - Update `.type-profile.md` with findings, append to refinement log
      - **Sync to shared**: if profile was significantly updated → merge changes to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (apply directory-safe transform for `:` in type, acquire `.memory/.type-profiles/.lock`, release after write)
-11. **Release `.working/.lock`** if acquired in step 9 (type discovery complete, `.index.json` and `.type-profile.md` updated)
+11. **Release `.working/.lock`** if acquired in step 9 (type discovery complete, `.status.json` and `.type-profile.md` updated)
 12. **Determine research direction**: Read `.type-profile.md` "Phase Intelligence" section first. If it has direction for the calling phase, use it. Otherwise fall back to per-type seed file `init/references/seed-types/<type>.md` for the calling phase's methodology. For types not in seed files, use `.type-profile.md` as sole direction source
 13. **Gap analysis**:
     - Extract topic keywords from steps 2-6 (technologies, libraries, APIs, patterns, methodologies, domain concepts)
@@ -355,11 +355,11 @@ These steps execute when `--caller test` is specified. Steps 1–18 run first
 
 > Collection targets by task type: see `commands/references/test-strategy-by-type.md` §Strategy Matrix and §Phase Responsibilities.
 
-**Test-S1. Read `.index.json` status to determine routing**
+**Test-S1. Read `.status.json` status to determine routing**
 
 Use shell script to extract status:
 ```bash
-python3 "$TASK_AI_ROOT/core/state.py" get ".working/.index.json" status
+python3 "$TASK_AI_ROOT/core/state.py" get ".working/.status.json" status
 ```
 
 **Test-S2a. If status = `planning` or `draft` → Methodology collection**
@@ -437,7 +437,7 @@ Write or append to `$NB_WORKSPACES_LIBRARY/.memory/.references/testing-<type>.md
 | Test methodology | `.test/<date>-research-methodology.md` | Testing strategy, patterns, coverage standards |
 | Test tools | `.test/<date>-research-tools.md` | Frameworks, assertions, thresholds, CI integration |
 
-Research writes to shared directories (`$NB_WORKSPACES_LIBRARY/.memory/.references/`, `.type-registry.md`, `.memory/.type-profiles/`) and to the task module's `.type-profile.md` and `.index.json` `type` field. It does **NOT** modify other task module files (`.summary.md`, `.plan.md`, etc.).
+Research writes to shared directories (`$NB_WORKSPACES_LIBRARY/.memory/.references/`, `.type-registry.md`, `.memory/.type-profiles/`) and to the task module's `.type-profile.md` and `.status.json` `type` field. It does **NOT** modify other task module files (`.summary.md`, `.plan.md`, etc.).
 
 ## State Transitions
 
@@ -528,7 +528,7 @@ Each `<topic>.md` should follow:
 ## Notes
 
 - **Evidence over assumptions**: Always verify claims via shell commands — `curl` official docs, check actual installed versions, read source code. Do not rely solely on internal knowledge
-- **Concurrency**: Research acquires two locks at different stages: (1) `.working/.lock` during type discovery (step 9) when writing `.index.json` or `.type-profile.md`, released after step 11; (2) `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` during reference collection (steps 14–18). **Lock ordering**: `.working/.lock` is always acquired and released before `.memory/.references/.lock`, preventing deadlocks. If a lock is held, wait and retry (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Research acquires two locks at different stages: (1) `.working/.lock` during type discovery (step 9) when writing `.status.json` or `.type-profile.md`, released after step 11; (2) `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` during reference collection (steps 14–18). **Lock ordering**: `.working/.lock` is always acquired and released before `.memory/.references/.lock`, preventing deadlocks. If a lock is held, wait and retry (see Concurrency Protection in `commands/task-ai.md`)
 - **Idempotent**: Running research multiple times with `--scope gap` is safe — it only adds missing topics, never removes or overwrites existing reference content (append-only for existing files)
 - **Shared resources**: `.memory/.references/`, `.type-registry.md`, and `.memory/.type-profiles/` are shared across all task modules. References and type profiles collected for one task benefit future tasks in the same domain. This is by design — domain knowledge compounds
 - **Shared profile priority**: When building `.type-profile.md`, check `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` first. If it exists, use as starting point instead of researching from scratch. Only web search for topics not covered by the shared profile

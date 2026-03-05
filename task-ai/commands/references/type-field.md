@@ -1,6 +1,6 @@
 # Type Field
 
-The `type` field in `.index.json` identifies the task's domain. It is **auto-discovered** by `research` during the first `plan` phase — `init` does not accept a `--type` argument. All subsequent sub-commands (`check`, `exec`) read this field to adapt their behavior.
+The `type` field in `.status.json` identifies the task's domain. It is **auto-discovered** by `research` during the first `plan` phase — `init` does not accept a `--type` argument. All subsequent sub-commands (`check`, `exec`) read this field to adapt their behavior.
 
 ## Format
 
@@ -14,7 +14,7 @@ Scientific research types follow [arXiv taxonomy](https://arxiv.org/category_tax
 
 ## Auto-Discovery
 
-Type is determined automatically by `research` during the first `plan` phase (see `plan/references/type-profiling.md`). Research analyzes `.target.md` + web search to identify the domain, detects hybrid indicators, and writes the type to `.index.json`. No user input is needed — `init` creates tasks with `type: ""`, which `research` fills in.
+Type is determined automatically by `research` during the first `plan` phase (see `plan/references/type-profiling.md`). Research analyzes `.target.md` + web search to identify the domain, detects hybrid indicators, and writes the type to `.status.json`. No user input is needed — `init` creates tasks with `type: ""`, which `research` fills in.
 
 ## Auto-Expanding Registry
 
@@ -30,11 +30,11 @@ Every task module gets a `.type-profile.md` during planning. This file is the **
 
 ## Validation
 
-Each pipe-separated segment must match `[a-zA-Z0-9_:-]+`. Full type field regex: `[a-zA-Z0-9_:|-]+`. `plan` MUST validate before writing to `.index.json`. `report` MUST validate before using as `.experiences/<type>/` directory name to prevent path traversal.
+Each pipe-separated segment must match `[a-zA-Z0-9_:-]+`. Full type field regex: `[a-zA-Z0-9_:|-]+`. `plan` MUST validate before writing to `.status.json`. `report` MUST validate before using as `.experiences/<type>/` directory name to prevent path traversal.
 
 ## Directory-Safe Transform
 
-When using a type segment as a directory name (e.g., `.experiences/<segment>/`, `.type-profiles/<segment>.md`), replace `:` with `-` (e.g., `science:astro` → `science-astro`). The original type value in `.index.json` is unchanged. **Collision note**: avoid registering types whose names differ only by `:` vs `-` (e.g., `science-astro` and `science:astro` both map to `science-astro/`). The type registry should treat these as the same type.
+When using a type segment as a directory name (e.g., `.experiences/<segment>/`, `.type-profiles/<segment>.md`), replace `:` with `-` (e.g., `science:astro` → `science-astro`). The original type value in `.status.json` is unchanged. **Collision note**: avoid registering types whose names differ only by `:` vs `-` (e.g., `science-astro` and `science:astro` both map to `science-astro/`). The type registry should treat these as the same type.
 
 ## Unknown Type Handling
 

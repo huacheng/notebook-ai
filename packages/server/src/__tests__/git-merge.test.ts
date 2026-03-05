@@ -51,7 +51,7 @@ async function setupRepoWithTaskBranch() {
   await mkdir(path.join(worktreePath, '.working'), { recursive: true });
 
   await writeFile(path.join(worktreePath, '.deliverables', 'src', 'app.py'), 'print("hello")', 'utf-8');
-  await writeFile(path.join(worktreePath, '.working', '.index.json'), '{}', 'utf-8');
+  await writeFile(path.join(worktreePath, '.working', '.status.json'), '{}', 'utf-8');
   await writeFile(path.join(worktreePath, 'my-task.notebook.json'), '{"cells":[]}', 'utf-8');
 
   await wtGit.add('-A');

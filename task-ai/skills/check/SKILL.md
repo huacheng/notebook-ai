@@ -269,7 +269,7 @@ Evaluates progress during execution when issues are encountered.
 
 | Criterion | Weight | Description |
 |-----------|--------|-------------|
-| **Progress** | High | How much of the plan has been completed? (read `completed_steps` from `.index.json`) |
+| **Progress** | High | How much of the plan has been completed? (read `completed_steps` from `.status.json`) |
 | **Deviation** | High | Has execution deviated from the plan? |
 | **Issues** | High | Are encountered issues resolvable? |
 | **Continue vs Replan** | Critical | Should execution continue or revert to planning? |
@@ -354,13 +354,13 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 
 ## Execution Steps
 
-1. **Read** `.index.json` to get current task status
+1. **Read** `.status.json` to get current task status
 2. **Validate** checkpoint is appropriate for current status:
    - `post-plan`: requires status `planning` or `re-planning`
    - `mid-exec`: requires status `executing`
    - `post-exec`: requires status `executing`
    - `pre-merge`: requires status `executing` (after post-exec ACCEPT)
-3. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, verdict is BLOCKED with dependency details
+3. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, verdict is BLOCKED with dependency details
 4. **Read** `.type-profile.md` if exists — "Verification Standards", "Quality metrics", and "Audit Adaptation" sections are the **primary** source for evaluation criteria and domain-specific audit checkpoints (see `plan/references/type-profiling.md` for type system details). If check reveals the profile's standards are inadequate for this domain, update the relevant sections with findings
 5. **Read** all relevant files per checkpoint (use `.summary.md` as primary context, latest file only from each history directory)
 6. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
@@ -377,7 +377,7 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
     - **`quality_status` updates**: execute highlight protocol scope=quality-update — see `highlight/SKILL.md` §3.4. ACCEPT (post-exec): provisional → verified. REPLAN: provisional → invalidated (if experience was misleading source). Inline call failure MUST NOT block check's main flow
 13. **Update** each written directory's `.summary.md` — overwrite with condensed summary of ALL entries in that directory (`.analysis/.summary.md`, `.bugfix/.summary.md`, `.test/.summary.md` as applicable per checkpoint)
 14. **Write** task-level `.summary.md` with condensed context: task state, plan summary, evaluation outcome, progress (`completed_steps`), known issues, key decisions (integrate from directory summaries)
-15. **Update** `.index.json` status and timestamp per outcome
+15. **Update** `.status.json` status and timestamp per outcome
 16. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture quality judgment and ACCEPT/REPLAN decision reasoning. Inline call failure MUST NOT block check's main flow
 17. **Git commit**: per outcome (see Git section below). All outcomes commit their output files and state updates, regardless of whether status changes
 18. **Write** `.auto-signal` with verdict, next action, and checkpoint (see .auto-signal section below)
@@ -443,7 +443,7 @@ When ACCEPT (post-exec) or PASS (pre-merge), the `merge` sub-command handles ref
 
 ## Task-Type-Aware Verification
 
-Verification methods MUST match the task domain. Read `type` from `.index.json` and apply domain-appropriate verification. If test methods are mismatched for the task type → verdict is NEEDS_REVISION.
+Verification methods MUST match the task domain. Read `type` from `.status.json` and apply domain-appropriate verification. If test methods are mismatched for the task type → verdict is NEEDS_REVISION.
 
 > **See `init/references/seed-types/<type>.md`** for per-type seed methodology (indicators, verification approach). Shared profiles in `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` take precedence when available.
 
@@ -455,7 +455,7 @@ Verification methods MUST match the task domain. Read `type` from `.index.json` 
 - Each mid-exec issue creates a new file in `.bugfix/` (one issue per file, filename includes date + summary)
 - For `post-exec`, if tests exist (`.test/` criteria files), they MUST be run and pass for ACCEPT
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `2024-01-15-post-exec-results.md`) documenting test outcomes
-- `depends_on` in `.index.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
+- `depends_on` in `.status.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
 - **Concurrency**: Check acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
 - **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. See `references/six-dimension-audit.md` for the full checklist and domain adaptation table
 - **VFP applicability**: VFP applies when `type` contains `software` OR `.type-profile.md` contains `## Verification Cycle` section. See `commands/references/verification-first-protocol.md` for full applicability rules

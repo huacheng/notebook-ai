@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [Core Principles](#core-principles)
-- [Type Format in .index.json](#type-format-in-indexjson)
+- [Type Format in .status.json](#type-format-in-indexjson)
 - [Type Determination Flow](#type-determination-flow)
 - [Auto-Expanding Type Registry](#auto-expanding-type-registry)
 - [Hybrid Type System](#hybrid-type-system)
@@ -23,7 +23,7 @@ Task type is NOT a one-shot decision. It is a **continuously refined classificat
 4. **Auto-expanding type registry** — when research discovers a domain not in the predefined table, it registers the new type in `$NB_WORKSPACES_LIBRARY/.type-registry.md` automatically. The predefined table is a seed, not a ceiling
 5. **Progressive refinement** — type confidence grows across phases: target analysis → research → plan → verify/check/exec feedback
 
-## Type Format in `.index.json`
+## Type Format in `.status.json`
 
 The `type` field uses a simple string with pipe separator for hybrids:
 
@@ -73,7 +73,7 @@ The `type` field uses a simple string with pipe separator for hybrids:
                                    │
                     ┌──────────────▼───────────────────────────┐
                     │     Write .type-profile.md                │
-                    │     Write type to .index.json             │
+                    │     Write type to .status.json             │
                     │     Update .type-registry.md (if new)     │
                     └──────────────────────────────────────────┘
                                    │
@@ -125,13 +125,13 @@ Auto-expansion solves both: research identifies the domain from `.target.md` + w
 
 ### Single Type
 ```
-.index.json type: "software"
+.status.json type: "software"
 ```
 Task clearly belongs to one domain. All phases use that domain's methodology.
 
 ### Hybrid Type (pipe-separated)
 ```
-.index.json type: "data-pipeline|ml"
+.status.json type: "data-pipeline|ml"
 ```
 Task spans two domains. Primary (`data-pipeline`) drives architecture and workflow; secondary (`ml`) adds specialized verification and implementation concerns.
 
@@ -139,7 +139,7 @@ Example: "Build an ETL pipeline that feeds into ML model training" → `data-pip
 
 ### Custom / Novel Type
 ```
-.index.json type: "quantum-computing"
+.status.json type: "quantum-computing"
 ```
 Task is in a domain not covered by existing registry types. `research` registers it and builds `.type-profile.md` as the **sole** methodology reference. Profile must be especially thorough.
 
@@ -273,14 +273,14 @@ research has **three type-related responsibilities**:
 - Analyze `.target.md` keywords against type registry (`$NB_WORKSPACES_LIBRARY/.type-registry.md`)
 - Web search to identify the actual domain field
 - Detect hybrid indicators (keywords from multiple domains)
-- Classify and write `type` to `.index.json` using `A|B` format for hybrids
+- Classify and write `type` to `.status.json` using `A|B` format for hybrids
 - Register new types in `.type-registry.md` if not already known
 
 ### 2. Type refinement (when called from any phase)
 - Each phase may discover that the current type classification is incomplete
 - research collects additional domain info and updates `.type-profile.md`
 - Type itself may change (e.g., `software` → `software|infrastructure` hybrid)
-- Updated type written back to `.index.json` with pipe format
+- Updated type written back to `.status.json` with pipe format
 
 ### 3. Custom type profiling (when no registry type fits)
 - Comprehensive web research to build the domain profile from scratch
