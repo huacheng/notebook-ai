@@ -1,6 +1,6 @@
 # Stall Detection & Recovery
 
-the agent may stall mid-execution (e.g., context window overflow prompt, waiting for user input, or internal hang). The daemon MUST actively detect and recover from stalls.
+The agent may stall mid-execution (e.g., context window overflow prompt, waiting for user input, or internal hang). The daemon MUST actively detect and recover from stalls.
 
 ## Heartbeat Polling
 
@@ -28,7 +28,7 @@ When stall is suspected, check the **last stream-json messages** for known stall
 | Continuation prompt | Last `assistant` message contains `continue`, `Continue?`, `press enter` (case-insensitive) | Send `{"type":"human","message":"continue"}` via stream-json stdin |
 | Yes/No prompt | Last `assistant` message contains `(y/n)`, `(Y/N)`, `[y/N]`, `[Y/n]` | Send `{"type":"human","message":"y"}` via stream-json stdin |
 | Proceed prompt | Last `assistant` message contains `Do you want to proceed`, `Shall I continue` | Send `{"type":"human","message":"yes"}` via stream-json stdin |
-| Process exited | `ClaudeProcess` emits `close` event or stream ends | the agent session ended unexpectedly → restart auto session (see Server Recovery in main SKILL.md) |
+| Process exited | `ClaudeProcess` emits `close` event or stream ends | Agent session ended unexpectedly → restart auto session (see Server Recovery in `references/backend-api.md`) |
 | **Quota exhausted** | Last `assistant` or `system` message contains `rate limit`, `quota exceeded`, `usage limit`, `token limit`, `try again later` (case-insensitive) | **NOT a stall** — reset `stall_count` to 0, enter quota-wait mode (see `references/context-quota.md`) |
 | No recognizable pattern | — | Log warning, increment `stall_count`, continue polling |
 
@@ -43,7 +43,7 @@ Track hashes of recent `assistant` stream-json messages:
 1. Maintain a rolling window of the last 5 `assistant` message content hashes
 2. If 3 consecutive hashes are identical → suspected reasoning loop
 3. Recovery: send `{"type":"human","message":"You appear to be in a loop. Stop current approach. Re-read .auto-signal and .status.json to determine your next step, then proceed."}` via stream-json stdin
-4. If dedup recovery fails twice consecutively → write `.auto-stop` with reason `"reasoning_loop"`
+4. If dedup recovery fails three times consecutively → write `.auto-stop` with reason `"reasoning_loop"`
 
 ### Single-Step Timeout
 
@@ -72,4 +72,4 @@ Monitor `.auto-signal` file timestamp independently of stream activity:
 | Max recoveries per iteration | 3 | Write `.auto-stop` with reason `"stall_limit"` |
 | Max total recoveries | 10 | Write `.auto-stop` with reason `"stall_limit"` |
 
-Recovery counts are tracked in SQLite and reset on each new `.auto-signal` receipt.
+Recovery counts are tracked in SQLite. `recovery_count_step` (per-iteration) resets on each new `.auto-signal` receipt; `recovery_count_total` persists across the entire auto session and does NOT reset.

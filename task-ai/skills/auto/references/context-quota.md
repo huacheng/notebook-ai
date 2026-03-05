@@ -2,11 +2,11 @@
 
 ## Context Window Management
 
-The auto loop runs in a single long-lived the agent session. As the conversation accumulates, context window usage grows. The strategy is **single active compaction + file-based recovery**:
+The auto loop runs in a single long-lived agent session. As the conversation accumulates, context window usage grows. The strategy is **single active compaction + file-based recovery**:
 
 ### Compaction Strategy
 
-1. **First compaction at ≥ 82%**: Before each iteration (loop step 3.2), check context usage. At **≥ 82%** AND `compaction_count == 0`, construct and send the **Structured Compaction Prompt** (see template in main SKILL.md)
+1. **First compaction at ≥ 82%**: Before each iteration (loop step 2.2), check context usage. At **≥ 82%** AND `compaction_count == 0`, construct and send the **Structured Compaction Prompt** (see template in main SKILL.md)
 2. **No subsequent active compaction**: After the first compaction (`compaction_count >= 1`), do NOT trigger additional active compactions regardless of usage level. This prevents compaction cascades that lose context continuity
 3. **Safety net**: Each sub-command writes `.summary.md` with a **Recovery Header** (see below), providing condensed recovery context
 4. **System compaction handling**: If Claude's system compaction occurs (≥95% threshold, uncontrollable), the daemon detects it and sends a recovery signal (see Daemon Compaction Detection below)
@@ -97,16 +97,14 @@ Detection is based on the **stream-json output** from `ClaudeProcess`:
 4. **Continue heartbeat**: Keep polling at 60s interval, but only check for quota recovery (new stream-json messages arriving) — do not apply stall determination logic
 5. **Exit quota-wait**: When heartbeat detects new stream-json output (the agent resumed), restore normal monitoring and resume timeout clock
 
-### the agent Behavior
+### Agent Behavior
 
-- the agent automatically waits and retries when quota is exhausted — no special handling needed inside the auto loop
+- The agent automatically waits and retries when quota is exhausted — no special handling needed inside the auto loop
 - The auto loop resumes naturally when quota resets
 
-### SQLite Extension
+### SQLite Column
 
-```sql
-ALTER TABLE task_auto ADD COLUMN quota_wait_since TEXT DEFAULT '';
-```
+The `quota_wait_since` column is part of the `task_auto` table schema (see `backend-api.md` §SQLite State):
 
-- Set to ISO 8601 timestamp when entering quota-wait mode, cleared when exiting
+- Set to ISO 8601 timestamp when entering quota-wait mode, cleared (`''`) when exiting
 - `timeoutMinutes` enforcement subtracts total quota-wait duration from elapsed time

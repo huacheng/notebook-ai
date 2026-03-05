@@ -114,7 +114,7 @@ Phase 1: Target Definition (status=draft) — Human in the loop
 
 Phase 2: Planning (status=planning) — Full auto + user can intervene
   - Optional: research for technical references (implementation-level, not objective research)
-  - Execute plan → check(post-plan) (no code output in this phase, no verify needed)
+  - Execute plan → verify(post-plan) → check(post-plan) (no code output — verify validates plan document quality)
   - check D1-D6 ≥ 0.70 → auto-advance to Phase 3
   - score < threshold → auto-replan based on failing dimensions → re-check
   - User can intervene: "step 3 unnecessary" → modify .plan.md, re-check
@@ -180,7 +180,7 @@ Auto mode runs as a **single long-lived Claude session**. The daemon monitors ex
 ┌─────────────────────────────────────────────────┐
 │  the agent (single session)                     │
 │                                                 │
-│  /task-ai:auto <module>                         │
+│  /task-ai:auto                                  │
 │    ├→ derive phase from .status.json ─┐          │
 │    ├→ execute plan logic              │ internal │
 │    ├→ execute check logic             │ loop     │
@@ -251,7 +251,7 @@ SKILL.md `auto_delegatable` and `model_tier` are **default hints**. Actual deleg
 | highlight | true | medium | Usually can delegate |
 | report | true | medium | Usually can delegate |
 | read | true | medium | Usually can delegate |
-| annotate | true | medium | Usually can delegate |
+| annotate | false | medium | Needs interactive mode for High-impact responses; lock acquisition context-dependent |
 
 **light (→ haiku)**
 
@@ -332,6 +332,8 @@ After each sub-command step completes, Claude writes a progress signal. This is 
   "next": "exec",
   "checkpoint": "post-plan",
   "iteration": 3,
+  "compaction_count": 0,
+  "vfp_cycles_completed": 2,
   "phase": "planning",
   "phase_progress": 0.75,
   "stage": { "current": 1, "total": 2 },
@@ -390,8 +392,8 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 |-------|-----------|----------------|
 | `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate` |
 | `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `stage-done`, `conflict`, `rejected` |
-| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `(stop)` |
-| `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
+| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `(stop)`, `(none)` |
+| `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `post-annotate`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
 | `compaction_count` | Integer | ≥ 0 |
 | `vfp_cycles_completed` | Integer (optional) | ≥ 0 (present only for software types in auto mode) |
@@ -416,7 +418,7 @@ The daemon writes `.auto-stop` to the task module directory to request graceful 
 }
 ```
 
-Reasons: `"timeout"`, `"max_iterations"`, `"user_stop"`, `"stall_limit"`
+Reasons: `"timeout"`, `"max_iterations"`, `"user_stop"`, `"stall_limit"`, `"reasoning_loop"`
 
 ## State Machine
 
@@ -428,9 +430,9 @@ Phase 1: Target (human-in-loop)
   Gate: no [PROPOSED] residuals in .target.md → [Phase 2]
 
 Phase 2: Planning (auto-review)
-  plan ──→ check(post-plan, threshold=0.70) ─── PASS ──→ [Phase 3]
-                    │
-                    NEEDS_REVISION ──→ plan (retry, max 3)
+  plan ──→ verify ──→ check(post-plan, threshold=0.70) ─── PASS ──→ [Phase 3]
+                              │
+                              NEEDS_REVISION ──→ plan (retry, max 3)
 
 Phase 3: Execution (auto-review)
   exec ─┬─ (mid-exec) ──→ verify ──→ check(mid-exec, threshold=0.60) ─── CONTINUE ──→ exec (resume)
@@ -528,7 +530,7 @@ The auto skill runs this loop within a single Claude session:
 | verify | (pass) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (fail) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (partial) | check | (from trigger context) | Verification done, check renders verdict |
-| annotate | (processed) | verify | post-plan | Annotations processed |
+| annotate | (processed) | `<by-layer>` | post-annotate | Layer-based: Requirement→plan/check, Planning→check, Eval-analysis→check, Eval-test→verify, Methodology→verify, Information/Comment-only→(none). See annotate SKILL.md §.auto-signal Routing |
 | report | (generated) | (stop) | — | Loop complete |
 
 ### Context Advantage
@@ -543,7 +545,7 @@ The `.summary.md` file is still written by each sub-command as a **compaction sa
 
 ## Stall Detection & Recovery
 
-Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle captures = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.auto-signal` update for 10 minutes). Recovery limits: 3 per iteration, 10 total.
+Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle heartbeats = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.auto-signal` update for 10 minutes). Recovery limits: 3 per iteration, 10 total.
 
 > **See `references/stall-detection.md`** for the full heartbeat polling logic, stall determination rules, pattern matching recovery table, and recovery limits.
 
@@ -631,7 +633,7 @@ Auto mode inherits git behavior from each sub-command. No additional git commits
 
 ## Notes
 
-- Auto mode starts by entering `/task-ai:auto <notebook_name>` in the prompt input window
+- Auto mode starts by entering `/task-ai:auto` in the prompt input window (notebook is auto-detected from CWD or git branch context)
 - Daemon's only active intervention is writing `.auto-stop`; all other activity is passive monitoring
 - `.auto-signal` and `.auto-stop` are transient files — should be in `.gitignore`
 - **Known trade-off**: First entry on `executing` status always runs `check --checkpoint post-exec`. If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration

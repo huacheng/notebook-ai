@@ -115,6 +115,18 @@ describe('TaskAutoDb methods', () => {
   });
 });
 
+describe('task_auto restart_count column', () => {
+  it('has restart_count column with default 0', async () => {
+    const { NotebookDb } = await import('../db.js');
+    const db = new NotebookDb(path.join(tmpDir, 'test.db'));
+
+    db.startAuto('session-rc', '/work/rc/.working', 20, 30);
+    const row = db.getAuto('session-rc');
+    expect(row).toBeTruthy();
+    expect(row!.restart_count).toBe(0);
+  });
+});
+
 describe('recoverDaemons', () => {
   it('recovers daemons for running task_auto rows with existing task_dir', async () => {
     const { NotebookDb } = await import('../db.js');

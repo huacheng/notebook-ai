@@ -93,8 +93,9 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
 
     DATE=$(date "+%Y-%m-%d %H:%M")
 
-    # D2: Use printf to avoid echo interpreting -n/-e as options
-    REFINEMENT_LINE=$(printf '- [%s] %s' "$DATE" "$REFINE_CONTENT")
+    # D2: Strip control characters (except newline) from user input, use printf to avoid echo -n/-e issues
+    REFINE_CONTENT_SAFE=$(printf '%s' "$REFINE_CONTENT" | tr -d '\000-\010\013\014\016-\037')
+    REFINEMENT_LINE=$(printf '- [%s] %s' "$DATE" "$REFINE_CONTENT_SAFE")
 
     # Append refinement to Refinements section
     if grep -q "^## Refinements" "$PLAN_FILE"; then
@@ -120,6 +121,23 @@ fi
 # Mode 3: Generate plan
 # ─────────────────────────────────────────────────────────────────────────────
 
+# 0. Guard: reject terminal statuses (SKILL.md State Transitions)
+CURRENT_STATUS_GUARD=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>&1) || CURRENT_STATUS_GUARD=""
+case "$CURRENT_STATUS_GUARD" in
+    complete)
+        echo "[ERROR] Completed tasks cannot be re-planned." >&2
+        exit 1
+        ;;
+    cancelled)
+        echo "[ERROR] Cancelled tasks cannot be re-planned." >&2
+        exit 1
+        ;;
+    stage-done)
+        echo "[ERROR] Stage completed — use /target to advance to next stage first." >&2
+        exit 1
+        ;;
+esac
+
 # 1. Invoke Research for Type Discovery (Simulated)
 # In real execution, this would call research.sh. For plumbing:
 # D3: python3 calls with error handling
@@ -127,15 +145,21 @@ TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>&1) || TYPE=""
 if [[ -z "$TYPE" ]]; then
     TYPE="software" # Default for plan testing
     if ! python3 "$STATE_PY" set "$STATUS_JSON" type "$TYPE" 2>&1; then
-        echo "[WARN] Failed to set type in index" >&2
+        echo "[WARN] Failed to set type in .status.json" >&2
     fi
 fi
 
 echo "Planning for task type: $TYPE"
 
+# D2: Validate type format (SKILL.md step 4)
+if [[ -n "$TYPE" ]] && ! [[ "$TYPE" =~ ^[a-zA-Z0-9_:|-]+$ ]]; then
+    echo "[ERROR] Invalid type format: $TYPE (must match [a-zA-Z0-9_:|-]+)" >&2
+    exit 1
+fi
+
 # 2. Generate .plan.md (Scaffold)
-# Archive existing plan with superseded naming convention
-if [[ -f "$WORK_DIR/.plan.md" ]]; then
+# Archive existing plan only when re-planning (SKILL.md step 14)
+if [[ -f "$PLAN_FILE" ]] && [[ "$CURRENT_STATUS_GUARD" == "review" || "$CURRENT_STATUS_GUARD" == "executing" || "$CURRENT_STATUS_GUARD" == "re-planning" ]]; then
     SUPERSEDED="$WORK_DIR/.plan-superseded.md"
     if [[ -f "$SUPERSEDED" ]]; then
         # Append numeric suffix if superseded file exists
@@ -144,13 +168,15 @@ if [[ -f "$WORK_DIR/.plan.md" ]]; then
         SUPERSEDED="$WORK_DIR/.plan-superseded-$i.md"
     fi
     # D3: mv with error handling - abort if fails to prevent data loss
-    if ! mv "$WORK_DIR/.plan.md" "$SUPERSEDED" 2>&1; then
+    if ! mv "$PLAN_FILE" "$SUPERSEDED" 2>&1; then
         echo "[ERROR] Failed to archive .plan.md - aborting" >&2
         exit 1
     fi
     echo "[WARN] Existing .plan.md archived to $SUPERSEDED"
+    # D6: Add superseded file to git so it's tracked
+    git add "$SUPERSEDED" 2>/dev/null || true
 fi
-cat > "$WORK_DIR/.plan.md" <<EOF
+cat > "$PLAN_FILE" <<EOF
 # Implementation Plan: $NOTEBOOK
 
 ## Step 1: Initialize Project
@@ -191,10 +217,21 @@ EOF
     echo "Generated VH stubs and baseline."
 fi
 
-# 4. Update Index Status
-# D3: python3 call with error handling
-if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status planning 2>&1; then
-    echo "[WARN] Failed to transition status to planning" >&2
+# 4. Update Status — choose planning vs re-planning based on current state
+# D4: Reuse CURRENT_STATUS_GUARD from step 0 instead of re-reading .status.json
+case "$CURRENT_STATUS_GUARD" in
+    review|executing|re-planning)
+        NEW_STATUS="re-planning"
+        NEW_PHASE="needs-check"
+        ;;
+    *)
+        NEW_STATUS="planning"
+        NEW_PHASE=""
+        ;;
+esac
+# D3: python3 call with error handling; reset completed_steps per SKILL.md step 23
+if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status "$NEW_STATUS" --phase "$NEW_PHASE" --completed-steps 0 2>&1; then
+    echo "[WARN] Failed to transition status to $NEW_STATUS" >&2
 fi
 
 # 5. Transition phases: target-refinement → plan-refinement
@@ -208,14 +245,22 @@ if ! printf 'phase: plan-refinement\nentered_at: %s\nentered_by: /task-ai:plan\n
     echo "[WARN] Failed to write session context" >&2
 fi
 
-# D1: Commit generated plan (consistent with refine mode)
+# D1: Commit generated plan + test artifacts + session context
 # D3: git with error handling
-if ! git add "$PLAN_FILE" "$STATUS_JSON" 2>&1; then
+if ! git add "$PLAN_FILE" "$STATUS_JSON" "$SESSION_CONTEXT" 2>&1; then
     echo "[WARN] git add failed" >&2
 fi
-if ! git commit -m "task-ai($NOTEBOOK):plan generate" 2>&1; then
+# Also add test directory if it exists (VH stubs, criteria)
+if [[ -d "$WORK_DIR/.test" ]]; then
+    git add "$WORK_DIR/.test" 2>/dev/null || true
+fi
+if ! git commit -m "task-ai($NOTEBOOK):plan generate implementation plan" 2>&1; then
     echo "[WARN] git commit failed (may be no changes)" >&2
 fi
+
+# 6. Write .auto-signal (SKILL.md step 27)
+AUTO_SIGNAL="$WORK_DIR/.auto-signal"
+printf '{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "%s" }\n' "$(date -Iseconds)" > "$AUTO_SIGNAL" 2>/dev/null || true
 
 echo "[plan] Plan generated. Entered plan-refinement phase."
 echo "[plan] Continue discussing to refine. Use /exec when ready."

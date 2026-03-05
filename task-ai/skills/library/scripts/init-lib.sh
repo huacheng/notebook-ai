@@ -115,7 +115,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTEL_TEMPLATE="$SCRIPT_DIR/../templates/audit-intel-sources.yaml"
 if [[ -f "$INTEL_TEMPLATE" && ! -f ".audit-intel-sources.yaml" ]]; then
     # D3: cp with error handling
-    if ! cp "$INTEL_TEMPLATE" ".audit-intel-sources.yaml" 2>&1; then
+    if ! cp "$INTEL_TEMPLATE" ".audit-intel-sources.yaml" 2>/dev/null; then
         echo "[WARN] Failed to copy intel template" >&2
     else
         echo "[+] Created: .audit-intel-sources.yaml (from template)"
@@ -142,13 +142,27 @@ EOF
 fi
 
 if [[ ! -f .type-registry.md ]]; then
+    # D1: seed all types from seed-types/.summary.md
+    SEED_DATE=$(date -u +"%Y-%m-%d")
     cat > .type-registry.md <<EOF
 # Task Type Registry
 
 | Type | Added | Source Task |
 |------|-------|-------------|
-| software | 2024-01-01 | seed |
-| documentation | 2024-01-01 | seed |
+| software | $SEED_DATE | seed |
+| science | $SEED_DATE | seed |
+| documentation | $SEED_DATE | seed |
+| data-pipeline | $SEED_DATE | seed |
+| infrastructure | $SEED_DATE | seed |
+| ml | $SEED_DATE | seed |
+| ai-skill | $SEED_DATE | seed |
+| image-processing | $SEED_DATE | seed |
+| video-production | $SEED_DATE | seed |
+| dsp | $SEED_DATE | seed |
+| literary | $SEED_DATE | seed |
+| screenwriting | $SEED_DATE | seed |
+| mechatronics | $SEED_DATE | seed |
+| chip-design | $SEED_DATE | seed |
 EOF
     echo "[+] Created: .type-registry.md"
     CHANGES=1
@@ -175,20 +189,21 @@ fi
 # D3: git commands with error handling
 if [[ ! -d ".git" ]]; then
     echo "Initializing Git repository..."
-    if ! git init 2>&1; then
+    if ! git init; then
         echo "[WARN] git init failed" >&2
-    elif ! git add . 2>&1; then
+    elif ! git add .; then
         echo "[WARN] git add failed" >&2
-    elif ! git commit -m "task-ai(library):init initialize library repository skeleton" 2>&1; then
+    elif ! git commit -m "task-ai(library):init initialize library repository skeleton"; then
         echo "[WARN] git commit failed" >&2
     else
         echo "Library initialized with Git."
     fi
 elif [[ $CHANGES -gt 0 ]]; then
     echo "Committing structure updates..."
-    git add .
-    if ! git diff --cached --quiet; then
-        git commit -m "task-ai(library):init补缺 add missing structure"
+    if ! git add .; then
+        echo "[WARN] git add failed during structure update" >&2
+    elif ! git diff --cached --quiet; then
+        git commit -m "task-ai(library):init补缺 add missing structure" || echo "[WARN] git commit failed" >&2
     fi
     echo "Library structure updated."
 else

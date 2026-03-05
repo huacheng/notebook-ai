@@ -16,7 +16,12 @@ write_check_score() {
     # D2: Pass values as arguments to python, not inline interpolation
     python3 - "$signal_file" "$overall" "$d1" "$d2" "$d3" "$d4" "$d5" "$d6" <<'PYEOF'
 import json, sys, os
-signal_file, overall, d1, d2, d3, d4, d5, d6 = sys.argv[1], *[float(x) for x in sys.argv[2:9]]
+signal_file = sys.argv[1]
+try:
+    overall, d1, d2, d3, d4, d5, d6 = [float(x) for x in sys.argv[2:9]]
+except (ValueError, IndexError) as e:
+    print(f"[ERROR] Invalid score arguments: {e}", file=sys.stderr)
+    sys.exit(1)
 with open(signal_file, 'r') as f:
     signal = json.load(f)
 signal['check_score'] = {

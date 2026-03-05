@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Library Maintain Script
-# Usage: maintain.sh [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--evolve]
+# Usage: maintain.sh [--mode quick|audit] [--rebuild-index] [--rebuild-relations]
+#        [--compact] [--check-staleness] [--all] [--evolve] [--promote-skill <name>]
 
 set -euo pipefail
 
@@ -30,6 +31,11 @@ while [[ $# -gt 0 ]]; do
           # Get last maintained timestamp (default to 0 if not exists)
           if [[ -f "$LAST_MAINTAINED" ]]; then
               LAST_TS=$(cat "$LAST_MAINTAINED")
+              # D2: Validate numeric only to prevent arithmetic injection
+              if ! [[ "$LAST_TS" =~ ^[0-9]+$ ]]; then
+                  echo "[WARN] Invalid .last-maintained content, resetting to 0" >&2
+                  LAST_TS=0
+              fi
           else
               LAST_TS=0
           fi
@@ -76,8 +82,8 @@ while [[ $# -gt 0 ]]; do
           ;;
         audit)
           echo "[maintain:audit] Running full library audit..."
-          # Full audit mode - run all maintenance tasks
-          bash "$0" --rebuild-index --rebuild-relations --compact
+          # Full audit mode - run all maintenance tasks (D1: matches --all pipeline)
+          bash "$0" --rebuild-index --rebuild-relations --compact --check-staleness
           ;;
         *)
           echo "Unknown mode: $MODE" >&2
@@ -88,13 +94,13 @@ while [[ $# -gt 0 ]]; do
       ;;
     --rebuild-index)
       # D3: python3 call with error handling
-      if ! python3 "$REBUILD_INDEX_PY" 2>&1; then
+      if ! python3 "$REBUILD_INDEX_PY"; then
           echo "[WARN] rebuild-index.py failed" >&2
       fi
       shift ;;
     --rebuild-relations)
       # D3: python3 call with error handling
-      if ! python3 "$REBUILD_RELATIONS_PY" 2>&1; then
+      if ! python3 "$REBUILD_RELATIONS_PY"; then
           echo "[WARN] rebuild-relations.py failed" >&2
       fi
       shift ;;
@@ -102,7 +108,7 @@ while [[ $# -gt 0 ]]; do
       EVOLVE_SCRIPT="$SCRIPT_DIR/evolve-rules.sh"
       if [[ -f "$EVOLVE_SCRIPT" ]]; then
           # D3: evolve-rules execution with error handling
-          if ! bash "$EVOLVE_SCRIPT" --domain "${2:-all}" --mode auto 2>&1; then
+          if ! bash "$EVOLVE_SCRIPT" --domain "${2:-all}" --mode auto; then
               echo "[WARN] evolve-rules.sh failed" >&2
           fi
           shift 2 2>/dev/null || shift
@@ -116,29 +122,32 @@ while [[ $# -gt 0 ]]; do
       if [[ -f "$CHANGELOG" ]] && [[ $(wc -l < "$CHANGELOG") -gt 2000 ]]; then
           ARCHIVE_DIR="$LIB_PATH/.changelog-archive"
           # D3: mkdir with error handling
-          if ! mkdir -p "$ARCHIVE_DIR" 2>&1; then
+          if ! mkdir -p "$ARCHIVE_DIR"; then
               echo "[ERROR] Failed to create archive directory" >&2
               exit 1
           fi
           DATE_STR=$(date +%Y-%m)
           ARCHIVE_FILE="$ARCHIVE_DIR/$DATE_STR.md"
           # H-MAINTAIN-1: Append to existing archive instead of overwriting
+          # D3: Create empty changelog FIRST to prevent data loss if interrupted
+          touch "${CHANGELOG}.new"
           if [[ -f "$ARCHIVE_FILE" ]]; then
-              # D3: cat append with error handling
-              if ! cat "$CHANGELOG" >> "$ARCHIVE_FILE" 2>&1; then
+              if ! cat "$CHANGELOG" >> "$ARCHIVE_FILE"; then
                   echo "[WARN] Failed to append changelog to archive" >&2
+                  rm -f "${CHANGELOG}.new"
               else
+                  mv "${CHANGELOG}.new" "$CHANGELOG"
                   echo "Changelog appended to existing $ARCHIVE_FILE"
               fi
           else
-              # D3: mv with error handling
-              if ! mv "$CHANGELOG" "$ARCHIVE_FILE" 2>&1; then
-                  echo "[WARN] Failed to move changelog to archive" >&2
+              if ! cp "$CHANGELOG" "$ARCHIVE_FILE"; then
+                  echo "[WARN] Failed to copy changelog to archive" >&2
+                  rm -f "${CHANGELOG}.new"
               else
+                  mv "${CHANGELOG}.new" "$CHANGELOG"
                   echo "Changelog compacted to $ARCHIVE_FILE"
               fi
           fi
-          touch "$CHANGELOG"
       fi
       shift ;;
 
@@ -244,6 +253,37 @@ while [[ $# -gt 0 ]]; do
       echo "=== Promotion Complete ==="
       ;;
 
+    --check-staleness)
+      # D1: Check staleness as documented in SKILL.md
+      AUDIT_PY="${AUDIT_PY:-$SCRIPT_DIR/audit-library.py}"
+      if [[ -f "$AUDIT_PY" ]]; then
+          echo "[maintain:check-staleness] Running staleness check..."
+          python3 "$AUDIT_PY" 2>&1 | grep -E '^\[STALE\]' || echo "[maintain:check-staleness] No stale entries found."
+      else
+          echo "[ERROR] audit-library.py not found" >&2
+          exit 1
+      fi
+      shift ;;
+
+    --all)
+      # D1: Run rebuild-index → rebuild-relations → compact → check-staleness in sequence
+      echo "[maintain:all] Running full maintenance pipeline..."
+      # Sweep stale locks first
+      echo "[maintain:all] Sweeping stale locks..."
+      while IFS= read -r lockfile; do
+          [[ -z "$lockfile" ]] && continue
+          if [[ -f "$lockfile" ]]; then
+              lock_pid=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['pid'])" "$lockfile" 2>/dev/null || echo "")
+              if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
+                  echo "[maintain:all] Removing stale lock: $lockfile (pid $lock_pid dead)"
+                  rm -f "$lockfile"
+              fi
+          fi
+      done < <(find "$LIB_PATH" -maxdepth 4 -name ".lock" 2>/dev/null)
+      # Run sub-tasks
+      bash "$0" --rebuild-index --rebuild-relations --compact --check-staleness
+      shift ;;
+
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   END_TIME=$(date +%s%3N)
@@ -256,16 +296,17 @@ cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 
 
 # Using git add . with a proper .gitignore is the most robust strategy
 # Ensures all .md and index files are tracked
-# D3: git add with error handling
-if ! git add . 2>&1; then
-    echo "[WARN] git add failed" >&2
-fi
+# D3: git add with error handling (only if .git exists)
+if [[ -d "$LIB_PATH/.git" ]]; then
+    if ! git add .; then
+        echo "[WARN] git add failed" >&2
+    fi
 
-if ! git diff --cached --quiet; then
-    # D3: git commit with error handling
-    if ! git commit -m "task-ai(library):maintain sync files and indices" 2>&1; then
-        echo "[WARN] git commit failed" >&2
-    else
-        echo "Library files and indices synced and committed."
+    if ! git diff --cached --quiet; then
+        if ! git commit -m "task-ai(library):maintain sync files and indices"; then
+            echo "[WARN] git commit failed" >&2
+        else
+            echo "Library files and indices synced and committed."
+        fi
     fi
 fi

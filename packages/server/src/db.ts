@@ -52,6 +52,7 @@ export interface TaskAutoRow {
   recovery_count_step: number;
   recovery_count_total: number;
   stall_count: number;
+  restart_count: number;
   quota_wait_since: string;
   started_at: string;
   last_signal_at: string;
@@ -193,6 +194,7 @@ export class NotebookDb {
         recovery_count_step INTEGER DEFAULT 0,
         recovery_count_total INTEGER DEFAULT 0,
         stall_count         INTEGER DEFAULT 0,
+        restart_count       INTEGER DEFAULT 0,
         quota_wait_since    TEXT DEFAULT '',
         started_at          TEXT,
         last_signal_at      TEXT

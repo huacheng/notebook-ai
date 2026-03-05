@@ -6,7 +6,7 @@ import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
 import { PromptQueue } from './PromptQueue';
-import { PhaseProgressBar, ScorePanel, StageIndicator, AutoStopButton } from './AutoStatusBar';
+import { PhaseProgressBar, ScorePanel, StageIndicator, IterationBadge, RetryBadge, MultiStageView, AutoStopButton } from './AutoStatusBar';
 import { stopAutoMode } from '../api/task-auto';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
@@ -448,11 +448,24 @@ export function Notebook() {
       <NotebookStatusBar />
       {autoStatus.phase && (
         <div className="auto-status-container">
-          <StageIndicator stage={autoStatus.stage} />
-          <PhaseProgressBar
-            phase={autoStatus.phase}
-            phaseProgress={autoStatus.phaseProgress}
-          />
+          {autoStatus.stage && autoStatus.stage.total > 1 ? (
+            <MultiStageView
+              stage={autoStatus.stage}
+              phase={autoStatus.phase}
+              phaseProgress={autoStatus.phaseProgress}
+              checkScore={autoStatus.checkScore}
+            />
+          ) : (
+            <>
+              <StageIndicator stage={autoStatus.stage} />
+              <PhaseProgressBar
+                phase={autoStatus.phase}
+                phaseProgress={autoStatus.phaseProgress}
+              />
+            </>
+          )}
+          <IterationBadge iteration={autoStatus.iteration} />
+          <RetryBadge retryCount={autoStatus.retryCount} />
           <ScorePanel
             checkScore={autoStatus.checkScore}
             expanded={scoreExpanded}

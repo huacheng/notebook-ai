@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:research implementation
-# Usage: research.sh [notebook] [--caller target|plan|test|verify|check|exec|library] [--phase objective|requirements] [--scope gap|deep]
+# Usage: research.sh [notebook] [--caller target|plan|test|verify|check|exec|library|audit] [--phase objective|requirements] [--scope gap|deep]
 # - notebook: optional, auto-detected from .working/ or task/* branch
 # - --scope: gap (default, incremental) or deep (force refresh)
 
@@ -43,6 +43,11 @@ CALLER=""
 PHASE=""
 SCOPE="gap"  # Default to incremental mode
 
+# D2: Allowed values for validated arguments
+VALID_CALLERS="target plan test verify check exec library audit"
+VALID_PHASES="objective requirements"
+VALID_SCOPES="gap deep"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --caller) CALLER="$2"; shift 2 ;;
@@ -68,16 +73,38 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# D2: Validate argument values against allowed lists
+if [[ -n "$CALLER" ]] && [[ ! " $VALID_CALLERS " =~ " $CALLER " ]]; then
+    echo "[ERROR] Invalid --caller value: $CALLER" >&2
+    echo "Allowed: $VALID_CALLERS" >&2
+    exit 1
+fi
+if [[ -n "$PHASE" ]] && [[ ! " $VALID_PHASES " =~ " $PHASE " ]]; then
+    echo "[ERROR] Invalid --phase value: $PHASE" >&2
+    echo "Allowed: $VALID_PHASES" >&2
+    exit 1
+fi
+if [[ ! " $VALID_SCOPES " =~ " $SCOPE " ]]; then
+    echo "[ERROR] Invalid --scope value: $SCOPE" >&2
+    echo "Allowed: $VALID_SCOPES" >&2
+    exit 1
+fi
+
 # Try to resolve notebook context (may fail if standalone topic research)
 WORK_DIR=""
 if [[ -n "$NOTEBOOK" ]] || [[ -z "$TOPIC" ]]; then
     resolve_workdir "${NOTEBOOK:-}" 2>/dev/null && {
         NOTEBOOK="$NB_NOTEBOOK"
-        WORK_DIR="$NB_WORKDIR"
+        # resolve_workdir exports WORK_DIR (not NB_WORKDIR)
     } || true
 fi
 
 TARGET_MD="${WORK_DIR:+$WORK_DIR/.target.md}"
+
+# Default --phase to "objective" when --caller target (per SKILL.md)
+if [[ "$CALLER" == "target" && -z "$PHASE" ]]; then
+    PHASE="objective"
+fi
 
 # Handle audit caller mode - intelligence collection for rule evolution
 # Does not require .target.md or task context
@@ -161,7 +188,7 @@ if [[ "$CALLER" == "audit" ]]; then
                 # Copy to security/negative as these are known-safe patterns
                 if [[ ! -f "$TEST_CORPUS_DIR/security/negative/$SLUG.md" ]]; then
                     # D3: cp with error handling
-                    if cp "$exp_file" "$TEST_CORPUS_DIR/security/negative/$SLUG.md" 2>&1; then
+                    if cp "$exp_file" "$TEST_CORPUS_DIR/security/negative/$SLUG.md" 2>/dev/null; then
                         ((NEGATIVE_COUNT++)) || true
                     else
                         echo "[research:audit] WARN: Failed to copy $exp_file" >&2
@@ -176,8 +203,9 @@ if [[ "$CALLER" == "audit" ]]; then
     # .auto-signal is only written when WORK_DIR is set (notebook context)
     echo "[research:audit] Intelligence collection complete"
     if [[ -n "$WORK_DIR" ]] && [[ -d "$WORK_DIR" ]]; then
-        echo 'result="(intel-collected)"' > "$WORK_DIR/.auto-signal"
-        echo 'next="(stop)"' >> "$WORK_DIR/.auto-signal"
+        cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
+{ "step": "research", "result": "(intel-collected)", "next": "(stop)", "timestamp": "$(date -Iseconds)" }
+SIGNAL_EOF
     else
         echo "[research:audit] No notebook context - skipping .auto-signal"
     fi
@@ -226,7 +254,7 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
             ARCHIVE_DIR="$REFS_DIR/.archive"
             mkdir -p "$ARCHIVE_DIR"
             # D3: mv with error handling - abort if archive fails to prevent data loss
-            if mv "$FILEPATH" "$ARCHIVE_DIR/${FILENAME}.${DATE}.md" 2>&1; then
+            if mv "$FILEPATH" "$ARCHIVE_DIR/${FILENAME}.${DATE}.md" 2>/dev/null; then
                 echo "[research] Archived previous version"
             else
                 echo "[ERROR] Failed to archive $FILEPATH - aborting to prevent data loss" >&2
@@ -256,8 +284,9 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
 
 RESEARCH_END
         # Replace placeholders with actual values (safe substitution)
-        # D2: Escape sed special chars in TOPIC: & (match ref), \ (escape), / (delimiter)
-        TOPIC_ESCAPED="${TOPIC//\\/\\\\}"  # Escape backslashes first
+        # D2: Escape sed special chars in TOPIC: & (match ref), \ (escape), / (delimiter), newlines
+        TOPIC_ESCAPED="${TOPIC//$'\n'/ }"  # Strip newlines first
+        TOPIC_ESCAPED="${TOPIC_ESCAPED//\\/\\\\}"  # Escape backslashes
         TOPIC_ESCAPED="${TOPIC_ESCAPED//&/\\&}"  # Then ampersands
         TOPIC_ESCAPED="${TOPIC_ESCAPED//\//\\/}"  # Then forward slashes
         sed -i "s/TOPIC_PLACEHOLDER/${TOPIC_ESCAPED}/g; s/DATE_PLACEHOLDER/$DATE/g; s/SCOPE_PLACEHOLDER/$SCOPE/g" "$FILEPATH"
@@ -267,7 +296,7 @@ RESEARCH_END
         CHANGELOG="$LIB_PATH/.changelog"
         CHANGELOG_LOCK="$LIB_PATH/.changelog.lock"
         (
-            flock -w 5 200 || { echo "[WARN] changelog lock timeout, proceeding anyway"; }
+            flock -w 5 200 || { echo "[WARN] changelog lock timeout, proceeding anyway" >&2; }
             echo "- [reference] ${FILENAME}.md | added | ts=${TS}" >> "$CHANGELOG"
         ) 200>"$CHANGELOG_LOCK"
 
@@ -299,20 +328,42 @@ detect_stage() {
     python3 "$DETECT_STAGE_PY" "$TARGET_MD"
 }
 
-if [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
+if [[ "$CALLER" == "target" && "$PHASE" == "requirements" ]]; then
+    # --caller target --phase requirements: append proposed requirements
+    DATE=$(date +%Y-%m-%d)
+    if ! grep -q "## Research Insights" "$TARGET_MD"; then
+        printf '\n## Research Insights\n' >> "$TARGET_MD"
+    fi
+    printf '\n### Proposed Requirements · %s\n\n#### [PROPOSED] Error Handling Strategy\n- TODO: Agent fills in requirements\n\n#### [PROPOSED] Performance Constraints\n- TODO: Agent fills in requirements\n\n#### [PROPOSED] Security Requirements\n- TODO: Agent fills in requirements\n' "$DATE" >> "$TARGET_MD"
+    echo "Updated .target.md with proposed requirements."
+
+    # D1: Write .auto-signal per SKILL.md specification
+    cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
+{ "step": "research", "result": "(collected)", "next": "plan", "checkpoint": "post-research", "timestamp": "$(date -Iseconds)" }
+SIGNAL_EOF
+
+    post_write_maintain
+
+elif [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
     STAGE=$(detect_stage)
     # D2: Validate STAGE for safe characters (prevent injection)
-    STAGE=$(echo "$STAGE" | tr -cd 'A-Za-z0-9_-')
+    # Allow colon for PENDING:O1/O2/O3 format
+    STAGE=$(echo "$STAGE" | tr -cd 'A-Za-z0-9_-:')
     if [[ -z "$STAGE" ]]; then
         STAGE="UNKNOWN"
     fi
     echo "Detected stage: $STAGE"
 
-    if [[ "$STAGE" == "PENDING" ]]; then
-        echo "[ABORT] Pending [PROPOSED] items found. Please review and remove markers before advancing."
+    if [[ "$STAGE" == PENDING* ]]; then
+        PENDING_STAGE="${STAGE#PENDING:}"
+        echo "[ABORT] Pending [PROPOSED] items in $PENDING_STAGE — review and confirm before continuing."
         exit 0
     elif [[ "$STAGE" == "COMPLETE" ]]; then
         echo "All objective stages complete. Run with --phase requirements to continue."
+        # D1: Write .auto-signal for objective-complete per SKILL.md
+        cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
+{ "step": "research", "result": "(objective-complete)", "next": "(stop)", "timestamp": "$(date -Iseconds)" }
+SIGNAL_EOF
         exit 0
     fi
 
@@ -324,6 +375,12 @@ if [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
     # D1/D2: Use printf instead of echo -e to avoid interpreting escape sequences in STAGE
     printf '\n### %s: Insights · %s\n\n#### [PROPOSED] Refinement\n- Data for %s...\n' "$STAGE" "$DATE" "$STAGE" >> "$TARGET_MD"
     echo "Updated .target.md with $STAGE insights."
+
+    # D1: Write .auto-signal per SKILL.md specification
+    STAGE_LOWER=$(echo "$STAGE" | tr '[:upper:]' '[:lower:]')
+    cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
+{ "step": "research", "result": "(${STAGE_LOWER}-collected)", "next": "(stop)", "checkpoint": "post-${STAGE_LOWER}", "timestamp": "$(date -Iseconds)" }
+SIGNAL_EOF
 
     # Trigger quick maintenance (research may have written to library)
     post_write_maintain
@@ -344,4 +401,16 @@ else
 
     # After research writes to library
     post_write_maintain
+
+    # D1: Write .auto-signal per SKILL.md — route back to calling phase
+    NEXT_PHASE="${CALLER:-plan}"
+    # Normalize: empty or unknown callers default to plan
+    case "$NEXT_PHASE" in
+        plan|test|verify|check|exec|library) ;; # valid
+        *) NEXT_PHASE="plan" ;;
+    esac
+    # For --caller test, route depends on status (plan vs verify) — simplified to caller
+    cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
+{ "step": "research", "result": "(collected)", "next": "$NEXT_PHASE", "checkpoint": "post-research", "timestamp": "$(date -Iseconds)" }
+SIGNAL_EOF
 fi

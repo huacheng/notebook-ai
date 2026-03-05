@@ -36,7 +36,7 @@ def audit_library():
     
     if memory_path.exists():
         for p in memory_path.rglob('*.md'):
-            if p.name.startswith('.') or p.name == '.index.md': continue
+            if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
             
             rel_path = str(p.relative_to(lib_path))
             physical_files.add(rel_path)

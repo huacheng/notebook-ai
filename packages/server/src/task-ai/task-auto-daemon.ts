@@ -53,8 +53,10 @@ export interface AutoSignal {
   step: string;
   result: string;
   next: string;
+  checkpoint?: string;
   iteration: number;
   compaction_count?: number;
+  vfp_cycles_completed?: number;
   phase: string;
   phase_progress: number;
   stage?: { current: number; total: number } | null;
@@ -108,7 +110,6 @@ export class TaskAutoDaemon extends EventEmitter {
 
   // Timeout suspension during quota-wait
   private timeoutRemainingMs: number = 0;
-  private quotaWaitStartedAt: number = 0;
 
   constructor(opts: TaskAutoDaemonOptions) {
     super();
@@ -196,7 +197,7 @@ export class TaskAutoDaemon extends EventEmitter {
       this.lastMessage = content;
 
       // Content-level dedup detection
-      const hash = crypto.createHash('md5').update(content).digest('hex');
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
       this.messageHashes.push(hash);
       if (this.messageHashes.length > DEDUP_WINDOW_SIZE) {
         this.messageHashes.shift();
@@ -243,7 +244,6 @@ export class TaskAutoDaemon extends EventEmitter {
   private enterQuotaWait(): void {
     this.isQuotaWait = true;
     this.stallCount = 0;
-    this.quotaWaitStartedAt = Date.now();
 
     // Suspend timeout: calculate remaining time and clear timer
     if (this.timeoutTimer && this.timeoutMinutes > 0) {

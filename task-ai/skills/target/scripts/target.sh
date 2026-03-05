@@ -5,7 +5,7 @@
 #        target.sh --finalize
 
 set -euo pipefail
-trap 'rm -f "${TMP_FILE:-}"' EXIT INT TERM
+trap 'rm -f "${TMP_FILE:-}" "${TMP_STATUS:-}"' EXIT INT TERM
 
 # Parse arguments
 REFINE_MODE=0
@@ -41,6 +41,28 @@ fi
 
 TARGET_FILE="$NB_WORKING/.target.md"
 SESSION_CONTEXT="$NB_WORKING/.session-context"
+STATUS_FILE="$NB_WORKING/.status.json"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# D1: Read .status.json and reject complete/cancelled tasks (SKILL.md step 1)
+# ─────────────────────────────────────────────────────────────────────────────
+CURRENT_STATUS=""
+if [[ -f "$STATUS_FILE" ]]; then
+    # D3: Graceful fallback if jq unavailable or JSON malformed
+    if command -v jq &>/dev/null; then
+        CURRENT_STATUS=$(jq -r '.status // "draft"' "$STATUS_FILE" 2>/dev/null) || CURRENT_STATUS="draft"
+    else
+        # Fallback: grep-based extraction
+        CURRENT_STATUS=$(grep -oP '"status"\s*:\s*"\K[^"]+' "$STATUS_FILE" 2>/dev/null) || CURRENT_STATUS="draft"
+    fi
+fi
+CURRENT_STATUS="${CURRENT_STATUS:-draft}"
+
+# D1: Reject completed/cancelled tasks (SKILL.md State Transitions table)
+if [[ "$CURRENT_STATUS" == "complete" || "$CURRENT_STATUS" == "cancelled" ]]; then
+    echo "[ERROR] Completed/cancelled tasks cannot be re-targeted." >&2
+    exit 1
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mode 1: Finalize (exit target-refinement, merge refinements)
@@ -104,7 +126,7 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
             { print }
             END { if (found) print ENVIRON["AWK_LINE"] }
         ' "$TARGET_FILE" > "$TMP_FILE"
-        if ! mv "$TMP_FILE" "$TARGET_FILE" 2>&1; then
+        if ! mv "$TMP_FILE" "$TARGET_FILE" 2>/dev/null; then
             echo "[ERROR] Failed to update $TARGET_FILE" >&2
             exit 1
         fi
@@ -114,11 +136,11 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     fi
 
     # D3: git with error handling
-    if ! git add "$TARGET_FILE" 2>&1; then
+    if ! git add "$TARGET_FILE" 2>/dev/null; then
         echo "[ERROR] git add failed" >&2
         exit 1
     fi
-    if ! git commit -m "task-ai($NB_NOTEBOOK):target refine objective" 2>&1; then
+    if ! git commit -m "task-ai($NB_NOTEBOOK):target refine objective" 2>/dev/null; then
         echo "[WARN] git commit failed (may be no changes)" >&2
     fi
 
@@ -148,38 +170,71 @@ OBJECTIVE_PLACEHOLDER
 
 <!-- Any constraints or limitations -->
 TARGET_END
-    # D2: Safe substitution with escaped special chars
-    NB_ESCAPED="${NB_NOTEBOOK//\\/\\\\}"
-    NB_ESCAPED="${NB_ESCAPED//&/\\&}"
-    NB_ESCAPED="${NB_ESCAPED//\//\\/}"
-    OBJ_ESCAPED="${OBJECTIVE//\\/\\\\}"
-    OBJ_ESCAPED="${OBJ_ESCAPED//&/\\&}"
-    OBJ_ESCAPED="${OBJ_ESCAPED//\//\\/}"
-    sed -i "s/NOTEBOOK_PLACEHOLDER/${NB_ESCAPED}/g; s/OBJECTIVE_PLACEHOLDER/${OBJ_ESCAPED}/g" "$TARGET_FILE"
+    # D2: Use awk ENVIRON for safe substitution (handles newlines, special chars)
+    # D2: Escape & in replacement strings — awk gsub treats & as matched text
+    TMP_FILE=$(mktemp) || { echo "[ERROR] Failed to create temp file" >&2; exit 1; }
+    AWK_NB="$NB_NOTEBOOK" AWK_OBJ="$OBJECTIVE" awk '
+        BEGIN {
+            nb = ENVIRON["AWK_NB"]; gsub(/&/, "\\\\&", nb)
+            obj = ENVIRON["AWK_OBJ"]; gsub(/&/, "\\\\&", obj)
+        }
+        { gsub(/NOTEBOOK_PLACEHOLDER/, nb); gsub(/OBJECTIVE_PLACEHOLDER/, obj); print }
+    ' "$TARGET_FILE" > "$TMP_FILE"
+    if ! mv "$TMP_FILE" "$TARGET_FILE" 2>/dev/null; then
+        echo "[ERROR] Failed to write $TARGET_FILE" >&2
+        exit 1
+    fi
 else
     # Update only the ## Objective section
     TMP_FILE=$(mktemp) || { echo "[ERROR] Failed to create temp file" >&2; exit 1; }
     # D6: Pass OBJECTIVE via environment variable to avoid shell escaping issues
+    # D3: Preserve blank line before next section header to avoid format degradation
     AWK_OBJ="$OBJECTIVE" awk '
       BEGIN { in_obj=0; found=0 }
       /^## Objective/ { print $0; print ""; print ENVIRON["AWK_OBJ"]; in_obj=1; found=1; next }
-      /^## / && in_obj { in_obj=0 }
+      /^## / && in_obj { print ""; in_obj=0 }
       !in_obj { print $0 }
       END { if (!found) { print "## Objective"; print ""; print ENVIRON["AWK_OBJ"] } }
     ' "$TARGET_FILE" > "$TMP_FILE"
     # D3: mv with error handling - abort if fails to prevent data loss
-    if ! mv "$TMP_FILE" "$TARGET_FILE" 2>&1; then
+    if ! mv "$TMP_FILE" "$TARGET_FILE" 2>/dev/null; then
         echo "[ERROR] Failed to update $TARGET_FILE - original preserved" >&2
         exit 1
     fi
 fi
 
-# D3: git with error handling
-if ! git add "$TARGET_FILE" 2>&1; then
+# D1: Update .status.json status transition (SKILL.md State Transitions table)
+# draft → planning; blocked → planning; review → re-planning
+# NOTE: stage-done is NOT transitioned here — SKILL.md step 2a requires archive
+# (steps 4-5) BEFORE status change. The agent handles stage-done → planning
+# after performing archive operations. See SKILL.md "Atomicity" note.
+if [[ -f "$STATUS_FILE" ]] && command -v jq &>/dev/null; then
+    NEW_STATUS=""
+    case "$CURRENT_STATUS" in
+        draft|blocked)  NEW_STATUS="planning" ;;
+        review)         NEW_STATUS="re-planning" ;;
+    esac
+    if [[ -n "$NEW_STATUS" ]]; then
+        TMP_STATUS=$(mktemp) || { echo "[ERROR] Failed to create temp file for status" >&2; exit 1; }
+        if jq --arg s "$NEW_STATUS" '.status = $s' "$STATUS_FILE" > "$TMP_STATUS" 2>/dev/null; then
+            mv "$TMP_STATUS" "$STATUS_FILE" || echo "[WARN] Failed to update status" >&2
+        else
+            rm -f "$TMP_STATUS"
+            echo "[WARN] Failed to update .status.json" >&2
+        fi
+    fi
+fi
+
+# D3: git with error handling — always add target file; add status file if it was modified
+GIT_ADD_FILES=("$TARGET_FILE")
+if [[ -n "${NEW_STATUS:-}" ]]; then
+    GIT_ADD_FILES+=("$STATUS_FILE")
+fi
+if ! git add "${GIT_ADD_FILES[@]}" 2>/dev/null; then
     echo "[ERROR] git add failed" >&2
     exit 1
 fi
-if ! git commit -m "task-ai($NB_NOTEBOOK):target update objective" 2>&1; then
+if ! git commit -m "task-ai($NB_NOTEBOOK):target update objective" 2>/dev/null; then
     echo "[WARN] git commit failed (may be no changes)" >&2
 fi
 
@@ -188,7 +243,7 @@ echo "Objective successfully updated and committed."
 # Enter target-refinement phase
 # D2: Variables are safe here (controlled values), but use explicit format
 # D3: Error handling for session context write
-if ! printf 'phase: target-refinement\nentered_at: %s\nentered_by: /task-ai:target\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>&1; then
+if ! printf 'phase: target-refinement\nentered_at: %s\nentered_by: /task-ai:target\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>/dev/null; then
     echo "[WARN] Failed to write session context" >&2
 fi
 

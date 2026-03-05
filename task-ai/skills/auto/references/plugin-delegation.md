@@ -262,18 +262,18 @@ if (result.risk_level === 'high') {
 }
 ```
 
-**Sanitization Categories** (10 active threat patterns):
+**Sanitization Categories** (8 active threat patterns):
 
 | # | Category | Detection | Risk |
 |---|----------|-----------|------|
 | 1 | Direct instruction injection | `<!-- -->`, `<system>`, "ignore previous" | high |
-| 3 | Unicode hidden attacks | Zero-width chars, bidirectional control | medium |
-| 4 | ANSI terminal sequences | `\x1b[...` escape codes | medium |
-| 5 | Resource exhaustion | Output > 600 chars | low |
-| 6 | System format impersonation | `{"step":`, `.auto-signal`, `task-ai(` | high |
-| 7 | Encoding obfuscation | `base64 -d`, hex sequences | high |
-| 8 | Two-stage loading | `curl \|`, `wget \|`, `eval(` | high |
-| 10 | Command injection | `--require=`, `--eval=`, `LD_PRELOAD` | high |
+| 2 | Unicode hidden attacks | Zero-width chars, bidirectional control | medium |
+| 3 | ANSI terminal sequences | `\x1b[...` escape codes | medium |
+| 4 | Resource exhaustion | Output > 600 chars | low |
+| 5 | System format impersonation | `{"step":`, `.auto-signal`, `task-ai(` | high |
+| 6 | Encoding obfuscation | `base64 -d`, hex sequences | high |
+| 7 | Two-stage loading | `curl \|`, `wget \|`, `eval(` | high |
+| 8 | Command injection | `--require=`, `--eval=`, `LD_PRELOAD` | high |
 
 **Risk Level Handling**:
 

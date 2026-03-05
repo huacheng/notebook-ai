@@ -15,8 +15,12 @@ TYPE_FILTER=""
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --type)  TYPE_FILTER="$2"; shift 2 ;;
-    --limit) LIMIT="$2"; [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=10; shift 2 ;;
+    --type)
+      if [[ $# -lt 2 ]]; then echo "[ERROR] --type requires a value" >&2; exit 1; fi
+      TYPE_FILTER="$2"; shift 2 ;;
+    --limit)
+      if [[ $# -lt 2 ]]; then echo "[ERROR] --limit requires a value" >&2; exit 1; fi
+      LIMIT="$2"; [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=10; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -24,6 +28,12 @@ done
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 MASTER_INDEX="$LIB_PATH/.master-index.md"
 RELATIONS_JSONL="$LIB_PATH/.relations.jsonl"
+
+# D3: Verify master index exists before searching
+if [[ ! -f "$MASTER_INDEX" ]]; then
+    echo "[ERROR] Master index not found at $MASTER_INDEX. Run: library maintain --rebuild-index" >&2
+    exit 1
+fi
 
 # Constants: column index in .master-index.md
 # Format: | Topic | Type | Keywords | File Path | Source |

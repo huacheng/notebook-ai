@@ -8,7 +8,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CORE_DIR="$SCRIPT_DIR/../../../core"
 
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 EVOLVING_RULES_DIR="$LIB_PATH/.evolving-rules"
@@ -20,8 +19,12 @@ MODE="auto"
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --domain) DOMAIN="$2"; shift 2 ;;
-        --mode)   MODE="$2"; shift 2 ;;
+        --domain)
+            if [[ $# -lt 2 ]]; then echo "[ERROR] --domain requires a value" >&2; exit 1; fi
+            DOMAIN="$2"; shift 2 ;;
+        --mode)
+            if [[ $# -lt 2 ]]; then echo "[ERROR] --mode requires a value" >&2; exit 1; fi
+            MODE="$2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done

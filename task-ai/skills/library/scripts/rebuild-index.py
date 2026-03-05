@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import sys
-import json
 from pathlib import Path
 from datetime import datetime
 
@@ -29,7 +28,7 @@ def rebuild_index():
             
         dir_rows = []
         for p in dir_path.rglob('*.md'):
-            if p.name.startswith('.') or p.name == '.index.md': continue
+            if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
             
             try:
                 content = p.read_text(encoding='utf-8')
@@ -50,14 +49,20 @@ def rebuild_index():
 
         if dir_rows:
             index_md = dir_path / '.index.md'
-            with open(index_md, 'w', encoding='utf-8') as f:
+            # D3: Atomic write via tmp + rename (per write-protocol.md)
+            tmp_path = dir_path / '.index.md.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 f.write(f"# {cat_type} Index\n\n| Topic | Type | Updated | File |\n|-------|------|---------|------|\n")
                 f.write('\n'.join(sorted(dir_rows)) + '\n')
+            tmp_path.rename(index_md)
 
     if master_rows:
-        with open(master_index_path, 'w', encoding='utf-8') as f:
+        # D3: Atomic write via tmp + rename
+        tmp_master = master_index_path.parent / '.master-index.md.tmp'
+        with open(tmp_master, 'w', encoding='utf-8') as f:
             f.write("# Library Master Index\n\n| Topic | Type | Keywords | File Path | Source |\n|-------|------|----------|-----------|--------|\n")
             f.write('\n'.join(sorted(master_rows)) + '\n')
+        tmp_master.rename(master_index_path)
 
 if __name__ == "__main__":
     rebuild_index()

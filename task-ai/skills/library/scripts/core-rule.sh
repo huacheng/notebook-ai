@@ -55,8 +55,12 @@ propose_core_rule() {
     shift 2 || true
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --cve) cve="$2"; shift 2 ;;
-            --risk) risk="$2"; shift 2 ;;
+            --cve)
+                if [[ $# -lt 2 ]]; then echo "[ERROR] --cve requires a value" >&2; exit 1; fi
+                cve="$2"; shift 2 ;;
+            --risk)
+                if [[ $# -lt 2 ]]; then echo "[ERROR] --risk requires a value" >&2; exit 1; fi
+                risk="$2"; shift 2 ;;
             *) echo "Unknown option: $1" >&2; exit 1 ;;
         esac
     done
@@ -169,8 +173,9 @@ validate_pattern() {
     echo ""
 
     # Create test files
-    local test_dir=$(mktemp -d)
-    trap "rm -rf $test_dir" EXIT
+    local test_dir
+    test_dir=$(mktemp -d)
+    trap 'rm -rf "$test_dir"' EXIT
 
     # Test 1: Pattern syntax is valid
     echo -n "Pattern syntax: "

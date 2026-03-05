@@ -28,7 +28,12 @@ TARGET_FILE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run) DRY_RUN=true; shift ;;
-        --target)  TARGET_FILE="${2:-}"; shift 2 2>/dev/null || shift ;;
+        --target)
+            if [[ -z "${2:-}" ]]; then
+                echo "[ERROR] --target requires a file path argument" >&2
+                exit 1
+            fi
+            TARGET_FILE="$2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -36,9 +41,8 @@ done
 echo "[promote] Scanning for promotable experiences..."
 
 # Ensure directories exist
-# D3: mkdir with error handling
-if ! mkdir -p "$CANDIDATES_DIR" 2>&1; then
-    echo "[ERROR] Failed to create candidates directory" >&2
+if ! mkdir -p "$CANDIDATES_DIR"; then
+    echo "[ERROR] Failed to create candidates directory: $CANDIDATES_DIR" >&2
     exit 1
 fi
 
@@ -70,8 +74,9 @@ count_usage() {
     fi
 
     # Count references in changelog (library search hits, etc.)
+    # D1: use -F for fixed-string match (paths contain regex metachar '.')
     local count
-    count=$(grep -c "$relative_path" "$CHANGELOG" 2>/dev/null || echo 0)
+    count=$(grep -cF "$relative_path" "$CHANGELOG" 2>/dev/null || echo 0)
     echo "$count"
 }
 
@@ -82,10 +87,25 @@ has_structural_patterns() {
     local file="$1"
 
     # Check for "## Patterns" or "## Steps" headers
-    if grep -qE '^## (Patterns|Steps|Key Decisions|What Worked)' "$file" 2>/dev/null; then
+    # §3.7 trigger condition 3: "## Patterns" or "## Steps" headers
+    if grep -qE '^## (Patterns|Steps)' "$file" 2>/dev/null; then
         return 0
     fi
     return 1
+}
+
+#######################################
+# Extract section content between ## headers
+# Uses awk with prefix match to handle variants like "## Patterns Discovered".
+# Handles last-section edge case (no trailing ## header).
+#######################################
+extract_section() {
+    local file="$1" header="$2"
+    awk -v h="## $header" '
+        index($0, h) == 1 { found=1; next }
+        found && /^## / { exit }
+        found { print }
+    ' "$file"
 }
 
 #######################################
@@ -120,32 +140,35 @@ extract_skill_content() {
 
     local keywords
     keywords=$(parse_frontmatter "$exp_file" "topic_keywords")
+    # D1: strip surrounding brackets — parse_frontmatter preserves YAML list syntax [a, b]
+    keywords="${keywords#\[}"
+    keywords="${keywords%\]}"
 
     # Extract key sections
     local patterns=""
     local steps=""
     local context=""
 
-    # Extract ## Patterns section
+    # Extract ## Patterns or ## Patterns Discovered
     if grep -q "^## Patterns" "$exp_file"; then
-        patterns=$(sed -n '/^## Patterns/,/^## /p' "$exp_file" | head -n -1 | tail -n +2)
+        patterns=$(extract_section "$exp_file" "Patterns")
     fi
 
-    # Extract ## What Worked as steps
+    # Extract ## What Worked
     if grep -q "^## What Worked" "$exp_file"; then
-        steps=$(sed -n '/^## What Worked/,/^## /p' "$exp_file" | head -n -1 | tail -n +2)
+        steps=$(extract_section "$exp_file" "What Worked")
     fi
 
     # Extract ## Context
     if grep -q "^## Context" "$exp_file"; then
-        context=$(sed -n '/^## Context/,/^## /p' "$exp_file" | head -n -1 | tail -n +2)
+        context=$(extract_section "$exp_file" "Context")
     fi
 
     # Generate SKILL.md content
     cat <<EOF
 ---
 name: $skill_name
-description: "Auto-generated skill from verified experience. ${context:0:100}"
+description: "Auto-generated skill from verified experience. $(echo "${context:0:100}" | tr -d '"')"
 model_tier: medium
 auto_delegatable: false
 triggers:
@@ -265,15 +288,16 @@ process_experience() {
     local SECURITY_ISSUES=""
 
     # Check for dangerous patterns
-    if grep -qE '\$\(|`[^`]+`|eval\s|exec\s' "$exp_file" 2>/dev/null; then
+    # D2: use [[:space:]] for POSIX portability (not \s which is PCRE)
+    if grep -qE '\$\(|`[^`]+`|eval[[:space:]]|exec[[:space:]]' "$exp_file" 2>/dev/null; then
         SECURITY_SCORE=$(echo "$SECURITY_SCORE - 0.3" | bc)
         SECURITY_ISSUES="${SECURITY_ISSUES}command-substitution;"
     fi
-    if grep -qiE 'curl.*\||wget.*\||bash\s+-c|sh\s+-c' "$exp_file" 2>/dev/null; then
+    if grep -qiE 'curl.*\||wget.*\||bash[[:space:]]+-c|sh[[:space:]]+-c' "$exp_file" 2>/dev/null; then
         SECURITY_SCORE=$(echo "$SECURITY_SCORE - 0.4" | bc)
         SECURITY_ISSUES="${SECURITY_ISSUES}remote-exec;"
     fi
-    if grep -qiE 'rm\s+-rf|chmod\s+777|sudo\s' "$exp_file" 2>/dev/null; then
+    if grep -qiE 'rm[[:space:]]+-rf|chmod[[:space:]]+777|sudo[[:space:]]' "$exp_file" 2>/dev/null; then
         SECURITY_SCORE=$(echo "$SECURITY_SCORE - 0.2" | bc)
         SECURITY_ISSUES="${SECURITY_ISSUES}dangerous-cmd;"
     fi
@@ -346,18 +370,18 @@ process_experience() {
     fi
 
     # Create candidate directory and files
-    # D3: mkdir with error handling
-    if ! mkdir -p "$candidate_dir" 2>&1; then
-        echo "[promote]   ERROR: Failed to create candidate directory" >&2
+    if ! mkdir -p "$candidate_dir"; then
+        echo "[promote]   ERROR: Failed to create candidate directory: $candidate_dir" >&2
         return 1
     fi
 
-    # D3: file writes with error handling
-    if ! extract_skill_content "$exp_file" "$slug" > "$candidate_dir/SKILL.md" 2>&1; then
+    # D3: file writes — stderr must NOT mix into stdout (heredoc content)
+    if ! extract_skill_content "$exp_file" "$slug" > "$candidate_dir/SKILL.md"; then
         echo "[promote]   ERROR: Failed to write SKILL.md" >&2
+        rm -rf "$candidate_dir"
         return 1
     fi
-    if ! generate_trust_report "$exp_file" "$slug" "$usage_count" > "$candidate_dir/trust-report.md" 2>&1; then
+    if ! generate_trust_report "$exp_file" "$slug" "$usage_count" > "$candidate_dir/trust-report.md"; then
         echo "[promote]   WARN: Failed to write trust-report.md" >&2
     fi
 
@@ -378,12 +402,25 @@ EOF
     echo "[promote]   Created: $candidate_dir/SKILL.md"
     echo "[promote]   Created: $candidate_dir/trust-report.md"
 
-    # Append to changelog
-    # D3: changelog append with error handling
-    if [[ -f "$CHANGELOG" ]]; then
-        if ! echo "$(date -Iseconds) | skill-candidate | .skills/.candidates/$slug | source:promote | from:$(basename "$exp_file")" >> "$CHANGELOG" 2>&1; then
-            echo "[promote]   WARN: Failed to append to changelog" >&2
+    # Append to changelog — acquire .changelog.lock per Library Write Protocol step 4
+    local changelog_lock="$LIB_PATH/.changelog.lock"
+    local lock_acquired=false
+    local max_retries=5
+    local retry=0
+    while [[ $retry -lt $max_retries ]]; do
+        if ( set -o noclobber; echo "{\"pid\":$$,\"session\":\"promote\",\"timestamp\":\"$(date -Iseconds)\"}" > "$changelog_lock" ) 2>/dev/null; then
+            lock_acquired=true
+            break
         fi
+        sleep 0.2
+        ((retry++)) || true
+    done
+    if $lock_acquired; then
+        echo "$(date -Iseconds) | skill-candidate | .skills/.candidates/$slug | source:promote | from:$(basename "$exp_file")" >> "$CHANGELOG" 2>/dev/null || \
+            echo "[promote]   WARN: Failed to append to changelog" >&2
+        rm -f "$changelog_lock"
+    else
+        echo "[promote]   WARN: Could not acquire .changelog.lock, skipping changelog" >&2
     fi
 
     return 0

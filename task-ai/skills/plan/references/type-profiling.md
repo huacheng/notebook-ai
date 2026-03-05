@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [Core Principles](#core-principles)
-- [Type Format in .status.json](#type-format-in-indexjson)
+- [Type Format in .status.json](#type-format-in-statusjson)
 - [Type Determination Flow](#type-determination-flow)
 - [Auto-Expanding Type Registry](#auto-expanding-type-registry)
 - [Hybrid Type System](#hybrid-type-system)
@@ -193,12 +193,12 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
 ## Audit Adaptation
 <!-- Domain-specific checkpoints that augment the six-dimension base (see check/references/six-dimension-audit.md) -->
 <!-- research populates from seed tables + web research; check/verify/exec refine from experience -->
-- **Security**: <+domain-specific security concerns>
-- **Architecture**: <+domain-specific structural concerns>
-- **Performance**: <+domain-specific efficiency concerns>
-- **Extensibility**: <+domain-specific extension concerns>
-- **Consistency**: <+domain-specific convention concerns>
-- **Correctness**: <+domain-specific verification concerns>
+- **D1 Correctness**: <+domain-specific correctness/verification concerns>
+- **D2 Security**: <+domain-specific security concerns>
+- **D3 Reliability**: <+domain-specific reliability/fault-tolerance concerns>
+- **D4 Performance**: <+domain-specific efficiency concerns>
+- **D5 Architecture**: <+domain-specific structural/extension concerns>
+- **D6 Maintainability**: <+domain-specific convention/readability concerns>
 
 ## Sources
 <!-- Where this profile information came from -->

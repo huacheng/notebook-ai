@@ -117,6 +117,89 @@ export function StageIndicator({ stage }: StageIndicatorProps) {
   );
 }
 
+interface IterationBadgeProps {
+  iteration: number;
+}
+
+export function IterationBadge({ iteration }: IterationBadgeProps) {
+  if (iteration <= 0) return null;
+  return (
+    <span className="auto-iteration-badge" title="Current iteration">
+      iter {iteration}
+    </span>
+  );
+}
+
+interface RetryBadgeProps {
+  retryCount: number;
+}
+
+export function RetryBadge({ retryCount }: RetryBadgeProps) {
+  if (retryCount <= 0) return null;
+  return (
+    <span className="auto-retry-badge" title="Retry count at current checkpoint">
+      retry {retryCount}
+    </span>
+  );
+}
+
+interface MultiStageViewProps {
+  stage: { current: number; total: number };
+  phase: string | null;
+  phaseProgress: number | null;
+  checkScore: CheckScore | null;
+}
+
+export function MultiStageView({ stage, phase, phaseProgress, checkScore }: MultiStageViewProps) {
+  const currentPhaseIndex = getPhaseIndex(phase);
+
+  return (
+    <div className="auto-multistage">
+      {Array.from({ length: stage.total }, (_, i) => {
+        const stageNum = i + 1;
+        const isCurrent = stageNum === stage.current;
+        const isComplete = stageNum < stage.current;
+        const statusLabel = isComplete ? 'complete' : isCurrent ? (phase ?? 'pending') : 'pending';
+        const statusClass = isComplete ? 'auto-ms-complete' : isCurrent ? 'auto-ms-current' : 'auto-ms-pending';
+
+        return (
+          <div key={stageNum} className={`auto-ms-card ${statusClass}`}>
+            <div className="auto-ms-header">
+              <span className="auto-ms-title">Stage {stageNum}/{stage.total}</span>
+              <span className="auto-ms-status">{statusLabel}</span>
+              {isComplete && checkScore && (
+                <span className="auto-ms-score">{checkScore.overall.toFixed(2)}</span>
+              )}
+            </div>
+            <div className="auto-ms-phases">
+              {PHASES.map((p, pi) => {
+                let cls = 'auto-ms-phase';
+                if (isCurrent) {
+                  if (pi < currentPhaseIndex) cls += ' auto-ms-phase-done';
+                  else if (pi === currentPhaseIndex) cls += ' auto-ms-phase-active';
+                } else if (isComplete) {
+                  cls += ' auto-ms-phase-done';
+                }
+                return (
+                  <span key={p}>
+                    {pi > 0 && <span className="auto-ms-arrow">&rarr;</span>}
+                    <span className={cls}>
+                      {((isComplete) || (isCurrent && pi < currentPhaseIndex)) && '\u2713'}
+                      {isCurrent && pi === currentPhaseIndex && phaseProgress != null
+                        ? `${p} ${Math.round(phaseProgress * 100)}%`
+                        : p}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface AutoStopButtonProps {
   onStop: () => void;
   disabled?: boolean;

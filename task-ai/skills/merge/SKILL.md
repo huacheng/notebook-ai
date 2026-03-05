@@ -77,8 +77,8 @@ On successful merge:
    c. **Update** `.status.json`: status → `stage-done`, push to `stage.completed` array `{ "stage": <current>, "name": "<stage name>", "completed_at": "<ISO timestamp>" }` — **retain** `branch` and `worktree` values
    d. **Git commit** state: `task-ai(<notebook>):merge stage <N> completed`
 4. **ELSE** (`stage.current == stage.total`, or data inconsistency from step 2):
-   a. **Update** `.status.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
-   b. **Write** `.summary.md` with final task summary
+   a. **Write** `.summary.md` with final task summary
+   b. **Update** `.status.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
    c. **Git commit** state: `task-ai(<notebook>):merge task completed`
 
 **Atomicity**: In the stage-done branch, status change (step 3c) occurs AFTER `.summary.md` and `.target.md` writes (steps 3a-3b). If steps 3a-3b fail, status remains `executing` — user can retry merge. If step 3c succeeds but 3d fails, status is `stage-done` — auto re-enters from stage-done entry point (highlight → report), no repeated merge.
@@ -102,7 +102,7 @@ On successful merge:
 8. **Phase 4**: Post-merge finalization — read `stage` field from `.status.json` (default `{ current: 1, total: 1, completed: [] }` if missing):
    - **If `stage.current > stage.total`**: log warning to `.summary.md`, then treat as final stage
    - **Elif `stage.current < stage.total`**: write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `stage-done` with stage.completed push → git commit `stage <N> completed`
-   - **Else** (`current == total` or data inconsistency): status → `complete` with branch/worktree retained → write `.summary.md` → git commit `task completed`
+   - **Else** (`current == total` or data inconsistency): write `.summary.md` → status → `complete` with branch/worktree retained → git commit `task completed`
 9. **Write** `.auto-signal` — MUST be written AFTER Phase 4 status update, so the daemon reads correct status when routing
 10. **Report** merge result
 
@@ -143,4 +143,4 @@ On successful merge:
 - After manual resolution, if the user has already merged manually, they can update `.status.json` status to `complete` directly
 - Pre-merge refactoring is optional — if no cleanup needed, skip directly to merge
 - Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
-- **Concurrency**: Merge acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Lock acquisition/release is handled by the caller (auto mode or CLI dispatcher). `merge.sh` assumes `.working/.lock` is already held (see Concurrency Protection in `commands/task-ai.md`)

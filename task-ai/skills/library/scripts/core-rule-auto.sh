@@ -49,8 +49,13 @@ audit_log() {
     local action="$1"
     local status="$2"
     local details="${3:-}"
-    local timestamp=$(date -Iseconds)
-    local entry=$(printf '{"ts":"%s","action":"%s","status":"%s","details":"%s"}\n' \
+    local timestamp
+    timestamp=$(date -Iseconds)
+    # Escape JSON special characters in details to prevent injection
+    details="${details//\\/\\\\}"
+    details="${details//\"/\\\"}"
+    local entry
+    entry=$(printf '{"ts":"%s","action":"%s","status":"%s","details":"%s"}\n' \
         "$timestamp" "$action" "$status" "$details")
     echo "$entry" >> "$AUDIT_LOG"
 }
@@ -370,7 +375,14 @@ cron_job() {
         local core_due=true
 
         if [[ -f "$core_state" && -z "$force" ]]; then
-            local last=$(($(cat "$core_state")))
+            local last_raw
+            last_raw=$(cat "$core_state")
+            # Validate: must be numeric only (D2: prevent arithmetic injection)
+            if ! [[ "$last_raw" =~ ^[0-9]+$ ]]; then
+                echo "[WARN] Invalid .last-scan-core content, forcing rescan" >&2
+                last_raw=0
+            fi
+            local last=$((last_raw))
             local elapsed=$((now - last))
             if [[ $elapsed -lt $CORE_RULES_INTERVAL ]]; then
                 local remaining=$(( (CORE_RULES_INTERVAL - elapsed) / 3600 ))
@@ -394,7 +406,14 @@ cron_job() {
         local ext_due=true
 
         if [[ -f "$ext_state" && -z "$force" ]]; then
-            local last=$(($(cat "$ext_state")))
+            local last_raw
+            last_raw=$(cat "$ext_state")
+            # Validate: must be numeric only (D2: prevent arithmetic injection)
+            if ! [[ "$last_raw" =~ ^[0-9]+$ ]]; then
+                echo "[WARN] Invalid .last-scan-extended content, forcing rescan" >&2
+                last_raw=0
+            fi
+            local last=$((last_raw))
             local elapsed=$((now - last))
             if [[ $elapsed -lt $EXTENDED_RULES_INTERVAL ]]; then
                 local remaining=$(( (EXTENDED_RULES_INTERVAL - elapsed) / 3600 ))
@@ -442,12 +461,12 @@ Log:    $log_path
 
 Quick Setup (copy & run):
 -------------------------
-cat > $script_path << 'EOSCRIPT'
+cat > "$script_path" << 'EOSCRIPT'
 #!/bin/bash
-cd $workspace || exit 1
-claude --print "/task-ai library evolve --full" 2>&1 >> $log_path
+cd "$workspace" || exit 1
+claude --print "/task-ai library evolve --full" 2>&1 >> "$log_path"
 EOSCRIPT
-chmod +x $script_path
+chmod +x "$script_path"
 (crontab -l 2>/dev/null; echo "0 3 * * 0  $script_path") | crontab -
 
 

@@ -12,7 +12,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-YAML_PARSER="$SCRIPT_DIR/../../../core/yaml_parser.py"
 # D5: Delegate sample generation to dedicated script
 SAMPLE_GENERATOR="$SCRIPT_DIR/sample-generator.sh"
 
@@ -47,14 +46,6 @@ echo "[intel-fetcher] Starting intelligence fetch..."
 echo "[intel-fetcher] Sources: $SOURCES_FILE"
 echo "[intel-fetcher] Output: $OUTPUT_DIR"
 
-# Parse sources config
-if [[ ! -f "$YAML_PARSER" ]]; then
-    echo "[ERROR] yaml_parser.py not found at $YAML_PARSER" >&2
-    exit 1
-fi
-
-SOURCES_JSON=$(python3 "$YAML_PARSER" parse "$SOURCES_FILE" 2>/dev/null || echo '{}')
-
 # Generate unique rule ID
 generate_rule_id() {
     local prefix="${1:-AUTO}"
@@ -73,16 +64,27 @@ create_candidate_rule() {
     local source_name="$5"
     local output_file="$6"
 
+    # D2: Sanitize YAML string values — escape backslashes, double-quotes, newlines
+    local safe_name="${name//\\/\\\\}"
+    safe_name="${safe_name//\"/\\\"}"
+    safe_name="${safe_name//$'\n'/ }"
+    local safe_pattern="${pattern//\\/\\\\}"
+    safe_pattern="${safe_pattern//\"/\\\"}"
+    safe_pattern="${safe_pattern//$'\n'/ }"
+    local safe_source="${source_name//\\/\\\\}"
+    safe_source="${safe_source//\"/\\\"}"
+    safe_source="${safe_source//$'\n'/ }"
+
     cat > "$output_file" <<EOF
 # Auto-generated candidate rule
-# Source: $source_name
+# Source: $safe_source
 # Generated: $(date -Iseconds)
 
 id: $id
-name: $name
-pattern: "$pattern"
+name: "$safe_name"
+pattern: "$safe_pattern"
 domain: $domain
-source: $source_name
+source: "$safe_source"
 enabled: true
 case_insensitive: false
 confidence: 0.70
@@ -202,13 +204,13 @@ validate_api_response() {
     fi
 
     # Check 2: Basic JSON structure validation (must start with { or [)
-    if ! echo "$response" | grep -qE '^\s*[\{\[]'; then
+    if ! printf '%s' "$response" | grep -qE '^\s*[\{\[]'; then
         echo "[intel-fetcher] WARN: $source_name response is not valid JSON"
         return 1
     fi
 
     # Check 3: No dangerous patterns in response (injection prevention)
-    if echo "$response" | grep -qE '\$\(|`[^`]+`|<script|javascript:|data:text/html'; then
+    if printf '%s' "$response" | grep -qE '\$\(|`[^`]+`|<script|javascript:|data:text/html'; then
         echo "[intel-fetcher] WARN: $source_name response contains dangerous patterns"
         return 1
     fi
@@ -340,11 +342,7 @@ if [[ "$EXISTING_COUNT" -eq 0 && "$DRY_RUN" == "false" ]]; then
         echo "[intel-fetcher] Delegating sample generation to sample-generator.sh..."
         for domain in security sanitization audit; do
             mkdir -p "$OUTPUT_DIR/$domain/candidates"
-            if $DRY_RUN; then
-                bash "$SAMPLE_GENERATOR" --domain "$domain" --output "$TEST_CORPUS_DIR" --dry-run
-            else
-                bash "$SAMPLE_GENERATOR" --domain "$domain" --output "$TEST_CORPUS_DIR"
-            fi
+            bash "$SAMPLE_GENERATOR" --domain "$domain" --output "$TEST_CORPUS_DIR"
         done
     fi
 fi

@@ -33,7 +33,7 @@ def rebuild_relations():
     memory_path = lib_path / '.memory'
     if memory_path.exists():
         for p in memory_path.rglob('*.md'):
-            if p.name.startswith('.') or p.name == '.index.md': continue
+            if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
             try:
                 fm = parse_frontmatter(p.read_text(encoding='utf-8'))
                 related = fm.get('related_references', [])
@@ -46,9 +46,12 @@ def rebuild_relations():
             except (OSError, UnicodeDecodeError, ValueError) as e:
                 print(f"[WARN] Skipping {p}: {e}", file=sys.stderr)
 
-    with open(relations_path, 'w', encoding='utf-8') as f:
+    # D3: Atomic write via tmp + rename (per write-protocol.md)
+    tmp_path = relations_path.parent / '.relations.jsonl.tmp'
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         for rel in relations:
             f.write(json.dumps(rel) + '\n')
+    tmp_path.rename(relations_path)
     print(f"Generated {len(relations)} relations.")
 
 if __name__ == "__main__":

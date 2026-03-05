@@ -150,6 +150,106 @@
   cursor: default;
 }
 
+/* Iteration Badge */
+.auto-iteration-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-cell-hover);
+}
+
+/* Retry Badge */
+.auto-retry-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-error);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* Multi-Stage View */
+.auto-multistage {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.auto-ms-card {
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.auto-ms-complete {
+  border-color: rgba(21, 128, 61, 0.3);
+  background: rgba(21, 128, 61, 0.04);
+}
+
+.auto-ms-current {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.auto-ms-pending {
+  opacity: 0.5;
+}
+
+.auto-ms-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.auto-ms-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.auto-ms-status {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.auto-ms-score {
+  margin-left: auto;
+  color: var(--color-completed);
+  font-weight: 600;
+}
+
+.auto-ms-phases {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.auto-ms-phase {
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--text-secondary);
+}
+
+.auto-ms-phase-done {
+  color: var(--color-completed);
+}
+
+.auto-ms-phase-active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.auto-ms-arrow {
+  color: var(--text-secondary);
+  opacity: 0.4;
+  margin: 0 1px;
+}
+
 /* Stage Indicator */
 .auto-stage-indicator {
   font-size: 11px;

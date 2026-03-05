@@ -36,14 +36,20 @@ Ingests user-provided documents, extracts novel information, applies strict 10-c
 
 ## Execution Steps
 
-1. **Ingestion**: Read the file. If binary (PDF/Docx), delegate to `doc-parse` plugin.
+1. **Ingestion**: Read the file. If binary (PDF/Docx), delegate to `doc-parse` plugin. Sanitize topic name from filename (strip control chars, special YAML chars).
 2. **Entity Extraction**: Identify primary topic, type, and key concepts.
 3. **Deduplication**: Run `library search` using concepts. Isolate the "delta" (novel information).
 4. **Depth Processing**:
    - `shallow`: Format the delta directly.
    - `deep`: Delegate to `research --caller exec --scope gap` to cross-reference and supplement the delta with web research. Read delegates the research work; it does not perform web searches itself.
-5. **Sanitization (Detox)**: Apply 10-category injection rules (`library/references/injection-rules.md`). Compute risk and hashes.
-6. **Library Write Protocol**: Acquire `.references/.lock`, write to `.memory/.references/<topic>.md`, append to `.changelog`, update `.index.md`, release lock.
+5. **Sanitization (Detox)**: Apply 10-category injection rules (`library/references/injection-rules.md`). Enforce 50KB size limit (Category 5). Compute content hashes (`content_hash_original`, `content_hash_sanitized`) and risk level.
+6. **Library Write Protocol** (six-step, per `commands/references/library-write-protocol.md`):
+   1. `mkdir -p` target directory (idempotent).
+   2. Acquire `.memory/.references/.lock` (`O_CREAT|O_EXCL`; stale-lock recovery via rename).
+   3. Write `.tmp` file → atomic `rename` to `<topic>.md`.
+   4. Acquire `.changelog.lock` → append changelog line → release `.changelog.lock`.
+   5. Update `.memory/.references/.index.md` (append new row or update existing).
+   6. Release `.memory/.references/.lock`.
 7. **Rebuild**: Trigger `library maintain --rebuild-index`.
 
 ## Output

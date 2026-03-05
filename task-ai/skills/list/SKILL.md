@@ -51,7 +51,7 @@ Output a summary table of all notebooks:
 | Title | `.status.json` → `title` |
 | Status | `.status.json` → `status` |
 | Phase | `.status.json` → `phase` (if non-empty) |
-| Progress | `.status.json` → `completed_steps` |
+| Progress | `.status.json` → `completed_steps` (integer — steps completed so far) |
 | Type | `.status.json` → `type` |
 | Updated | `.status.json` → `updated` |
 
@@ -73,7 +73,7 @@ graph LR
   auth-refactor --> api-design
 ```
 
-Nodes colored by status: green (complete), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
+Arrow direction: `A --> B` means "A depends on B" (drawn from the `depends_on` field of A). Nodes colored by status: green (complete), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
 
 ### 4. Status Timeline (`--timeline <notebook_name>`)
 
@@ -90,8 +90,8 @@ Parse commit messages to reconstruct the timeline of status changes with timesta
 ## Execution Steps
 
 1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories, then within each project list notebook directories that contain `.working/.status.json` to discover notebooks
-2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json` to extract `title`, `status`, `type`, and `branch`.
-3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: extract history via `git log --oneline --grep="task-ai(<notebook>)"`
+2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json` to extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`.
+3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: extract history via `git log --oneline --fixed-strings --grep="task-ai(<notebook>)"`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
 
 ## State Transitions
@@ -112,4 +112,5 @@ None — `list` does not write `.auto-signal`. It is a utility command that does
 
 - **Pure read-only**: `list` never writes files, never changes status, never creates commits. It is safe to run at any time without side effects
 - **No lock required**: Since `list` only reads files, it does not acquire `.working/.lock`
+- **Corrupt/missing .status.json**: If a notebook's `.status.json` is missing or fails to parse, skip that notebook with a warning line in the output (do not abort the entire listing)
 - **Dependency validation**: The `--deps` mode only visualizes relationships; it does not validate whether dependencies are met (that is `check`'s responsibility)

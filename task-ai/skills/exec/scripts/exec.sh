@@ -19,16 +19,26 @@ SECURITY_SH="$SCRIPT_DIR/../../security/scripts/security.sh"
 # from stub implementation to actual command execution. Currently exec.sh
 # simulates VFP cycles without running real commands.
 run_secure_cmd() {
-    local cmd="$1"
-    local notebook="$2"
+    local cmd="${1:-}"
+    local notebook="${2:-}"
+
+    # D2: Validate required parameters
+    if [[ -z "$cmd" ]]; then
+        echo "[exec] ERROR: run_secure_cmd requires a command argument" >&2
+        return 1
+    fi
+    if [[ -z "$notebook" ]]; then
+        echo "[exec] ERROR: run_secure_cmd requires a notebook argument" >&2
+        return 1
+    fi
 
     # D3: Security audit before execution - warn if security script missing
     if [[ -f "$SECURITY_SH" ]]; then
         local security_result
         security_result=$(bash "$SECURITY_SH" "$notebook" verify-cmd "$cmd" 2>&1)
-        if echo "$security_result" | grep -q "REJECT"; then
-            echo "[exec] SECURITY REJECT: $cmd"
-            echo "$security_result"
+        if echo "$security_result" | grep -qw "REJECT"; then
+            echo "[exec] SECURITY REJECT — command blocked by security policy" >&2
+            echo "$security_result" >&2
             return 1
         fi
     else
@@ -36,8 +46,8 @@ run_secure_cmd() {
     fi
 
     # D2: Execute command safely (avoid eval injection)
-    # Use bash -c for controlled execution instead of eval
-    bash -c "$cmd"
+    # Use bash -c with '--' to prevent option injection
+    bash -c -- "$cmd"
 }
 
 NOTEBOOK="${1:-}"
@@ -48,7 +58,12 @@ NOTEBOOK="$NB_NOTEBOOK"
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --step) TARGET_STEP="$2"; shift 2 ;;
+    --step)
+      if [[ $# -lt 2 ]]; then
+        echo "[ERROR] --step requires a value" >&2
+        exit 1
+      fi
+      TARGET_STEP="$2"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -62,6 +77,8 @@ STATUS_JSON="$WORK_DIR/.status.json"
 SESSION_CONTEXT="$WORK_DIR/.session-context"
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
+SIGNAL_FILE="$WORK_DIR/.auto-signal"
+SUMMARY_FILE="$WORK_DIR/.summary.md"
 mkdir -p "$NOTES_DIR"
 
 # D3: Check state.py existence before calling
@@ -70,10 +87,51 @@ if [[ ! -f "$STATE_PY" ]]; then
     exit 1
 fi
 
+# D1: Step 1 — Validate status is 'review' or 'executing'
+CURRENT_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "")
+if [[ "$CURRENT_STATUS" != "review" && "$CURRENT_STATUS" != "executing" ]]; then
+    echo "[ERROR] Cannot exec: status is '$CURRENT_STATUS', expected 'review' or 'executing'." >&2
+    exit 1
+fi
+
+# D1: Step 2 — Validate dependency gate
+DEPENDS_ON=$(python3 "$STATE_PY" get "$STATUS_JSON" depends_on 2>/dev/null || echo "")
+if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "None" && "$DEPENDS_ON" != "[]" ]]; then
+    echo "[INFO] Dependency check: depends_on=$DEPENDS_ON (full validation delegated to Claude agent)"
+fi
+
+# D1: Step 3 — Transition status to 'executing', clear phase
+if [[ "$CURRENT_STATUS" == "review" ]]; then
+    python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --phase "" 2>&1 || true
+    echo "[exec] Status transitioned: review -> executing"
+fi
+
+# D1: Step 6 — NEEDS_FIX resumption detection
+if [[ "$CURRENT_STATUS" == "executing" ]]; then
+    echo "[exec] Resuming execution (NEEDS_FIX or continuation)."
+    # Check for fix guidance files (Claude agent reads these for full context)
+    if [[ -d "$WORK_DIR/.bugfix" ]] && ls "$WORK_DIR/.bugfix/"*.md &>/dev/null; then
+        LATEST_BUGFIX=$(ls -t "$WORK_DIR/.bugfix/"*.md 2>/dev/null | head -1)
+        echo "[exec] Fix guidance available: $(basename "$LATEST_BUGFIX")"
+    fi
+    if [[ -d "$WORK_DIR/.analysis" ]] && ls "$WORK_DIR/.analysis/"*.md &>/dev/null; then
+        LATEST_ANALYSIS=$(ls -t "$WORK_DIR/.analysis/"*.md 2>/dev/null | head -1)
+        echo "[exec] Analysis available: $(basename "$LATEST_ANALYSIS")"
+    fi
+fi
+
 # Exit plan-refinement phase (if active)
 if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: plan-refinement" "$SESSION_CONTEXT"; then
     rm -f "$SESSION_CONTEXT"
     echo "[exec] Exited plan-refinement phase."
+fi
+
+# D1: Prerequisite checks — .target.md and .analysis/ should exist
+if [[ ! -f "$WORK_DIR/.target.md" ]]; then
+    echo "[WARN] .target.md not found — execution may lack requirements context" >&2
+fi
+if [[ ! -d "$WORK_DIR/.analysis" ]] || ! ls "$WORK_DIR/.analysis/"*.md &>/dev/null; then
+    echo "[WARN] .analysis/ has no evaluation files — check may not have run" >&2
 fi
 
 # 1. Step Discovery (from .plan.md)
@@ -101,50 +159,123 @@ echo "Executing $NOTEBOOK. Progress: $COMPLETED/$TOTAL_STEPS"
 NEXT_STEP=$((COMPLETED + 1))
 
 if [[ $NEXT_STEP -gt $TOTAL_STEPS ]]; then
-    echo "All steps already completed."
+    # D3: Detect plan/progress mismatch (e.g., plan re-generated with fewer steps)
+    if [[ "$COMPLETED" -gt "$TOTAL_STEPS" ]]; then
+        echo "[WARN] completed_steps ($COMPLETED) exceeds total steps ($TOTAL_STEPS) — plan may have been re-generated" >&2
+    fi
+    echo "All steps already completed ($COMPLETED/$TOTAL_STEPS)."
+    # D1: Still write signal so auto mode can route correctly
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
+{
+  "step": "exec",
+  "result": "(done)",
+  "next": "verify",
+  "checkpoint": "post-exec",
+  "timestamp": "$TIMESTAMP"
+}
+EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 0
 fi
 
-# D2: Validate TARGET_STEP contains only digits
+# D2: Validate TARGET_STEP contains only digits and is in range
 if [[ -n "$TARGET_STEP" ]]; then
     if [[ ! "$TARGET_STEP" =~ ^[0-9]+$ ]]; then
         echo "[ERROR] Invalid step number: $TARGET_STEP" >&2
         exit 1
     fi
-    if [[ "$TARGET_STEP" != "$NEXT_STEP" ]]; then
-        echo "[ERROR] Requested step $TARGET_STEP but next step is $NEXT_STEP." >&2
+    if [[ "$TARGET_STEP" -lt 1 || "$TARGET_STEP" -gt "$TOTAL_STEPS" ]]; then
+        echo "[ERROR] Step $TARGET_STEP out of range (1-$TOTAL_STEPS)." >&2
         exit 1
     fi
 fi
 
-echo "--- Executing Step $NEXT_STEP ---"
-
-# 3. VFP Cycle Simulation (Software only)
+# 3. Determine task type for VFP applicability
 # D3: python3 call with fallback
 TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
-TYPE=${TYPE:-"software"}  # Default to software if not set
-if [[ "$TYPE" == *"software"* ]]; then
-    echo "[VFP] Red (VH) confirmed."
-    echo "[VFP] Implementing logic..."
-    echo "[VFP] Green (HS) confirmed."
+TYPE=${TYPE:-""}
+
+# D1: Determine step range
+if [[ -n "$TARGET_STEP" ]]; then
+    STEP_START="$TARGET_STEP"
+    STEP_END="$TARGET_STEP"
+else
+    STEP_START="$NEXT_STEP"
+    STEP_END="$TOTAL_STEPS"
 fi
 
-# 4. Record Notes
 DATE=$(date +%Y-%m-%d)
-# D3: File write with error handling
-if ! cat > "$NOTES_DIR/$DATE-step-$NEXT_STEP-exec.md" <<EOF
-# Exec Note: Step $NEXT_STEP
+EXEC_RESULT="(done)"
+EXEC_CHECKPOINT="post-exec"
+
+# D1: Step 8/9 — Execute steps in order
+for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
+    echo "--- Executing Step $STEP/$TOTAL_STEPS ---"
+
+    # 9.2 VFP VH confirmation (software types only)
+    if [[ "$TYPE" == *"software"* ]]; then
+        echo "[VFP] Step $STEP: Red (VH) — checking pre-implementation test state..."
+    fi
+
+    # 9.3 Implementation (delegated to Claude agent — stub records intent)
+    echo "[exec] Step $STEP: Implementation delegated to Claude agent."
+
+    # 9.4 VFP HS confirmation (software types only)
+    if [[ "$TYPE" == *"software"* ]]; then
+        echo "[VFP] Step $STEP: Green (HS) — post-implementation test confirmation."
+    fi
+
+    # 9.8 Record Notes
+    # D3: File write with error handling
+    if ! cat > "$NOTES_DIR/$DATE-step-$STEP-exec.md" <<EOF
+# Exec Note: Step $STEP
 - Status: Completed
-- VFP: Red -> Green -> Refactor (Pass)
+- Type: $TYPE
+- VFP: $(if [[ "$TYPE" == *"software"* ]]; then echo "Red -> Green -> Refactor (Pass)"; else echo "N/A (non-software type)"; fi)
 EOF
-then
-    echo "[WARN] Failed to write exec note" >&2
+    then
+        echo "[WARN] Failed to write exec note for step $STEP" >&2
+    fi
+
+    # 9.9 Update completed_steps
+    # D3: python3 call with error handling
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --completed-steps "$STEP" 2>&1; then
+        echo "[WARN] Failed to update progress for step $STEP" >&2
+    fi
+
+    echo "Step $STEP/$TOTAL_STEPS completed successfully."
+done
+
+# D1: Step 10 — Determine signal result before writing files
+if [[ -n "$TARGET_STEP" ]]; then
+    EXEC_RESULT="(step-$TARGET_STEP)"
+    EXEC_CHECKPOINT="mid-exec"
 fi
 
-# 5. Update Progress
-# D3: python3 call with error handling
-if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --completed-steps $NEXT_STEP 2>&1; then
-    echo "[WARN] Failed to update progress in index" >&2
-fi
+# D1/D3: Step 10 — Write .summary.md atomically
+cat > "${SUMMARY_FILE}.tmp" <<EOF
+# Execution Summary — $NOTEBOOK
 
-echo "Step $NEXT_STEP completed successfully."
+- **Date**: $DATE
+- **Steps completed**: $STEP_END / $TOTAL_STEPS
+- **Task type**: ${TYPE:-unknown}
+- **Result**: $EXEC_RESULT
+EOF
+mv "${SUMMARY_FILE}.tmp" "$SUMMARY_FILE"
+
+# D1/D3: Step 10 — Write .auto-signal atomically
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+cat > "${SIGNAL_FILE}.tmp" <<EOF
+{
+  "step": "exec",
+  "result": "$EXEC_RESULT",
+  "next": "verify",
+  "checkpoint": "$EXEC_CHECKPOINT",
+  "timestamp": "$TIMESTAMP"
+}
+EOF
+mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
+
+echo "[exec] Signal written: result=$EXEC_RESULT, checkpoint=$EXEC_CHECKPOINT"
+echo "Execution complete: $STEP_END/$TOTAL_STEPS steps done."

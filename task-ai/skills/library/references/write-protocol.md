@@ -10,7 +10,7 @@ All sub-commands that write to `$NB_WORKSPACES_LIBRARY/` MUST follow the six-ste
 
 | Directory | Lock file | Writers | Typical hold |
 |-----------|-----------|---------|-------------|
-| `.memory/.references/` | `.memory/.references/.lock` | `research`, `exec`, `check`, `maintain` | Medium (web fetch + write) |
+| `.memory/.references/` | `.memory/.references/.lock` | `read`, `research`, `exec`, `check`, `maintain` | Medium (web fetch + write) |
 | `.memory/.experiences/` | `.memory/.experiences/.lock` | `report`, `exec`, `verify`, `check` | Short (write + index append) |
 | `.memory/.type-profiles/` | `.memory/.type-profiles/.lock` | `research`, `report` | Short (profile write) |
 | `.memory/.thinking/patterns/` | `.memory/.thinking/patterns/.lock` | `report` | Long (read raw/ + distil + write) |

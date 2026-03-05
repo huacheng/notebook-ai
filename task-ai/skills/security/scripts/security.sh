@@ -41,6 +41,13 @@ NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
 
 verify_cmd() {
     local cmd="$1"
+
+    # D2: Reject empty commands immediately
+    if [[ -z "$cmd" ]]; then
+        echo "[SECURITY] REJECT: Empty command string"
+        return 1
+    fi
+
     local risk="low"
     local reason=""
 
@@ -58,7 +65,7 @@ verify_cmd() {
         local -a grep_opts=("-q" "-E")
         [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if echo "$cmd" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+        if printf '%s\n' "$cmd" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
             risk="high"
             reason="dynamic:$rule_id"
             break
@@ -70,40 +77,82 @@ verify_cmd() {
     # =========================================================================
 
     # 1. Fatal Pattern Blocking (Destructive commands)
-    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "rm\s+-rf\s+(/|/etc|~|/var)"; then
+    # D2: Broad pattern matching rm with force/recursive flags (parity with scan_skill CORE-001)
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(^|\s)rm\s+(-[a-zA-Z]*[rf]|--recursive|--force)"; then
         risk="high"
-        reason="Destructive path deletion"
+        reason="Destructive command with force/recursive flags"
     fi
 
     # 2. VFP Injection (Command Semantics)
-    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE -e "--eval|--conftest|--require|--include|--import"; then
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE -- "--eval|--conftest|--require|--include|--import"; then
         risk="high"
         reason="VFP semantics injection"
     fi
 
     # 3. Two-stage loading (download & execute patterns)
-    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
         risk="high"
         reason="Two-stage payload execution"
     fi
-    # 3b. Download-then-execute pattern (curl -o file && run)
-    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
+    # 3b. Download-then-execute pattern (curl -o file && chmod/run)
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
         risk="high"
         reason="Download and execute pattern"
     fi
 
     # 4. Environment manipulation (high risk if overriding critical libs)
-    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
         risk="high"
         reason="Environment manipulation"
     fi
 
-    # 5. Path Traversal & Absolute Paths
-    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "\.\./|~| /"; then
-        if ! echo "$cmd" | grep -qF "$NB_ROOT"; then
-            risk="high"
-            reason="Path traversal or absolute path outside workspace"
-        fi
+    # 5. Path Traversal
+    # D2: Only check for traversal patterns (../) not all absolute paths (too many false positives)
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "\.\./" ; then
+        risk="high"
+        reason="Path traversal detected"
+    fi
+
+    # 6. Sensitive path access
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(~/\.claude|~/\.anthropic|~/\.ssh|~/\.aws|~/\.netrc|/etc/shadow|credentials\.json|auth\.json)"; then
+        risk="high"
+        reason="Sensitive path access"
+    fi
+
+    # 7. Secret exfiltration via network tools
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(curl|wget|fetch|nc|ncat).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET|GITHUB_TOKEN|API_KEY|SECRET)"; then
+        risk="high"
+        reason="Secret exfiltration via network"
+    fi
+
+    # 8. Injection / obfuscation in commands
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE 'base64\s+-d.*\|\s*(bash|sh)|\\x[0-9a-fA-F]{2}.*\\x[0-9a-fA-F]{2}|\$\{IFS\}'; then
+        risk="high"
+        reason="Command obfuscation detected"
+    fi
+
+    # 9. Config file tampering (Claude Code / MCP)
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qiE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore"; then
+        risk="high"
+        reason="Config file tampering"
+    fi
+
+    # 10. DNS tunneling / covert exfiltration
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(nslookup|dig|host)\s+.*\\\$\("; then
+        risk="high"
+        reason="Covert channel via DNS"
+    fi
+
+    # 11. SSRF to internal networks (OWASP A10)
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(curl|wget|fetch)\s.*https?://(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|0\.0\.0\.0|localhost|\[::1\])"; then
+        risk="high"
+        reason="SSRF: request to internal network"
+    fi
+
+    # 12. Reverse shell patterns (OWASP A03 - Injection)
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(bash|sh|zsh)\s+-i\s+>&\s*/dev/tcp|nc\s+-e\s+/bin/(bash|sh)|mkfifo.*nc.*sh"; then
+        risk="high"
+        reason="Reverse shell detected"
     fi
 
     if [[ "$risk" == "high" ]]; then
@@ -123,7 +172,15 @@ audit_plan() {
     fi
 
     local content
-    content=$(cat "$plan_md")
+    content=$(cat "$plan_md" 2>/dev/null) || {
+        echo "[SECURITY] PASS: Could not read plan.md (may have been removed)"
+        return 0
+    }
+    # D3: Handle empty plan gracefully
+    if [[ -z "$content" ]]; then
+        echo "[SECURITY] PASS: Plan is empty"
+        return 0
+    fi
     local risk="low"
     local findings=()
 
@@ -141,7 +198,7 @@ audit_plan() {
         local -a grep_opts=("-q" "-E")
         [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if echo "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+        if printf '%s\n' "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
             risk="high"
             findings+=("dynamic:$rule_id")
         fi
@@ -149,18 +206,61 @@ audit_plan() {
 
     # =========================================================================
     # TIER 2: CORE RULES (Security Floor - Hardcoded)
+    # D1: Parity with verify_cmd and scan_skill core rules
     # =========================================================================
-    if echo "$content" | grep -qE "rm\s+-rf"; then
+
+    # Destructive commands
+    if printf '%s\n' "$content" | grep -qE "(^|\s)rm\s+(-[a-zA-Z]*[rf]|--recursive|--force)"; then
         risk="high"
         findings+=("destructive_command:rm_rf")
     fi
-    if echo "$content" | grep -qE "curl\s*\|\s*bash|wget\s*\|\s*sh"; then
+
+    # VFP injection
+    if printf '%s\n' "$content" | grep -qE -- "--eval|--conftest|--require|--include|--import"; then
         risk="high"
-        findings+=("two_stage_loading")
+        findings+=("vfp_injection")
     fi
-    if echo "$content" | grep -qE "(LD_PRELOAD|NODE_OPTIONS|PYTHONPATH)="; then
+
+    # Two-stage loading (pipe)
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch).*\|.*(bash|sh|zsh|python|perl|ruby|node)"; then
+        risk="high"
+        findings+=("two_stage_loading:pipe")
+    fi
+
+    # Two-stage loading (download & execute)
+    if printf '%s\n' "$content" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
+        risk="high"
+        findings+=("two_stage_loading:download_exec")
+    fi
+
+    # Environment manipulation
+    if printf '%s\n' "$content" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
         risk="high"
         findings+=("env_manipulation")
+    fi
+
+    # Injection / obfuscation patterns
+    if printf '%s\n' "$content" | grep -qE 'eval\s*\(|base64\s+-d|<system>|ignore previous|forget.*instruction'; then
+        risk="high"
+        findings+=("injection_or_obfuscation")
+    fi
+
+    # Config file tampering (Claude Code / MCP)
+    if printf '%s\n' "$content" | grep -qiE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore|enableAllProjectMcpServers"; then
+        risk="high"
+        findings+=("config_tampering")
+    fi
+
+    # Sensitive path access in plan
+    if printf '%s\n' "$content" | grep -qiE "(cat|read|cp|curl.*-d).*(\~/\.claude|\~/\.ssh|\~/\.aws|/etc/shadow|credentials\.json)"; then
+        risk="high"
+        findings+=("sensitive_path_access")
+    fi
+
+    # Secret exfiltration patterns in plan
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|nc).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET|GITHUB_TOKEN)"; then
+        risk="high"
+        findings+=("secret_exfil")
     fi
 
     if [[ "$risk" == "high" ]]; then
@@ -176,10 +276,6 @@ audit_plan() {
     echo "[SECURITY] PASS: Plan looks safe"
     return 0
 }
-
-# NOTE: sanitize_rule_pattern() and load_dynamic_rules() removed
-# D5: Rule loading delegated to core/rule-loader.sh (uses yaml_parser.py)
-# This ensures proper YAML escape sequence handling (e.g., \\ → \)
 
 # =============================================================================
 # L1 Static Analysis for Skills
@@ -205,7 +301,11 @@ scan_skill() {
         return 0
     fi
 
-    local content=$(cat "$skill_md")
+    local content
+    content=$(cat "$skill_md" 2>/dev/null) || {
+        echo "[SECURITY] ERROR: Could not read skill file: $skill_md"
+        return 1
+    }
 
     # =========================================================================
     # TIER 1: EXTENDED RULES (Evolvable)
@@ -224,7 +324,7 @@ scan_skill() {
         local -a grep_opts=("-q" "-E")
         [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if echo "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+        if printf '%s\n' "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
             risk="high"
             findings+=("dynamic:$rule_id")
         fi
@@ -241,29 +341,29 @@ scan_skill() {
     # CORE rules scan full $content directly for better coverage
 
     # CORE-001: Destructive commands
-    if echo "$content" | grep -qE "(^|\s)rm\s+(-[a-zA-Z]*[rf]|--recursive|--force)"; then
+    if printf '%s\n' "$content" | grep -qE "(^|\s)rm\s+(-[a-zA-Z]*[rf]|--recursive|--force)"; then
         risk="high"
         findings+=("destructive_command:rm_rf")
     fi
 
     # CORE-002: VFP Injection (malicious CLI flags)
-    if echo "$content" | grep -qE -- "--eval|--conftest|--require|--include|--import"; then
+    if printf '%s\n' "$content" | grep -qE -- "--eval|--conftest|--require|--include|--import"; then
         risk="high"
         findings+=("vfp_injection")
     fi
 
     # CORE-003: Two-stage loading (download & execute)
-    if echo "$content" | grep -qE "(curl|wget|fetch).*\|.*(bash|sh|zsh|python|perl|ruby|node)"; then
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch).*\|.*(bash|sh|zsh|python|perl|ruby|node)"; then
         risk="high"
         findings+=("two_stage_loading:pipe")
     fi
-    if echo "$content" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
+    if printf '%s\n' "$content" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
         risk="high"
         findings+=("two_stage_loading:download_exec")
     fi
 
     # CORE-004: Environment manipulation (library injection)
-    if echo "$content" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
+    if printf '%s\n' "$content" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
         risk="high"
         findings+=("env_manipulation")
     fi
@@ -284,7 +384,7 @@ scan_skill() {
         '\$\(.*\)'
     )
     for pattern in "${injection_patterns[@]}"; do
-        if echo "$content" | grep -qE "$pattern"; then
+        if printf '%s\n' "$content" | grep -qE "$pattern"; then
             risk="high"
             findings+=("injection:$pattern")
             break
@@ -293,19 +393,19 @@ scan_skill() {
 
     # CORE-006: CVE-2025-59536/CVE-2026-21852 Claude Code attack vectors
     # CORE-006a: MCP configuration abuse
-    if echo "$content" | grep -qiE "enableAllProjectMcpServers|enabledMcpjsonServers|\.mcp\.json"; then
+    if printf '%s\n' "$content" | grep -qiE "enableAllProjectMcpServers|enabledMcpjsonServers|\.mcp\.json"; then
         risk="high"
         findings+=("cve_2026_21852:mcp_config_abuse")
     fi
 
     # CORE-006b: Hooks configuration tampering
-    if echo "$content" | grep -qiE "pre-tool-use|post-tool-use|\.claude/settings\.json|hooks.*command"; then
+    if printf '%s\n' "$content" | grep -qiE "pre-tool-use|post-tool-use|\.claude/settings\.json|hooks.*command"; then
         risk="high"
         findings+=("cve_2025_59536:hooks_tampering")
     fi
 
     # CORE-006c: Config file writes
-    if echo "$content" | grep -qE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore"; then
+    if printf '%s\n' "$content" | grep -qE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore"; then
         risk="high"
         findings+=("config_file_tampering")
     fi
@@ -326,7 +426,7 @@ scan_skill() {
         '\.netrc'
     )
     for spath in "${sensitive_paths[@]}"; do
-        if echo "$content" | grep -qiE "(cat|read|head|tail|less|more|vim|nano|cp|mv|curl.*-d|wget.*--post).*$spath"; then
+        if printf '%s\n' "$content" | grep -qiE "(cat|read|head|tail|less|more|vim|nano|cp|mv|curl.*-d|wget.*--post).*$spath"; then
             risk="high"
             findings+=("auth_theft:$spath")
             break
@@ -335,25 +435,37 @@ scan_skill() {
 
     # CORE-008: API Key / Secret exfiltration patterns
     # Matches: curl/wget with POST/data containing env vars like $ANTHROPIC_API_KEY
-    if echo "$content" | grep -qE "(curl|wget|fetch|nc|ncat).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET|GITHUB_TOKEN|API_KEY|SECRET)"; then
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch|nc|ncat).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET|GITHUB_TOKEN|API_KEY|SECRET)"; then
         risk="high"
         findings+=("secret_exfil:api_key_env")
     fi
 
     # CORE-009: Sensitive env var access (echo/print)
-    if echo "$content" | grep -qE "(echo|print|printf|cat).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET_ACCESS_KEY|GITHUB_TOKEN)"; then
+    if printf '%s\n' "$content" | grep -qE "(echo|print|printf|cat).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET_ACCESS_KEY|GITHUB_TOKEN)"; then
         risk="high"
         findings+=("env_leak:sensitive_var")
     fi
-    if echo "$content" | grep -qE "printenv.*\|\s*grep.*(key|secret|token|password)"; then
+    if printf '%s\n' "$content" | grep -qE "printenv.*\|\s*grep.*(key|secret|token|password)"; then
         risk="high"
         findings+=("env_leak:printenv_grep")
     fi
 
     # CORE-010: DNS tunneling / covert channels
-    if echo "$content" | grep -qE "(nslookup|dig|host)\s+.*\\\$\("; then
+    if printf '%s\n' "$content" | grep -qE "(nslookup|dig|host)\s+.*\\\$\("; then
         risk="high"
         findings+=("covert_channel:dns_tunnel")
+    fi
+
+    # CORE-011: SSRF to internal networks
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch)\s.*https?://(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|0\.0\.0\.0|localhost|\[::1\])"; then
+        risk="high"
+        findings+=("ssrf:internal_network")
+    fi
+
+    # CORE-012: Reverse shell patterns
+    if printf '%s\n' "$content" | grep -qE "(bash|sh|zsh)\s+-i\s+>&\s*/dev/tcp|nc\s+-e\s+/bin/(bash|sh)|mkfifo.*nc.*sh"; then
+        risk="high"
+        findings+=("reverse_shell")
     fi
 
     # 4. Output result

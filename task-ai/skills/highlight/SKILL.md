@@ -723,11 +723,14 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 2. Filter: quality_status=verified
 3. Filter: usage_count >= 3 (from changelog)
 4. Filter: has structural patterns
-5. Generate SKILL.md (trust_tier: T1)
-6. Generate trust-report.md
-7. Write to .skills/.candidates/<slug>/
-8. Update .changelog
+5. D2 Security static analysis + D1/D3/D5 Semantic review (pre-promotion score >= 0.5)
+6. Generate SKILL.md (trust_tier: T1)
+7. Generate trust-report.md (includes pre-promotion scores)
+8. Write to .skills/.candidates/<slug>/
+9. Acquire .changelog.lock → append: `<ts> | skill-candidate | .skills/.candidates/<slug> | source:promote | from:<experience-file>` → release
 ```
+
+> **Note**: The `skill-candidate` changelog type is specific to promote operations and extends the standard types (`experience`, `reference`, `type-profile`, `pattern`, `referenced`) defined in `commands/references/library-write-protocol.md`.
 
 #### Next Steps After Promotion
 

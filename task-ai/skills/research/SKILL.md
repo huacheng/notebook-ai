@@ -84,7 +84,7 @@ Research is invoked from multiple lifecycle phases:
 
 | Plan Context | Trigger | Scope |
 |--------------|---------|-------|
-| First plan (`draft`/`planning`, no `.plan.md`) | **Always** | `full` |
+| First plan (`draft`/`planning`, no `.plan.md`) | **Always** | `deep` |
 | Re-plan (`re-planning`/`review`/`executing`) | **Conditional** — only if gap analysis finds uncovered topics | `gap` |
 
 Plan invokes research internally before generating the implementation plan. See `skills/plan/SKILL.md` for integration details.
@@ -132,7 +132,7 @@ Each phase reads `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` at ent
 ### 5. Standalone (manual)
 
 ```
-/task-ai:research <notebook_name> --scope full
+/task-ai:research <notebook_name> --scope deep
 /task-ai:research <notebook_name> --scope gap
 ```
 

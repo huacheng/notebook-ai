@@ -78,8 +78,13 @@ PHASE=$(derive_phase "$STATUS")
 echo "Auto-mode: Starting loop from status: $STATUS (phase: $PHASE)"
 
 # 3. Determine next step based on status (D1-1: handle all statuses per SKILL.md)
+# D3: Recover iteration/compaction from existing signal if resuming
 ITERATION=1
 COMPACTION=0
+if [[ -f "$SIGNAL_FILE" ]]; then
+    ITERATION=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('iteration',1))" "$SIGNAL_FILE" 2>/dev/null || echo "1")
+    COMPACTION=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('compaction_count',0))" "$SIGNAL_FILE" 2>/dev/null || echo "0")
+fi
 
 case "$STATUS" in
   draft)
@@ -166,18 +171,45 @@ case "$STATUS" in
 esac
 
 # 4. Write Progress Signal (D2-2: use python for safe JSON generation)
-python3 - "$SIGNAL_FILE" "$STEP" "$RESULT" "$NEXT_STEP" "$ITERATION" "$COMPACTION" "$PHASE" <<'PYEOF'
+# Read stage from .status.json if available
+# D3: Get stage field. Python heredoc has try/except for malformed JSON (e.g. Python repr vs JSON)
+STAGE_JSON=$(python3 "$STATE_PY" get "$STATUS_JSON" stage 2>/dev/null || echo "")
+CHECKPOINT=""
+# Derive checkpoint from step + status context
+case "$STEP" in
+    verify)
+        case "$STATUS" in
+            executing) CHECKPOINT="post-exec" ;;
+            planning|re-planning) CHECKPOINT="post-plan" ;;
+            *) CHECKPOINT="post-plan" ;;
+        esac
+        ;;
+    *) CHECKPOINT="" ;;
+esac
+
+python3 - "$SIGNAL_FILE" "$STEP" "$RESULT" "$NEXT_STEP" "$ITERATION" "$COMPACTION" "$PHASE" "$CHECKPOINT" "$STAGE_JSON" <<'PYEOF'
 import json, sys, os
 from datetime import datetime, timezone
 signal_file = sys.argv[1]
+checkpoint = sys.argv[8]
+stage_raw = sys.argv[9]
+# Parse stage JSON if available
+stage = None
+if stage_raw:
+    try:
+        stage = json.loads(stage_raw)
+    except (json.JSONDecodeError, ValueError):
+        pass
 signal = {
     "step": sys.argv[2],
     "result": sys.argv[3],
     "next": sys.argv[4],
+    "checkpoint": checkpoint,
     "iteration": int(sys.argv[5]),
     "compaction_count": int(sys.argv[6]),
     "phase": sys.argv[7],
     "phase_progress": 0.0,
+    "stage": stage,
     "check_score": None,
     "retry_count": 0,
     "delegation_failures": [],

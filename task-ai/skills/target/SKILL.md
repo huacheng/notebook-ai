@@ -2,7 +2,7 @@
 name: target
 description: "Define, refine, and review task objectives and requirements in .target.md. Supports both conversational definition and file-based editing."
 model_tier: heavy
-auto_delegatable: true
+auto_delegatable: false
 triggers:
   keywords:
     zh: [目标, 需求, 范围, 约束, 交付物, 验收标准, 阶段推进]
@@ -149,7 +149,8 @@ Build a JWT authentication system
 | Command | Type | Scope | Subject |
 | :--- | :--- | :--- | :--- |
 | `target` | `target` | `state` | `target update objective` |
-| `target` | `target` | `state` | `target stage <N+1> defined` |
+| `target --refine` | `target` | `state` | `target refine objective` |
+| `target` (stage advance) | `target` | `state` | `target stage <N+1> defined` |
 
 ## Notes
 

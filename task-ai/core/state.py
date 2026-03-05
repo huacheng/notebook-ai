@@ -64,7 +64,15 @@ def write_state(status_path, state):
 
 def cmd_get(args):
     state = read_state(args.file)
-    val = state.get(args.key, '')
+    # Support dotted key paths (e.g., "stage.current")
+    keys = args.key.split('.')
+    val = state
+    for k in keys:
+        if isinstance(val, dict):
+            val = val.get(k, '')
+        else:
+            val = ''
+            break
     print(val if val is not None else '')
 
 def cmd_set(args):

@@ -18,8 +18,18 @@ TARGET_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --checkpoint) CHECKPOINT="$2"; shift 2 ;;
-    --target) TARGET_FILE="$2"; shift 2 ;;
+    --checkpoint)
+      # D3: Guard against missing option value
+      if [[ $# -lt 2 ]]; then
+        echo "[ERROR] --checkpoint requires a value" >&2; exit 1
+      fi
+      CHECKPOINT="$2"; shift 2 ;;
+    --target)
+      # D3: Guard against missing option value
+      if [[ $# -lt 2 ]]; then
+        echo "[ERROR] --target requires a value" >&2; exit 1
+      fi
+      TARGET_FILE="$2"; shift 2 ;;
     --*) echo "Unknown option: $1" >&2; exit 1 ;;
     *)
       # Positional argument = notebook name
@@ -89,7 +99,13 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
         local rule="$3"
         local precision="$4"
         local reason="${5:-}"
-        echo "{\"ts\":\"$(date -Iseconds)\",\"action\":\"$action\",\"domain\":\"$domain\",\"rule\":\"$rule\",\"precision\":$precision,\"reason\":\"$reason\"}" >> "$AUDIT_LOG"
+        # D2: Sanitize values for safe JSON embedding (escape backslashes, quotes, control chars)
+        local safe_reason
+        safe_reason=$(printf '%s' "$reason" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g')
+        local safe_rule
+        safe_rule=$(printf '%s' "$rule" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        printf '{"ts":"%s","action":"%s","domain":"%s","rule":"%s","precision":%s,"reason":"%s"}\n' \
+            "$(date -Iseconds)" "$action" "$domain" "$safe_rule" "$precision" "$safe_reason" >> "$AUDIT_LOG"
     }
 
     # Calculate precision using Python yaml_parser.py
@@ -163,7 +179,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
             # B2: Gate 1 - D2 Security check (blocking)
             if ! check_rule_security "$candidate" "$CANDIDATE_ID"; then
                 # D3: mv with error handling
-                if ! mv "$candidate" "$REVIEW_DIR/" 2>&1; then
+                if ! mv "$candidate" "$REVIEW_DIR/" 2>/dev/null; then
                     echo "[ERROR] Failed to move $candidate to review" >&2
                     continue
                 fi
@@ -176,7 +192,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
             # Gate 2 - Precision threshold
             if (( $(echo "$PRECISION >= 0.80" | bc -l) )); then
                 # D3: mv with error handling
-                if ! mv "$candidate" "$ACTIVE_DIR/" 2>&1; then
+                if ! mv "$candidate" "$ACTIVE_DIR/" 2>/dev/null; then
                     echo "[ERROR] Failed to move $candidate to active" >&2
                     continue
                 fi
@@ -185,7 +201,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
                 ((ACTIVATED_COUNT++)) || true
             else
                 # D3: mv with error handling
-                if ! mv "$candidate" "$REVIEW_DIR/" 2>&1; then
+                if ! mv "$candidate" "$REVIEW_DIR/" 2>/dev/null; then
                     echo "[ERROR] Failed to move $candidate to review" >&2
                     continue
                 fi
@@ -223,7 +239,10 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
     if [[ -f "$RULE_LOADER" ]]; then
         source "$RULE_LOADER"
         load_rules_from_domain "audit" 2>/dev/null || true
-        AUDIT_RULES_LOADED=${#RULE_IDS[@]}
+        # D3: Guard against unbound RULE_IDS if load_rules_from_domain did not declare it
+        if [[ -n "${RULE_IDS+x}" ]]; then
+            AUDIT_RULES_LOADED=${#RULE_IDS[@]}
+        fi
         [[ $AUDIT_RULES_LOADED -gt 0 ]] && echo "[INFO] Loaded $AUDIT_RULES_LOADED dynamic audit rules"
     fi
 
@@ -260,7 +279,8 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
     fi
 
     # Additional security checks
-    if grep -qE '\$\(|`[^`]+`|eval\s|exec\s' "$TARGET_FILE"; then
+    # D1: Use word-boundary match to avoid false positives on "execution"/"executable"
+    if grep -qE '\$\(|`[^`]+`|\beval\b|\bexec\b' "$TARGET_FILE"; then
         D2_SCORE=$(echo "$D2_SCORE - 0.3" | bc)
         D2_ISSUES="${D2_ISSUES}\n- Command substitution or eval detected"
     fi
@@ -421,7 +441,6 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
         # Blocked - calculate partial score
         COMPOSITE=$(echo "scale=2; ${D2_SCORE:-0} * 0.25 + ${D1_SCORE:-0} * 0.20 + ${D3_SCORE:-0} * 0.15" | bc)
         TRUST_TIER="T1"
-        REVIEW_STATUS="BLOCKED"
 
         echo "Status: BLOCKED at $BLOCKED_AT"
         echo "Reason: $BLOCK_REASON"
@@ -465,8 +484,6 @@ EOF
         elif (( $(echo "$COMPOSITE >= 0.50" | bc -l) )); then
             TRUST_TIER="T2"
         fi
-        REVIEW_STATUS="PASS"
-
         echo "Status: ALL GATES PASSED ✅"
         echo "Composite Score: $COMPOSITE"
         echo "Trust Tier: $TRUST_TIER"
@@ -514,13 +531,12 @@ EOF
         # L2 can only promote to T3 (L3 required for T4)
         if [[ "$SKILL_PARENT_DIR" == *".candidates"* ]]; then
             if [[ "$TRUST_TIER" == "T3" ]]; then
-                MOVE_TO_DRAFTS=1
                 DRAFTS_TARGET="$LIB_PATH/.skills/.drafts/$SKILL_SLUG"
 
                 if [[ ! -d "$DRAFTS_TARGET" ]]; then
                     mkdir -p "$DRAFTS_TARGET"
                     # D3: cp -r with error handling
-                    if ! cp -r "$SKILL_PARENT_DIR"/* "$DRAFTS_TARGET/" 2>&1; then
+                    if ! cp -r "$SKILL_PARENT_DIR"/* "$DRAFTS_TARGET/" 2>/dev/null; then
                         echo "[ERROR] Failed to copy skill to drafts" >&2
                     else
                         # Update trust_tier in SKILL.md
@@ -584,7 +600,8 @@ if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
     L3_D1_ISSUES=""
 
     # Check description vs steps consistency
-    DESCRIPTION=$(grep -A1 "^description:" "$TARGET_FILE" 2>/dev/null | tail -1 | tr -d '"' || echo "")
+    # D1: Extract description value from same line (YAML: description: "value")
+    DESCRIPTION=$(grep "^description:" "$TARGET_FILE" 2>/dev/null | head -1 | sed 's/^description:\s*//' | tr -d '"' || echo "")
     HAS_STEPS=$(grep -qE "^## (Steps|Instructions|Usage)" "$TARGET_FILE" && echo 1 || echo 0)
 
     if [[ -n "$DESCRIPTION" && "$HAS_STEPS" == "1" ]]; then
@@ -722,13 +739,12 @@ EOF
     # Auto-move T3→T4 if PROMOTE verdict
     # ─────────────────────────────────────────────────────────────────
     if [[ "$L3_VERDICT" == "PROMOTE" ]]; then
-        MOVE_TO_ACTIVE=1
         ACTIVE_TARGET="$LIB_PATH/.skills/.active/$SKILL_SLUG"
 
         if [[ ! -d "$ACTIVE_TARGET" ]]; then
             mkdir -p "$ACTIVE_TARGET"
             # D3: cp -r with error handling
-            if ! cp -r "$SKILL_PARENT_DIR"/* "$ACTIVE_TARGET/" 2>&1; then
+            if ! cp -r "$SKILL_PARENT_DIR"/* "$ACTIVE_TARGET/" 2>/dev/null; then
                 echo "[ERROR] Failed to copy skill to active" >&2
             else
                 # Update trust_tier in SKILL.md
@@ -776,7 +792,7 @@ $AUDIT_OUTPUT
 Review and revise the plan to remove dangerous operations.
 EOF
             # D3: python3 call with error handling
-            if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>&1; then
+            if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>/dev/null; then
                 echo "[WARN] Failed to transition status to re-planning" >&2
             fi
             echo "Check completed. Security blocked. Analysis: $ANALYSIS_FILE"
@@ -807,7 +823,8 @@ if [[ "$CHECKPOINT" == "pre-merge" ]]; then
     fi
 
     # Verify status is executing (pre-merge only after post-exec ACCEPT)
-    CURRENT_STATUS=$(python3 -c "import json; print(json.load(open('$STATUS_JSON'))['status'])" 2>/dev/null || echo "unknown")
+    # D2: Pass path as argument to avoid code injection via filenames
+    CURRENT_STATUS=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['status'])" "$STATUS_JSON" 2>/dev/null || echo "unknown")
     if [[ "$CURRENT_STATUS" != "executing" ]]; then
         echo "[ERROR] pre-merge requires status=executing, got $CURRENT_STATUS" >&2
         exit 1
@@ -818,7 +835,8 @@ if [[ "$CHECKPOINT" == "pre-merge" ]]; then
 
     # D1 Correctness: Check if post-exec ACCEPT exists
     D1_SCORE=0.70
-    if ls "$ANALYSIS_DIR"/*post-exec-accept* 2>/dev/null | head -1 > /dev/null; then
+    # D3: Use compgen glob instead of ls pipe for reliable file detection
+    if compgen -G "$ANALYSIS_DIR"'/*post-exec-accept*' > /dev/null 2>&1; then
         D1_SCORE=0.90
     fi
 
@@ -833,7 +851,8 @@ if [[ "$CHECKPOINT" == "pre-merge" ]]; then
 
     # D3 Reliability: Check test results exist
     D3_SCORE=0.80
-    if ls "$WORK_DIR/.test/"*results* 2>/dev/null | head -1 > /dev/null; then
+    # D3: Use compgen glob instead of ls pipe for reliable file detection
+    if compgen -G "$WORK_DIR/.test/"'*results*' > /dev/null 2>&1; then
         D3_SCORE=0.90
     else
         D3_SCORE=0.65
@@ -923,7 +942,7 @@ EOF
 Threshold: 0.80 — FAILED. Falling back to Phase 3.
 
 ## Failing Dimensions
-$(echo -e "$FAILING_DIMS")
+$(printf '%b' "$FAILING_DIMS")
 
 ## Required Action
 Address failing dimensions and re-run post-exec check.
@@ -943,43 +962,70 @@ EOF
     exit 0
 fi
 
-# 1. Decision Logic (Simulated for plumbing)
-# In real AI agent run, this would be a reasoned verdict.
-VERDICT="PASS"
-[[ "$CHECKPOINT" == "post-exec" ]] && VERDICT="ACCEPT"
+# ─────────────────────────────────────────────────────────────────────────────
+# Fallthrough: Simulated plumbing for checkpoints not yet fully implemented
+# (post-plan without security block, post-exec, mid-exec)
+# In real AI agent run, this would be a reasoned verdict from LLM evaluation.
+# ─────────────────────────────────────────────────────────────────────────────
+case "$CHECKPOINT" in
+  post-plan)  VERDICT="PASS" ;;
+  post-exec)  VERDICT="ACCEPT" ;;
+  mid-exec)   VERDICT="CONTINUE" ;;
+  *)
+    echo "[ERROR] Unhandled checkpoint: $CHECKPOINT" >&2
+    exit 1
+    ;;
+esac
 
 echo "Checking $NOTEBOOK at $CHECKPOINT... Verdict: $VERDICT"
 
-# 2. State Transitions
-# D3: python3 calls with error handling
+# State Transitions per SKILL.md State Transitions table
 case "$VERDICT" in
   PASS)
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status review 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status review 2>/dev/null; then
         echo "[WARN] Failed to transition status to review" >&2
     fi
     ;;
-  ACCEPT)
-    # ACCEPT keeps 'executing' status but signals 'merge'
+  ACCEPT|CONTINUE)
+    # ACCEPT/CONTINUE keep current status unchanged
     ;;
   REPLAN)
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>/dev/null; then
         echo "[WARN] Failed to transition status to re-planning" >&2
     fi
     ;;
   BLOCKED)
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status blocked 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status blocked 2>/dev/null; then
         echo "[WARN] Failed to transition status to blocked" >&2
     fi
     ;;
 esac
 
-# 3. Output Analysis File
+# Output Analysis File
 DATE=$(date +%Y-%m-%d)
 ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-$CHECKPOINT-${VERDICT,,}.md"
 cat > "$ANALYSIS_FILE" <<EOF
 # Evaluation: $CHECKPOINT · $DATE
 - Verdict: $VERDICT
-- Rationale: Simulated plumbing pass.
+- Rationale: Plumbing stub — full LLM-driven evaluation not yet implemented for this checkpoint.
 EOF
+
+# D1: Write .auto-signal per SKILL.md Step 18
+case "$VERDICT" in
+  PASS)
+    SIGNAL_NEXT="exec" ;;
+  ACCEPT)
+    SIGNAL_NEXT="merge" ;;
+  CONTINUE)
+    SIGNAL_NEXT="exec" ;;
+  REPLAN)
+    SIGNAL_NEXT="plan" ;;
+  BLOCKED)
+    SIGNAL_NEXT="(stop)" ;;
+  *)
+    SIGNAL_NEXT="unknown" ;;
+esac
+SIGNAL_JSON="{\"step\":\"check\",\"result\":\"$VERDICT\",\"next\":\"$SIGNAL_NEXT\",\"checkpoint\":\"$CHECKPOINT\",\"timestamp\":\"$(date -Iseconds)\"}"
+echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
 
 echo "Check completed. Analysis written to $ANALYSIS_FILE."

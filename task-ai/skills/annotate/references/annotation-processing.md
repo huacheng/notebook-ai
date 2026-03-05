@@ -76,6 +76,10 @@ Selected: "performance"
 
 **Claude-side processing**: read the source file, seek to `cursor`, and use `selected` as confirmation anchor. `cursor` + `selected` together form a **dual positional anchor** — `cursor` provides the position, `selected` confirms the content. When multiple annotations target the same file, group by `file` and read each source file only once.
 
+**Anchor mismatch handling**: If the source text at `cursor` does not match `selected`, search for `selected` in a neighborhood window (cursor ± 200 chars). If a unique match is found within the window, use that position. If multiple matches or no match, report the annotation as unresolvable in the execution report and skip it — do not guess.
+
+**Batch ordering**: When multiple modify-type annotations (Delete/Replace/Insert) target the same file, apply them in **reverse cursor order** (highest offset first). This prevents earlier edits from invalidating the character offsets of later annotations. Comment annotations (which only append blockquotes) are order-independent.
+
 ## Content Sanitization
 
 Before writing annotation content (insertion, replacement, or comment text) to task `.md` files, apply sanitization:
@@ -102,7 +106,7 @@ Triage each delete annotation:
 | Level | Action |
 |-------|--------|
 | **None** | Execute directly |
-| **Low** | Adjust affected plans inline |
+| **Low** | Adjust affected content inline |
 | **Medium** | Research approach → execute → document resolution |
 | **High — Interactive** | Explain + draft solution → print to screen → 10 min timeout → fall back to Silent |
 | **High — Silent** | Write explanation + draft into task file → await next annotation |

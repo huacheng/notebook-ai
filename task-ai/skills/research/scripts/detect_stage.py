@@ -25,15 +25,15 @@ def detect_stage(target_md_path):
     if not has_ri or not has_o1:
         print('O1')
     elif get_proposed_in_section(t, '### O1:', '### O2:' if has_o2 else None):
-        print('PENDING')
+        print('PENDING:O1')
     elif not has_o2:
         print('O2')
     elif get_proposed_in_section(t, '### O2:', '### O3:' if has_o3 else None):
-        print('PENDING')
+        print('PENDING:O2')
     elif not has_o3:
         print('O3')
     elif get_proposed_in_section(t, '### O3:'):
-        print('PENDING')
+        print('PENDING:O3')
     else:
         print('COMPLETE')
 

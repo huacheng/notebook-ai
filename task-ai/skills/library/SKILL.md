@@ -55,7 +55,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 /task-ai:library search "<query>" [--type <type>] [--topic <topic>]
 /task-ai:library list [--type <type>]
 /task-ai:library status
-/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--compact] [--check-staleness] [--all]
+/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all]
 ```
 
 ## Library Directory Structure

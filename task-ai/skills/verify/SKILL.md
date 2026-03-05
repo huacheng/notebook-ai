@@ -22,6 +22,13 @@ arguments:
     description: "Verification scope: quick, full, or step-N"
     required: false
     default: full
+  - name: generate-skill-tests
+    description: "Generate a structured test template for a skill file (requires --target)"
+    required: false
+    type: flag
+  - name: target
+    description: "Path to a SKILL.md file (used with --generate-skill-tests)"
+    required: false
 ---
 
 # /task-ai:verify — Test Execution & Verification
@@ -32,7 +39,12 @@ Run domain-adapted tests and verification procedures for a task module, producin
 
 ```
 /task-ai:verify <notebook_name> [--checkpoint quick|full|step-N]
+/task-ai:verify <notebook_name> --generate-skill-tests --target <skill.md>
 ```
+
+### Skill Test Generation Mode
+
+When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, verify generates a structured test template for the specified skill file under `.test/skill-<name>.test.md`. This mode exits immediately after generation and does not run normal verification flow.
 
 ## Checkpoints
 
@@ -80,9 +92,9 @@ Run domain-adapted tests and verification procedures for a task module, producin
 
 | Result | Meaning |
 |--------|---------|
-| `pass` | All verification criteria met |
-| `fail` | One or more critical criteria failed |
-| `partial` | Some criteria passed, some failed (non-critical failures) |
+| `(pass)` | All verification criteria met |
+| `(fail)` | One or more critical criteria failed |
+| `(partial)` | Some criteria passed, some failed (non-critical failures) |
 
 ## State Transitions
 

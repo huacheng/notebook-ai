@@ -2,29 +2,20 @@
 
 Templates for generating test corpus samples used in precision calculation.
 
-## Directory Structure
+## Overview
 
-```
-samples/
-├── positive.md.tmpl    # Template for positive samples (should match rules)
-├── negative.md.tmpl    # Template for negative samples (should NOT match)
-└── README.md           # This file
-```
+`sample-generator.sh` generates labeled positive/negative test samples for
+precision calculation. Samples are created using inline templates in the script.
 
-## Usage
+## Supported Placeholders (inline)
 
-Templates are used by `sample-generator.sh` to create labeled test samples.
+- `SAMPLE_ID` - Unique sample identifier
+- `DOMAIN` - Domain (security/sanitization/audit)
+- `DESCRIPTION` - Human-readable description
+- `PATTERN` - The code/pattern content
+- `GENERATED` - ISO timestamp
 
-## Variables
+## Extending
 
-Templates support these placeholders:
-- `{{SAMPLE_ID}}` - Unique sample identifier
-- `{{DOMAIN}}` - Domain (security/sanitization/audit)
-- `{{DESCRIPTION}}` - Human-readable description
-- `{{PATTERN}}` - The code/pattern content
-- `{{GENERATED}}` - ISO timestamp
-
-## Note
-
-Currently, sample-generator.sh uses inline templates. These file templates
-are reserved for future customization needs.
+To add new sample types, edit `sample-generator.sh` directly. Add new
+`generate_<domain>_samples()` functions and register them in the `case` dispatch.
