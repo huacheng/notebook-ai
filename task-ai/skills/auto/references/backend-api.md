@@ -9,7 +9,7 @@ Backend implementation details for the auto mode daemon. This file is for server
 | `POST` | `/api/sessions/:id/task-auto` | Start auto mode for a task module |
 | `DELETE` | `/api/sessions/:id/task-auto` | Stop auto mode (writes `.auto-stop`) |
 | `GET` | `/api/sessions/:id/task-auto` | Get auto mode status |
-| `GET` | `/api/task-auto/lookup?taskDir=<path>` | Look up which session is running auto for a given task directory. Returns `{ session_name, status }` or 404 if not found. Used by `cancel` to find the correct session to stop |
+| `GET` | `/api/task-auto/lookup?taskDir=<path>` | Look up which session is running auto for a given task directory. Returns `{ session_name, status }` or 404 if not found. Used by `cancel` to find the correct session to stop. **D2: Same `path.resolve()` + workspace root validation as POST** |
 
 Request body for POST:
 ```json
@@ -22,7 +22,7 @@ Request body for POST:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `taskDir` | string | (required) | Absolute path to notebook `.working/` directory in **main worktree** (e.g., `/nb-workspaces/auth-refactor/.working`). In worktree mode, this is still the main worktree path — NOT the task worktree path. Daemon's `fs.watch` monitors this path for `.auto-signal`. **D2: Server MUST validate** that `taskDir` is under the configured `NB_WORKSPACES` root and ends with `/.working` — reject paths outside the workspace to prevent directory traversal |
+| `taskDir` | string | (required) | Absolute path to notebook `.working/` directory in **main worktree** (e.g., `/nb-workspaces/auth-refactor/.working`). In worktree mode, this is still the main worktree path — NOT the task worktree path. Daemon's `fs.watch` monitors this path for `.auto-signal`. **D2: Server MUST validate** that `taskDir`, after `path.resolve()` canonicalization, is under the configured `NB_WORKSPACES` root and ends with `/.working` — reject paths outside the workspace to prevent directory traversal (e.g., `/../` sequences) |
 | `maxIterations` | number | 20 | Max plan/check/exec cycles before forced stop |
 | `timeoutMinutes` | number | 30 | Total execution time limit (minutes). User sets based on task difficulty |
 

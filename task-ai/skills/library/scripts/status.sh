@@ -45,7 +45,8 @@ while IFS= read -r lockfile; do
     ((LOCK_COUNT++)) || true
     # D3: Show lock holder info and whether PID is still alive
     lock_info=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(f'pid={d.get(\"pid\",\"?\")} session={d.get(\"session\",\"?\")} ts={d.get(\"timestamp\",\"?\")}')" "$lockfile" 2>/dev/null || echo "unreadable")
-    lock_pid=$(echo "$lock_info" | grep -oP 'pid=\K[0-9]+' || echo "")
+    # D3: Use sed instead of grep -P for macOS compatibility
+    lock_pid=$(echo "$lock_info" | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
     if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
         echo "  [ACTIVE] $lockfile ($lock_info)"
     else

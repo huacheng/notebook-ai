@@ -83,7 +83,7 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
     - If status is unchanged (including `stage-done`), preserve existing `phase`
     - Otherwise clear `phase` to `""`
     - Update `updated` timestamp
-13. **Write `.summary.md`** with condensed context reflecting annotation changes
+13. **Write `.summary.md`** (atomic write via `.summary.md.tmp` + rename) with condensed context reflecting annotation changes
 14. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value). Capture cross-impact assessment reasoning. Inline call failure MUST NOT block annotate's main flow
 15. **Git commit** (skip if all annotations were unresolvable and no files changed): `task-ai(<notebook>):annotate annotations processed`
 16. **Write `.auto-signal`** (route `next` by file layer — see §.auto-signal Routing)
@@ -184,7 +184,7 @@ Comment annotations have **identical behavior across all file layers** — they 
 
 ## .auto-signal Routing
 
-The `next` field routes by **(file layer, current status)**. Comment-only annotations always set `next` to `(none)`.
+The `next` field routes by **(file layer, status before transition)**. The routing table uses the **pre-transition** status to determine `next`, even though `.auto-signal` is written after `.status.json` is updated (step 16 follows step 12). Comment-only annotations always set `next` to `(none)`.
 
 ```json
 { "step": "annotate", "result": "(processed)", "next": "<by-layer>", "checkpoint": "post-annotate", "timestamp": "..." }
@@ -204,9 +204,12 @@ The `next` field routes by **(file layer, current status)**. Comment-only annota
 | Planning `.plan.md` | `re-planning` | `check` | Plan revised during re-planning, re-check needed |
 | Planning `.plan.md` | `blocked` | `plan` | Unblocking via plan change, needs planning |
 | Planning `.plan.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
-| Evaluation `.analysis/*` | any | `check` | Evaluation conclusion challenged |
-| Evaluation `.test/*` | any | `verify` | Test criteria/results changed |
-| Methodology `.type-profile.md` | any | `verify` | Methodology change affects verification |
+| Evaluation `.analysis/*` | any (except `stage-done`) | `check` | Evaluation conclusion challenged |
+| Evaluation `.analysis/*` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
+| Evaluation `.test/*` | any (except `stage-done`) | `verify` | Test criteria/results changed |
+| Evaluation `.test/*` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
+| Methodology `.type-profile.md` | any (except `stage-done`) | `verify` | Methodology change affects verification |
+| Methodology `.type-profile.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
 | Information (`.summary.md` etc.) | any | `(none)` | Pure context improvement |
 | Comment-only (any file) | any | `(none)` | Comments don't trigger downstream |
 

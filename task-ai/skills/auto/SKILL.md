@@ -470,7 +470,7 @@ The auto skill runs this loop within a single Claude session:
 1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
 2. LOOP:
    2.1. Check for .auto-stop file → if exists, break loop
-   2.2. Context check: if context window usage ≥ 82%, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`
+   2.2. Context check: if context window usage ≥ 82% AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
    2.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - Evaluate four delegation factors (phase, context dependency, complexity, execution history)
       - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.status.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
@@ -503,13 +503,14 @@ The auto skill runs this loop within a single Claude session:
 
 | step | result | next | checkpoint | Rationale |
 |------|--------|------|------------|-----------|
-| check | PASS | exec | — | Plan approved, proceed to execution |
+| check | PASS | exec | post-plan | Plan approved, proceed to execution |
+| check | PASS | merge | pre-merge | Pre-merge check passed, proceed to merge |
 | check | NEEDS_REVISION | plan | — | Plan needs revision |
 | check | ACCEPT | merge | — | Task verified, merge to main |
 | check | NEEDS_FIX | exec | mid-exec / post-exec | Minor issues, re-execute to fix |
 | check | REPLAN | plan | — | Fundamental issues, revise plan |
 | check | BLOCKED | (stop) | — | Cannot continue |
-| check | CONTINUE | exec | — | Progress OK, resume execution |
+| check | CONTINUE | exec | mid-exec | Progress OK, resume execution |
 | plan | (generated) | verify | post-plan | Plan ready, verify before assessment |
 | exec | (done) | verify | post-exec | All steps completed, verify before assessment |
 | exec | (mid-exec) | verify | mid-exec | Significant issue, verify before checkpoint |
@@ -546,7 +547,7 @@ The `.summary.md` file is still written by each sub-command as a **compaction sa
 
 ## Stall Detection & Recovery
 
-Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle heartbeats = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.auto-signal` update for 10 minutes). Recovery limits: 3 per iteration, 10 total.
+Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle heartbeats = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.auto-signal` update for 10 minutes). Recovery limits: 3 per step, 10 total.
 
 > **See `references/stall-detection.md`** for the full heartbeat polling logic, stall determination rules, pattern matching recovery table, and recovery limits.
 
@@ -612,7 +613,7 @@ When `type` contains `software`, the auto loop tracks VH→HS cycle progress dur
 
 - **Max iterations**: user-configurable (default 20), daemon writes `.auto-stop` when reached
 - **Timeout**: user-configurable (default 30 min), daemon writes `.auto-stop` when elapsed
-- **Stall detection**: heartbeat polling (60s) + pattern matching recovery, with per-iteration (3) and total (10) recovery limits
+- **Stall detection**: heartbeat polling (60s) + pattern matching recovery, with per-step (3) and total (10) recovery limits
 - **Context management**: proactive structured compaction at ≥ 82% context window usage
 - **Quota exhaustion**: detected and handled as wait (not stall), timeout clock paused during quota-wait
 - **Pause on blocked**: Auto stops immediately on `blocked` status

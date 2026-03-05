@@ -88,8 +88,26 @@ fi
 
 # D3/D2: Concurrency — acquire .working/.lock before proceeding (per SKILL.md)
 LOCK_FILE="$WORK_DIR/.lock"
-cleanup_lock() { rm -f "$LOCK_FILE"; }
-trap cleanup_lock EXIT
+cleanup_exec() {
+    local exit_code=$?
+    # D3: On unexpected exit (non-zero, non-caught), write mid-exec signal so auto mode can route
+    if [[ $exit_code -ne 0 && -n "${SIGNAL_FILE:-}" && ! -f "${SIGNAL_FILE:-}" ]]; then
+        local ts
+        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")
+        cat > "${SIGNAL_FILE}.tmp" 2>/dev/null <<TRAP_EOF
+{
+  "step": "exec",
+  "result": "(mid-exec)",
+  "next": "verify",
+  "checkpoint": "mid-exec",
+  "timestamp": "$ts"
+}
+TRAP_EOF
+        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE" 2>/dev/null || true
+    fi
+    rm -f "$LOCK_FILE"
+}
+trap cleanup_exec EXIT
 if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
     # D3: Stale lock recovery — check if holding PID is still alive
     existing_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
@@ -121,7 +139,7 @@ fi
 
 # D1: Step 3 — Transition status to 'executing', clear phase
 if [[ "$CURRENT_STATUS" == "review" ]]; then
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --phase "" 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --phase ""; then
         echo "[ERROR] Failed to transition status to 'executing'" >&2
         exit 1
     fi
@@ -133,18 +151,18 @@ if [[ "$CURRENT_STATUS" == "executing" ]]; then
     echo "[exec] Resuming execution (NEEDS_FIX or continuation)."
     # Check for fix guidance files (Claude agent reads these for full context)
     # D1: Sort by filename (reverse alpha) to match "most recent by filename date" per SKILL.md
-    LATEST_BUGFIX=$(find "$WORK_DIR/.bugfix" -maxdepth 1 -name '*.md' 2>/dev/null | sort -r | head -1)
+    LATEST_BUGFIX=$(find "$WORK_DIR/.bugfix" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_BUGFIX" ]]; then
         echo "[exec] Fix guidance available: $(basename "$LATEST_BUGFIX")"
     fi
-    LATEST_ANALYSIS=$(find "$WORK_DIR/.analysis" -maxdepth 1 -name '*.md' 2>/dev/null | sort -r | head -1)
+    LATEST_ANALYSIS=$(find "$WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_ANALYSIS" ]]; then
         echo "[exec] Analysis available: $(basename "$LATEST_ANALYSIS")"
     fi
 fi
 
 # Exit plan-refinement phase (if active)
-if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: plan-refinement" "$SESSION_CONTEXT"; then
+if [[ -f "$SESSION_CONTEXT" ]] && grep -qF "phase: plan-refinement" "$SESSION_CONTEXT"; then
     rm -f "$SESSION_CONTEXT"
     echo "[exec] Exited plan-refinement phase."
 fi
@@ -153,7 +171,7 @@ fi
 if [[ ! -f "$WORK_DIR/.target.md" ]]; then
     echo "[WARN] .target.md not found — execution may lack requirements context" >&2
 fi
-if [[ -z "$(find "$WORK_DIR/.analysis" -maxdepth 1 -name '*.md' 2>/dev/null | head -1)" ]]; then
+if [[ -z "$(find "$WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]]; then
     echo "[WARN] .analysis/ has no evaluation files — check may not have run" >&2
 fi
 
@@ -218,7 +236,7 @@ fi
 # 3. Determine task type for VFP applicability
 # D3: python3 call with fallback
 TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
-TYPE=${TYPE:-""}
+# D1: Empty string is valid — indicates unknown type, VFP checks will be skipped
 
 # D1: Determine step range
 if [[ -n "$TARGET_STEP" ]]; then
@@ -267,7 +285,7 @@ EOF
 
     # 9.9 Update completed_steps
     # D3: python3 call with error handling
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --completed-steps "$STEP" 2>&1; then
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --completed-steps "$STEP"; then
         echo "[WARN] Failed to update progress for step $STEP" >&2
     fi
 
@@ -288,7 +306,7 @@ cat > "${SUMMARY_FILE}.tmp" <<EOF
 # Execution Summary — $NOTEBOOK
 
 - **Date**: $DATE
-- **Steps completed**: $STEP_END / $TOTAL_STEPS
+- **Steps completed**: $STEP_END/$TOTAL_STEPS
 - **Task type**: ${TYPE:-unknown}
 - **Result**: $EXEC_RESULT
 EOF

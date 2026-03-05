@@ -344,7 +344,7 @@ No retry at pre-merge — failure means the deliverable needs more Phase 3 work 
 
 | File | When Created | Content |
 |------|-------------|---------|
-| `.analysis/<date>-<summary>.md` | post-plan, mid-exec (BLOCKED), post-exec | Feasibility analysis, blocking analysis, or issue list. One file per assessment, preserving evaluation history |
+| `.analysis/<date>-<summary>.md` | post-plan, mid-exec (BLOCKED), post-exec, pre-merge | Feasibility analysis, blocking analysis, or issue list. One file per assessment, preserving evaluation history |
 | `.bugfix/<date>-<summary>.md` | mid-exec (NEEDS_FIX, REPLAN) | Issue analysis, root cause, fix approach. One file per issue |
 | `.test/<date>-<checkpoint>-results.md` | mid-exec, post-exec | Test outcomes for criteria verification. One file per checkpoint evaluation |
 

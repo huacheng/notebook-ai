@@ -26,6 +26,12 @@ if [[ -z "$ACTION" ]]; then
     exit 1
 fi
 
+# D3: Validate action before resolve_workdir to avoid confusing errors
+case "$ACTION" in
+    verify-cmd|audit-plan|scan-skill) ;;
+    *) echo "[ERROR] Unknown action: $ACTION" >&2; exit 1 ;;
+esac
+
 # scan-skill doesn't require a working directory
 if [[ "$ACTION" != "scan-skill" ]]; then
     resolve_workdir "$NOTEBOOK"
@@ -112,7 +118,8 @@ verify_cmd() {
     fi
 
     # 6. Sensitive path access
-    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(~/\.claude|~/\.anthropic|~/\.ssh|~/\.aws|~/\.netrc|/etc/shadow|credentials\.json|auth\.json)"; then
+    # D2: Parity with scan_skill CORE-007 — include /etc/passwd and ~/.config/claude
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "(~/\.claude|~/\.config/claude|~/\.anthropic|~/\.ssh|~/\.aws|~/\.netrc|/etc/passwd|/etc/shadow|credentials\.json|auth\.json)"; then
         risk="high"
         reason="Sensitive path access"
     fi
@@ -221,7 +228,8 @@ audit_plan() {
     fi
 
     # Two-stage loading (pipe)
-    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch).*\|.*(bash|sh|zsh|python|perl|ruby|node)"; then
+    # D1: Parity with verify_cmd — include optional /bin/ prefix for shell binaries
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
         risk="high"
         findings+=("two_stage_loading:pipe")
     fi
@@ -238,6 +246,13 @@ audit_plan() {
         findings+=("env_manipulation")
     fi
 
+    # Path traversal
+    # D1: Parity with verify_cmd rule 5
+    if printf '%s\n' "$content" | grep -qE "\.\./"; then
+        risk="high"
+        findings+=("path_traversal")
+    fi
+
     # Injection / obfuscation patterns
     if printf '%s\n' "$content" | grep -qE 'eval\s*\(|base64\s+-d|<system>|ignore previous|forget.*instruction'; then
         risk="high"
@@ -252,8 +267,8 @@ audit_plan() {
     fi
 
     # Sensitive path access in plan
-    # D6: Consistent tilde escaping with verify_cmd rule 6; added ~/\.anthropic, ~/\.netrc, auth\.json
-    if printf '%s\n' "$content" | grep -qiE "(cat|read|cp|curl.*-d).*(~/\.claude|~/\.anthropic|~/\.ssh|~/\.aws|~/\.netrc|/etc/shadow|credentials\.json|auth\.json)"; then
+    # D2: Parity with verify_cmd rule 6 and scan_skill CORE-007; includes /etc/passwd, ~/.config/claude
+    if printf '%s\n' "$content" | grep -qiE "(cat|read|cp|curl.*-d).*(~/\.claude|~/\.config/claude|~/\.anthropic|~/\.ssh|~/\.aws|~/\.netrc|/etc/passwd|/etc/shadow|credentials\.json|auth\.json)"; then
         risk="high"
         findings+=("sensitive_path_access")
     fi
@@ -376,7 +391,8 @@ scan_skill() {
     fi
 
     # CORE-003: Two-stage loading (download & execute)
-    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch).*\|.*(bash|sh|zsh|python|perl|ruby|node)"; then
+    # D1: Include optional /bin/ prefix for parity with verify_cmd/audit_plan
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
         risk="high"
         findings+=("two_stage_loading:pipe")
     fi
@@ -438,7 +454,7 @@ scan_skill() {
     # Sensitive paths that should never be read
     local sensitive_paths=(
         '~/\.claude'
-        '~/.config/claude'
+        '~/\.config/claude'
         '~/\.anthropic'
         'credentials\.json'
         'auth\.json'
@@ -516,6 +532,11 @@ case "$ACTION" in
         audit_plan
         ;;
     scan-skill)
+        # D2: Validate payload is provided before calling scan_skill
+        if [[ -z "$PAYLOAD" ]]; then
+            echo "[ERROR] scan-skill requires a file path as payload." >&2
+            exit 1
+        fi
         scan_skill "$PAYLOAD"
         ;;
     *)

@@ -81,7 +81,7 @@ On successful merge:
    b. **Update** `.status.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
    c. **Git commit** state: `task-ai(<notebook>):merge task completed`
 
-**Atomicity**: In the stage-done branch, status change (step 3c) occurs AFTER `.summary.md` and `.target.md` writes (steps 3a-3b). If steps 3a-3b fail, status remains `executing` — user can retry merge. If step 3c succeeds but 3d fails, status is `stage-done` — auto re-enters from stage-done entry point (highlight → report), no repeated merge.
+**Atomicity**: In the stage-done code path, status change (step 3c) occurs AFTER `.summary.md` and `.target.md` writes (steps 3a-3b). If steps 3a-3b fail, status remains `executing` — user can retry merge. If step 3c succeeds but 3d fails, status is `stage-done` — auto re-enters from stage-done entry point (highlight → report), no repeated merge.
 
 > **Note**: Merge does NOT delete branches or worktrees. The user can clean them up manually or via a separate cleanup command when ready.
 
@@ -135,6 +135,7 @@ On successful merge:
 | Dependency not met | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 | No ACCEPT verdict | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "no-accept", "timestamp": "..." }` |
 | Checkout failed | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "checkout-failed", "timestamp": "..." }` |
+| State transition failed | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "state-transition-failed", "timestamp": "..." }` |
 
 ## Notes
 

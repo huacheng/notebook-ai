@@ -52,14 +52,14 @@ $NB_WORKSPACES_ROOT/
 │   ├── .changelog-archive/            # 月度归档目录（首次创建时初始化空目录）
 │   ├── .master-index.md               # 扁平总索引（空表头，git 追踪）
 │   ├── .type-registry.md              # 任务类型注册表（从 seed-types 初始化）
-│   └── .memory/                       # 系统管理知识库（子目录惰性创建）
+│   └── .memory/                       # 系统管理知识库（子目录由 init-lib.sh 创建）
 │
 └── <project_name>/
     ├── .status.json                    # Project metadata
     └── <notebook_name>/
         └── .working/
             ├── .status.json            # Task metadata (JSON) — machine-readable
-            └── .target.md             # Task target / requirements — human-authored
+            └── .target.md              # Task target / requirements — human-authored
 ```
 
 ## .status.json JSON Schema
@@ -131,7 +131,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 ## Execution Steps
 
 1. **Validate** project_name and notebook_name: both must match `[a-zA-Z0-9_-]+` (ASCII letters, digits, hyphens, underscores), no whitespace, no leading dot, no path separators
-2. **Check** `$NB_WORKSPACES_ROOT/` directory exists; create if missing. Check `$NB_WORKSPACES_LIBRARY/` (= `$NB_WORKSPACES_ROOT/.library/`) exists; if missing, create the library skeleton: `.changelog` (empty file), `.changelog-archive/` (empty directory — git won't track it until `maintain --compact` writes the first archive file), `.master-index.md` (empty table header), `.type-registry.md` (initialized from seed types — read `references/seed-types/.summary.md`; see `plan/references/type-profiling.md` for registry format), `.memory/` (empty directory — the four system sub-directories `.memory/.references/`, `.memory/.experiences/`, `.memory/.type-profiles/`, `.memory/.thinking/` are created lazily by each sub-command on first write). `.plugin-registry.md` is created lazily by the `auto` sub-command on first successful plugin delegation. **Gitignore setup** (idempotent): ensure the following entries exist in `$NB_WORKSPACES_ROOT/.gitignore` (create file if missing; append only missing entries): `.worktrees/`, `**/.working/.auto-signal`, `**/.working/.auto-signal.tmp`, `**/.working/.auto-stop`, `**/.working/.lock`, `**/.working/.library-state.json`, `.library/.changelog`, `.library/.changelog-archive/.lock`, `.library/.memory/.thinking/raw/`, `.library/.memory/.thinking/patterns/.lock`, `.library/.inconsistency.log`, `.library/.ioc.md`, `**/.lock`, `**/.lock.stale.*`
+2. **Check** `$NB_WORKSPACES_ROOT/` directory exists; create if missing. Check `$NB_WORKSPACES_LIBRARY/` (= `$NB_WORKSPACES_ROOT/.library/`) exists; if missing, create the library skeleton: `.changelog` (empty file), `.changelog-archive/` (empty directory — git won't track it until `maintain --compact` writes the first archive file), `.master-index.md` (empty table header), `.type-registry.md` (initialized from seed types hardcoded in `init-lib.sh` — see `references/seed-types/.summary.md` for the type catalog and `plan/references/type-profiling.md` for registry format), `.memory/` (with sub-directories `.memory/.references/`, `.memory/.experiences/`, `.memory/.type-profiles/`, `.memory/.thinking/raw/`, `.memory/.thinking/patterns/` — created eagerly by `init-lib.sh`). `.plugin-registry.md` is created lazily by the `auto` sub-command on first successful plugin delegation. **Gitignore setup** (idempotent): ensure the following entries exist in `$NB_WORKSPACES_ROOT/.gitignore` (create file if missing; append only missing entries): `.worktrees/`, `**/.working/.auto-signal`, `**/.working/.auto-signal.tmp`, `**/.working/.auto-stop`, `**/.working/.lock`, `**/.working/.library-state.json`, `.library/.changelog`, `.library/.changelog-archive/.lock`, `.library/.memory/.thinking/raw/`, `.library/.memory/.thinking/patterns/.lock`, `.library/.inconsistency.log`, `.library/.ioc.md`, `**/.lock`, `**/.lock.stale.*`
 3. **Check** `$NB_WORKSPACES_ROOT/<project_name>/` exists; create if missing (with `.status.json`)
 4. **Check** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/` does not already exist; abort with error if it does
 5. **Check branch collision**: verify `task/<notebook_name>` branch does not already exist (`git branch --list task/<notebook_name>`). If exists, abort with error suggesting `--cleanup` the old task or choose a different name
@@ -142,6 +142,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 10. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.working/` directory. In worktree mode, all paths below are translated to the worktree directory (e.g., `<worktree>/<relative-path-from-repo-root>/...`)
 11. **Create** `.working/.status.json` with JSON:
    - `title`: from `--title` argument or notebook_name
+   - `type`: `""` (empty — auto-discovered by `research` during planning)
    - `status`: `draft`
    - `phase`: `""` (empty)
    - `completed_steps`: `0`
@@ -157,15 +158,12 @@ Dependencies reference other task modules. Two formats — simple string (requir
     # Task Target: <title>
 
     ## Objective
-
     <!-- Describe the goal of this task -->
 
     ## Requirements
-
     <!-- List specific requirements -->
 
     ## Constraints
-
     <!-- Any constraints or limitations -->
     ```
 13. **Git commit**: `task-ai(<notebook_name>):init initialize notebook`

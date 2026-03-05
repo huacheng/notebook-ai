@@ -248,9 +248,9 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
 
         # Generate filename from topic (sanitize + validate)
         FILENAME=$(echo "$TOPIC" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-' | head -c 50)
-        # D2/D3: Guard against empty, dash-only, or leading-dash filenames
-        FILENAME="${FILENAME#-}"  # Strip leading dash to prevent option confusion
-        if [[ -z "$FILENAME" ]] || [[ "$FILENAME" == "-" ]]; then
+        # D2/D3: Strip ALL leading dashes to prevent option confusion (e.g., "--help" → "help")
+        while [[ "$FILENAME" == -* ]]; do FILENAME="${FILENAME#-}"; done
+        if [[ -z "$FILENAME" ]]; then
             FILENAME="research-$(date +%s)"
         fi
         FILEPATH="$REFS_DIR/${FILENAME}.md"
@@ -354,7 +354,8 @@ SIGNAL_EOF
     post_write_maintain
 
 elif [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
-    STAGE=$(detect_stage)
+    # D3: Tolerate detect_stage failure (missing script, unreadable file) under set -e
+    STAGE=$(detect_stage) || true
     # D2: Validate STAGE for safe characters (prevent injection)
     # Allow colon for PENDING:O1/O2/O3 format
     STAGE=$(echo "$STAGE" | tr -cd 'A-Za-z0-9_-:')
@@ -401,7 +402,8 @@ else
     # Default flow: search library first, then research gaps
     if [[ -f "$TARGET_MD" ]]; then
         # Extract keywords from target for library search
-        KEYWORDS=$(grep -E "^##|^-" "$TARGET_MD" | head -5 | tr '\n' ' ')
+        # D3: grep returns 1 on no match; || true prevents set -euo pipefail from aborting
+        KEYWORDS=$(grep -E "^##|^-" "$TARGET_MD" 2>/dev/null | head -5 | tr '\n' ' ' || true)
         if [[ -n "$KEYWORDS" ]]; then
             echo "[research] Searching library for: $KEYWORDS"
             library_search "$KEYWORDS"
@@ -415,10 +417,20 @@ else
     NEXT_PHASE="${CALLER:-plan}"
     # Normalize: empty or unknown callers default to plan
     case "$NEXT_PHASE" in
-        plan|test|verify|check|exec|library) ;; # valid
+        plan|verify|check|exec|library) ;; # valid direct-route callers
+        test)
+            # D1: --caller test routes based on current task status per SKILL.md Test-S2a/S2b
+            TASK_STATUS=""
+            if [[ -f "$WORK_DIR/.status.json" ]]; then
+                TASK_STATUS=$(python3 "$TASK_AI_ROOT/core/state.py" get "$WORK_DIR/.status.json" status 2>/dev/null || echo "")
+            fi
+            case "$TASK_STATUS" in
+                executing|review) NEXT_PHASE="verify" ;;
+                *)                NEXT_PHASE="plan" ;;   # planning/draft/unknown → plan
+            esac
+            ;;
         *) NEXT_PHASE="plan" ;;
     esac
-    # For --caller test, route depends on status (plan vs verify) — simplified to caller
     cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
 { "step": "research", "result": "(collected)", "next": "$NEXT_PHASE", "checkpoint": "post-research", "timestamp": "$(date -Iseconds)" }
 SIGNAL_EOF

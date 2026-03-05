@@ -16,6 +16,11 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --refine)
             REFINE_MODE=1
+            # D2: Validate that --refine's value is not another flag
+            if [[ "${2:-}" == --* ]]; then
+                echo "[ERROR] --refine requires a content argument, got '$2'" >&2
+                exit 1
+            fi
             OBJECTIVE="${2:-}"
             shift 2 || shift
             ;;
@@ -61,6 +66,13 @@ CURRENT_STATUS="${CURRENT_STATUS:-draft}"
 # D1: Reject completed/cancelled tasks (SKILL.md State Transitions table)
 if [[ "$CURRENT_STATUS" == "complete" || "$CURRENT_STATUS" == "cancelled" ]]; then
     echo "[ERROR] Completed/cancelled tasks cannot be re-targeted." >&2
+    exit 1
+fi
+
+# D1: stage-done requires archive operations (SKILL.md step 2a) which are
+# handled by the agent, not this script. Refuse direct script invocation.
+if [[ "$CURRENT_STATUS" == "stage-done" ]] && [[ -n "${OBJECTIVE:-}" || "$REFINE_MODE" -eq 1 ]]; then
+    echo "[ERROR] Status is 'stage-done'. Stage advance requires archive operations — use the agent workflow, not direct script invocation." >&2
     exit 1
 fi
 
@@ -112,8 +124,9 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     fi
 
     DATE=$(date "+%Y-%m-%d %H:%M")
-    # D2: Use printf to avoid echo interpreting -n/-e as options
-    REFINEMENT_LINE=$(printf '- [%s] %s' "$DATE" "$OBJECTIVE")
+    # D2: Direct string assignment — avoids echo -n/-e interpretation and
+    # printf format specifier injection from user content (e.g., "50% done")
+    REFINEMENT_LINE="- [$DATE] $OBJECTIVE"
 
     # D1: Append refinement within Refinements section (not at file end)
     if grep -q "^## Refinements" "$TARGET_FILE"; then
@@ -173,12 +186,12 @@ OBJECTIVE_PLACEHOLDER
 <!-- Any constraints or limitations -->
 TARGET_END
     # D2: Use awk ENVIRON for safe substitution (handles newlines, special chars)
-    # D2: Escape & in replacement strings — awk gsub treats & as matched text
+    # D2: Escape \ and & in replacement strings — awk gsub treats \ as escape and & as matched text
     TMP_FILE=$(mktemp) || { echo "[ERROR] Failed to create temp file" >&2; exit 1; }
     AWK_NB="$NB_NOTEBOOK" AWK_OBJ="$OBJECTIVE" awk '
         BEGIN {
-            nb = ENVIRON["AWK_NB"]; gsub(/&/, "\\\\&", nb)
-            obj = ENVIRON["AWK_OBJ"]; gsub(/&/, "\\\\&", obj)
+            nb = ENVIRON["AWK_NB"]; gsub(/\\/, "\\\\", nb); gsub(/&/, "\\\\&", nb)
+            obj = ENVIRON["AWK_OBJ"]; gsub(/\\/, "\\\\", obj); gsub(/&/, "\\\\&", obj)
         }
         { gsub(/NOTEBOOK_PLACEHOLDER/, nb); gsub(/OBJECTIVE_PLACEHOLDER/, obj); print }
     ' "$TARGET_FILE" > "$TMP_FILE"
@@ -210,10 +223,8 @@ fi
 # NOTE: stage-done is NOT transitioned here — SKILL.md step 2a requires archive
 # (steps 4-5) BEFORE status change. The agent handles stage-done → planning
 # after performing archive operations. See SKILL.md "Atomicity" note.
-if [[ -f "$STATUS_FILE" ]]; then
-    if ! command -v jq &>/dev/null; then
-        echo "[WARN] jq not found — cannot update .status.json status transition" >&2
-    fi
+if [[ -f "$STATUS_FILE" ]] && ! command -v jq &>/dev/null; then
+    echo "[WARN] jq not found — cannot update .status.json status transition" >&2
 fi
 if [[ -f "$STATUS_FILE" ]] && command -v jq &>/dev/null; then
     NEW_STATUS=""

@@ -27,9 +27,9 @@ arguments:
     required: false
     default: gap
   - name: caller
-    description: "Calling phase: target (default), plan, test, verify, check, exec, library, or audit — determines output routing"
+    description: "Calling phase: target, plan, test, verify, check, exec, library, or audit — determines output routing. When omitted, runs generic reference collection (routes to plan)"
     required: false
-    default: target
+    default: ""
   - name: phase
     description: "Sub-phase for --caller target: objective (default, 3-stage: o1→o2→o3) or requirements"
     required: false

@@ -291,7 +291,7 @@ EOYAML
 
         # Commit to library
         local lib_commit="$SCRIPT_DIR/lib-commit.sh"
-        if [[ -x "$lib_commit" ]]; then
+        if [[ -f "$lib_commit" ]]; then
             bash "$lib_commit" --system evolve "add $core_id $name" "$rule_yaml"
         fi
 
@@ -472,7 +472,7 @@ Log:    $log_path
 
 Quick Setup (copy & run):
 -------------------------
-cat > "$script_path" << 'EOSCRIPT'
+cat > "$script_path" <<EOSCRIPT
 #!/bin/bash
 cd "$workspace" || exit 1
 claude --print "/task-ai library evolve --full" 2>&1 >> "$log_path"

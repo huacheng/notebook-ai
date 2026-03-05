@@ -55,12 +55,17 @@ if [[ " $LIBRARY_ONLY_CHECKPOINTS " =~ " $CHECKPOINT " ]]; then
     STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 else
     # Normal notebook-context checkpoints
+    # D3: Validate notebook argument before resolving
+    if [[ -z "$NOTEBOOK" ]]; then
+        echo "[ERROR] Notebook name required for checkpoint '$CHECKPOINT'." >&2
+        exit 1
+    fi
     resolve_workdir "$NOTEBOOK"
     NOTEBOOK="$NB_NOTEBOOK"
     STATUS_JSON="$WORK_DIR/.status.json"
 
     if [[ ! -d "$WORK_DIR" ]]; then
-        echo "[ERROR] Working directory not found." >&2
+        echo "[ERROR] Working directory not found for notebook '$NOTEBOOK'." >&2
         exit 1
     fi
 
@@ -87,7 +92,7 @@ else
 
     ANALYSIS_DIR="$WORK_DIR/.analysis"
     mkdir -p "$ANALYSIS_DIR"
-    STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+    STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 fi
 
 # D3: Check state.py existence before calling
@@ -140,14 +145,20 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
     calculate_precision() {
         local rule_file="$1"
         local test_dir="$2"
+        local result
 
         if [[ -f "$YAML_PARSER" ]]; then
             # Use Python parser for robust YAML handling
-            python3 "$YAML_PARSER" calculate-precision "$rule_file" "$test_dir" 2>/dev/null || echo "0.75"
+            result=$(python3 "$YAML_PARSER" calculate-precision "$rule_file" "$test_dir" 2>/dev/null || echo "0.75")
         else
             # Fallback: default precision if parser unavailable
-            echo "0.75"
+            result="0.75"
         fi
+        # D3: Guard against empty output — default to 0.75 if result is empty or non-numeric
+        if [[ -z "$result" || ! "$result" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+            result="0.75"
+        fi
+        echo "$result"
     }
 
     # B2: D2 Security check before activation
@@ -642,7 +653,8 @@ if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
     fi
 
     # Check for hidden side effects (write/delete/send without mention in description)
-    if grep -qiE "(write|delete|remove|send|post|push)" "$TARGET_FILE" 2>/dev/null; then
+    # D1: Use targeted patterns to avoid false positives on common words (post-plan, git push)
+    if grep -qiE "(write file|write to|delete file|remove dir|send request|send data|push to remote)" "$TARGET_FILE" 2>/dev/null; then
         if ! echo "$DESCRIPTION" | grep -qiE "(write|delete|remove|send|modify|update)"; then
             L3_D1_SCORE=$(echo "$L3_D1_SCORE - 0.2" | bc)
             L3_D1_ISSUES="${L3_D1_ISSUES}\n- Potential hidden side effects not in description"
@@ -673,7 +685,8 @@ if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
     fi
 
     # Prompt injection vectors
-    if grep -qiE "user.*input.*directly|inject|ignore.*instruction" "$TARGET_FILE"; then
+    # D1: Match injection attack patterns, not defensive mentions like "injection prevention"
+    if grep -qiE "user.*input.*directly|inject.*into|ignore.*instruction|override.*system" "$TARGET_FILE"; then
         L3_D2_SCORE=$(echo "$L3_D2_SCORE - 0.4" | bc)
         L3_D2_ISSUES="${L3_D2_ISSUES}\n- Prompt injection vulnerability"
     fi
@@ -797,7 +810,7 @@ EOF
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Post-plan checkpoint: Security audit-plan pre-hook (per SKILL.md L315)
+# Post-plan checkpoint: Security audit-plan pre-hook (per SKILL.md Step 10)
 # SECURITY_SH defined at top of file (D6)
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$CHECKPOINT" == "post-plan" ]]; then
@@ -946,7 +959,7 @@ EOF
 import json, sys
 try:
     with open(sys.argv[1]) as f: d = json.load(f)
-except: d = {}
+except Exception: d = {}
 d.update({'step':'check','result':'PASS','next':'merge','checkpoint':'pre-merge','timestamp':'$(date -Iseconds)'})
 with open(sys.argv[1],'w') as f: json.dump(d,f)
 " "$WORK_DIR/.auto-signal" 2>/dev/null || {
@@ -1006,15 +1019,15 @@ EOF
 import json, sys
 try:
     with open(sys.argv[1]) as f: d = json.load(f)
-except: d = {}
-d.update({'step':'check','result':'NEEDS_FIX','next':'exec','checkpoint':'pre-merge','timestamp':'$(date -Iseconds)'})
+except Exception: d = {}
+d.update({'step':'check','result':'NEEDS_FIX','next':'exec','checkpoint':'pre-merge','retry_count':0,'timestamp':'$(date -Iseconds)'})
 with open(sys.argv[1],'w') as f: json.dump(d,f)
 " "$WORK_DIR/.auto-signal" 2>/dev/null || {
-                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$(date -Iseconds)\"}"
+                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$(date -Iseconds)\"}"
                 echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
             }
         else
-            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$(date -Iseconds)\"}"
+            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$(date -Iseconds)\"}"
             echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
         fi
     fi
@@ -1028,10 +1041,28 @@ fi
 # (post-plan without security block, post-exec, mid-exec)
 # In real AI agent run, this would be a reasoned verdict from LLM evaluation.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# D1: Validate checkpoint-status compatibility per SKILL.md Step 2
+CURRENT_STATUS=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['status'])" "$STATUS_JSON" 2>/dev/null || echo "unknown")
 case "$CHECKPOINT" in
-  post-plan)  VERDICT="PASS" ;;
-  post-exec)  VERDICT="ACCEPT" ;;
-  mid-exec)   VERDICT="CONTINUE" ;;
+  post-plan)
+    if [[ "$CURRENT_STATUS" != "planning" && "$CURRENT_STATUS" != "re-planning" ]]; then
+        echo "[ERROR] post-plan requires status=planning or re-planning, got $CURRENT_STATUS" >&2
+        exit 1
+    fi
+    VERDICT="PASS" ;;
+  post-exec)
+    if [[ "$CURRENT_STATUS" != "executing" ]]; then
+        echo "[ERROR] post-exec requires status=executing, got $CURRENT_STATUS" >&2
+        exit 1
+    fi
+    VERDICT="ACCEPT" ;;
+  mid-exec)
+    if [[ "$CURRENT_STATUS" != "executing" ]]; then
+        echo "[ERROR] mid-exec requires status=executing, got $CURRENT_STATUS" >&2
+        exit 1
+    fi
+    VERDICT="CONTINUE" ;;
   *)
     echo "[ERROR] Unhandled checkpoint: $CHECKPOINT" >&2
     exit 1

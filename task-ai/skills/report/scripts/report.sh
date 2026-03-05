@@ -41,7 +41,8 @@ fi
 
 # D3: Concurrency — acquire .lock before proceeding (with stale lock recovery)
 LOCK_FILE="$WORK_DIR/.lock"
-cleanup_lock() { rm -f "$LOCK_FILE"; }
+_LOCK_ACQUIRED=false
+cleanup_lock() { if $_LOCK_ACQUIRED; then rm -f "$LOCK_FILE"; fi; }
 trap cleanup_lock EXIT INT TERM
 if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
     # D3: Stale lock recovery — check if holding PID is still alive
@@ -53,17 +54,27 @@ if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
             echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
             exit 1
         fi
+        _LOCK_ACQUIRED=true
     else
         echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
         exit 1
     fi
+else
+    _LOCK_ACQUIRED=true
 fi
 
 # 1. Gather Metadata (D3: python3 calls with error handling)
 TITLE=$(python3 "$STATE_PY" get "$STATUS_JSON" title 2>/dev/null || echo "$NOTEBOOK")
 STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "unknown")
 CREATED=$(python3 "$STATE_PY" get "$STATUS_JSON" created 2>/dev/null || echo "unknown")
-COMPLETED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# D1: Use actual completion timestamp from status.json if available, else fall back to now
+COMPLETED=$(python3 "$STATE_PY" get "$STATUS_JSON" completed 2>/dev/null || true)
+if [[ -z "$COMPLETED" || "$COMPLETED" == "None" ]]; then
+    COMPLETED=$(python3 "$STATE_PY" get "$STATUS_JSON" updated 2>/dev/null || true)
+fi
+if [[ -z "$COMPLETED" || "$COMPLETED" == "None" ]]; then
+    COMPLETED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+fi
 TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
 TYPE=${TYPE:-generic}
 
@@ -127,9 +138,9 @@ fi
 # 2. Objective from .target.md
 OBJECTIVE=$(read_file_or "$WORK_DIR/.target.md" "N/A")
 
-# 3. Plan from .plan.md (full content for full format, first 30 lines for summary)
+# 3. Plan from .plan.md
 if [[ -f "$WORK_DIR/.plan.md" ]]; then
-    PLAN_CONTENT=$(cat "$WORK_DIR/.plan.md")
+    PLAN_CONTENT=$(cat "$WORK_DIR/.plan.md" 2>/dev/null || echo "N/A")
 else
     PLAN_CONTENT="N/A"
 fi
@@ -156,7 +167,7 @@ fi
 TIMELINE_SECTION=""
 if [[ -f "$WORK_DIR/.auto-timeline.md" ]]; then
     TIMELINE_SECTION="## Execution Timeline
-$(cat "$WORK_DIR/.auto-timeline.md")
+$(cat "$WORK_DIR/.auto-timeline.md" 2>/dev/null || echo "_Failed to read timeline._")
 "
 fi
 
@@ -192,7 +203,7 @@ fi
 # 11. Compose report in requested format
 if [[ "$FORMAT" == "summary" ]]; then
     # Summary format: status, objective (1 line), key changes, verification result
-    obj_line=$(grep -v -e '^#' -e '^$' "$WORK_DIR/.target.md" 2>/dev/null | head -n 1)
+    obj_line=$(grep -v -e '^#' -e '^$' "$WORK_DIR/.target.md" 2>/dev/null | head -n 1 || true)
     obj_line=${obj_line:-N/A}
     # D6: Format multi-line changes as code block for summary readability
     if [[ "$CHANGES" == "N/A" ]]; then
@@ -257,7 +268,9 @@ else
     echo "[WARN] Failed to write report to $REPORT_FILE" >&2
 fi
 
-echo "Report written to $REPORT_FILE."
+if [[ -f "$REPORT_FILE" ]]; then
+    echo "Report written to $REPORT_FILE."
+fi
 
 # Note: Experience distillation moved to /task-ai:highlight skill
 # This script only generates reports; use highlight for library writes

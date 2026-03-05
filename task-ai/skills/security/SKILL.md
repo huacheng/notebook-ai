@@ -23,7 +23,7 @@ arguments:
     description: "Action to perform: audit-plan, verify-cmd, or scan-skill"
     required: false
   - name: payload
-    description: "Command string (required for verify-cmd) or file path (required for scan-skill)"
+    description: "Command string (required for verify-cmd) or file path (required for scan-skill). Must not be empty for these actions."
     required: false
 ---
 
@@ -44,13 +44,13 @@ Acts as the mandatory Pre-hook for existing sub-commands (`check` and `exec`), e
 ### verify-cmd (Used by `exec`)
 1. Reject empty command strings immediately.
 2. **Dynamic Rules** (Tier 1): Check against evolving rules from `.evolving-rules/security/active/`. Stops on first match.
-3. **Core Pattern Check** (Tier 2, 12 rules): Scan for destructive ops (`rm -rf`), VFP injection (`--eval`, `--require`), two-stage payloads (`curl | bash`), download-then-execute, environment manipulation (`LD_PRELOAD`, `NODE_OPTIONS`, etc.), path traversal (`../`), sensitive path access (`~/.ssh`, `/etc/shadow`), secret exfiltration, command obfuscation (`base64 -d | bash`, `${IFS}`), config file tampering (`.claude/`, `.mcp.json`), DNS tunneling, SSRF to internal networks, and reverse shell patterns.
+3. **Core Pattern Check** (Tier 2, 13 rules): Scan for destructive ops (`rm -rf`), VFP injection (`--eval`, `--require`), two-stage payloads (`curl | bash`), download-then-execute, environment manipulation (`LD_PRELOAD`, `NODE_OPTIONS`, etc.), path traversal (`../`), sensitive path access (`~/.ssh`, `~/.config/claude`, `/etc/passwd`), secret exfiltration, command obfuscation (`base64 -d | bash`, `${IFS}`), config file tampering (`.claude/`, `.mcp.json`), DNS tunneling, SSRF to internal networks, and reverse shell patterns.
 4. **Verdict**: If safe, return `[SECURITY] PASS`. If dangerous, return `[SECURITY] REJECT: <reason>`.
 
 ### audit-plan (Used by `check`)
 1. Read `.plan.md`. If absent or empty, PASS.
 2. **Dynamic Rules** (Tier 1): Check against evolving rules from `.evolving-rules/security/active/`.
-3. **Core Pattern Scan** (Tier 2): Check for destructive commands, VFP injection, two-stage payloads, download-then-execute, environment manipulation, injection/obfuscation, config file tampering, sensitive path access, secret exfiltration, DNS tunneling, SSRF to internal networks, and reverse shell patterns.
+3. **Core Pattern Scan** (Tier 2): Check for destructive commands, VFP injection, two-stage payloads, download-then-execute, environment manipulation, path traversal, injection/obfuscation, config file tampering, sensitive path access, secret exfiltration, DNS tunneling, SSRF to internal networks, and reverse shell patterns.
 4. **Verdict**: Return `[SECURITY] PASS` or `[SECURITY] BLOCKED` with findings list.
 5. (Optional) Execute highlight protocol scope=thinking-raw (see `highlight/SKILL.md` section 3.3). Not implemented in `security.sh`; intended for agent-level callers. Inline call failure MUST NOT block security's main flow.
 

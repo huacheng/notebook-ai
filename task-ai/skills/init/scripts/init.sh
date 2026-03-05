@@ -67,7 +67,8 @@ fi
 # 3. Clean working tree check (SKILL.md Step 6)
 # D3: Only block on tracked file modifications; untracked/gitignored files are allowed
 # D3: Verify git status succeeds before relying on its output
-GIT_STATUS_OUTPUT=$(git status --porcelain 2>&1) || {
+# D3: Capture stdout only; stderr warnings (e.g., submodule) must not pollute porcelain output
+GIT_STATUS_OUTPUT=$(git status --porcelain 2>/dev/null) || {
     echo "[ERROR] git status failed — cannot verify clean working tree." >&2
     exit 1
 }
@@ -93,7 +94,7 @@ cleanup() {
         if [[ -z "$CLEANUP_WORKTREE" ]]; then
             git checkout - 2>/dev/null || true
         fi
-        git branch -d "$CLEANUP_BRANCH" 2>/dev/null || true
+        git branch -D "$CLEANUP_BRANCH" 2>/dev/null || true
     fi
 }
 trap cleanup ERR INT TERM

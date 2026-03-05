@@ -215,14 +215,14 @@ You have access to the [{plugin_name}] skill/tool.
 {1-3 sentence description of what is needed}
 
 **Input data**:
-{Relevant excerpt: file path, git diff summary, code snippet, or document path — keep under 2000 chars}
+{Relevant excerpt: file path, git diff summary, code snippet, or document path — keep under per-slot Input Limit (see Dynamic Context Budget table)}
 
 **Instructions**:
 1. Invoke the [{plugin_name}] skill/tool with the input data
 2. Analyze the result
 3. Return a structured summary (see output format below)
 
-**Output format** (strict, <=500 chars total):
+**Output format** (strict, <={per-slot Output Limit} chars total):
 ## Findings
 - [Key finding 1]
 - [Key finding 2]
@@ -245,7 +245,7 @@ The subagent returns a structured summary with three sections:
 | **Action Items** | Concrete, actionable recommendations | 1-3 bullet points |
 | **Confidence** | `high` / `medium` / `low` with 1-sentence rationale | 1 line |
 
-Total output: <=500 characters. The calling skill incorporates this as supplementary input.
+Default output: <=500 characters. Per-slot overrides apply (see Dynamic Context Budget table above — e.g., `doc-parse` allows up to 2000 chars). The calling skill incorporates this as supplementary input.
 
 ### Output Processing (Sanitization)
 
@@ -269,7 +269,7 @@ if (result.risk_level === 'high') {
 | 1 | Direct instruction injection | `<!-- -->`, `<system>`, "ignore previous" | high |
 | 2 | Unicode hidden attacks | Zero-width chars, bidirectional control | medium |
 | 3 | ANSI terminal sequences | `\x1b[...` escape codes | medium |
-| 4 | Resource exhaustion | Output > 600 chars | low |
+| 4 | Resource exhaustion | Output > per-slot Output Limit × 1.2 | low |
 | 5 | System format impersonation | `{"step":`, `.auto-signal`, `task-ai(` | high |
 | 6 | Encoding obfuscation | `base64 -d`, hex sequences | high |
 | 7 | Two-stage loading | `curl \|`, `wget \|`, `eval(` | high |

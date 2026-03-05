@@ -68,7 +68,9 @@ def parse_yaml_file(filepath: str) -> dict:
                 continue
 
             # Strip quotes and process escape sequences
+            was_quoted = False
             if value.startswith('"') and value.endswith('"'):
+                was_quoted = True
                 value = value[1:-1]
                 # Process YAML double-quote escape sequences
                 value = value.replace('\\\\', '\x00')  # Temp placeholder
@@ -78,14 +80,16 @@ def parse_yaml_file(filepath: str) -> dict:
                 value = value.replace('\\"', '"')
                 value = value.replace('\x00', '\\')  # Restore single backslash
             elif value.startswith("'") and value.endswith("'"):
+                was_quoted = True
                 # Single quotes: no escape processing (literal)
                 value = value[1:-1]
 
-            # Convert boolean strings
-            if value.lower() == 'true':
-                value = True
-            elif value.lower() == 'false':
-                value = False
+            # D1: Only convert unquoted values to booleans (quoted "true" stays string)
+            if not was_quoted:
+                if value.lower() == 'true':
+                    value = True
+                elif value.lower() == 'false':
+                    value = False
 
             result[key] = value
 

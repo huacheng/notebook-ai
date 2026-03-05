@@ -206,7 +206,7 @@ elif [[ $CHANGES -gt 0 ]]; then
     if ! git add .; then
         echo "[WARN] git add failed during structure update" >&2
     elif ! git diff --cached --quiet; then
-        git commit -m "task-ai(library):init补缺 add missing structure" || echo "[WARN] git commit failed" >&2
+        git commit -m "task-ai(library):init add missing structure" || echo "[WARN] git commit failed" >&2
     fi
     echo "Library structure updated."
 else

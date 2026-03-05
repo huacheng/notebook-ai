@@ -114,7 +114,8 @@ case "$STATUS" in
         if grep -q '\[PROPOSED\]' "$TARGET_MD"; then
             echo "[PAUSE] Pending [PROPOSED] items in .target.md — review and confirm before continuing"
             exit 0
-        elif ! grep -q '## Research Insights' "$TARGET_MD"; then
+        elif ! grep -q '## Research Insights' "$TARGET_MD" || \
+             [ "$(sed -n '/## Research Insights/,/^## /{ /^## /d; /^[[:space:]]*$/d; p; }' "$TARGET_MD" | wc -l)" -eq 0 ]; then
             STEP="research"
             RESULT="(o1-collected)"
             NEXT_STEP="(stop)"
@@ -143,7 +144,7 @@ case "$STATUS" in
         RESULT="(pass)"
         NEXT_STEP="check"
         ;;
-      needs-plan|""|*)
+      needs-plan|*)
         # D1: Explicitly match needs-plan per SKILL.md §Entry Point; empty/unknown defaults to plan
         STEP="plan"
         RESULT="(generated)"
@@ -221,13 +222,18 @@ if stage_raw:
         stage = json.loads(stage_raw)
     except (json.JSONDecodeError, ValueError):
         pass
+try:
+    iteration = int(sys.argv[5])
+    compaction = int(sys.argv[6])
+except (ValueError, IndexError):
+    iteration, compaction = 1, 0
 signal = {
     "step": sys.argv[2],
     "result": sys.argv[3],
     "next": sys.argv[4],
     "checkpoint": checkpoint,
-    "iteration": int(sys.argv[5]),
-    "compaction_count": int(sys.argv[6]),
+    "iteration": iteration,
+    "compaction_count": compaction,
     "phase": sys.argv[7],
     "phase_progress": 0.0,
     "stage": stage,

@@ -232,7 +232,11 @@ fetch_nist_nvd() {
 
     # Build query URL with date parameter
     local seven_days_ago
-    seven_days_ago=$(date -d '7 days ago' +%Y-%m-%dT00:00:00.000 2>/dev/null || date -v-7d +%Y-%m-%dT00:00:00.000 2>/dev/null || echo "2024-01-01T00:00:00.000")
+    # D3: Use python3 as a portable fallback for date arithmetic when neither GNU nor BSD date works
+    seven_days_ago=$(date -d '7 days ago' +%Y-%m-%dT00:00:00.000 2>/dev/null \
+        || date -v-7d +%Y-%m-%dT00:00:00.000 2>/dev/null \
+        || python3 -c "from datetime import datetime,timedelta;print((datetime.now()-timedelta(days=7)).strftime('%Y-%m-%dT00:00:00.000'))" 2>/dev/null \
+        || echo "1970-01-01T00:00:00.000")
 
     local query_url="${url}?pubStartDate=${seven_days_ago}"
 
@@ -290,8 +294,8 @@ fetch_github_advisories() {
 # Main fetch loop - parse sources and dispatch
 FETCH_COUNT=0
 
-# Extract source names from JSON (simplified parsing)
-# In production, use jq or Python for proper JSON handling
+# Bootstrap: creates initial sample candidate and test corpus when no candidates exist.
+# Full YAML source dispatch (jq/Python parsing) is a future enhancement.
 echo "[intel-fetcher] Processing sources..."
 
 # Example: create a sample candidate rule if any source is enabled
@@ -355,7 +359,8 @@ fi
 
 SAMPLE_COUNT=0
 if [[ -n "$TEST_CORPUS_DIR" ]]; then
-    SAMPLE_COUNT=$(find "$TEST_CORPUS_DIR" -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
+    # D4: Limit find depth for consistency with other find invocations
+    SAMPLE_COUNT=$(find "$TEST_CORPUS_DIR" -maxdepth 3 -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
 fi
 
 echo "[intel-fetcher] Fetch complete. New candidates: $FETCH_COUNT, Test samples: $SAMPLE_COUNT"

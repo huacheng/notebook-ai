@@ -18,7 +18,8 @@ CORE_DIR="$SCRIPT_DIR/../../../core"
 source "$CORE_DIR/lib.sh"
 ensure_library
 
-LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
+# D5: Use NB_WORKSPACES_LIBRARY exported by lib.sh (single source of truth)
+LIB_PATH="$NB_WORKSPACES_LIBRARY"
 EXPERIENCES_DIR="$LIB_PATH/.memory/.experiences"
 SKILLS_DIR="$LIB_PATH/.skills"
 CANDIDATES_DIR="$SKILLS_DIR/.candidates"
@@ -155,6 +156,11 @@ generate_slug() {
     if [[ -z "$slug" ]]; then
         slug="unnamed-experience"
     fi
+
+    # D1: Validate slug matches the kebab-case contract from SKILL.md §3.6
+    # Strip any characters not matching [a-zA-Z0-9-]
+    slug=$(echo "$slug" | sed 's/[^a-zA-Z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+    [[ -z "$slug" ]] && slug="unnamed-experience"
     echo "$slug"
 }
 
@@ -182,23 +188,24 @@ extract_skill_content() {
     local context=""
 
     # Extract ## Patterns or ## Patterns Discovered
-    if grep -q "^## Patterns" "$exp_file"; then
+    if grep -q "^## Patterns" "$exp_file" 2>/dev/null; then
         patterns=$(extract_section "$exp_file" "Patterns")
     fi
 
     # D6: Extract ## What Worked (maps to "## Steps" in generated skill)
-    if grep -q "^## What Worked" "$exp_file"; then
+    if grep -q "^## What Worked" "$exp_file" 2>/dev/null; then
         what_worked=$(extract_section "$exp_file" "What Worked")
     fi
 
     # Extract ## Context
-    if grep -q "^## Context" "$exp_file"; then
+    if grep -q "^## Context" "$exp_file" 2>/dev/null; then
         context=$(extract_section "$exp_file" "Context")
     fi
 
-    # D2: Sanitize context snippet for YAML — remove quotes, colons at line start, and special chars
+    # D2: Sanitize context snippet for YAML double-quoted string —
+    # remove quotes/backticks, collapse newlines, escape backslashes (YAML interprets \n, \t, etc.)
     local safe_context
-    safe_context=$(echo "${context:0:100}" | tr -d '"'"'"'`' | tr '\n' ' ' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    safe_context=$(echo "${context:0:100}" | tr -d '"'"'"'`' | tr '\n' ' ' | sed 's/\\/\\\\/g' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
 
     # Generate SKILL.md content
     cat <<EOF
@@ -414,7 +421,7 @@ process_experience() {
     # D3: file writes — stderr must NOT mix into stdout (heredoc content)
     if ! extract_skill_content "$exp_file" "$slug" > "$candidate_dir/SKILL.md"; then
         echo "[promote]   ERROR: Failed to write SKILL.md" >&2
-        rm -r "$candidate_dir"
+        rm -rf "$candidate_dir"
         return 1
     fi
     if ! generate_trust_report "$exp_file" "$slug" "$usage_count" > "$candidate_dir/trust-report.md"; then
@@ -497,8 +504,10 @@ else
             if process_experience "$exp_file"; then
                 ((PROMOTED_COUNT++)) || true
             fi
-        # D4: Exclude index/summary files and stage-complete synthesis files (not individual experiences)
-        done < <(find "$EXPERIENCES_DIR" -name "*.md" -type f ! -name ".index.md" ! -name ".summary.md" ! -name "*-stage-*-complete.md" -print0 2>/dev/null)
+        # D4: Exclude index/summary files and complete distillation files (not individual experiences).
+        # Both stage-complete (*-stage-*-complete.md) and final-complete (*-complete.md) are
+        # meta-summaries produced by scope=complete — they should not be promoted into skills.
+        done < <(find "$EXPERIENCES_DIR" -name "*.md" -type f ! -name ".index.md" ! -name ".summary.md" ! -name "*-complete.md" -print0 2>/dev/null)
     fi
 fi
 

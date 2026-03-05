@@ -33,6 +33,8 @@ if [[ ! "$TYPE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     exit 1
 fi
 DESC="$1"; shift
+# D2: Sanitize description — strip control chars and limit length to prevent commit message abuse
+DESC=$(printf '%s' "$DESC" | tr -d '\n\r' | cut -c1-200)
 FILES=("$@")
 
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"

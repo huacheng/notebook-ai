@@ -55,12 +55,12 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
    - Delete `.working/.auto-stop` file if exists
    - Delete `.working/.lock` file if exists — first read lock content and verify the holder: (a) if holder `pid` is dead → delete lock (stale); (b) if holder `session` matches the auto session being cancelled → delete lock (same session); (c) if held by a **different live session** → REJECT with error identifying the holding session — user must stop that session first or use `cancel` from the holding session. Cancel does NOT force-override locks held by other live sessions to prevent concurrent write corruption
 4. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`). If lock is held by a different live session (not the auto session stopped in step 3), REJECT — user must stop that session first
-5. **If uncommitted changes exist**, git commit snapshot: `task-ai(<notebook>):cancel pre-cancel snapshot`
+5. **If uncommitted changes exist**, git commit snapshot: `task-ai(<notebook>):cancel pre-cancel snapshot`. If the snapshot commit fails (e.g., git error), log a warning and continue — the cancel operation should not abort due to a snapshot failure
 6. **Update** `.status.json` (atomic write via `.status.json.tmp` + rename):
    - Set `status` to `cancelled`
    - Update `updated` timestamp
    - If `--reason` provided, add `"cancel_reason"` field with the sanitized reason text
-7. **Write** `.summary.md` with condensed context: previous status (before cancellation), cancellation reason, progress at time of cancellation (`completed_steps`), any known issues
+7. **Write** `.summary.md` (atomic write via `.summary.md.tmp` + rename) with condensed context: previous status (before cancellation), cancellation reason, progress at time of cancellation (`completed_steps`), any known issues
 8. **Git commit**: `task-ai(<notebook>):cancel user cancelled`
 9. **Release** `.working/.lock`
 10. **If `--cleanup`**:
@@ -95,7 +95,7 @@ None — `cancel` does not write `.auto-signal`. It is a lifecycle-terminating c
 
 ## Notes
 
-- **Input sanitization**: The `--reason` text must be sanitized before writing to `.status.json` or `.summary.md` — strip HTML comments, ANSI escape sequences, and control characters (except `\n`) per the Input Validation rules in `commands/task-ai.md`
+- **Input sanitization**: The `--reason` text must be sanitized before writing to `.status.json` or `.summary.md` — strip HTML comments, ANSI escape sequences, and control characters (except `\n` and `\t`) per the Input Validation rules in `commands/task-ai.md`
 - Cancel is rejected on terminal statuses: `complete` (use a separate workflow to reopen) and `cancelled` (already terminal)
 - If the task has uncommitted code changes in a worktree, `--cleanup` will warn before deleting
 - Without `--cleanup`, the branch and worktree are preserved for reference

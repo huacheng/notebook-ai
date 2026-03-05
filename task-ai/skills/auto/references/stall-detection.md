@@ -69,7 +69,7 @@ Monitor `.auto-signal` file timestamp independently of stream activity:
 
 | Limit | Value | Action on Exceed |
 |-------|-------|-----------------|
-| Max recoveries per iteration | 3 | Write `.auto-stop` with reason `"stall_limit"` |
+| Max recoveries per step | 3 | Write `.auto-stop` with reason `"stall_limit"` |
 | Max total recoveries | 10 | Write `.auto-stop` with reason `"stall_limit"` |
 
-Recovery counts are tracked in SQLite (see `backend-api.md` §SQLite State). `recovery_count_step` (per-iteration stall recoveries) resets on each new `.auto-signal` receipt; `recovery_count_total` persists across the entire auto session and does NOT reset. Note: these are stall-recovery counters, distinct from `.auto-signal`'s `retry_count` (which tracks check-triggered retries at a given checkpoint).
+Recovery counts are tracked in SQLite (see `backend-api.md` §SQLite State). `recovery_count_step` (per-step stall recoveries) resets on each new `.auto-signal` receipt; `recovery_count_total` persists across the entire auto session and does NOT reset. Note: these are stall-recovery counters, distinct from `.auto-signal`'s `retry_count` (which tracks check-triggered retries at a given checkpoint).

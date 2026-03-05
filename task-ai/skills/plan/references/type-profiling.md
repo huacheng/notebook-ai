@@ -191,7 +191,7 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
 - **Tool chain**: <specific tools and their roles>
 
 ## Audit Adaptation
-<!-- Domain-specific checkpoints that augment the six-dimension base (see check/references/six-dimension-audit.md) -->
+<!-- Domain-specific checkpoints that augment the six-dimension base (see skills/check/references/six-dimension-audit.md) -->
 <!-- research populates from seed tables + web research; check/verify/exec refine from experience -->
 - **D1 Correctness**: <+domain-specific correctness/verification concerns>
 - **D2 Security**: <+domain-specific security concerns>
@@ -237,7 +237,7 @@ When research needs domain intelligence for a type, it checks sources in this or
 
 ```
 1. $NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md     ← shared profile from prior tasks (most specific; apply directory-safe transform: `:` → `-`)
-2. Per-type seed files                   ← init/references/seed-types/<type>.md (factory defaults)
+2. Per-type seed files                   ← skills/init/references/seed-types/<type>.md (factory defaults)
 3. Web search from scratch              ← fallback for completely unknown types
 ```
 
@@ -258,7 +258,7 @@ For type `A|B`, shared profiles are stored by **primary** type: `$NB_WORKSPACES_
 | Phase | Reads | May Update | Trigger |
 |-------|-------|-----------|---------|
 | research | Entire profile (gap detection) | All sections (new domain info) | Always — research is the primary type intelligence source |
-| plan | All sections (methodology selection) | Domain Classification, Methodology | Initial creation; re-plan if nature changed |
+| plan | All sections (methodology selection) | Domain Classification, Domain Methodology | Initial creation; re-plan if nature changed |
 | verify | Verification Standards | Verification Standards | Testing approach proved inadequate for this domain |
 | check | Verification Standards, Quality metrics, Audit Adaptation | Verification Standards, Audit Adaptation | Evaluation criteria or audit checkpoints mismatched domain norms |
 | exec | Implementation Patterns, Key tools | Implementation Patterns | Discovered tools/patterns differ from profile |

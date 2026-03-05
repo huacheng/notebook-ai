@@ -119,7 +119,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --compact)
       CHANGELOG="$LIB_PATH/.changelog"
-      if [[ -f "$CHANGELOG" ]] && [[ $(wc -l < "$CHANGELOG") -gt 2000 ]]; then
+      if [[ -f "$CHANGELOG" ]] && [[ $(wc -l < "$CHANGELOG") -gt 0 ]]; then
           ARCHIVE_DIR="$LIB_PATH/.changelog-archive"
           # D3: mkdir with error handling
           if ! mkdir -p "$ARCHIVE_DIR"; then
@@ -127,13 +127,14 @@ while [[ $# -gt 0 ]]; do
               exit 1
           fi
           # D1: Archive only entries older than 90 days (per SKILL.md spec)
-          CUTOFF_DATE=$(date -u -d "90 days ago" +%Y-%m-%dT%H:%M 2>/dev/null || date -u -v-90d +%Y-%m-%dT%H:%M 2>/dev/null || date -u +%Y-%m-%dT%H:%M)
+          CUTOFF_DATE=$(date -u -d "90 days ago" +%Y-%m-%dT%H:%M 2>/dev/null || date -u -v-90d +%Y-%m-%dT%H:%M 2>/dev/null || { echo "[WARN] Cannot compute 90-day cutoff; no entries will be archived" >&2; date -u +%Y-%m-%dT%H:%M; })
           DATE_STR=$(date +%Y-%m)
           ARCHIVE_FILE="$ARCHIVE_DIR/$DATE_STR.md"
           # Separate old entries (to archive) from recent entries (to keep)
           AGED_LINES=0
-          touch "${CHANGELOG}.recent"
-          touch "${CHANGELOG}.aged"
+          # D3: Truncate temp files to prevent data mixing from interrupted prior runs
+          : > "${CHANGELOG}.recent"
+          : > "${CHANGELOG}.aged"
           while IFS= read -r line; do
               # Extract ISO8601 timestamp from line start
               line_ts="${line%% |*}"
@@ -163,7 +164,7 @@ while [[ $# -gt 0 ]]; do
               echo "[maintain:compact] No entries older than 90 days to archive"
           fi
       else
-          echo "[maintain:compact] Changelog below 2000-line threshold, skipping"
+          echo "[maintain:compact] Changelog is empty, skipping"
       fi
       shift ;;
 

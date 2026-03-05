@@ -74,4 +74,4 @@ For types not listed, apply equal weights. For hybrid types (`A|B`), merge weigh
 - **No analysis files**: self-audit does NOT write to `.analysis/` (that is check's responsibility)
 - **In-place fixes only**: edit `.plan.md` directly
 - **Non-fatal**: if self-audit crashes or times out, skip and continue to Git commit. Report "Self-audit: skipped (error)" in step 28
-- **Report**: step 28 includes one-line summary — "Self-audit: N issues found and corrected" or "Self-audit: clean"
+- **Report**: step 28 includes one-line summary — "Self-audit: N issues found and corrected" or "Self-audit: clean" or "Self-audit: skipped (error)"

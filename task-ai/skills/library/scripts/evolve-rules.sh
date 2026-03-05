@@ -51,7 +51,7 @@ echo "[evolve-rules] Starting rule evolution for domains: ${DOMAINS[*]}, mode: $
 CHECK_SH="$SCRIPT_DIR/../../check/scripts/check.sh"
 if [[ -f "$CHECK_SH" ]]; then
     echo "[evolve-rules] Phase 1: Validating candidates..."
-    bash "$CHECK_SH" "_evolve" --checkpoint audit-validate 2>/dev/null || true
+    bash "$CHECK_SH" "_evolve" --checkpoint audit-validate || true
 fi
 
 # Report results

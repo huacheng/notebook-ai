@@ -17,7 +17,12 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --type)
       if [[ $# -lt 2 ]]; then echo "[ERROR] --type requires a value" >&2; exit 1; fi
-      TYPE_FILTER="$2"; shift 2 ;;
+      TYPE_FILTER="$2"
+      # D2: Validate type filter to prevent awk injection
+      if [[ ! "$TYPE_FILTER" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+          echo "[ERROR] Invalid type filter: $TYPE_FILTER" >&2; exit 1
+      fi
+      shift 2 ;;
     --limit)
       if [[ $# -lt 2 ]]; then echo "[ERROR] --limit requires a value" >&2; exit 1; fi
       LIMIT="$2"; [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=10; shift 2 ;;

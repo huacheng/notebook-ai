@@ -36,7 +36,7 @@ BASENAME=$(basename "$FILE_PATH")
 TOPIC="${BASENAME%.*}"
 # D2: Sanitize TOPIC for safe YAML embedding and path safety
 # Strip control chars, quotes, colons; also strip / and .. to prevent path traversal
-TOPIC=$(printf '%s' "$TOPIC" | tr -d '\n\r/' | sed 's/\.\./_/g; s/[:"'"'"'`#]/_/g' | head -c 120)
+TOPIC=$(printf '%s' "$TOPIC" | tr -d '\0-\37\177/' | sed 's/\.\./_/g; s/[:"'"'"'`#]/_/g' | head -c 120)
 # D3: Guard against empty topic after sanitization
 if [[ -z "$TOPIC" ]]; then
     TOPIC="unnamed-$(date +%s)"
@@ -64,9 +64,11 @@ DYNAMIC_PATTERNS=()
 if [[ -f "$RULE_LOADER" ]]; then
     source "$RULE_LOADER"
     load_rules_from_domain "sanitization" 2>/dev/null || true
-    for i in "${!RULE_PATTERNS[@]}"; do
-        DYNAMIC_PATTERNS+=("${RULE_PATTERNS[$i]}")
-    done
+    if [[ -n "${RULE_PATTERNS+x}" ]]; then
+        for i in "${!RULE_PATTERNS[@]}"; do
+            DYNAMIC_PATTERNS+=("${RULE_PATTERNS[$i]}")
+        done
+    fi
 fi
 
 # Hardcoded fallback patterns (10 categories from injection-rules.md)
@@ -103,7 +105,8 @@ done
 # D1: Skip truncation if content was already replaced by detox (injection found)
 if [[ "$INJECTION_RISK" == "none" ]]; then
     # D3: Trim whitespace from wc output for reliable numeric comparison
-    FILE_SIZE=$(wc -c < "$FILE_PATH" 2>/dev/null | tr -d ' ' || echo 0)
+    FILE_SIZE=$(wc -c < "$FILE_PATH" 2>/dev/null | tr -d ' ')
+    FILE_SIZE="${FILE_SIZE:-0}"
     if [[ "$FILE_SIZE" -gt 51200 ]]; then
         CONTENT=$(head -c 51200 "$FILE_PATH" 2>/dev/null || echo "")
         CONTENT="${CONTENT}
@@ -157,7 +160,7 @@ acquire_lock() {
             if [[ -n "$held_pid" ]] && ! kill -0 "$held_pid" 2>/dev/null; then
                 # Stale lock: rename-based recovery (TOCTOU safe)
                 if mv "$lock" "${lock}.stale.${held_pid}" 2>/dev/null; then
-                    rm -f "${lock}".stale.* 2>/dev/null
+                    rm -f "${lock}.stale.${held_pid}" 2>/dev/null
                     continue  # retry acquisition
                 fi
             fi
@@ -182,8 +185,10 @@ LOCK_ACQUIRED=1
 REF_FILE="$REF_DIR/$TOPIC.md"
 
 # D3: Set trap immediately after lock acquisition to guarantee cleanup on any exit
+CHANGELOG_LOCK_ACQUIRED=0
 cleanup() {
     [[ "$LOCK_ACQUIRED" -eq 1 ]] && release_lock "$LOCK_FILE"
+    [[ "$CHANGELOG_LOCK_ACQUIRED" -eq 1 ]] && release_lock "${CHANGELOG_LOCK:-}"
     rm -f "${REF_DIR}/${TOPIC}.md.tmp.$$" 2>/dev/null
 }
 trap cleanup EXIT
@@ -249,11 +254,13 @@ fi
 echo "[5/7] Updating changelog and index..."
 CHANGELOG_LOCK="$LIB_PATH/.changelog.lock"
 if acquire_lock "$CHANGELOG_LOCK"; then
+    CHANGELOG_LOCK_ACQUIRED=1
     # D3: Use subshell-style error handling to ensure changelog lock release
     printf '%s | reference | .memory/.references/%s.md | topic:%s,source:local\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TOPIC" "$TOPIC" >> "$LIB_PATH/.changelog" 2>/dev/null \
         || echo "[WARN] Failed to append to changelog" >&2
     release_lock "$CHANGELOG_LOCK" || true
+    CHANGELOG_LOCK_ACQUIRED=0
 else
     echo "[WARN] Failed to acquire .changelog.lock, skipping changelog" >&2
 fi
@@ -264,7 +271,7 @@ INDEX_ROW="| $TOPIC | v$VERSION | — | local | $DATE | no | $INJECTION_RISK |"
 if [[ -f "$INDEX_FILE" ]]; then
     # Check if topic already has a row; update in-place or append
     # D2: Escape TOPIC for safe use in grep/sed regex (dots, brackets, etc.)
-    TOPIC_ESCAPED=$(printf '%s' "$TOPIC" | sed 's/[.[\*^$()+?{}|]/\\&/g')
+    TOPIC_ESCAPED=$(printf '%s' "$TOPIC" | sed 's/[][.\\*^$()+?{}|]/\\&/g')
     if grep -q "^| $TOPIC_ESCAPED |" "$INDEX_FILE" 2>/dev/null; then
         # D3: Use '#' as sed delimiter to avoid conflict with '|' in markdown tables
         sed -i "s#^| $TOPIC_ESCAPED |.*#$INDEX_ROW#" "$INDEX_FILE" 2>/dev/null \

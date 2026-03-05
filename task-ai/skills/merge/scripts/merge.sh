@@ -63,11 +63,13 @@ ANALYSIS_DIR="$WORK_DIR/.analysis"
 if [[ ! -d "$ANALYSIS_DIR" ]]; then
     reject_no_accept "Analysis directory not found. Run 'check --checkpoint post-exec' first."
 fi
-LATEST_ANALYSIS=$(ls -t "$ANALYSIS_DIR"/*.md 2>/dev/null | head -1)
+# D2: Use find instead of ls glob to avoid issues with special-char filenames
+LATEST_ANALYSIS=$(find "$ANALYSIS_DIR" -maxdepth 1 -name '*.md' -printf '%T@\t%p\n' 2>/dev/null | sort -rn | head -1 | cut -f2)
 if [[ -z "$LATEST_ANALYSIS" ]]; then
     reject_no_accept "No analysis files found in $ANALYSIS_DIR. Run 'check --checkpoint post-exec' first."
 fi
-if ! grep -qi "post-exec-accept\|verdict.*accept" "$LATEST_ANALYSIS" 2>/dev/null; then
+# D1: Use -E for portable extended regex; anchor "accept" to avoid matching "not-accept"
+if ! grep -qiE "post-exec-accept|verdict[: ]+accept" "$LATEST_ANALYSIS" 2>/dev/null; then
     reject_no_accept "No ACCEPT verdict found in latest analysis file. Run 'check --checkpoint post-exec' first."
 fi
 
@@ -102,10 +104,11 @@ fi
 MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "")
 
 # D3: Fallback chain — try "main", then "master"
-if [[ -z "$MAIN_BRANCH" ]] || ! git rev-parse --verify "$MAIN_BRANCH" >/dev/null 2>&1; then
-    if git rev-parse --verify "main" >/dev/null 2>&1; then
+# D3: Use refs/heads/ prefix to ensure we match local branches, not tags
+if [[ -z "$MAIN_BRANCH" ]] || ! git rev-parse --verify "refs/heads/$MAIN_BRANCH" >/dev/null 2>&1; then
+    if git rev-parse --verify "refs/heads/main" >/dev/null 2>&1; then
         MAIN_BRANCH="main"
-    elif git rev-parse --verify "master" >/dev/null 2>&1; then
+    elif git rev-parse --verify "refs/heads/master" >/dev/null 2>&1; then
         MAIN_BRANCH="master"
     else
         echo "[ERROR] No main/master branch found." >&2
@@ -142,10 +145,11 @@ EOF
     exit 1
 fi
 
-MERGE_OK=0
-git merge --no-ff -m "task-ai($NOTEBOOK):merge merge completed task" -- "$TASK_BRANCH" || MERGE_OK=1
+# D6: Variable name reflects semantics — 0 = no failure, 1 = failure
+MERGE_FAILED=0
+git merge --no-ff -m "task-ai($NOTEBOOK):merge merge completed task" -- "$TASK_BRANCH" || MERGE_FAILED=1
 
-if [[ "$MERGE_OK" -ne 0 ]]; then
+if [[ "$MERGE_FAILED" -ne 0 ]]; then
     echo "[ERROR] Merge conflict detected. Please resolve manually." >&2
     # D3: Abort merge and write conflict signal
     git merge --abort 2>/dev/null || echo "[WARN] merge --abort failed" >&2
@@ -159,10 +163,10 @@ EOF
     exit 1
 fi
 
-# Merge succeeded — return to task branch for state updates
-if ! git checkout "$TASK_BRANCH" 2>/dev/null; then
-    echo "[WARN] Failed to checkout task branch $TASK_BRANCH after merge" >&2
-fi
+# Merge succeeded — stay on main branch for state update commits
+# D1: State updates (.status.json, .auto-signal) must be committed on main so
+# the merged codebase includes the final status. Checking out the task branch
+# would leave main without the status transition.
 
 # 5. Phase 4: Post-merge finalization — branch on stage info
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -175,6 +179,10 @@ if [[ "$STAGE_CURRENT" -lt "$STAGE_TOTAL" ]]; then
     # D3: Transition failure is fatal — .auto-signal must not claim stage-done if status is still executing
     if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status stage-done; then
         echo "[ERROR] Failed to update status to stage-done. Merge succeeded but state update failed." >&2
+        # D3: Write .auto-signal so daemon can route even on state transition failure
+        cat > "$WORK_DIR/.auto-signal" <<EOFAIL
+{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"state-transition-failed","timestamp":"$TIMESTAMP"}
+EOFAIL
         exit 1
     fi
 
@@ -195,6 +203,10 @@ else
     # D3: Transition failure is fatal — .auto-signal must not claim success if status is still executing
     if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status complete; then
         echo "[ERROR] Failed to update status to complete. Merge succeeded but state update failed." >&2
+        # D3: Write .auto-signal so daemon can route even on state transition failure
+        cat > "$WORK_DIR/.auto-signal" <<EOFAIL
+{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"state-transition-failed","timestamp":"$TIMESTAMP"}
+EOFAIL
         exit 1
     fi
 

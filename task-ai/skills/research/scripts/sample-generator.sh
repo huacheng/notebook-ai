@@ -50,7 +50,7 @@ generate_sample_id() {
     local prefix="$1"
     local timestamp
     timestamp=$(date +%Y%m%d%H%M%S)
-    echo "${prefix}-${timestamp}-$(head -c2 /dev/urandom | od -An -tx1 | tr -d ' \t\n')"
+    echo "${prefix}-${timestamp}-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \t\n')"
 }
 
 # Create positive sample with CAUTION warning (D2 Security)
@@ -255,7 +255,8 @@ case "$DOMAIN" in
 esac
 
 # Count generated samples
-POS_COUNT=$(find "$OUTPUT_DIR/$DOMAIN/positive" -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
-NEG_COUNT=$(find "$OUTPUT_DIR/$DOMAIN/negative" -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
+# D4: Limit find depth to avoid scanning unrelated nested directories
+POS_COUNT=$(find "$OUTPUT_DIR/$DOMAIN/positive" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
+NEG_COUNT=$(find "$OUTPUT_DIR/$DOMAIN/negative" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
 
 echo "[sample-generator] Complete: $DOMAIN domain - positive=$POS_COUNT, negative=$NEG_COUNT"

@@ -70,7 +70,7 @@ Generate a structured completion report for a task module, documenting what was 
 <!-- Summary of implementation approach from .plan.md -->
 
 ## Changes Made
-<!-- List of files modified/created/deleted with brief descriptions -->
+<!-- Git commit log from task-ai(<notebook>) commits -->
 
 ## Verification
 <!-- From .test/ criteria and results files, build status, evaluation outcomes -->
@@ -90,7 +90,7 @@ Generate a structured completion report for a task module, documenting what was 
 
 ### Summary Format
 
-Compact single-section report with: status, objective (1 line), key changes (bullet list), verification result.
+Compact single-section report with: status, type, created/completed timestamps, objective (1 line), key changes (git log in code block), verification result.
 
 ## Output
 

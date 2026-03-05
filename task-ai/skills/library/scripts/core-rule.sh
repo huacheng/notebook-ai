@@ -78,6 +78,12 @@ propose_core_rule() {
         exit 1
     fi
 
+    # D3: Verify security.sh exists before trying to extract CORE-XXX IDs
+    if [[ ! -f "$SECURITY_SH" ]]; then
+        echo "[ERROR] security.sh not found at $SECURITY_SH" >&2
+        exit 1
+    fi
+
     # Get next CORE-XXX ID (find max number, ignore sub-rules like CORE-006a)
     local last_id=$(grep -oE 'CORE-[0-9]+' "$SECURITY_SH" | grep -oE '[0-9]+' | sort -n | uniq | tail -1)
     # Remove leading zeros to avoid octal interpretation

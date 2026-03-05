@@ -82,7 +82,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$REFINE_MODE" -eq 1 ]]; then
     # D1: Reject refinement on terminal statuses
-    REFINE_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>&1) || REFINE_STATUS=""
+    REFINE_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null) || REFINE_STATUS=""
     case "$REFINE_STATUS" in
         complete|cancelled|stage-done)
             echo "[ERROR] Cannot refine — task status is $REFINE_STATUS." >&2
@@ -119,10 +119,9 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
         printf '\n## Refinements\n\n%s\n' "$REFINEMENT_LINE" >> "$PLAN_FILE"
     fi
 
-    # D3: git with error handling
+    # D3: git with error handling (non-fatal — refinement already written to file)
     if ! git add "$PLAN_FILE" 2>&1; then
-        echo "[ERROR] git add failed" >&2
-        exit 1
+        echo "[WARN] git add failed" >&2
     fi
     if ! git commit -m "task-ai($NOTEBOOK):plan refine" 2>&1; then
         echo "[WARN] git commit failed (may be no changes)" >&2
@@ -137,7 +136,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 0. Guard: reject terminal statuses (SKILL.md State Transitions)
-CURRENT_STATUS_GUARD=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>&1) || CURRENT_STATUS_GUARD=""
+CURRENT_STATUS_GUARD=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null) || CURRENT_STATUS_GUARD=""
 case "$CURRENT_STATUS_GUARD" in
     complete)
         echo "[ERROR] Completed tasks cannot be re-planned." >&2
@@ -156,7 +155,7 @@ esac
 # 1. Invoke Research for Type Discovery (Simulated)
 # In real execution, this would call research.sh. For plumbing:
 # D3: python3 calls with error handling
-TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>&1) || TYPE=""
+TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null) || TYPE=""
 if [[ -z "$TYPE" ]]; then
     TYPE="software" # Default for plan testing
 fi
@@ -199,7 +198,7 @@ if [[ -f "$PLAN_FILE" ]] && [[ "$CURRENT_STATUS_GUARD" == "review" || "$CURRENT_
         echo "[ERROR] Failed to archive .plan.md - aborting" >&2
         exit 1
     fi
-    echo "[WARN] Existing .plan.md archived to $SUPERSEDED"
+    echo "[INFO] Existing .plan.md archived to $SUPERSEDED"
     # D6: Add superseded file to git so it's tracked
     git add "$SUPERSEDED" 2>/dev/null || true
 fi

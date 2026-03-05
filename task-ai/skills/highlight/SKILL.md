@@ -318,7 +318,7 @@ Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
 | Write mode | Frontmatter field overwrite (atomic: read → modify → .tmp → rename) |
 | Lock | `.memory/.experiences/.lock` |
 
-#### Write Steps (promotion)
+#### Write Steps (status upgrade to verified)
 
 1. acquire `.memory/.experiences/.lock`
 2. read target file frontmatter
@@ -329,7 +329,7 @@ Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
 
 #### Write Steps (invalidation)
 
-Same as promotion, but `quality_status: provisional → invalidated`, changelog marks `invalidated-by:check`.
+Same as status upgrade steps above, but `quality_status: provisional → invalidated`, changelog marks `invalidated-by:check`.
 
 #### Related Operation — failure_count Update
 
@@ -420,7 +420,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 | completeness | `complete` |
 | source | `highlight-complete` |
 
-For multi-type (e.g., `data-pipeline|ml`), write one file per pipe segment. Segments use directory-safe transform (`:` → `-`).
+For multi-type (e.g., `data-pipeline|ml`), split on `|` and write one file per segment. Each segment name uses directory-safe transform (`:` → `-`, e.g., `audio:dsp` → `audio-dsp`).
 
 **Final stage distillation** (last stage merge → `complete`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
 

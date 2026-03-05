@@ -132,7 +132,7 @@ if [[ -z "$CHECKPOINT" ]]; then
     echo "[verify] No checkpoint specified, defaulting to 'full'"
 fi
 
-# D2: Validate checkpoint value (step-* further validated below)
+# D2: Validate checkpoint value
 if [[ "$CHECKPOINT" != "quick" && "$CHECKPOINT" != "full" && ! "$CHECKPOINT" =~ ^step-[1-9][0-9]*$ ]]; then
     echo "[ERROR] Invalid checkpoint: $CHECKPOINT. Must be quick, full, or step-N (N >= 1)." >&2
     exit 1
@@ -143,12 +143,31 @@ LOCK_DIR="$WORK_DIR/.working"
 LOCK_FILE="$LOCK_DIR/.lock"
 mkdir -p "$LOCK_DIR"
 if ! mkdir "$LOCK_FILE" 2>/dev/null; then
-    echo "[ERROR] Another verify/exec process holds the lock ($LOCK_FILE). Aborting." >&2
-    exit 1
+    # D3: Stale lock detection — check if holding PID is still alive
+    LOCK_PID_FILE="$LOCK_FILE/pid"
+    if [[ -f "$LOCK_PID_FILE" ]]; then
+        LOCK_PID=$(cat "$LOCK_PID_FILE" 2>/dev/null || true)
+        if [[ -n "$LOCK_PID" ]] && ! kill -0 "$LOCK_PID" 2>/dev/null; then
+            echo "[WARN] Stale lock from PID $LOCK_PID detected, reclaiming" >&2
+            rm -rf "$LOCK_FILE"
+            mkdir "$LOCK_FILE" 2>/dev/null || { echo "[ERROR] Failed to reclaim lock" >&2; exit 1; }
+        else
+            echo "[ERROR] Another verify/exec process (PID ${LOCK_PID:-unknown}) holds the lock ($LOCK_FILE). Aborting." >&2
+            exit 1
+        fi
+    else
+        echo "[ERROR] Another verify/exec process holds the lock ($LOCK_FILE). Aborting." >&2
+        exit 1
+    fi
 fi
-# D3: Ensure lock is released on exit (normal, error, or signal)
-cleanup_lock() { rmdir "$LOCK_FILE" 2>/dev/null || true; }
-trap cleanup_lock EXIT INT TERM
+# D3: Record owning PID for stale lock detection
+echo $$ > "$LOCK_FILE/pid"
+# D3: Ensure lock is released and temp files cleaned on exit (normal, error, or signal)
+cleanup() {
+    rm -rf "$LOCK_FILE" 2>/dev/null || true
+    rm -f "$TEST_DIR"/*.tmp.$$ "$WORK_DIR"/.auto-signal.tmp.$$ 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 echo "Verifying $NOTEBOOK with checkpoint: $CHECKPOINT"
 
@@ -178,24 +197,32 @@ case "$CHECKPOINT" in
 esac
 
 # D1 Step 11: Write Results File
-# D3: File write with error handling
-if ! cat > "$RESULTS_FILE" <<EOF
+# D3: Atomic write via temp file to avoid partial results on interrupt
+RESULTS_TMP="$RESULTS_FILE.tmp.$$"
+if ! cat > "$RESULTS_TMP" <<EOF
 # Verification Results: $CHECKPOINT · $DATE
 - Result: $RESULT
+- Task Type: ${TASK_TYPE:-unknown}
 - Summary: All criteria met for checkpoint $CHECKPOINT.
+- Note: Stub implementation — real test execution pending
 EOF
 then
+    rm -f "$RESULTS_TMP"
     echo "[ERROR] Failed to write $RESULTS_FILE" >&2
     exit 1
 fi
+mv -f "$RESULTS_TMP" "$RESULTS_FILE"
 
 # D1 Step 13: Update .test/.summary.md
 # D3: File write with error handling
+# Note: Full implementation should aggregate ALL criteria & results files in .test/
+RESULT_COUNT=$(find "$TEST_DIR" -maxdepth 1 -name '*-results.md' 2>/dev/null | wc -l)
 if ! cat > "$TEST_DIR/.summary.md" <<EOF
 # Test Summary
 - Last Checkpoint: $CHECKPOINT
 - Last Result: $RESULT
 - Date: $DATE
+- Total result files: $RESULT_COUNT
 EOF
 then
     echo "[WARN] Failed to write .summary.md" >&2
@@ -205,14 +232,19 @@ fi
 # TODO: Implement git commit: task-ai($NOTEBOOK):verify $CHECKPOINT verification
 # Should stage .test/ results and .summary.md, skip if no git repo or nothing to commit
 
-# D1 Step 15: Write .auto-signal (skipped in auto mode — auto loop handles it)
+# D1 Step 15: Write .auto-signal
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # D2: Use printf to avoid variable injection in JSON; CHECKPOINT is validated, RESULT is hardcoded
+# D3: Atomic write — auto loop may read signal concurrently
+SIGNAL_TMP="$SIGNAL_FILE.tmp.$$"
 if ! printf '{ "step": "verify", "result": "%s", "next": "check", "checkpoint": "%s", "timestamp": "%s" }\n' \
-    "$RESULT" "$CHECKPOINT" "$TIMESTAMP" > "$SIGNAL_FILE"
+    "$RESULT" "$CHECKPOINT" "$TIMESTAMP" > "$SIGNAL_TMP"
 then
+    rm -f "$SIGNAL_TMP"
     echo "[WARN] Failed to write .auto-signal" >&2
+else
+    mv -f "$SIGNAL_TMP" "$SIGNAL_FILE"
 fi
 
 # D1 Step 16: Report results summary
