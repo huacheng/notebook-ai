@@ -476,7 +476,7 @@ export function FileViewerRender({
     if (activeHighlightId === id) setActiveHighlightId(newId);
   }, [annotations, onAnnotationsChange, activeHighlightId]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+  const showSelectionFloat = useCallback((clientX: number, clientY: number) => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) { setFloat(null); return; }
     const text = sel.toString().trim();
@@ -501,8 +501,8 @@ export function FileViewerRender({
       scrollLeft,
     );
     setFloat({
-      x: e.clientX - containerRect.left + scrollLeft,
-      y: e.clientY - containerRect.top + scrollTop - 40,
+      x: clientX - containerRect.left + scrollLeft,
+      y: clientY - containerRect.top + scrollTop - 40,
       selectionBottom: rangeRect.bottom - containerRect.top + scrollTop + 8,
       text,
       rects,
@@ -510,6 +510,21 @@ export function FileViewerRender({
       renderedTextLen,
     });
   }, []);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    showSelectionFloat(e.clientX, e.clientY);
+  }, [showSelectionFloat]);
+
+  // Mobile: text selection completes after touchend with a delay
+  const handleTouchEnd = useCallback(() => {
+    setTimeout(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+      const range = sel.getRangeAt(0);
+      const rangeRect = range.getBoundingClientRect();
+      showSelectionFloat(rangeRect.left + rangeRect.width / 2, rangeRect.top);
+    }, 300);
+  }, [showSelectionFloat]);
 
   const isSent = useCallback((id: string) => baselineIdsRef.current.has(id), []);
 
@@ -571,7 +586,7 @@ export function FileViewerRender({
   }, [highlights, scaleHl]);
 
   return (
-    <div ref={containerRef} className="fv-render" onMouseUp={handleMouseUp}>
+    <div ref={containerRef} className="fv-render" onMouseUp={handleMouseUp} onTouchEnd={handleTouchEnd}>
       {/* Annotation dropdown — top-right corner */}
       <div className="fv-render__ann-overlay">
         <FileAnnotationDropdown

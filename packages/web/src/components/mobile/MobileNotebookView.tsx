@@ -36,6 +36,9 @@ export function MobileNotebookView() {
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
   const promptQueue = useStore((s) => s.promptQueue);
+  const editMode = useStore((s) => s.editMode);
+  const pendingDeletes = useStore((s) => s.pendingDeletes);
+  const togglePendingDelete = useStore((s) => s.togglePendingDelete);
   const cells = notebook?.cells ?? [];
   const hasQueuedPrompts = promptQueue.length > 0;
 
@@ -273,6 +276,9 @@ export function MobileNotebookView() {
               key={cell.id}
               cell={cell}
               index={cellsOffset + index}
+              editMode={editMode}
+              pendingDelete={pendingDeletes.has(cell.id)}
+              onToggleDelete={togglePendingDelete}
             />
           ))}
           <div ref={bottomRef} />

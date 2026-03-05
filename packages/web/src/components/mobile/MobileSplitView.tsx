@@ -21,6 +21,9 @@ export function MobileSplitView() {
   const toggleRightDrawer = useStore((s) => s.toggleRightDrawer);
   const openFileTab = useStore((s) => s.openFileTab);
   const closeFileTab = useStore((s) => s.closeFileTab);
+  const editMode = useStore((s) => s.editMode);
+  const pendingDeletes = useStore((s) => s.pendingDeletes);
+  const togglePendingDelete = useStore((s) => s.togglePendingDelete);
 
   const notebookRef = useRef<HTMLDivElement>(null);
 
@@ -135,7 +138,7 @@ export function MobileSplitView() {
         <div className="mobile-split-content" ref={notebookRef}>
           <div className="mobile-cells">
             {notebook?.cells.map((cell, index) => (
-              <Cell key={cell.id} cell={cell} index={index} />
+              <Cell key={cell.id} cell={cell} index={index} editMode={editMode} pendingDelete={pendingDeletes.has(cell.id)} onToggleDelete={togglePendingDelete} />
             ))}
           </div>
         </div>

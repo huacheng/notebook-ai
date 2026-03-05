@@ -7049,6 +7049,25 @@ button:focus-visible {
   font-size: 11px;
 }
 
+.notebook-input-bar--mobile .nb-input-actions {
+  gap: var(--space-sm);
+}
+
+.notebook-input-bar--mobile .voice-input-btn,
+.notebook-input-bar--mobile .nb-attach-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+  border-radius: var(--radius-md);
+}
+
+.notebook-input-bar--mobile .nb-run-btn {
+  width: 40px;
+  height: 36px;
+  font-size: 1.1rem;
+  border-radius: var(--radius-md);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    MOBILE UI STYLES
    ═══════════════════════════════════════════════════════════════════════════ */
