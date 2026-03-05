@@ -1,7 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../../store';
 import { MobileHeader } from './MobileHeader';
-import { MobileAnnotationBar } from './MobileAnnotationBar';
 import { FileViewer } from '../FileViewer';
 
 /**
@@ -17,6 +16,7 @@ export function MobileFileViewer() {
   const openNotebooks = useStore((s) => s.openNotebooks);
   const openFileTab = useStore((s) => s.openFileTab);
   const closeFileTab = useStore((s) => s.closeFileTab);
+  const activeFileTabId = useStore((s) => s.activeFileTabId);
 
   const activeTab = activeNotebookTabId ? openNotebooks[activeNotebookTabId] : null;
   const sessionId = activeTab?.sessionId || '';
@@ -32,6 +32,17 @@ export function MobileFileViewer() {
       });
     }
   }, [mobileFileViewerPath, mobileFileViewerSource, sessionId, activeProjectId, openFileTab]);
+
+  // Auto-close mobile file viewer when file tab is closed via [x]
+  // Only trigger when activeFileTabId transitions from a value to null (not on initial mount)
+  const prevFileTabIdRef = useRef(activeFileTabId);
+  useEffect(() => {
+    const prev = prevFileTabIdRef.current;
+    prevFileTabIdRef.current = activeFileTabId;
+    if (prev && !activeFileTabId && mobileFileViewerPath) {
+      closeMobileFileViewer();
+    }
+  }, [activeFileTabId, mobileFileViewerPath, closeMobileFileViewer]);
 
   // Cleanup file tab when component unmounts or file viewer closes
   useEffect(() => {
@@ -62,8 +73,6 @@ export function MobileFileViewer() {
       <main className="mobile-content mobile-file-content">
         <FileViewer />
       </main>
-
-      <MobileAnnotationBar filePath={mobileFileViewerPath} />
     </div>
   );
 }

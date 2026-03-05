@@ -78,8 +78,75 @@ export function MobileNotebookView() {
     return () => window.removeEventListener('nb:library-changed', handler);
   }, []);
 
+  // Open a .notebook.json as a notebook tab (same logic as desktop ProjectSidebar)
+  const openAsNotebook = useCallback(async (subPath: string, name: string) => {
+    const { openNotebooks, setActiveNotebookTab, deactivateFileTab } = useStore.getState();
+    const notebookPath = subPath === '.' ? `${activeProjectPath}/${name}` : `${activeProjectPath}/${subPath}/${name}`;
+    const wsDir = notebookPath.replace(/\/[^/]+$/, '');
+
+    // Check if already open — switch tab
+    for (const [nbId, entry] of Object.entries(openNotebooks)) {
+      if (entry.workspaceDir === wsDir) {
+        deactivateFileTab();
+        setActiveNotebookTab(nbId);
+        closeDrawers();
+        return;
+      }
+    }
+
+    deactivateFileTab();
+    useStore.setState({ notebookLoading: true });
+    closeDrawers();
+
+    try {
+      const { ws, openNotebookTab: openTab, subscribeToSession: sub, authToken: token } = useStore.getState();
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const requestId = crypto.randomUUID();
+        const opened = await new Promise<any>((resolve, reject) => {
+          const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 180_000);
+          function onOpened(e: Event) {
+            const d = (e as CustomEvent).detail;
+            if (d.request_id === requestId) { cleanup(); resolve(d); }
+          }
+          function onError(e: Event) {
+            const d = (e as CustomEvent).detail;
+            if (d.request_id === requestId) { cleanup(); reject(new Error(d.error)); }
+          }
+          function cleanup() { clearTimeout(timeout); window.removeEventListener('nb:notebook-opened', onOpened); window.removeEventListener('nb:notebook-open-error', onError); }
+          window.addEventListener('nb:notebook-opened', onOpened);
+          window.addEventListener('nb:notebook-open-error', onError);
+          ws.send(JSON.stringify({ type: 'open_notebook', path: notebookPath, request_id: requestId }));
+        });
+
+        openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
+        setActiveNotebookTab(opened.notebook_id);
+        sub(opened.session_id);
+        useStore.setState({ notebookLoading: false });
+      } else {
+        // REST fallback
+        const res = await fetch(`/api/notebooks/open?path=${encodeURIComponent(notebookPath)}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        openTab(data.notebook_id, data.notebook, data.session_id, data.workspace_dir);
+        setActiveNotebookTab(data.notebook_id);
+        sub(data.session_id);
+        useStore.setState({ notebookLoading: false });
+      }
+    } catch {
+      useStore.setState({ notebookLoading: false });
+    }
+  }, [activeProjectPath, closeDrawers]);
+
   // File click handlers
   const handleWorkspaceFileClick = (subPath: string, name: string) => {
+    if (name.endsWith('.notebook.json')) {
+      openAsNotebook(subPath, name);
+      return;
+    }
     const relPath = subPath === '.' ? name : `${subPath}/${name}`;
     openMobileFileViewer(relPath, 'workspace');
     closeDrawers();
@@ -92,6 +159,10 @@ export function MobileNotebookView() {
   };
 
   const handleDelivFileClick = (subPath: string, name: string) => {
+    if (name.endsWith('.notebook.json')) {
+      openAsNotebook(subPath, name);
+      return;
+    }
     const relPath = subPath === '.' ? name : `${subPath}/${name}`;
     openMobileFileViewer(relPath, 'deliverables');
     closeDrawers();

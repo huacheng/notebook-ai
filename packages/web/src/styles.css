@@ -4865,6 +4865,7 @@ button:focus-visible {
   overflow-y: auto;
   padding: 20px 24px;
   position: relative;
+  -webkit-touch-callout: none; /* suppress native context menu on mobile for annotation flow */
 }
 .fv-render__text-zoom-wrapper {
   /* Semantic container for CSS-scaled text content; transform is inline */

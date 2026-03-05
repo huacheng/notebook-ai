@@ -532,15 +532,29 @@ export function FileViewerRender({
     showSelectionFloat(e.clientX, e.clientY);
   }, [showSelectionFloat]);
 
-  // Mobile: text selection completes after touchend with a delay
-  const handleTouchEnd = useCallback(() => {
-    setTimeout(() => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
-      const range = sel.getRangeAt(0);
-      const rangeRect = range.getBoundingClientRect();
-      showSelectionFloat(rangeRect.left + rangeRect.width / 2, rangeRect.top);
-    }, 300);
+  // Mobile: listen to selectionchange for reliable text selection detection.
+  // touchend fires before the browser finalises the selection; selectionchange
+  // fires as the user adjusts selection handles after a long-press.
+  useEffect(() => {
+    if (!('ontouchstart' in window)) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+        const container = containerRef.current;
+        if (!container || !container.contains(sel.anchorNode)) return;
+        const range = sel.getRangeAt(0);
+        const rangeRect = range.getBoundingClientRect();
+        showSelectionFloat(rangeRect.left + rangeRect.width / 2, rangeRect.top);
+      }, 400);
+    };
+    document.addEventListener('selectionchange', handler);
+    return () => {
+      document.removeEventListener('selectionchange', handler);
+      clearTimeout(timer);
+    };
   }, [showSelectionFloat]);
 
   const isSent = useCallback((id: string) => baselineIdsRef.current.has(id), []);
@@ -603,7 +617,7 @@ export function FileViewerRender({
   }, [highlights, scaleHl]);
 
   return (
-    <div ref={containerRef} className="fv-render" onMouseUp={handleMouseUp} onTouchEnd={handleTouchEnd}>
+    <div ref={containerRef} className="fv-render" onMouseUp={handleMouseUp}>
       {/* Annotation dropdown — top-right corner */}
       <div className="fv-render__ann-overlay">
         <FileAnnotationDropdown
