@@ -345,6 +345,7 @@ export const AnnotationSyncSchema = z.object({
 export const RestartSessionSchema = z.object({
   type: z.literal('restart_session'),
   session_id: z.string(),
+  clear: z.boolean().optional(), // clear: true → skipResume, truly clears Claude context
 });
 
 // Client → Server: load older cells (pagination)

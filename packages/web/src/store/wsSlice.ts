@@ -22,7 +22,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'lastEventIndex' | 'updateLastEventIndex' | 'lastCompletedCellId' | 'lastAskQuestionCellId'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
-  | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'rerunNotebook'
+  | 'loadNotebook' | 'exportHtml' | 'restartSession' | 'clearSession' | 'rerunNotebook'
   | 'interruptCell'
   | 'submitToolResult' | 'updateToolResultLocal'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
@@ -692,6 +692,15 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
       set({ restartPhase: 'restarting', restartError: '' });
       ws.send(JSON.stringify({ type: 'restart_session', session_id: sessionId }));
+    }
+  },
+
+  clearSession() {
+    const { ws, sessionId } = get();
+    if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
+      set({ restartPhase: 'restarting', restartError: '' });
+      // clear: true → skipResume on backend, truly clears Claude context
+      ws.send(JSON.stringify({ type: 'restart_session', session_id: sessionId, clear: true }));
     }
   },
 

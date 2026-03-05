@@ -19,6 +19,7 @@ function NotebookStatusBar() {
   const setActiveTab = useStore((s) => s.setActiveTab);
   const saveNotebook = useStore((s) => s.saveNotebook);
   const restartSession = useStore((s) => s.restartSession);
+  const clearSession = useStore((s) => s.clearSession);
   const rerunNotebook = useStore((s) => s.rerunNotebook);
   const interruptCell = useStore((s) => s.interruptCell);
   const restartPhase = useStore((s) => s.restartPhase);
@@ -89,6 +90,14 @@ function NotebookStatusBar() {
           title={isRestarting ? t('status.restarting') : t('status.restartTitle')}
         >
           {isRestarting ? '...' : t('status.restart')}
+        </button>
+        <button
+          className="notebook-statusbar-btn notebook-statusbar-clear-btn"
+          onClick={clearSession}
+          disabled={!connected || isRestarting || editMode}
+          title={t('status.clearTitle')}
+        >
+          {t('status.clear')}
         </button>
         <button
           className="notebook-statusbar-btn notebook-statusbar-rerun-btn"

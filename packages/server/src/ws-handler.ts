@@ -866,11 +866,12 @@ export function setupWebSocket(
         }
 
         case 'restart_session': {
-          const { session_id } = msg;
+          const { session_id, clear } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
-            await sessionManager.restartSession(session_id);
-            sendToClient(ws, { type: 'session_restarted', session_id });
+            // clear: true → skipResume: true (truly clears Claude context)
+            await sessionManager.restartSession(session_id, clear ? { skipResume: true } : undefined);
+            sendToClient(ws, { type: 'session_restarted', session_id, cleared: !!clear });
           } catch (err) {
             sendToClient(ws, { type: 'session_restart_failed', session_id, error: sanitizeErrorForClient(err) });
           }

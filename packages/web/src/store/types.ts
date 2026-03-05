@@ -245,6 +245,7 @@ export interface NotebookStore {
   loadNotebook(path: string): void;
   exportHtml(): void;
   restartSession(): void;
+  clearSession(): void;
   rerunNotebook(): void;
   interruptCell(): void;
   submitToolResult(sessionId: string, toolUseId: string, content: string): void;
