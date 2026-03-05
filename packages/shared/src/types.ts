@@ -480,6 +480,11 @@ export const QueueReorderSchema = z.object({
   version: z.number().int().nonnegative(),
 });
 
+export const AutoSubscribeSchema = z.object({
+  type: z.literal('auto_subscribe'),
+  session_id: z.string(),
+});
+
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
   SubscribeSchema,
   UnsubscribeSchema,
@@ -509,6 +514,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   QueuePromptSchema,
   QueueRemoveSchema,
   QueueReorderSchema,
+  AutoSubscribeSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
   z.object({
@@ -904,6 +910,54 @@ export const ToolLongRunningSchema = z.object({
   pending_tools: z.number().int(),
 });
 
+// ── Auto signal schema (Conversational Auto) ────────────────────────────────
+
+export const CheckScoreSchema = z.object({
+  overall: z.number().min(0).max(1),
+  d1_correctness: z.number().min(0).max(1),
+  d2_security: z.number().min(0).max(1),
+  d3_reliability: z.number().min(0).max(1),
+  d4_performance: z.number().min(0).max(1),
+  d5_architecture: z.number().min(0).max(1),
+  d6_maintainability: z.number().min(0).max(1),
+});
+
+export const AutoSignalSchema = z.object({
+  step: z.string(),
+  result: z.string(),
+  next: z.string(),
+  checkpoint: z.string().optional(),
+  iteration: z.number().int().nonnegative(),
+  compaction_count: z.number().int().nonnegative().optional(),
+  vfp_cycles_completed: z.number().int().nonnegative().optional(),
+  phase: z.enum(['target', 'planning', 'execution', 'finalization']),
+  phase_progress: z.number().min(0).max(1),
+  stage: z.object({
+    current: z.number().int().positive(),
+    total: z.number().int().positive(),
+  }).optional(),
+  check_score: CheckScoreSchema.nullable(),
+  retry_count: z.number().int().nonnegative(),
+  delegation_failures: z.array(z.string()),
+  timestamp: z.string(),
+});
+
+export const AutoStatusMessageSchema = z.object({
+  type: z.literal('auto_status'),
+  session_id: z.string(),
+  phase: z.enum(['target', 'planning', 'execution', 'finalization']).nullable(),
+  phase_progress: z.number().min(0).max(1).nullable(),
+  step: z.string().nullable(),
+  next: z.string().nullable(),
+  stage: z.object({
+    current: z.number().int().positive(),
+    total: z.number().int().positive(),
+  }).nullable(),
+  check_score: CheckScoreSchema.nullable(),
+  retry_count: z.number().int().nonnegative(),
+  iteration: z.number().int().nonnegative(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellCreatedMessageSchema,
@@ -957,6 +1011,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   ProcessDeadSchema,
   StuckExhaustedSchema,
   ToolLongRunningSchema,
+  AutoStatusMessageSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───
@@ -1091,3 +1146,7 @@ export type GitDiffError = z.infer<typeof GitDiffErrorSchema>;
 export type UrlCaptureRequest = z.infer<typeof UrlCaptureRequestSchema>;
 export type UrlCaptureResult = z.infer<typeof UrlCaptureResultSchema>;
 export type SuggestNextStep = z.infer<typeof SuggestNextStepSchema>;
+
+export type AutoSignal = z.infer<typeof AutoSignalSchema>;
+export type CheckScore = z.infer<typeof CheckScoreSchema>;
+export type AutoStatusMessage = z.infer<typeof AutoStatusMessageSchema>;
