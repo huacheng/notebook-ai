@@ -1,26 +1,34 @@
 #!/usr/bin/env bash
 # Intelligence Fetcher for Rule Evolution
-# Usage: intel-fetcher.sh --sources <config.yaml> --output <evolving-rules-dir>
+# Usage: intel-fetcher.sh --sources <config.yaml> --output <evolving-rules-dir> [--test-corpus <dir>]
 #
-# Fetches intelligence from configured sources and generates candidate rules.
+# Fetches intelligence from configured sources and generates:
+# 1. Candidate rules → --output/{domain}/candidates/
+# 2. Positive test samples → --test-corpus/{domain}/positive/
+# 3. Negative test samples → --test-corpus/{domain}/negative/
+#
 # Sources: NIST NVD, GitHub Advisories, OWASP, arXiv, etc.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 YAML_PARSER="$SCRIPT_DIR/../../../core/yaml_parser.py"
+# D5: Delegate sample generation to dedicated script
+SAMPLE_GENERATOR="$SCRIPT_DIR/sample-generator.sh"
 
 # Defaults
 SOURCES_FILE=""
 OUTPUT_DIR=""
+TEST_CORPUS_DIR=""
 DRY_RUN=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --sources) SOURCES_FILE="$2"; shift 2 ;;
-        --output)  OUTPUT_DIR="$2"; shift 2 ;;
-        --dry-run) DRY_RUN=true; shift ;;
+        --sources)     SOURCES_FILE="$2"; shift 2 ;;
+        --output)      OUTPUT_DIR="$2"; shift 2 ;;
+        --test-corpus) TEST_CORPUS_DIR="$2"; shift 2 ;;
+        --dry-run)     DRY_RUN=true; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -84,6 +92,130 @@ EOF
     echo "[intel-fetcher] Created candidate: $output_file"
 }
 
+# I2: Bootstrap-only fallback when sample-generator.sh unavailable
+# These functions are kept for backwards compatibility and initial bootstrap
+# Primary sample generation is delegated to sample-generator.sh (D5 Architecture)
+
+# Create positive test sample (should match the rule)
+# NOTE: Prefer sample-generator.sh for production use
+create_positive_sample() {
+    local pattern="$1"
+    local domain="$2"
+    local sample_id="$3"
+    local description="$4"
+
+    if [[ -z "$TEST_CORPUS_DIR" ]]; then
+        return 0
+    fi
+
+    local sample_dir="$TEST_CORPUS_DIR/$domain/positive"
+    mkdir -p "$sample_dir"
+    local sample_file="$sample_dir/${sample_id}.md"
+
+    # D3: Check if file already exists - skip to avoid overwrite
+    if [[ -f "$sample_file" ]]; then
+        echo "[intel-fetcher] Skip: $sample_file already exists"
+        return 0
+    fi
+
+    cat > "$sample_file" <<EOF
+# CAUTION: TEST SAMPLE ONLY - DO NOT EXECUTE
+# ============================================
+# This file contains DANGEROUS patterns for testing security rules.
+# It is NOT meant to be executed or used as reference code.
+# ============================================
+
+# Positive Sample: $sample_id
+# Domain: $domain
+# Description: $description
+# Expected: Should MATCH the security rule pattern
+# Generated: $(date -Iseconds)
+
+## Dangerous Pattern
+
+\`\`\`
+$pattern
+\`\`\`
+
+## Why This Is Dangerous
+
+This pattern represents a known vulnerability or attack vector.
+Security rules should detect and block this pattern.
+EOF
+
+    echo "[intel-fetcher] Created positive sample: $sample_file"
+}
+
+# Create negative test sample (should NOT match the rule)
+create_negative_sample() {
+    local safe_pattern="$1"
+    local domain="$2"
+    local sample_id="$3"
+    local description="$4"
+
+    if [[ -z "$TEST_CORPUS_DIR" ]]; then
+        return 0
+    fi
+
+    local sample_dir="$TEST_CORPUS_DIR/$domain/negative"
+    mkdir -p "$sample_dir"
+    local sample_file="$sample_dir/${sample_id}.md"
+
+    # D3: Check if file already exists - skip to avoid overwrite
+    if [[ -f "$sample_file" ]]; then
+        echo "[intel-fetcher] Skip: $sample_file already exists"
+        return 0
+    fi
+
+    cat > "$sample_file" <<EOF
+# Negative Sample: $sample_id
+# Description: $description
+# Expected: Should NOT match rule pattern (safe code)
+# Generated: $(date -Iseconds)
+
+## Safe Pattern
+
+This file contains a safe pattern that should NOT trigger false positives:
+
+\`\`\`
+$safe_pattern
+\`\`\`
+
+This represents normal, safe code that should pass security checks.
+EOF
+
+    echo "[intel-fetcher] Created negative sample: $sample_file"
+}
+
+# I1: Validate API response for safety (D2 Security)
+# Returns 0 if response is valid JSON and safe, 1 otherwise
+validate_api_response() {
+    local response="$1"
+    local source_name="$2"
+    local max_size=1048576  # 1MB max response size
+
+    # Check 1: Response size limit
+    local response_size=${#response}
+    if [[ "$response_size" -gt "$max_size" ]]; then
+        echo "[intel-fetcher] WARN: $source_name response exceeds size limit ($response_size > $max_size)"
+        return 1
+    fi
+
+    # Check 2: Basic JSON structure validation (must start with { or [)
+    if ! echo "$response" | grep -qE '^\s*[\{\[]'; then
+        echo "[intel-fetcher] WARN: $source_name response is not valid JSON"
+        return 1
+    fi
+
+    # Check 3: No dangerous patterns in response (injection prevention)
+    if echo "$response" | grep -qE '\$\(|`[^`]+`|<script|javascript:|data:text/html'; then
+        echo "[intel-fetcher] WARN: $source_name response contains dangerous patterns"
+        return 1
+    fi
+
+    return 0
+}
+
 # Fetch from NIST NVD API
 fetch_nist_nvd() {
     local url="$1"
@@ -106,6 +238,12 @@ fetch_nist_nvd() {
     # Fetch with curl (rate limit: 5 requests per 30 seconds for unauthenticated)
     local response
     response=$(curl -s --max-time 30 "$query_url" 2>/dev/null || echo '{"error": "fetch failed"}')
+
+    # I1: Validate response before processing
+    if ! validate_api_response "$response" "NVD"; then
+        echo "[intel-fetcher] NVD: Skipping invalid response"
+        return 1
+    fi
 
     # Check for vulnerabilities
     if echo "$response" | grep -q '"vulnerabilities"'; then
@@ -160,16 +298,60 @@ if [[ "$EXISTING_COUNT" -eq 0 && "$DRY_RUN" == "false" ]]; then
     # Create sample candidate for testing the pipeline
     SAMPLE_ID=$(generate_rule_id "AUTO" "security")
     SAMPLE_FILE="$SAMPLE_CANDIDATES_DIR/${SAMPLE_ID}.yaml"
+    SAMPLE_PATTERN="eval\\s*\\(\\s*\\$"
 
     create_candidate_rule \
         "$SAMPLE_ID" \
-        "Sample auto-generated rule" \
-        "example_dangerous_pattern" \
+        "Detect eval with variable input" \
+        "$SAMPLE_PATTERN" \
         "security" \
         "intel-fetcher-bootstrap" \
         "$SAMPLE_FILE"
 
+    # Also create corresponding test samples
+    create_positive_sample \
+        'eval($user_input)' \
+        "security" \
+        "${SAMPLE_ID}-pos-1" \
+        "Eval with user input - code injection vulnerability"
+
+    create_positive_sample \
+        'eval( $request->get("code") )' \
+        "security" \
+        "${SAMPLE_ID}-pos-2" \
+        "Eval with request parameter - code injection"
+
+    create_negative_sample \
+        'evaluate_expression(sanitized_input)' \
+        "security" \
+        "${SAMPLE_ID}-neg-1" \
+        "Safe function call with sanitized input"
+
+    create_negative_sample \
+        'print("Hello, World!")' \
+        "security" \
+        "${SAMPLE_ID}-neg-2" \
+        "Simple print statement - safe code"
+
     ((FETCH_COUNT++)) || true
+
+    # D5: Delegate sample generation to sample-generator.sh for all domains
+    if [[ -n "$TEST_CORPUS_DIR" && -f "$SAMPLE_GENERATOR" ]]; then
+        echo "[intel-fetcher] Delegating sample generation to sample-generator.sh..."
+        for domain in security sanitization audit; do
+            mkdir -p "$OUTPUT_DIR/$domain/candidates"
+            if $DRY_RUN; then
+                bash "$SAMPLE_GENERATOR" --domain "$domain" --output "$TEST_CORPUS_DIR" --dry-run
+            else
+                bash "$SAMPLE_GENERATOR" --domain "$domain" --output "$TEST_CORPUS_DIR"
+            fi
+        done
+    fi
 fi
 
-echo "[intel-fetcher] Fetch complete. New candidates: $FETCH_COUNT"
+SAMPLE_COUNT=0
+if [[ -n "$TEST_CORPUS_DIR" ]]; then
+    SAMPLE_COUNT=$(find "$TEST_CORPUS_DIR" -name "*.md" -type f 2>/dev/null | wc -l || echo 0)
+fi
+
+echo "[intel-fetcher] Fetch complete. New candidates: $FETCH_COUNT, Test samples: $SAMPLE_COUNT"

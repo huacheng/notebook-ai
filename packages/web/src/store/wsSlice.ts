@@ -252,6 +252,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           } else {
             store.updateToolResult(parsed.cell_id, parsed.tool_use_id, parsed.content, parsed.is_error);
           }
+          // Clear "Tool execution in progress" notice when tool completes
+          if (get().sessionNotice?.includes('Tool execution')) {
+            set({ sessionNotice: null });
+          }
           break;
         case 'execution_complete':
           store.flushStreamBuffer(parsed.cell_id);
@@ -543,6 +547,26 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'queue_error': {
           const queueErr = parsed as { error?: string };
           set({ sessionNotice: `⚠️ Queue error: ${queueErr.error ?? 'Unknown error'}` });
+          break;
+        }
+        // ── Heartbeat events ──────────────────────────────────────────────────
+        case 'process_dead': {
+          const deadMsg = parsed as { cell_id: string };
+          console.error(`[heartbeat] Agent process died while cell "${deadMsg.cell_id}" was running`);
+          set({ sessionNotice: '⚠️ Agent process terminated unexpectedly' });
+          break;
+        }
+        case 'stuck_exhausted': {
+          const stuckMsg = parsed as { cell_id: string; retries: number };
+          console.error(`[heartbeat] Cell "${stuckMsg.cell_id}" stuck after ${stuckMsg.retries} retries`);
+          set({ sessionNotice: `⚠️ Cell stuck and unresponsive after ${stuckMsg.retries} retries` });
+          break;
+        }
+        case 'tool_long_running': {
+          const toolMsg = parsed as { cell_id: string; elapsed_ms: number; pending_tools: number };
+          const mins = Math.round(toolMsg.elapsed_ms / 60000);
+          console.log(`[heartbeat] Tool running for ${mins}+ minutes (cell: ${toolMsg.cell_id})`);
+          set({ sessionNotice: `ℹ️ Tool execution in progress (${mins}+ min)...` });
           break;
         }
         case 'error':

@@ -1006,6 +1006,21 @@ export class SessionManager {
     const runningCellId = findRunningCellId(session.notebook);
 
     if (runningCellId) {
+      // D3-1: Check if agent process is still alive before any stuck detection
+      if (!session.agentProcess.isAlive()) {
+        console.error(`[session ${session.id}] Agent process died while cell "${runningCellId}" was running`);
+
+        // Notify frontend of process death
+        this.broadcast(session, {
+          type: 'process_dead',
+          cell_id: runningCellId,
+        });
+
+        // Complete the running cell as error
+        this.completeCell(session, runningCellId, true);
+        return;
+      }
+
       const now = Date.now();
       const elapsed = now - session._lastOutputTime;
 

@@ -881,6 +881,29 @@ export const QueueErrorSchema = z.object({
   code: z.string(),
 });
 
+// ─── Heartbeat Events ───
+
+export const ProcessDeadSchema = z.object({
+  type: z.literal('process_dead'),
+  session_id: z.string(),
+  cell_id: z.string(),
+});
+
+export const StuckExhaustedSchema = z.object({
+  type: z.literal('stuck_exhausted'),
+  session_id: z.string(),
+  cell_id: z.string(),
+  retries: z.number().int(),
+});
+
+export const ToolLongRunningSchema = z.object({
+  type: z.literal('tool_long_running'),
+  session_id: z.string(),
+  cell_id: z.string(),
+  elapsed_ms: z.number(),
+  pending_tools: z.number().int(),
+});
+
 export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellOutputMessageSchema,
   CellCreatedMessageSchema,
@@ -931,6 +954,9 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   AutosaveErrorSchema,
   QueueStateSchema,
   QueueErrorSchema,
+  ProcessDeadSchema,
+  StuckExhaustedSchema,
+  ToolLongRunningSchema,
 ]);
 
 // ─── Notebook List / Workspace Types ───

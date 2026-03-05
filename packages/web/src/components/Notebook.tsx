@@ -382,6 +382,8 @@ export function Notebook() {
   const editMode = useStore((s) => s.editMode);
   const pendingDeletes = useStore((s) => s.pendingDeletes);
   const togglePendingDelete = useStore((s) => s.togglePendingDelete);
+  const sessionNotice = useStore((s) => s.sessionNotice);
+  const clearSessionNotice = useStore((s) => s.clearSessionNotice);
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
   const cells = notebook?.cells ?? [];
@@ -437,6 +439,12 @@ export function Notebook() {
   return (
     <div className="notebook-container">
       <NotebookStatusBar />
+      {sessionNotice && (
+        <div className="session-notice">
+          <span>{sessionNotice}</span>
+          <button className="session-notice-close" onClick={clearSessionNotice}>✕</button>
+        </div>
+      )}
       <RestartOverlay />
       <EditSaveOverlay />
 

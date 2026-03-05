@@ -195,7 +195,10 @@ export class AgentProcess {
   }
 
   isAlive(): boolean {
-    return this.proc !== null && this.proc.exitCode === null && !this.proc.killed;
+    // Note: proc.killed becomes true after any kill signal (including SIGINT),
+    // but SIGINT doesn't terminate the process—it just interrupts current generation.
+    // We should only check exitCode to determine if the process is truly dead.
+    return this.proc !== null && this.proc.exitCode === null;
   }
 
   private _waitForFirstOutput(timeoutMs = AGENT_START_TIMEOUT_MS): Promise<void> {

@@ -90,21 +90,37 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     fi
 
     DATE=$(date "+%Y-%m-%d %H:%M")
+    # D2: Use printf to avoid echo interpreting -n/-e as options
+    REFINEMENT_LINE=$(printf '- [%s] %s' "$DATE" "$OBJECTIVE")
 
-    # Append refinement to Refinements section (create if not exists)
+    # D1: Append refinement within Refinements section (not at file end)
     if grep -q "^## Refinements" "$TARGET_FILE"; then
-        # Append to existing Refinements section
-        echo "- [$DATE] $OBJECTIVE" >> "$TARGET_FILE"
+        # Insert after ## Refinements section header (before next ## or EOF)
+        TMP_FILE=$(mktemp) || { echo "[ERROR] Failed to create temp file" >&2; exit 1; }
+        # D2: Use ENVIRON instead of -v to avoid backslash interpretation
+        AWK_LINE="$REFINEMENT_LINE" awk '
+            /^## Refinements/ { print; found=1; next }
+            /^## / && found { print ENVIRON["AWK_LINE"]; print ""; found=0 }
+            { print }
+            END { if (found) print ENVIRON["AWK_LINE"] }
+        ' "$TARGET_FILE" > "$TMP_FILE"
+        if ! mv "$TMP_FILE" "$TARGET_FILE" 2>&1; then
+            echo "[ERROR] Failed to update $TARGET_FILE" >&2
+            exit 1
+        fi
     else
-        # Create Refinements section
-        echo "" >> "$TARGET_FILE"
-        echo "## Refinements" >> "$TARGET_FILE"
-        echo "" >> "$TARGET_FILE"
-        echo "- [$DATE] $OBJECTIVE" >> "$TARGET_FILE"
+        # Create Refinements section at end
+        printf '\n## Refinements\n\n%s\n' "$REFINEMENT_LINE" >> "$TARGET_FILE"
     fi
 
-    git add "$TARGET_FILE"
-    git commit -m "task-ai($NB_NOTEBOOK):target refine objective"
+    # D3: git with error handling
+    if ! git add "$TARGET_FILE" 2>&1; then
+        echo "[ERROR] git add failed" >&2
+        exit 1
+    fi
+    if ! git commit -m "task-ai($NB_NOTEBOOK):target refine objective" 2>&1; then
+        echo "[WARN] git commit failed (may be no changes)" >&2
+    fi
 
     echo "[target] Refinement added: $OBJECTIVE"
     exit 0
@@ -116,12 +132,13 @@ fi
 echo "Updating task objective in $TARGET_FILE..."
 
 if [[ ! -f "$TARGET_FILE" ]]; then
-    cat > "$TARGET_FILE" <<EOF
-# Task Target: $NB_NOTEBOOK
+    # D2: Use quoted 'TARGET_END' to prevent variable expansion in OBJECTIVE
+    cat > "$TARGET_FILE" << 'TARGET_END'
+# Task Target: NOTEBOOK_PLACEHOLDER
 
 ## Objective
 
-$OBJECTIVE
+OBJECTIVE_PLACEHOLDER
 
 ## Requirements
 
@@ -130,10 +147,19 @@ $OBJECTIVE
 ## Constraints
 
 <!-- Any constraints or limitations -->
-EOF
+TARGET_END
+    # D2: Safe substitution with escaped special chars
+    NB_ESCAPED="${NB_NOTEBOOK//\\/\\\\}"
+    NB_ESCAPED="${NB_ESCAPED//&/\\&}"
+    NB_ESCAPED="${NB_ESCAPED//\//\\/}"
+    OBJ_ESCAPED="${OBJECTIVE//\\/\\\\}"
+    OBJ_ESCAPED="${OBJ_ESCAPED//&/\\&}"
+    OBJ_ESCAPED="${OBJ_ESCAPED//\//\\/}"
+    sed -i "s/NOTEBOOK_PLACEHOLDER/${NB_ESCAPED}/g; s/OBJECTIVE_PLACEHOLDER/${OBJ_ESCAPED}/g" "$TARGET_FILE"
 else
     # Update only the ## Objective section
-    TMP_FILE=$(mktemp)
+    TMP_FILE=$(mktemp) || { echo "[ERROR] Failed to create temp file" >&2; exit 1; }
+    # D6: Pass OBJECTIVE via environment variable to avoid shell escaping issues
     AWK_OBJ="$OBJECTIVE" awk '
       BEGIN { in_obj=0; found=0 }
       /^## Objective/ { print $0; print ""; print ENVIRON["AWK_OBJ"]; in_obj=1; found=1; next }
@@ -141,20 +167,30 @@ else
       !in_obj { print $0 }
       END { if (!found) { print "## Objective"; print ""; print ENVIRON["AWK_OBJ"] } }
     ' "$TARGET_FILE" > "$TMP_FILE"
-    mv "$TMP_FILE" "$TARGET_FILE"
+    # D3: mv with error handling - abort if fails to prevent data loss
+    if ! mv "$TMP_FILE" "$TARGET_FILE" 2>&1; then
+        echo "[ERROR] Failed to update $TARGET_FILE - original preserved" >&2
+        exit 1
+    fi
 fi
 
-git add "$TARGET_FILE"
-git commit -m "task-ai($NB_NOTEBOOK):target update objective"
+# D3: git with error handling
+if ! git add "$TARGET_FILE" 2>&1; then
+    echo "[ERROR] git add failed" >&2
+    exit 1
+fi
+if ! git commit -m "task-ai($NB_NOTEBOOK):target update objective" 2>&1; then
+    echo "[WARN] git commit failed (may be no changes)" >&2
+fi
 
 echo "Objective successfully updated and committed."
 
 # Enter target-refinement phase
-cat > "$SESSION_CONTEXT" << EOF
-phase: target-refinement
-entered_at: $(date -Iseconds)
-entered_by: /task-ai:target
-EOF
+# D2: Variables are safe here (controlled values), but use explicit format
+# D3: Error handling for session context write
+if ! printf 'phase: target-refinement\nentered_at: %s\nentered_by: /task-ai:target\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>&1; then
+    echo "[WARN] Failed to write session context" >&2
+fi
 
 echo "[target] Entered target-refinement phase."
 echo "[target] Continue discussing to refine. Use /plan when ready."

@@ -31,8 +31,37 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-# 1. Entry Point Routing (Simulated)
-STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status)
+# D3: Check state.py existence before calling
+if [[ ! -f "$STATE_PY" ]]; then
+    echo "[ERROR] state.py not found: $STATE_PY" >&2
+    exit 1
+fi
+
+# 1. Handle ACTION parameter (D1: per SKILL.md)
+case "$ACTION" in
+    stop)
+        echo "[AUTO] Stopping auto loop..."
+        rm -f "$SIGNAL_FILE"
+        echo "Auto loop stopped."
+        exit 0
+        ;;
+    status)
+        if [[ -f "$SIGNAL_FILE" ]]; then
+            echo "[AUTO] Signal file exists:"
+            cat "$SIGNAL_FILE"
+        else
+            echo "[AUTO] No active auto loop signal"
+        fi
+        exit 0
+        ;;
+    start)
+        # Continue with normal auto loop
+        ;;
+esac
+
+# 2. Entry Point Routing (Simulated)
+# D3: python3 call with error handling
+STATUS=$(python3 "$STATE_PY" get "$INDEX_JSON" status 2>/dev/null || echo "unknown")
 echo "Auto-mode: Starting loop from status: $STATUS"
 
 # 2. Simulated Loop (Executing one step for plumbing)
@@ -71,7 +100,8 @@ case "$STATUS" in
 esac
 
 # 3. Write Progress Signal
-cat > "$SIGNAL_FILE" <<EOF
+# D3: .auto-signal write with error handling
+if ! cat > "$SIGNAL_FILE" <<EOF
 {
   "step": "auto",
   "result": "CONTINUE",
@@ -81,5 +111,8 @@ cat > "$SIGNAL_FILE" <<EOF
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 }
 EOF
+then
+    echo "[WARN] Failed to write .auto-signal" >&2
+fi
 
 echo "Auto loop initialized. Next step: $NEXT_STEP."

@@ -48,7 +48,8 @@ if [[ "$GENERATE_SKILL_TESTS" == "true" ]]; then
     SKILL_DESC=$(grep -E "^description:" "$TARGET_FILE" | sed 's/^description:\s*//' || echo "No description")
     SKILL_STEPS=$(grep -A 100 "^## Steps" "$TARGET_FILE" | grep -E "^[0-9]+\." | head -5 || echo "No steps found")
 
-    cat > "$TEST_FILE" <<EOF
+    # D3: File write with error handling
+    if ! cat > "$TEST_FILE" <<EOF
 # Skill Test: $SKILL_NAME
 Generated: $DATE
 
@@ -78,9 +79,19 @@ $SKILL_STEPS
 - Use strict permission mode: \`claude --permission-mode strict\`
 - Collect permission requests as behavioral fingerprint
 EOF
+    then
+        echo "[ERROR] Failed to write $TEST_FILE" >&2
+        exit 1
+    fi
 
     echo "Generated skill tests: $TEST_FILE"
     exit 0
+fi
+
+# D1: Default empty CHECKPOINT to 'quick'
+if [[ -z "$CHECKPOINT" ]]; then
+    CHECKPOINT="quick"
+    echo "[verify] No checkpoint specified, defaulting to 'quick'"
 fi
 
 echo "Verifying $NOTEBOOK with checkpoint: $CHECKPOINT"
@@ -101,23 +112,37 @@ case "$CHECKPOINT" in
     ;;
   step-*)
     STEP_NUM=${CHECKPOINT#step-}
+    # D2: Validate STEP_NUM contains only digits
+    if [[ ! "$STEP_NUM" =~ ^[0-9]+$ ]]; then
+        echo "[ERROR] Invalid step number: $STEP_NUM" >&2
+        exit 1
+    fi
     echo "- Running tests for step $STEP_NUM... PASS"
     ;;
 esac
 
 # 2. Write Results File
-cat > "$RESULTS_FILE" <<EOF
+# D3: File write with error handling
+if ! cat > "$RESULTS_FILE" <<EOF
 # Verification Results: $CHECKPOINT · $DATE
 - Result: $RESULT
 - Summary: All criteria met for checkpoint $CHECKPOINT.
 EOF
+then
+    echo "[ERROR] Failed to write $RESULTS_FILE" >&2
+    exit 1
+fi
 
 # 3. Update .test/.summary.md
-cat > "$TEST_DIR/.summary.md" <<EOF
+# D3: File write with error handling
+if ! cat > "$TEST_DIR/.summary.md" <<EOF
 # Test Summary
 - Last Checkpoint: $CHECKPOINT
 - Last Result: $RESULT
 - Date: $DATE
 EOF
+then
+    echo "[WARN] Failed to write .summary.md" >&2
+fi
 
 echo "Verification completed. Results written to $RESULTS_FILE."

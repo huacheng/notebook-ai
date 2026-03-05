@@ -8,6 +8,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORE_DIR="$SCRIPT_DIR/../../../core"
 
+# Load core library and ensure library exists (C pattern)
+source "$CORE_DIR/lib.sh"
+ensure_library
+
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 EXPERIENCES_DIR="$LIB_PATH/.memory/.experiences"
 SKILLS_DIR="$LIB_PATH/.skills"
@@ -32,7 +36,11 @@ done
 echo "[promote] Scanning for promotable experiences..."
 
 # Ensure directories exist
-mkdir -p "$CANDIDATES_DIR"
+# D3: mkdir with error handling
+if ! mkdir -p "$CANDIDATES_DIR" 2>&1; then
+    echo "[ERROR] Failed to create candidates directory" >&2
+    exit 1
+fi
 
 #######################################
 # Parse frontmatter field from markdown file
@@ -249,6 +257,79 @@ process_experience() {
 
     echo "[promote]   Eligible! quality=verified, usage=$usage_count, has patterns"
 
+    # ─────────────────────────────────────────────────────────────────
+    # Pipeline Step 1: D2 Security Check (Static Analysis)
+    # ─────────────────────────────────────────────────────────────────
+    echo "[promote]   Running D2 Security check..."
+    local SECURITY_SCORE=1.0
+    local SECURITY_ISSUES=""
+
+    # Check for dangerous patterns
+    if grep -qE '\$\(|`[^`]+`|eval\s|exec\s' "$exp_file" 2>/dev/null; then
+        SECURITY_SCORE=$(echo "$SECURITY_SCORE - 0.3" | bc)
+        SECURITY_ISSUES="${SECURITY_ISSUES}command-substitution;"
+    fi
+    if grep -qiE 'curl.*\||wget.*\||bash\s+-c|sh\s+-c' "$exp_file" 2>/dev/null; then
+        SECURITY_SCORE=$(echo "$SECURITY_SCORE - 0.4" | bc)
+        SECURITY_ISSUES="${SECURITY_ISSUES}remote-exec;"
+    fi
+    if grep -qiE 'rm\s+-rf|chmod\s+777|sudo\s' "$exp_file" 2>/dev/null; then
+        SECURITY_SCORE=$(echo "$SECURITY_SCORE - 0.2" | bc)
+        SECURITY_ISSUES="${SECURITY_ISSUES}dangerous-cmd;"
+    fi
+
+    # Clamp score
+    SECURITY_SCORE=$(echo "if ($SECURITY_SCORE < 0) 0 else $SECURITY_SCORE" | bc)
+
+    if (( $(echo "$SECURITY_SCORE < 0.5" | bc -l) )); then
+        echo "[promote]   REJECT: D2 Security failed ($SECURITY_SCORE) - $SECURITY_ISSUES"
+        return 1
+    fi
+    echo "[promote]   D2 Security: $SECURITY_SCORE ✓"
+
+    # ─────────────────────────────────────────────────────────────────
+    # Pipeline Step 2: D1/D3/D5 Semantic Review (Self-Assessment)
+    # ─────────────────────────────────────────────────────────────────
+    echo "[promote]   Running D1/D3/D5 Semantic review..."
+    local SEMANTIC_SCORE=0.5
+
+    # D1 Correctness: Has clear objective/context
+    if grep -qE "^## (Context|Objective|Goal|Purpose)" "$exp_file" 2>/dev/null; then
+        SEMANTIC_SCORE=$(echo "$SEMANTIC_SCORE + 0.15" | bc)
+    fi
+
+    # D3 Reliability: Has error handling or edge case docs
+    if grep -qiE "(error|fail|edge.case|fallback|when.*not)" "$exp_file" 2>/dev/null; then
+        SEMANTIC_SCORE=$(echo "$SEMANTIC_SCORE + 0.15" | bc)
+    fi
+
+    # D5 Architecture: Has clear structure (multiple sections)
+    local section_count
+    section_count=$(grep -cE "^## " "$exp_file" 2>/dev/null || echo 0)
+    if [[ "$section_count" -ge 3 ]]; then
+        SEMANTIC_SCORE=$(echo "$SEMANTIC_SCORE + 0.2" | bc)
+    elif [[ "$section_count" -ge 2 ]]; then
+        SEMANTIC_SCORE=$(echo "$SEMANTIC_SCORE + 0.1" | bc)
+    fi
+
+    if (( $(echo "$SEMANTIC_SCORE < 0.5" | bc -l) )); then
+        echo "[promote]   REJECT: D1/D3/D5 Semantic review failed ($SEMANTIC_SCORE)"
+        return 1
+    fi
+    echo "[promote]   D1/D3/D5 Semantic: $SEMANTIC_SCORE ✓"
+
+    # ─────────────────────────────────────────────────────────────────
+    # Pipeline Step 3: Combined Pre-Promotion Score
+    # ─────────────────────────────────────────────────────────────────
+    local PRE_SCORE
+    PRE_SCORE=$(echo "scale=2; $SECURITY_SCORE * 0.4 + $SEMANTIC_SCORE * 0.6" | bc)
+    echo "[promote]   Pre-promotion score: $PRE_SCORE"
+
+    if (( $(echo "$PRE_SCORE < 0.5" | bc -l) )); then
+        echo "[promote]   REJECT: Pre-promotion score too low ($PRE_SCORE < 0.5)"
+        return 1
+    fi
+
     # Generate skill
     local slug
     slug=$(generate_slug "$exp_file")
@@ -265,17 +346,44 @@ process_experience() {
     fi
 
     # Create candidate directory and files
-    mkdir -p "$candidate_dir"
+    # D3: mkdir with error handling
+    if ! mkdir -p "$candidate_dir" 2>&1; then
+        echo "[promote]   ERROR: Failed to create candidate directory" >&2
+        return 1
+    fi
 
-    extract_skill_content "$exp_file" "$slug" > "$candidate_dir/SKILL.md"
-    generate_trust_report "$exp_file" "$slug" "$usage_count" > "$candidate_dir/trust-report.md"
+    # D3: file writes with error handling
+    if ! extract_skill_content "$exp_file" "$slug" > "$candidate_dir/SKILL.md" 2>&1; then
+        echo "[promote]   ERROR: Failed to write SKILL.md" >&2
+        return 1
+    fi
+    if ! generate_trust_report "$exp_file" "$slug" "$usage_count" > "$candidate_dir/trust-report.md" 2>&1; then
+        echo "[promote]   WARN: Failed to write trust-report.md" >&2
+    fi
+
+    # Append pre-promotion scores to trust-report
+    cat >> "$candidate_dir/trust-report.md" <<EOF
+
+## Pre-Promotion Review (Pipeline Steps 1-2)
+
+| Check | Score | Threshold | Status |
+|-------|-------|-----------|--------|
+| D2 Security | $SECURITY_SCORE | 0.5 | ✅ PASS |
+| D1/D3/D5 Semantic | $SEMANTIC_SCORE | 0.5 | ✅ PASS |
+| **Combined** | $PRE_SCORE | 0.5 | ✅ PASS |
+
+${SECURITY_ISSUES:+**Security Notes**: $SECURITY_ISSUES}
+EOF
 
     echo "[promote]   Created: $candidate_dir/SKILL.md"
     echo "[promote]   Created: $candidate_dir/trust-report.md"
 
     # Append to changelog
+    # D3: changelog append with error handling
     if [[ -f "$CHANGELOG" ]]; then
-        echo "$(date -Iseconds) | skill-candidate | .skills/.candidates/$slug | source:promote | from:$(basename "$exp_file")" >> "$CHANGELOG"
+        if ! echo "$(date -Iseconds) | skill-candidate | .skills/.candidates/$slug | source:promote | from:$(basename "$exp_file")" >> "$CHANGELOG" 2>&1; then
+            echo "[promote]   WARN: Failed to append to changelog" >&2
+        fi
     fi
 
     return 0

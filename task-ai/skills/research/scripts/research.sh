@@ -11,6 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TASK_AI_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
+# Ensure library exists before any library operations (C pattern)
+ensure_library
+
 # Library paths
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 MAINTAIN_SCRIPT="$TASK_AI_ROOT/skills/library/scripts/maintain.sh"
@@ -79,33 +82,41 @@ TARGET_MD="${WORK_DIR:+$WORK_DIR/.target.md}"
 # Handle audit caller mode - intelligence collection for rule evolution
 # Does not require .target.md or task context
 if [[ "$CALLER" == "audit" ]]; then
-    LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
+    # D5: LIB_PATH already defined at top of file (L18)
     INTEL_SOURCES="$LIB_PATH/.audit-intel-sources.yaml"
     EVOLVING_RULES_DIR="$LIB_PATH/.evolving-rules"
-    YAML_PARSER="$SCRIPT_DIR/../../../core/yaml_parser.py"
+    TEST_CORPUS_DIR="$LIB_PATH/.test-corpus"
+    # D6: YAML_PARSER removed - intel-fetcher.sh handles YAML parsing internally
     INTEL_FETCHER="$SCRIPT_DIR/intel-fetcher.sh"
 
     echo "[research:audit] Starting intelligence collection..."
 
-    # Ensure candidates directories exist
-    for domain in security sanitization audit; do
-        mkdir -p "$EVOLVING_RULES_DIR/$domain/candidates"
-    done
+    # R5: Define constants for magic strings (D6 maintainability)
+    QUALITY_STATUS_VERIFIED="quality_status: verified"
+    MAX_EXPERIENCE_SIZE=102400  # 100KB max for experience files (D2 security)
+
+    # R4: Directory creation delegated to intel-fetcher.sh (D5 architecture)
+    # intel-fetcher creates: candidates/, positive/, negative/ for all domains
 
     # Check if intel sources config exists
     if [[ -f "$INTEL_SOURCES" ]]; then
         echo "[research:audit] Loading intel sources from $INTEL_SOURCES"
 
-        # Parse sources using Python yaml_parser
-        if [[ -f "$YAML_PARSER" ]]; then
-            SOURCES_JSON=$(python3 "$YAML_PARSER" parse "$INTEL_SOURCES" 2>/dev/null || echo '{}')
-            echo "[research:audit] Parsed intel sources config"
-        fi
+        # D1: intel-fetcher.sh reads INTEL_SOURCES directly
+        # No need to pre-parse here (removed unused SOURCES_JSON)
 
         # Call intel-fetcher if available
+        # intel-fetcher generates both candidate rules AND test samples
         if [[ -f "$INTEL_FETCHER" ]]; then
             echo "[research:audit] Invoking intel-fetcher..."
-            bash "$INTEL_FETCHER" --sources "$INTEL_SOURCES" --output "$EVOLVING_RULES_DIR" 2>/dev/null || true
+            # R2: Capture exit status and log errors instead of silent ignore
+            INTEL_FETCH_STATUS=0
+            bash "$INTEL_FETCHER" --sources "$INTEL_SOURCES" \
+                --output "$EVOLVING_RULES_DIR" \
+                --test-corpus "$TEST_CORPUS_DIR" 2>&1 || INTEL_FETCH_STATUS=$?
+            if [[ "$INTEL_FETCH_STATUS" -ne 0 ]]; then
+                echo "[research:audit] WARNING: intel-fetcher failed with status $INTEL_FETCH_STATUS"
+            fi
         else
             echo "[research:audit] intel-fetcher.sh not found, skipping external fetch"
         fi
@@ -114,10 +125,62 @@ if [[ "$CALLER" == "audit" ]]; then
         echo "[research:audit] Copy template from skills/library/templates/audit-intel-sources.yaml"
     fi
 
-    # Output .auto-signal for automation loop
+    # Also extract negative samples from successful historical tasks
+    # These are known-good code patterns that should NOT trigger security rules
+    EXPERIENCES_DIR="$LIB_PATH/.memory/.experiences"
+    if [[ -d "$EXPERIENCES_DIR" ]]; then
+        echo "[research:audit] Extracting negative samples from verified experiences..."
+        NEGATIVE_COUNT=0
+        SKIPPED_COUNT=0
+        # Ensure target directory exists before copying
+        mkdir -p "$TEST_CORPUS_DIR/security/negative"
+        while IFS= read -r -d '' exp_file; do
+            # R5: Use named constant instead of magic string
+            if grep -q "$QUALITY_STATUS_VERIFIED" "$exp_file" 2>/dev/null; then
+                # R3: Validate content before copy (D2 security)
+                # Check 1: File size limit
+                FILE_SIZE=$(stat -f%z "$exp_file" 2>/dev/null || stat -c%s "$exp_file" 2>/dev/null || echo 0)
+                if [[ "$FILE_SIZE" -gt "$MAX_EXPERIENCE_SIZE" ]]; then
+                    echo "[research:audit] Skip: $exp_file exceeds size limit"
+                    ((SKIPPED_COUNT++)) || true
+                    continue
+                fi
+                # Check 2: No dangerous patterns (basic sanitization)
+                # D2: Check full file for dangerous patterns (security over performance)
+                if grep -qE '\$\(|`[^`]+`|curl.*\|.*bash' "$exp_file" 2>/dev/null; then
+                    echo "[research:audit] Skip: $exp_file contains dangerous patterns"
+                    ((SKIPPED_COUNT++)) || true
+                    continue
+                fi
+
+                SLUG=$(basename "$exp_file" .md | tr -cd 'a-zA-Z0-9_-')
+                # D2: Guard against empty SLUG (special character filenames)
+                if [[ -z "$SLUG" ]]; then
+                    SLUG="exp-$(date +%s)-$RANDOM"
+                fi
+                # Copy to security/negative as these are known-safe patterns
+                if [[ ! -f "$TEST_CORPUS_DIR/security/negative/$SLUG.md" ]]; then
+                    # D3: cp with error handling
+                    if cp "$exp_file" "$TEST_CORPUS_DIR/security/negative/$SLUG.md" 2>&1; then
+                        ((NEGATIVE_COUNT++)) || true
+                    else
+                        echo "[research:audit] WARN: Failed to copy $exp_file" >&2
+                    fi
+                fi
+            fi
+        done < <(find "$EXPERIENCES_DIR" -name "*-complete.md" -type f -print0 2>/dev/null)
+        echo "[research:audit] Extracted $NEGATIVE_COUNT negative samples (skipped $SKIPPED_COUNT)"
+    fi
+
+    # D1: audit mode does not participate in task automation loop
+    # .auto-signal is only written when WORK_DIR is set (notebook context)
     echo "[research:audit] Intelligence collection complete"
-    echo 'result="(intel-collected)"' > "$WORK_DIR/.auto-signal" 2>/dev/null || true
-    echo 'next="(stop)"' >> "$WORK_DIR/.auto-signal" 2>/dev/null || true
+    if [[ -n "$WORK_DIR" ]] && [[ -d "$WORK_DIR" ]]; then
+        echo 'result="(intel-collected)"' > "$WORK_DIR/.auto-signal"
+        echo 'next="(stop)"' >> "$WORK_DIR/.auto-signal"
+    else
+        echo "[research:audit] No notebook context - skipping .auto-signal"
+    fi
 
     exit 0
 fi
@@ -162,20 +225,26 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
         if [[ "$SCOPE" == "deep" ]] && [[ -f "$FILEPATH" ]]; then
             ARCHIVE_DIR="$REFS_DIR/.archive"
             mkdir -p "$ARCHIVE_DIR"
-            mv "$FILEPATH" "$ARCHIVE_DIR/${FILENAME}.${DATE}.md"
-            echo "[research] Archived previous version"
+            # D3: mv with error handling - abort if archive fails to prevent data loss
+            if mv "$FILEPATH" "$ARCHIVE_DIR/${FILENAME}.${DATE}.md" 2>&1; then
+                echo "[research] Archived previous version"
+            else
+                echo "[ERROR] Failed to archive $FILEPATH - aborting to prevent data loss" >&2
+                exit 1
+            fi
         fi
 
         # Write placeholder (actual research content would be generated by agent)
-        cat > "$FILEPATH" << EOF
-# ${TOPIC}
+        # D2: Use quoted 'EOF' to prevent variable expansion issues in TOPIC
+        cat > "$FILEPATH" << 'RESEARCH_END'
+# TOPIC_PLACEHOLDER
 
-> Researched: ${DATE}
-> Scope: ${SCOPE}
+> Researched: DATE_PLACEHOLDER
+> Scope: SCOPE_PLACEHOLDER
 
 ## Overview
 
-<!-- Research findings for: ${TOPIC} -->
+<!-- Research findings -->
 
 ## Key Points
 
@@ -185,7 +254,13 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
 
 - TODO: Add sources
 
-EOF
+RESEARCH_END
+        # Replace placeholders with actual values (safe substitution)
+        # D2: Escape sed special chars in TOPIC: & (match ref), \ (escape), / (delimiter)
+        TOPIC_ESCAPED="${TOPIC//\\/\\\\}"  # Escape backslashes first
+        TOPIC_ESCAPED="${TOPIC_ESCAPED//&/\\&}"  # Then ampersands
+        TOPIC_ESCAPED="${TOPIC_ESCAPED//\//\\/}"  # Then forward slashes
+        sed -i "s/TOPIC_PLACEHOLDER/${TOPIC_ESCAPED}/g; s/DATE_PLACEHOLDER/$DATE/g; s/SCOPE_PLACEHOLDER/$SCOPE/g" "$FILEPATH"
         echo "[research] Created reference: $FILEPATH"
 
         # Step 3: Append to changelog (with lock for concurrency)
@@ -215,11 +290,22 @@ fi
 DETECT_STAGE_PY="$SCRIPT_DIR/detect_stage.py"
 
 detect_stage() {
+    # D3: Check script existence before calling
+    if [[ ! -f "$DETECT_STAGE_PY" ]]; then
+        echo "[ERROR] detect_stage.py not found: $DETECT_STAGE_PY" >&2
+        echo "UNKNOWN"
+        return 1
+    fi
     python3 "$DETECT_STAGE_PY" "$TARGET_MD"
 }
 
 if [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
     STAGE=$(detect_stage)
+    # D2: Validate STAGE for safe characters (prevent injection)
+    STAGE=$(echo "$STAGE" | tr -cd 'A-Za-z0-9_-')
+    if [[ -z "$STAGE" ]]; then
+        STAGE="UNKNOWN"
+    fi
     echo "Detected stage: $STAGE"
 
     if [[ "$STAGE" == "PENDING" ]]; then
@@ -233,14 +319,17 @@ if [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
     # Write insights to .target.md
     DATE=$(date +%Y-%m-%d)
     if ! grep -q "## Research Insights" "$TARGET_MD"; then
-        echo -e "\n## Research Insights" >> "$TARGET_MD"
+        printf '\n## Research Insights\n' >> "$TARGET_MD"
     fi
-    echo -e "\n### $STAGE: Insights · $DATE\n\n#### [PROPOSED] Refinement\n- Data for $STAGE..." >> "$TARGET_MD"
+    # D1/D2: Use printf instead of echo -e to avoid interpreting escape sequences in STAGE
+    printf '\n### %s: Insights · %s\n\n#### [PROPOSED] Refinement\n- Data for %s...\n' "$STAGE" "$DATE" "$STAGE" >> "$TARGET_MD"
     echo "Updated .target.md with $STAGE insights."
 
     # Trigger quick maintenance (research may have written to library)
     post_write_maintain
 else
+    # D6: Non-objective callers (plan/test/verify/check/exec/library or auto)
+    # These callers need library search for context, not stage-based insights
     echo "Executing research for caller: ${CALLER:-auto}, scope: $SCOPE"
 
     # Default flow: search library first, then research gaps

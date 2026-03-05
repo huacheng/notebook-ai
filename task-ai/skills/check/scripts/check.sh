@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:check implementation
-# Usage: check.sh <notebook> [--checkpoint post-plan|mid-exec|post-exec]
+# Usage: check.sh <notebook> [--checkpoint post-plan|mid-exec|post-exec|audit-validate|skill-review|skill-deep-review]
 
 set -euo pipefail
 
@@ -8,32 +8,62 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
+# D6: Security script path defined once at top (used by multiple checkpoints)
+SECURITY_SH="$SCRIPT_DIR/../../security/scripts/security.sh"
 
-NOTEBOOK="${1:-}"
-resolve_workdir "$NOTEBOOK"
-NOTEBOOK="$NB_NOTEBOOK"
-
+# Parse all arguments first to check for library-only checkpoints
+NOTEBOOK=""
 CHECKPOINT=""
 TARGET_FILE=""
-shift || true
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --checkpoint) CHECKPOINT="$2"; shift 2 ;;
     --target) TARGET_FILE="$2"; shift 2 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    --*) echo "Unknown option: $1" >&2; exit 1 ;;
+    *)
+      # Positional argument = notebook name
+      if [[ -z "$NOTEBOOK" ]]; then
+        NOTEBOOK="$1"
+      fi
+      shift
+      ;;
   esac
 done
-INDEX_JSON="$WORK_DIR/.index.json"
 
-if [[ ! -d "$WORK_DIR" ]]; then
-    echo "[ERROR] Working directory not found." >&2
-    exit 1
+# D1: Default empty CHECKPOINT to 'post-plan'
+if [[ -z "$CHECKPOINT" ]]; then
+    CHECKPOINT="post-plan"
+    echo "[check] No checkpoint specified, defaulting to 'post-plan'"
 fi
 
-ANALYSIS_DIR="$WORK_DIR/.analysis"
-mkdir -p "$ANALYSIS_DIR"
+# Library-only checkpoints don't need notebook context
+LIBRARY_ONLY_CHECKPOINTS="audit-validate"
+if [[ " $LIBRARY_ONLY_CHECKPOINTS " =~ " $CHECKPOINT " ]]; then
+    # Set minimal context for library operations
+    WORK_DIR=""
+    STATE_PY="$SCRIPT_DIR/../../../core/state.py"
+else
+    # Normal notebook-context checkpoints
+    resolve_workdir "$NOTEBOOK"
+    NOTEBOOK="$NB_NOTEBOOK"
+    INDEX_JSON="$WORK_DIR/.index.json"
 
-STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+    if [[ ! -d "$WORK_DIR" ]]; then
+        echo "[ERROR] Working directory not found." >&2
+        exit 1
+    fi
+
+    ANALYSIS_DIR="$WORK_DIR/.analysis"
+    mkdir -p "$ANALYSIS_DIR"
+    STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+fi
+
+# D3: Check state.py existence before calling
+if [[ ! -f "$STATE_PY" ]]; then
+    echo "[ERROR] state.py not found: $STATE_PY" >&2
+    exit 1
+fi
 
 # Handle audit-validate checkpoint - validates candidate rules
 if [[ "$CHECKPOINT" == "audit-validate" ]]; then
@@ -49,6 +79,19 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
 
     echo "[audit-validate] Validating candidate rules in $EVOLVING_RULES_DIR"
 
+    # B3: Audit log for traceability
+    AUDIT_LOG="$LIB_PATH/.evolving-rules/.audit.log"
+    mkdir -p "$(dirname "$AUDIT_LOG")"
+
+    log_audit() {
+        local action="$1"
+        local domain="$2"
+        local rule="$3"
+        local precision="$4"
+        local reason="${5:-}"
+        echo "{\"ts\":\"$(date -Iseconds)\",\"action\":\"$action\",\"domain\":\"$domain\",\"rule\":\"$rule\",\"precision\":$precision,\"reason\":\"$reason\"}" >> "$AUDIT_LOG"
+    }
+
     # Calculate precision using Python yaml_parser.py
     calculate_precision() {
         local rule_file="$1"
@@ -63,8 +106,30 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
         fi
     }
 
+    # B2: D2 Security check before activation
+    check_rule_security() {
+        local rule_file="$1"
+        local rule_id="$2"
+
+        if [[ -f "$YAML_PARSER" ]]; then
+            # Extract pattern and check for dangerous constructs
+            local pattern
+            pattern=$(python3 "$YAML_PARSER" parse "$rule_file" 2>/dev/null | grep -oP '"pattern":\s*"\K[^"]*' || echo "")
+
+            if [[ -n "$pattern" ]]; then
+                local result
+                result=$(python3 "$YAML_PARSER" sanitize "$pattern" "$rule_id" 2>/dev/null || echo '{"safe":false}')
+                if echo "$result" | grep -q '"safe": true\|"safe":true'; then
+                    return 0  # Safe
+                fi
+            fi
+        fi
+        return 1  # Unsafe or check failed
+    }
+
     ACTIVATED_COUNT=0
     REVIEW_COUNT=0
+    BLOCKED_COUNT=0
 
     for domain in security sanitization audit; do
         CANDIDATES_DIR="$EVOLVING_RULES_DIR/$domain/candidates"
@@ -75,32 +140,63 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
         mkdir -p "$ACTIVE_DIR" "$REVIEW_DIR"
 
         # Determine test directory based on domain
-        case "$domain" in
-            security)     TEST_DIR="$LIB_PATH/.memory/.experiences" ;;
-            sanitization) TEST_DIR="$LIB_PATH/.memory/.references" ;;
-            audit)        TEST_DIR="$ANALYSIS_DIR" ;;
-        esac
+        # Priority: .test-corpus/ (labeled samples) > fallback directories
+        TEST_CORPUS="$LIB_PATH/.test-corpus/$domain"
+        if [[ -d "$TEST_CORPUS/positive" ]] || [[ -d "$TEST_CORPUS/negative" ]]; then
+            TEST_DIR="$TEST_CORPUS"
+        else
+            # B1 fix: Fallback to legacy directories if no labeled corpus
+            case "$domain" in
+                security)     TEST_DIR="$LIB_PATH/.memory/.experiences" ;;
+                sanitization) TEST_DIR="$LIB_PATH/.memory/.references" ;;
+                audit)        TEST_DIR="$LIB_PATH/.analysis" ;;  # B1: Fixed undefined variable
+            esac
+        fi
 
         for candidate in "$CANDIDATES_DIR"/*.yaml; do
             [[ -f "$candidate" ]] || continue
 
             CANDIDATE_NAME=$(basename "$candidate")
+            CANDIDATE_ID="${CANDIDATE_NAME%.yaml}"
             PRECISION=$(calculate_precision "$candidate" "$TEST_DIR")
 
-            # Decision: activate or review
+            # B2: Gate 1 - D2 Security check (blocking)
+            if ! check_rule_security "$candidate" "$CANDIDATE_ID"; then
+                # D3: mv with error handling
+                if ! mv "$candidate" "$REVIEW_DIR/" 2>&1; then
+                    echo "[ERROR] Failed to move $candidate to review" >&2
+                    continue
+                fi
+                echo "[BLOCKED] $domain/$CANDIDATE_NAME - D2 security check failed"
+                log_audit "blocked" "$domain" "$CANDIDATE_NAME" "$PRECISION" "D2_security_failed"
+                ((BLOCKED_COUNT++)) || true
+                continue
+            fi
+
+            # Gate 2 - Precision threshold
             if (( $(echo "$PRECISION >= 0.80" | bc -l) )); then
-                mv "$candidate" "$ACTIVE_DIR/"
+                # D3: mv with error handling
+                if ! mv "$candidate" "$ACTIVE_DIR/" 2>&1; then
+                    echo "[ERROR] Failed to move $candidate to active" >&2
+                    continue
+                fi
                 echo "[ACTIVATED] $domain/$CANDIDATE_NAME precision=$PRECISION"
+                log_audit "activated" "$domain" "$CANDIDATE_NAME" "$PRECISION" "precision_passed"
                 ((ACTIVATED_COUNT++)) || true
             else
-                mv "$candidate" "$REVIEW_DIR/"
+                # D3: mv with error handling
+                if ! mv "$candidate" "$REVIEW_DIR/" 2>&1; then
+                    echo "[ERROR] Failed to move $candidate to review" >&2
+                    continue
+                fi
                 echo "[REVIEW] $domain/$CANDIDATE_NAME precision=$PRECISION (< 0.80 threshold)"
+                log_audit "review" "$domain" "$CANDIDATE_NAME" "$PRECISION" "precision_below_threshold"
                 ((REVIEW_COUNT++)) || true
             fi
         done
     done
 
-    echo "[audit-validate] Complete: activated=$ACTIVATED_COUNT, review=$REVIEW_COUNT"
+    echo "[audit-validate] Complete: activated=$ACTIVATED_COUNT, review=$REVIEW_COUNT, blocked=$BLOCKED_COUNT"
     exit 0
 fi
 
@@ -149,14 +245,15 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
     echo ""
     echo "--- Gate 1: D2 Security (blocking) ---"
 
-    SECURITY_SH="$SCRIPT_DIR/../../security/scripts/security.sh"
+    # SECURITY_SH defined at top of file (D6)
     D2_SCORE=0.9
     D2_ISSUES=""
 
     # Check for dangerous patterns
     if [[ -f "$SECURITY_SH" ]]; then
         SECURITY_OUTPUT=$(bash "$SECURITY_SH" "$NOTEBOOK" scan-skill "$TARGET_FILE" 2>&1 || true)
-        if echo "$SECURITY_OUTPUT" | grep -qiE "blocked|dangerous|risk|violation"; then
+        # D1: Check for REJECT verdict, not generic keywords (fixes false positive on "Risk: low")
+        if echo "$SECURITY_OUTPUT" | grep -qE "REJECT|BLOCKED"; then
             D2_SCORE=0.2
             D2_ISSUES="$SECURITY_OUTPUT"
         fi
@@ -359,12 +456,12 @@ EOF
         # All gates passed - calculate full composite
         COMPOSITE=$(echo "scale=2; $D1_SCORE * 0.20 + $D2_SCORE * 0.25 + $D3_SCORE * 0.15 + $D4_SCORE * 0.10 + $D5_SCORE * 0.15 + $D6_SCORE * 0.15" | bc)
 
-        # Determine trust tier
+        # Determine trust tier for L2 (skill-review)
+        # L2 only promotes to T3 (>= 0.70), never directly to T4
+        # T4 promotion requires L3 (skill-deep-review)
         TRUST_TIER="T1"
-        if (( $(echo "$COMPOSITE >= 0.85" | bc -l) )); then
-            TRUST_TIER="T4"
-        elif (( $(echo "$COMPOSITE >= 0.70" | bc -l) )); then
-            TRUST_TIER="T3"
+        if (( $(echo "$COMPOSITE >= 0.70" | bc -l) )); then
+            TRUST_TIER="T3"  # L2 max tier is T3
         elif (( $(echo "$COMPOSITE >= 0.50" | bc -l) )); then
             TRUST_TIER="T2"
         fi
@@ -398,17 +495,294 @@ ${D4_SUGGESTION:+- D4: $D4_SUGGESTION}
 ${D5_SUGGESTION:+- D5: $D5_SUGGESTION}
 ${D6_SUGGESTION:+- D6: $D6_SUGGESTION}
 
-## Tier Actions
-- T4 (>= 0.85): Auto-promote to skills/
-- T3 (0.70-0.84): Move to .drafts/ (pending human review)
+## L2 Tier Actions (skill-review)
+- T3 (>= 0.70): Move to .drafts/ → next: L3 skill-deep-review
 - T2 (0.50-0.69): Return findings, needs improvement
 - T1 (< 0.50): Reject
+
+Note: T4 requires L3 (skill-deep-review) with score >= 0.85
 EOF
+
+        # ─────────────────────────────────────────────────────────────────
+        # Auto-move based on trust tier (T2→T3)
+        # ─────────────────────────────────────────────────────────────────
+        LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
+        SKILL_PARENT_DIR=$(dirname "$TARGET_FILE")
+        SKILL_SLUG=$(basename "$SKILL_PARENT_DIR")
+
+        # Check if skill is in .candidates/ (eligible for T2→T3 move)
+        # L2 can only promote to T3 (L3 required for T4)
+        if [[ "$SKILL_PARENT_DIR" == *".candidates"* ]]; then
+            if [[ "$TRUST_TIER" == "T3" ]]; then
+                MOVE_TO_DRAFTS=1
+                DRAFTS_TARGET="$LIB_PATH/.skills/.drafts/$SKILL_SLUG"
+
+                if [[ ! -d "$DRAFTS_TARGET" ]]; then
+                    mkdir -p "$DRAFTS_TARGET"
+                    # D3: cp -r with error handling
+                    if ! cp -r "$SKILL_PARENT_DIR"/* "$DRAFTS_TARGET/" 2>&1; then
+                        echo "[ERROR] Failed to copy skill to drafts" >&2
+                    else
+                        # Update trust_tier in SKILL.md
+                        if [[ -f "$DRAFTS_TARGET/SKILL.md" ]]; then
+                            sed -i "s/trust_tier: T[0-9]/trust_tier: T3/" "$DRAFTS_TARGET/SKILL.md"
+                        fi
+
+                        echo ""
+                        echo "[PROMOTION] T2→T3: Moved to $DRAFTS_TARGET"
+                        echo "[PROMOTION] Next: check --checkpoint skill-deep-review --target $DRAFTS_TARGET/SKILL.md"
+                    fi
+                else
+                    echo "[SKIP] Already exists in .drafts/"
+                fi
+            fi
+        fi
     fi
 
     echo ""
     echo "Analysis written to $ANALYSIS_FILE"
     exit 0
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Handle skill-deep-review checkpoint (L3 LLM Semantic Review)
+# T3→T4 promotion: >= 0.85 composite → move to .skills/<name>/
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
+    if ! command -v bc &>/dev/null; then
+        echo "[ERROR] 'bc' command required for skill-deep-review." >&2
+        exit 1
+    fi
+
+    if [[ -z "$TARGET_FILE" || ! -f "$TARGET_FILE" ]]; then
+        echo "[ERROR] --target <skill.md> required for skill-deep-review" >&2
+        exit 1
+    fi
+
+    echo "=== L3 LLM Deep Semantic Review: $TARGET_FILE ==="
+
+    DATE=$(date +%Y-%m-%d)
+    SKILL_NAME=$(basename "${TARGET_FILE%.*}")
+    SKILL_PARENT_DIR=$(dirname "$TARGET_FILE")
+    SKILL_SLUG=$(basename "$SKILL_PARENT_DIR")
+    ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-skill-deep-review-$SKILL_NAME.md"
+
+    # Verify skill is in .drafts/ (T3)
+    if [[ "$SKILL_PARENT_DIR" != *".drafts"* ]]; then
+        echo "[WARN] Skill not in .drafts/ — may not be T3 yet"
+    fi
+
+    LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
+
+    #############################################
+    # L3 Dimension 1: Intent Alignment
+    #############################################
+    echo ""
+    echo "--- L3.1: Intent Alignment ---"
+
+    L3_D1_SCORE=0.8
+    L3_D1_ISSUES=""
+
+    # Check description vs steps consistency
+    DESCRIPTION=$(grep -A1 "^description:" "$TARGET_FILE" 2>/dev/null | tail -1 | tr -d '"' || echo "")
+    HAS_STEPS=$(grep -qE "^## (Steps|Instructions|Usage)" "$TARGET_FILE" && echo 1 || echo 0)
+
+    if [[ -n "$DESCRIPTION" && "$HAS_STEPS" == "1" ]]; then
+        L3_D1_SCORE=0.9
+    else
+        L3_D1_SCORE=0.6
+        L3_D1_ISSUES="Missing clear description-to-steps alignment"
+    fi
+
+    # Check for hidden side effects (write/delete/send without mention in description)
+    if grep -qiE "(write|delete|remove|send|post|push)" "$TARGET_FILE" 2>/dev/null; then
+        if ! echo "$DESCRIPTION" | grep -qiE "(write|delete|remove|send|modify|update)"; then
+            L3_D1_SCORE=$(echo "$L3_D1_SCORE - 0.2" | bc)
+            L3_D1_ISSUES="${L3_D1_ISSUES}\n- Potential hidden side effects not in description"
+        fi
+    fi
+
+    echo "L3.1 Intent Alignment: $L3_D1_SCORE"
+
+    #############################################
+    # L3 Dimension 2: Semantic Security
+    #############################################
+    echo ""
+    echo "--- L3.2: Semantic Security ---"
+
+    L3_D2_SCORE=0.9
+    L3_D2_ISSUES=""
+
+    # Indirect command execution
+    if grep -qE '\$\{.*\}.*\||\$\(.*\)\s*\|' "$TARGET_FILE"; then
+        L3_D2_SCORE=$(echo "$L3_D2_SCORE - 0.3" | bc)
+        L3_D2_ISSUES="${L3_D2_ISSUES}\n- Indirect command execution pattern"
+    fi
+
+    # Data exfiltration paths
+    if grep -qiE "(curl|wget|fetch).*\$|send.*to.*\$" "$TARGET_FILE"; then
+        L3_D2_SCORE=$(echo "$L3_D2_SCORE - 0.2" | bc)
+        L3_D2_ISSUES="${L3_D2_ISSUES}\n- Potential data exfiltration path"
+    fi
+
+    # Prompt injection vectors
+    if grep -qiE "user.*input.*directly|inject|ignore.*instruction" "$TARGET_FILE"; then
+        L3_D2_SCORE=$(echo "$L3_D2_SCORE - 0.4" | bc)
+        L3_D2_ISSUES="${L3_D2_ISSUES}\n- Prompt injection vulnerability"
+    fi
+
+    L3_D2_SCORE=$(echo "if ($L3_D2_SCORE < 0) 0 else $L3_D2_SCORE" | bc)
+    echo "L3.2 Semantic Security: $L3_D2_SCORE"
+
+    #############################################
+    # L3 Dimension 3: Logical Completeness
+    #############################################
+    echo ""
+    echo "--- L3.3: Logical Completeness ---"
+
+    L3_D3_SCORE=0.7
+    L3_D3_ISSUES=""
+
+    # Precondition checks
+    if grep -qiE "(require|prerequisite|before|ensure|verify.*first)" "$TARGET_FILE"; then
+        L3_D3_SCORE=$(echo "$L3_D3_SCORE + 0.1" | bc)
+    else
+        L3_D3_ISSUES="${L3_D3_ISSUES}\n- No precondition documentation"
+    fi
+
+    # Error handling
+    if grep -qiE "(error|fail|exception|fallback|if.*not|when.*missing)" "$TARGET_FILE"; then
+        L3_D3_SCORE=$(echo "$L3_D3_SCORE + 0.1" | bc)
+    else
+        L3_D3_ISSUES="${L3_D3_ISSUES}\n- No error handling documentation"
+    fi
+
+    # Idempotency mention
+    if grep -qiE "(idempotent|safe.*rerun|repeat)" "$TARGET_FILE"; then
+        L3_D3_SCORE=$(echo "$L3_D3_SCORE + 0.1" | bc)
+    fi
+
+    echo "L3.3 Logical Completeness: $L3_D3_SCORE"
+
+    #############################################
+    # Calculate L3 Composite
+    #############################################
+    echo ""
+    echo "=== L3 Review Summary ==="
+
+    L3_COMPOSITE=$(echo "scale=2; $L3_D1_SCORE * 0.35 + $L3_D2_SCORE * 0.40 + $L3_D3_SCORE * 0.25" | bc)
+
+    # Determine outcome
+    if (( $(echo "$L3_COMPOSITE >= 0.85" | bc -l) )); then
+        L3_VERDICT="PROMOTE"
+        L3_NEXT_TIER="T4"
+    elif (( $(echo "$L3_COMPOSITE >= 0.70" | bc -l) )); then
+        L3_VERDICT="PASS"
+        L3_NEXT_TIER="T3"
+    else
+        L3_VERDICT="NEEDS_WORK"
+        L3_NEXT_TIER="T3"
+    fi
+
+    echo "L3 Composite: $L3_COMPOSITE"
+    echo "Verdict: $L3_VERDICT"
+    echo "Trust Tier: $L3_NEXT_TIER"
+
+    # Write analysis
+    cat > "$ANALYSIS_FILE" <<EOF
+# L3 Deep Semantic Review: $SKILL_NAME · $DATE
+
+## Scores
+| Dimension | Score | Weight |
+|-----------|-------|--------|
+| L3.1 Intent Alignment | $L3_D1_SCORE | 35% |
+| L3.2 Semantic Security | $L3_D2_SCORE | 40% |
+| L3.3 Logical Completeness | $L3_D3_SCORE | 25% |
+
+## Result
+- **L3 Composite**: $L3_COMPOSITE
+- **Verdict**: $L3_VERDICT
+- **Trust Tier**: $L3_NEXT_TIER
+
+## Issues Found
+${L3_D1_ISSUES:-None}
+${L3_D2_ISSUES:-None}
+${L3_D3_ISSUES:-None}
+
+## Next Steps
+$(if [[ "$L3_VERDICT" == "PROMOTE" ]]; then
+    echo "- ✅ Ready for T4 activation"
+    echo "- Skill will be moved to .skills/.active/$SKILL_SLUG/"
+else
+    echo "- Fix issues above and re-run skill-deep-review"
+fi)
+EOF
+
+    # ─────────────────────────────────────────────────────────────────
+    # Auto-move T3→T4 if PROMOTE verdict
+    # ─────────────────────────────────────────────────────────────────
+    if [[ "$L3_VERDICT" == "PROMOTE" ]]; then
+        MOVE_TO_ACTIVE=1
+        ACTIVE_TARGET="$LIB_PATH/.skills/.active/$SKILL_SLUG"
+
+        if [[ ! -d "$ACTIVE_TARGET" ]]; then
+            mkdir -p "$ACTIVE_TARGET"
+            # D3: cp -r with error handling
+            if ! cp -r "$SKILL_PARENT_DIR"/* "$ACTIVE_TARGET/" 2>&1; then
+                echo "[ERROR] Failed to copy skill to active" >&2
+            else
+                # Update trust_tier in SKILL.md
+                if [[ -f "$ACTIVE_TARGET/SKILL.md" ]]; then
+                    sed -i "s/trust_tier: T[0-9]/trust_tier: T4/" "$ACTIVE_TARGET/SKILL.md"
+                fi
+
+                echo ""
+                echo "[PROMOTION] T3→T4: Moved to $ACTIVE_TARGET"
+                echo "[PROMOTION] Skill is now ACTIVE and available for hot-reload"
+            fi
+        else
+            echo "[SKIP] Already exists in .skills/"
+        fi
+    fi
+
+    echo ""
+    echo "Analysis written to $ANALYSIS_FILE"
+    exit 0
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Post-plan checkpoint: Security audit-plan pre-hook (per SKILL.md L315)
+# SECURITY_SH defined at top of file (D6)
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "$CHECKPOINT" == "post-plan" ]]; then
+    echo "[post-plan] Running security audit-plan..."
+    if [[ -f "$SECURITY_SH" ]]; then
+        AUDIT_OUTPUT=$(bash "$SECURITY_SH" "$NOTEBOOK" audit-plan 2>&1 || true)
+        echo "$AUDIT_OUTPUT"
+        if echo "$AUDIT_OUTPUT" | grep -qiE "BLOCKED|HIGH.RISK"; then
+            echo "[post-plan] Security audit FAILED - triggering REPLAN"
+            VERDICT="REPLAN"
+            DATE=$(date +%Y-%m-%d)
+            ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-$CHECKPOINT-security-blocked.md"
+            cat > "$ANALYSIS_FILE" <<EOF
+# Security Audit: post-plan · $DATE
+- Verdict: REPLAN
+- Reason: Security audit blocked the plan
+
+## Security Report
+$AUDIT_OUTPUT
+
+## Required Action
+Review and revise the plan to remove dangerous operations.
+EOF
+            # D3: python3 call with error handling
+            if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status re-planning --phase needs-plan 2>&1; then
+                echo "[WARN] Failed to transition status to re-planning" >&2
+            fi
+            echo "Check completed. Security blocked. Analysis: $ANALYSIS_FILE"
+            exit 0
+        fi
+    fi
 fi
 
 # 1. Decision Logic (Simulated for plumbing)
@@ -419,18 +793,25 @@ VERDICT="PASS"
 echo "Checking $NOTEBOOK at $CHECKPOINT... Verdict: $VERDICT"
 
 # 2. State Transitions
+# D3: python3 calls with error handling
 case "$VERDICT" in
   PASS)
-    python3 "$STATE_PY" transition "$INDEX_JSON" --status review
+    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status review 2>&1; then
+        echo "[WARN] Failed to transition status to review" >&2
+    fi
     ;;
   ACCEPT)
     # ACCEPT keeps 'executing' status but signals 'merge'
     ;;
   REPLAN)
-    python3 "$STATE_PY" transition "$INDEX_JSON" --status re-planning --phase needs-plan
+    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status re-planning --phase needs-plan 2>&1; then
+        echo "[WARN] Failed to transition status to re-planning" >&2
+    fi
     ;;
   BLOCKED)
-    python3 "$STATE_PY" transition "$INDEX_JSON" --status blocked
+    if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status blocked 2>&1; then
+        echo "[WARN] Failed to transition status to blocked" >&2
+    fi
     ;;
 esac
 

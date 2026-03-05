@@ -79,6 +79,31 @@ describe('interrupt (Esc)', () => {
     expect(typeof ap.interrupt).toBe('function');
   });
 
+  it('isAlive() returns true after SIGINT (proc.killed is true but exitCode is null)', async () => {
+    // This test verifies the bug fix: SIGINT sets proc.killed=true but doesn't
+    // terminate the process. isAlive() should still return true.
+    const { AgentProcess } = await import('../agent-process.js');
+    const ap = new AgentProcess('claude', '/tmp');
+
+    // Mock a process that received SIGINT but is still running
+    const mockProc = { exitCode: null, killed: true } as any;
+    (ap as any).proc = mockProc;
+
+    // isAlive() should return true because exitCode is still null
+    expect(ap.isAlive()).toBe(true);
+  });
+
+  it('isAlive() returns false only when exitCode is set', async () => {
+    const { AgentProcess } = await import('../agent-process.js');
+    const ap = new AgentProcess('claude', '/tmp');
+
+    // Process truly exited
+    const mockProc = { exitCode: 0, killed: true } as any;
+    (ap as any).proc = mockProc;
+
+    expect(ap.isAlive()).toBe(false);
+  });
+
   // ── SessionManager.interruptCell() ──────────────────────────────────────
 
   it('interruptCell() calls agent interrupt() and sets _interrupted flag', async () => {

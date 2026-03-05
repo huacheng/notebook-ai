@@ -181,6 +181,41 @@ describe('Session Heartbeat Mechanism', () => {
     });
   });
 
+  describe('Process death handling (D3-1)', () => {
+    it('should check agentProcess.isAlive() before sending continue prompt', () => {
+      const src = sessionSrc();
+      // heartbeatCheck should verify process is alive before sending continue
+      expect(src).toMatch(/heartbeatCheck[\s\S]*?agentProcess\.isAlive\(\)/);
+    });
+
+    it('should skip continue prompt when process is dead', () => {
+      const src = sessionSrc();
+      // Should have early return or guard when process is dead
+      expect(src).toMatch(/!session\.agentProcess\.isAlive\(\)/);
+    });
+
+    it('should broadcast process_dead event when process dies during heartbeat', () => {
+      const src = sessionSrc();
+      expect(src).toContain('process_dead');
+    });
+
+    it('should complete running cell as error when process is dead', () => {
+      const src = sessionSrc();
+      // When process is dead and cell is running, should complete as error
+      const heartbeatMatch = src.match(/heartbeatCheck[\s\S]*?!session\.agentProcess\.isAlive\(\)[\s\S]*?completeCell/);
+      expect(heartbeatMatch).toBeTruthy();
+    });
+  });
+
+  describe('Timer cleanup guarantee (D3-2)', () => {
+    it('should clear heartbeat timer when session is deleted from map', () => {
+      const src = sessionSrc();
+      // sessions.delete should be preceded by stopHeartbeat or timer cleanup
+      const deleteMatch = src.match(/stopHeartbeat[\s\S]*?sessions\.delete|_heartbeatTimer[\s\S]*?sessions\.delete/);
+      expect(deleteMatch).toBeTruthy();
+    });
+  });
+
   describe('Tool execution timeout feedback (P3: D3-1)', () => {
     it('should have TOOL_LONG_RUNNING_MS constant', () => {
       const src = sessionSrc();

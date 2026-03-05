@@ -16,6 +16,30 @@ fi
 # Library directory: $NB_WORKSPACES_ROOT/.library
 export NB_WORKSPACES_LIBRARY="${NB_WORKSPACES_LIBRARY:-$NB_WORKSPACES_ROOT/.library}"
 
+# --- Library Initialization ---
+
+# Ensures library directory structure exists (idempotent).
+# Calls init-lib.sh if library is missing or incomplete.
+ensure_library() {
+  local lib_path="${NB_WORKSPACES_LIBRARY:-$NB_WORKSPACES_ROOT/.library}"
+  local init_script="$TASK_AI_ROOT/skills/library/scripts/init-lib.sh"
+
+  # Quick check: if core structure exists, skip
+  if [[ -d "$lib_path/.memory/.experiences" && -f "$lib_path/.master-index.md" ]]; then
+    return 0
+  fi
+
+  # Run init-lib.sh (idempotent)
+  # D3: init-lib.sh call with error handling
+  if [[ -f "$init_script" ]]; then
+    if ! bash "$init_script" 2>&1; then
+      echo "[WARN] init-lib.sh failed, library may be incomplete" >&2
+    fi
+  else
+    echo "[WARN] init-lib.sh not found at $init_script" >&2
+  fi
+}
+
 # --- Context Discovery ---
 
 # Identifies the current notebook based on CWD or Git branch.

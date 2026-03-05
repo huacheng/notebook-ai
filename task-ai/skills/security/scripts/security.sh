@@ -13,6 +13,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
+# D5: Delegate rule loading to unified rule-loader.sh
+# rule-loader.sh uses yaml_parser.py for proper YAML parsing (escape sequences, etc.)
+source "$SCRIPT_DIR/../../../core/rule-loader.sh"
+
 NOTEBOOK="${1:-}"
 ACTION="${2:-}"
 PAYLOAD="${3:-}"
@@ -40,37 +44,62 @@ verify_cmd() {
     local risk="low"
     local reason=""
 
+    # =========================================================================
+    # TIER 1: EXTENDED RULES (Evolvable) - check command against dynamic rules
+    # D5: Delegated to rule-loader.sh
+    # =========================================================================
+    load_rules_from_domain "security"
+    local i
+    for i in "${!RULE_IDS[@]}"; do
+        local rule_id="${RULE_IDS[$i]}"
+        local rule_pattern="${RULE_PATTERNS[$i]}"
+        local rule_case_insensitive="${RULE_CASE_INSENSITIVE[$i]}"
+
+        local -a grep_opts=("-q" "-E")
+        [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
+
+        if echo "$cmd" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+            risk="high"
+            reason="dynamic:$rule_id"
+            break
+        fi
+    done
+
+    # =========================================================================
+    # TIER 2: CORE RULES (Security Floor - Hardcoded)
+    # =========================================================================
+
     # 1. Fatal Pattern Blocking (Destructive commands)
-    if echo "$cmd" | grep -qE "rm\s+-rf\s+(/|/etc|~|/var)"; then
+    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "rm\s+-rf\s+(/|/etc|~|/var)"; then
         risk="high"
         reason="Destructive path deletion"
     fi
 
     # 2. VFP Injection (Command Semantics)
-    if echo "$cmd" | grep -qE -e "--eval|--conftest|--require|--include|--import"; then
+    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE -e "--eval|--conftest|--require|--include|--import"; then
         risk="high"
         reason="VFP semantics injection"
     fi
 
     # 3. Two-stage loading (download & execute patterns)
-    if echo "$cmd" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
+    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "(curl|wget|fetch).*\|.*(/bin/)?(bash|sh|zsh|python|perl|ruby|node)"; then
         risk="high"
         reason="Two-stage payload execution"
     fi
     # 3b. Download-then-execute pattern (curl -o file && run)
-    if echo "$cmd" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
+    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "(curl|wget).*(-o|-O).*&&.*(chmod|bash|sh|\./)"; then
         risk="high"
         reason="Download and execute pattern"
     fi
 
     # 4. Environment manipulation (high risk if overriding critical libs)
-    if echo "$cmd" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
+    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "(LD_PRELOAD|PYTHONPATH|NODE_OPTIONS|JAVA_TOOL_OPTIONS|RUBYOPT|PERL5LIB|DYLD_INSERT_LIBRARIES)="; then
         risk="high"
         reason="Environment manipulation"
     fi
 
     # 5. Path Traversal & Absolute Paths
-    if echo "$cmd" | grep -qE "\.\./|~| /"; then
+    if [[ "$risk" == "low" ]] && echo "$cmd" | grep -qE "\.\./|~| /"; then
         if ! echo "$cmd" | grep -qF "$NB_ROOT"; then
             risk="high"
             reason="Path traversal or absolute path outside workspace"
@@ -93,95 +122,64 @@ audit_plan() {
         return 0
     fi
 
-    local content=$(cat "$plan_md")
+    local content
+    content=$(cat "$plan_md")
+    local risk="low"
+    local findings=()
 
-    # Semantic deviation audit (simulated)
-    if echo "$content" | grep -qE "rm -rf|curl\s*\|\s*bash|wget"; then
+    # =========================================================================
+    # TIER 1: EXTENDED RULES (Evolvable)
+    # D5: Delegated to rule-loader.sh
+    # =========================================================================
+    load_rules_from_domain "security"
+    local i
+    for i in "${!RULE_IDS[@]}"; do
+        local rule_id="${RULE_IDS[$i]}"
+        local rule_pattern="${RULE_PATTERNS[$i]}"
+        local rule_case_insensitive="${RULE_CASE_INSENSITIVE[$i]}"
+
+        local -a grep_opts=("-q" "-E")
+        [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
+
+        if echo "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+            risk="high"
+            findings+=("dynamic:$rule_id")
+        fi
+    done
+
+    # =========================================================================
+    # TIER 2: CORE RULES (Security Floor - Hardcoded)
+    # =========================================================================
+    if echo "$content" | grep -qE "rm\s+-rf"; then
+        risk="high"
+        findings+=("destructive_command:rm_rf")
+    fi
+    if echo "$content" | grep -qE "curl\s*\|\s*bash|wget\s*\|\s*sh"; then
+        risk="high"
+        findings+=("two_stage_loading")
+    fi
+    if echo "$content" | grep -qE "(LD_PRELOAD|NODE_OPTIONS|PYTHONPATH)="; then
+        risk="high"
+        findings+=("env_manipulation")
+    fi
+
+    if [[ "$risk" == "high" ]]; then
         echo "[SECURITY] BLOCKED: High risk operations detected in plan"
+        if [[ ${#findings[@]} -gt 0 ]]; then
+            echo "[SECURITY] Findings:"
+            for finding in "${findings[@]}"; do
+                echo "  - $finding"
+            done
+        fi
         return 1
     fi
     echo "[SECURITY] PASS: Plan looks safe"
     return 0
 }
 
-# Sanitize rule pattern - reject patterns containing shell injection attempts
-# Returns 0 if safe, 1 if dangerous
-sanitize_rule_pattern() {
-    local pattern="$1"
-    local rule_id="$2"
-
-    # Reject patterns containing shell injection constructs
-    # $(...) command substitution
-    if [[ "$pattern" == *'$('* ]]; then
-        echo "[SECURITY] WARN: Skipping rule $rule_id - pattern contains \$() injection" >&2
-        return 1
-    fi
-    # `...` backtick substitution
-    if [[ "$pattern" == *'`'* ]]; then
-        echo "[SECURITY] WARN: Skipping rule $rule_id - pattern contains backtick injection" >&2
-        return 1
-    fi
-    # ; && || command chaining (not in regex context)
-    if echo "$pattern" | grep -qE ';\s*\$|;\s*[a-z]|&&\s*[a-z]|\|\|\s*[a-z]'; then
-        echo "[SECURITY] WARN: Skipping rule $rule_id - pattern contains command chaining" >&2
-        return 1
-    fi
-    return 0
-}
-
-# Load dynamic rules from .evolving-rules/security/active/*.yaml
-# Directory structure: $NB_WORKSPACES_LIBRARY/.evolving-rules/security/{candidates,active,review,deprecated}/
-# Falls back to legacy .audit-patterns/active/ for compatibility (DEPRECATED: will be removed in v2.0)
-# Stores rules in parallel arrays to avoid delimiter conflicts with regex patterns
-load_dynamic_rules() {
-    RULE_IDS=()
-    RULE_PATTERNS=()
-    RULE_CASE_INSENSITIVE=()
-
-    # Primary: new unified directory structure
-    local rules_dir="${NB_WORKSPACES_LIBRARY:-.library}/.evolving-rules/security/active"
-    # Fallback: legacy directory for compatibility
-    local legacy_dir="${NB_WORKSPACES_LIBRARY:-.library}/.audit-patterns/active"
-
-    # Use primary if exists, otherwise fallback
-    if [[ ! -d "$rules_dir" ]]; then
-        if [[ -d "$legacy_dir" ]]; then
-            rules_dir="$legacy_dir"
-        else
-            return 0
-        fi
-    fi
-
-    for rule_file in "$rules_dir"/*.yaml "$rules_dir"/*.yml; do
-        [[ -f "$rule_file" ]] || continue
-
-        # Parse YAML (simple grep-based, no external deps)
-        local enabled=$(grep -E '^enabled:\s*' "$rule_file" | sed 's/enabled:\s*//' | tr -d ' ')
-        [[ "$enabled" == "false" ]] && continue
-
-        local id=$(grep -E '^id:\s*' "$rule_file" | sed 's/id:\s*//' | tr -d '"' | tr -d "'")
-        # Handle pattern on single line only (skip multiline YAML)
-        local pattern_line=$(grep -E '^pattern:\s*".*"' "$rule_file" || grep -E "^pattern:\s*'.*'" "$rule_file" || grep -E '^pattern:\s*[^|>]' "$rule_file" | head -1)
-        local pattern=$(echo "$pattern_line" | sed 's/pattern:\s*//' | tr -d '"' | tr -d "'")
-        local case_insensitive=$(grep -E '^case_insensitive:\s*' "$rule_file" | sed 's/case_insensitive:\s*//' | tr -d ' ')
-
-        # Skip if pattern is empty or multiline indicator
-        if [[ -z "$pattern" || "$pattern" == "|" || "$pattern" == ">" ]]; then
-            continue
-        fi
-
-        # D2 Security: Sanitize rule pattern before loading
-        if ! sanitize_rule_pattern "$pattern" "$id"; then
-            continue
-        fi
-
-        if [[ -n "$id" && -n "$pattern" ]]; then
-            RULE_IDS+=("$id")
-            RULE_PATTERNS+=("$pattern")
-            RULE_CASE_INSENSITIVE+=("${case_insensitive:-false}")
-        fi
-    done
-}
+# NOTE: sanitize_rule_pattern() and load_dynamic_rules() removed
+# D5: Rule loading delegated to core/rule-loader.sh (uses yaml_parser.py)
+# This ensures proper YAML escape sequence handling (e.g., \\ → \)
 
 # =============================================================================
 # L1 Static Analysis for Skills
@@ -211,20 +209,22 @@ scan_skill() {
 
     # =========================================================================
     # TIER 1: EXTENDED RULES (Evolvable)
-    # Loaded from .evolving-rules/security/active/*.yaml
+    # Loaded from .evolving-rules/security/active/*.yaml via rule-loader.sh
     # Can be added/modified/disabled without code changes
+    # D5: Delegated to rule-loader.sh (uses yaml_parser.py for proper parsing)
     # =========================================================================
-    load_dynamic_rules
+    load_rules_from_domain "security"
     local i
     for i in "${!RULE_IDS[@]}"; do
         local rule_id="${RULE_IDS[$i]}"
         local rule_pattern="${RULE_PATTERNS[$i]}"
         local rule_case_insensitive="${RULE_CASE_INSENSITIVE[$i]}"
 
-        local grep_flags="-qE"
-        [[ "$rule_case_insensitive" == "true" ]] && grep_flags="-qiE"
+        # D6: Use array for grep options to ensure safe expansion
+        local -a grep_opts=("-q" "-E")
+        [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if echo "$content" | grep $grep_flags "$rule_pattern"; then
+        if echo "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
             risk="high"
             findings+=("dynamic:$rule_id")
         fi
@@ -237,8 +237,8 @@ scan_skill() {
     # To add new core rules, modify this code and release a new version.
     # =========================================================================
 
-    # 1. Extract executable blocks (bash, sh, python, javascript)
-    local code_blocks=$(echo "$content" | grep -E '```(bash|sh|python|javascript|js)|^!\`|^\s*\`[^`]+\`$' || true)
+    # D6: Removed unused code_blocks variable (dead code)
+    # CORE rules scan full $content directly for better coverage
 
     # CORE-001: Destructive commands
     if echo "$content" | grep -qE "(^|\s)rm\s+(-[a-zA-Z]*[rf]|--recursive|--force)"; then

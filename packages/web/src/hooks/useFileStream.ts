@@ -176,6 +176,8 @@ export function useFileStream(
             }
           } catch (e) {
             console.error('[useFileStream] Failed to decompress:', e);
+            // D3: Update state to notify user of decompression failure
+            setState((prev) => ({ ...prev, status: 'error', error: `Decompression failed: ${String(e)}` }));
           }
           break;
         }
@@ -257,6 +259,8 @@ export function useFileStream(
             }
           } catch (e) {
             console.error('[useFileStream] Failed to decompress file-changed chunk:', e);
+            // D3: Update state to notify user of decompression failure
+            setState((prev) => ({ ...prev, status: 'error', error: `Decompression failed: ${String(e)}` }));
           }
           break;
         }

@@ -87,10 +87,16 @@ while [[ $# -gt 0 ]]; do
       continue
       ;;
     --rebuild-index)
-      python3 "$REBUILD_INDEX_PY"
+      # D3: python3 call with error handling
+      if ! python3 "$REBUILD_INDEX_PY" 2>&1; then
+          echo "[WARN] rebuild-index.py failed" >&2
+      fi
       shift ;;
     --rebuild-relations)
-      python3 "$REBUILD_RELATIONS_PY"
+      # D3: python3 call with error handling
+      if ! python3 "$REBUILD_RELATIONS_PY" 2>&1; then
+          echo "[WARN] rebuild-relations.py failed" >&2
+      fi
       shift ;;
     --evolve)
       EVOLVE_SCRIPT="$SCRIPT_DIR/evolve-rules.sh"
@@ -106,7 +112,11 @@ while [[ $# -gt 0 ]]; do
       CHANGELOG="$LIB_PATH/.changelog"
       if [[ -f "$CHANGELOG" ]] && [[ $(wc -l < "$CHANGELOG") -gt 2000 ]]; then
           ARCHIVE_DIR="$LIB_PATH/.changelog-archive"
-          mkdir -p "$ARCHIVE_DIR"
+          # D3: mkdir with error handling
+          if ! mkdir -p "$ARCHIVE_DIR" 2>&1; then
+              echo "[ERROR] Failed to create archive directory" >&2
+              exit 1
+          fi
           DATE_STR=$(date +%Y-%m)
           ARCHIVE_FILE="$ARCHIVE_DIR/$DATE_STR.md"
           # H-MAINTAIN-1: Append to existing archive instead of overwriting
@@ -120,6 +130,109 @@ while [[ $# -gt 0 ]]; do
           touch "$CHANGELOG"
       fi
       shift ;;
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # promote-skill: Unified skill promotion command (T1→T2→T3→T4)
+    # Usage: maintain.sh --promote-skill <skill-name> [--auto]
+    # ─────────────────────────────────────────────────────────────────────────
+    --promote-skill)
+      SKILL_NAME="${2:-}"
+      AUTO_MODE=0
+      shift 2 2>/dev/null || shift
+
+      # Check for --auto flag
+      if [[ "${1:-}" == "--auto" ]]; then
+          AUTO_MODE=1
+          shift
+      fi
+
+      if [[ -z "$SKILL_NAME" ]]; then
+          echo "[ERROR] Usage: maintain.sh --promote-skill <skill-name> [--auto]" >&2
+          exit 1
+      fi
+
+      CANDIDATES_DIR="$LIB_PATH/.skills/.candidates"
+      DRAFTS_DIR="$LIB_PATH/.skills/.drafts"
+      ACTIVE_DIR="$LIB_PATH/.skills/.active"
+      CHECK_SCRIPT="$SCRIPT_DIR/../../check/scripts/check.sh"
+
+      echo "=== Skill Promotion Pipeline: $SKILL_NAME ==="
+
+      # Find skill location
+      SKILL_FILE=""
+      CURRENT_TIER=""
+      if [[ -f "$CANDIDATES_DIR/$SKILL_NAME/SKILL.md" ]]; then
+          SKILL_FILE="$CANDIDATES_DIR/$SKILL_NAME/SKILL.md"
+          CURRENT_TIER="T1/T2"
+          echo "Found in .candidates/ (T1/T2)"
+      elif [[ -f "$DRAFTS_DIR/$SKILL_NAME/SKILL.md" ]]; then
+          SKILL_FILE="$DRAFTS_DIR/$SKILL_NAME/SKILL.md"
+          CURRENT_TIER="T3"
+          echo "Found in .drafts/ (T3)"
+      elif [[ -f "$ACTIVE_DIR/$SKILL_NAME/SKILL.md" ]]; then
+          SKILL_FILE="$ACTIVE_DIR/$SKILL_NAME/SKILL.md"
+          CURRENT_TIER="T4"
+          echo "Already at T4 (active)"
+          exit 0
+      else
+          echo "[ERROR] Skill '$SKILL_NAME' not found in .candidates/, .drafts/, or .skills/" >&2
+          exit 1
+      fi
+
+      # Determine next promotion step
+      case "$CURRENT_TIER" in
+          "T1/T2")
+              echo ""
+              echo "--- Step 1: L2 Six-Dimension Review (skill-review) ---"
+              if [[ -f "$CHECK_SCRIPT" ]]; then
+                  bash "$CHECK_SCRIPT" _ --checkpoint skill-review --target "$SKILL_FILE"
+              else
+                  echo "[ERROR] check.sh not found" >&2
+                  exit 1
+              fi
+
+              # Check if skill moved to drafts
+              if [[ -f "$DRAFTS_DIR/$SKILL_NAME/SKILL.md" ]]; then
+                  echo ""
+                  echo "[SUCCESS] Promoted to T3 (.drafts/)"
+                  SKILL_FILE="$DRAFTS_DIR/$SKILL_NAME/SKILL.md"
+                  CURRENT_TIER="T3"
+
+                  if [[ "$AUTO_MODE" -eq 1 ]]; then
+                      echo "--- Continuing to L3 (--auto mode) ---"
+                  else
+                      echo "Next: maintain.sh --promote-skill $SKILL_NAME (for L3 review)"
+                      exit 0
+                  fi
+              else
+                  echo "[INFO] Score < 0.70, skill remains in .candidates/"
+                  exit 0
+              fi
+              ;;
+      esac
+
+      # If T3, run L3 deep review
+      if [[ "$CURRENT_TIER" == "T3" ]]; then
+          echo ""
+          echo "--- Step 2: L3 LLM Deep Semantic Review (skill-deep-review) ---"
+          if [[ -f "$CHECK_SCRIPT" ]]; then
+              bash "$CHECK_SCRIPT" _ --checkpoint skill-deep-review --target "$SKILL_FILE"
+          fi
+
+          # Check if skill moved to active
+          if [[ -f "$ACTIVE_DIR/$SKILL_NAME/SKILL.md" ]]; then
+              echo ""
+              echo "[SUCCESS] Promoted to T4 (.skills/.active/$SKILL_NAME/)"
+              echo "Skill is now ACTIVE and available for hot-reload"
+          else
+              echo "[INFO] Score < 0.85, skill remains in .drafts/"
+          fi
+      fi
+
+      echo ""
+      echo "=== Promotion Complete ==="
+      ;;
+
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   END_TIME=$(date +%s%3N)
@@ -132,9 +245,16 @@ cd "$LIB_PATH" || { echo "[ERROR] Cannot access library at $LIB_PATH" >&2; exit 
 
 # Using git add . with a proper .gitignore is the most robust strategy
 # Ensures all .md and index files are tracked
-git add . 
+# D3: git add with error handling
+if ! git add . 2>&1; then
+    echo "[WARN] git add failed" >&2
+fi
 
 if ! git diff --cached --quiet; then
-    git commit -m "task-ai(library):maintain sync files and indices"
-    echo "Library files and indices synced and committed."
+    # D3: git commit with error handling
+    if ! git commit -m "task-ai(library):maintain sync files and indices" 2>&1; then
+        echo "[WARN] git commit failed" >&2
+    else
+        echo "Library files and indices synced and committed."
+    fi
 fi

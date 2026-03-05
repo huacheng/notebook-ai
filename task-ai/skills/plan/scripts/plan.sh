@@ -51,6 +51,12 @@ fi
 
 STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
 
+# D3: Check state.py existence before calling
+if [[ ! -f "$STATE_PY" ]]; then
+    echo "[ERROR] state.py not found: $STATE_PY" >&2
+    exit 1
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Mode 1: Finalize (exit plan-refinement phase)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,18 +93,24 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
 
     DATE=$(date "+%Y-%m-%d %H:%M")
 
+    # D2: Use printf to avoid echo interpreting -n/-e as options
+    REFINEMENT_LINE=$(printf '- [%s] %s' "$DATE" "$REFINE_CONTENT")
+
     # Append refinement to Refinements section
     if grep -q "^## Refinements" "$PLAN_FILE"; then
-        echo "- [$DATE] $REFINE_CONTENT" >> "$PLAN_FILE"
+        printf '%s\n' "$REFINEMENT_LINE" >> "$PLAN_FILE"
     else
-        echo "" >> "$PLAN_FILE"
-        echo "## Refinements" >> "$PLAN_FILE"
-        echo "" >> "$PLAN_FILE"
-        echo "- [$DATE] $REFINE_CONTENT" >> "$PLAN_FILE"
+        printf '\n## Refinements\n\n%s\n' "$REFINEMENT_LINE" >> "$PLAN_FILE"
     fi
 
-    git add "$PLAN_FILE"
-    git commit -m "task-ai($NOTEBOOK):plan refine"
+    # D3: git with error handling
+    if ! git add "$PLAN_FILE" 2>&1; then
+        echo "[ERROR] git add failed" >&2
+        exit 1
+    fi
+    if ! git commit -m "task-ai($NOTEBOOK):plan refine" 2>&1; then
+        echo "[WARN] git commit failed (may be no changes)" >&2
+    fi
 
     echo "[plan] Refinement added: $REFINE_CONTENT"
     exit 0
@@ -110,10 +122,13 @@ fi
 
 # 1. Invoke Research for Type Discovery (Simulated)
 # In real execution, this would call research.sh. For plumbing:
-TYPE=$(python3 "$STATE_PY" get "$INDEX_JSON" type)
+# D3: python3 calls with error handling
+TYPE=$(python3 "$STATE_PY" get "$INDEX_JSON" type 2>&1) || TYPE=""
 if [[ -z "$TYPE" ]]; then
     TYPE="software" # Default for plan testing
-    python3 "$STATE_PY" set "$INDEX_JSON" type "$TYPE"
+    if ! python3 "$STATE_PY" set "$INDEX_JSON" type "$TYPE" 2>&1; then
+        echo "[WARN] Failed to set type in index" >&2
+    fi
 fi
 
 echo "Planning for task type: $TYPE"
@@ -128,7 +143,11 @@ if [[ -f "$WORK_DIR/.plan.md" ]]; then
         while [[ -f "$WORK_DIR/.plan-superseded-$i.md" ]]; do ((i++)); done
         SUPERSEDED="$WORK_DIR/.plan-superseded-$i.md"
     fi
-    mv "$WORK_DIR/.plan.md" "$SUPERSEDED"
+    # D3: mv with error handling - abort if fails to prevent data loss
+    if ! mv "$WORK_DIR/.plan.md" "$SUPERSEDED" 2>&1; then
+        echo "[ERROR] Failed to archive .plan.md - aborting" >&2
+        exit 1
+    fi
     echo "[WARN] Existing .plan.md archived to $SUPERSEDED"
 fi
 cat > "$WORK_DIR/.plan.md" <<EOF
@@ -173,7 +192,10 @@ EOF
 fi
 
 # 4. Update Index Status
-python3 "$STATE_PY" transition "$INDEX_JSON" --status planning
+# D3: python3 call with error handling
+if ! python3 "$STATE_PY" transition "$INDEX_JSON" --status planning 2>&1; then
+    echo "[WARN] Failed to transition status to planning" >&2
+fi
 
 # 5. Transition phases: target-refinement → plan-refinement
 if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: target-refinement" "$SESSION_CONTEXT"; then
@@ -181,11 +203,19 @@ if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: target-refinement" "$SESSION_C
 fi
 
 # Enter plan-refinement phase
-cat > "$SESSION_CONTEXT" << EOF
-phase: plan-refinement
-entered_at: $(date -Iseconds)
-entered_by: /task-ai:plan
-EOF
+# D3: Error handling for session context write
+if ! printf 'phase: plan-refinement\nentered_at: %s\nentered_by: /task-ai:plan\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>&1; then
+    echo "[WARN] Failed to write session context" >&2
+fi
+
+# D1: Commit generated plan (consistent with refine mode)
+# D3: git with error handling
+if ! git add "$PLAN_FILE" "$INDEX_JSON" 2>&1; then
+    echo "[WARN] git add failed" >&2
+fi
+if ! git commit -m "task-ai($NOTEBOOK):plan generate" 2>&1; then
+    echo "[WARN] git commit failed (may be no changes)" >&2
+fi
 
 echo "[plan] Plan generated. Entered plan-refinement phase."
 echo "[plan] Continue discussing to refine. Use /exec when ready."

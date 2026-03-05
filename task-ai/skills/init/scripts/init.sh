@@ -4,6 +4,13 @@
 
 set -euo pipefail
 
+# Load core library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../../core/lib.sh"
+
+# Ensure library exists before creating notebook (A pattern)
+ensure_library
+
 PROJECT_NAME="${1:-}"
 NOTEBOOK_NAME="${2:-}"
 TITLE="$NOTEBOOK_NAME"
@@ -20,7 +27,15 @@ shift 2 || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --title) TITLE="$2"; shift 2 ;;
-    --tags)  TAGS=$(printf '%s' "$2" | sed 's/[^a-zA-Z0-9_,-]//g' | sed 's/,/","/g' | sed 's/.*$/["&"]/'); shift 2 ;;
+    --tags)
+      # D1: Sanitize tags and guard against empty result
+      SANITIZED=$(printf '%s' "$2" | sed 's/[^a-zA-Z0-9_,-]//g')
+      if [[ -z "$SANITIZED" ]]; then
+        TAGS="[]"
+      else
+        TAGS=$(printf '%s' "$SANITIZED" | sed 's/,/","/g' | sed 's/.*$/["&"]/')
+      fi
+      shift 2 ;;
     --worktree) USE_WORKTREE=1; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -122,8 +137,14 @@ cat > "$WORKING_DIR/.target.md" <<EOF
 EOF
 
 # 7. Git Commit
-git add "$WORKING_DIR/.index.json" "$WORKING_DIR/.target.md"
-git commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook"
+# D3: git with error handling
+if ! git add "$WORKING_DIR/.index.json" "$WORKING_DIR/.target.md" 2>&1; then
+    echo "[ERROR] git add failed" >&2
+    exit 1
+fi
+if ! git commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook" 2>&1; then
+    echo "[WARN] git commit failed (may be no changes)" >&2
+fi
 
 # Success - disable cleanup trap
 trap - ERR
