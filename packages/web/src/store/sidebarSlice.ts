@@ -190,7 +190,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       const totalCells = data.totalCells ?? data.notebook.cells.length;
       const cellsOffset = totalCells - data.notebook.cells.length;
 
-      set({
+      set((state) => ({
         notebook: data.notebook,
         sessionId: data.sessionId,
         activeNotebookId: data.notebookId,
@@ -198,7 +198,18 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
         notebookLoading: false,
         cellsOffset,
         loadingOlderCells: false,
-      });
+        // Sync openNotebooks so restored notebook appears in tab bar
+        openNotebooks: {
+          ...state.openNotebooks,
+          [data.notebookId]: {
+            notebook: data.notebook,
+            sessionId: data.sessionId,
+            scrollY: state.openNotebooks[data.notebookId]?.scrollY ?? 0,
+            workspaceDir: data.workspaceDir,
+          },
+        },
+        activeNotebookTabId: data.notebookId,
+      }));
 
       _persistNotebook(data.notebookId, data.notebook);
       get().fetchNotebookList();

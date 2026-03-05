@@ -261,8 +261,12 @@ function AuthenticatedApp() {
     }
   }, [activeNotebookId]);
 
-  // On mount: reopen the last notebook if none is currently active.
+  // On mount: restore open tabs from localStorage, then reopen the last notebook.
   useEffect(() => {
+    // Restore non-active notebook tabs and file tabs from cache
+    useStore.getState().restoreOpenNotebookTabs();
+    useStore.getState().restoreOpenFileTabs();
+
     const lastId = cacheGet<string>('nb-last-notebook', TTL.LAST_NOTEBOOK);
     if (lastId) {
       restoreNotebook(lastId).catch(() => {

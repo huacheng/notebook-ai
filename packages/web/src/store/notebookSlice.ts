@@ -1,3 +1,5 @@
+import { cacheSet, cacheGet, TTL } from '../utils/localCache';
+import { _loadCachedNotebook } from './cacheHelpers';
 import type { StateCreator } from 'zustand';
 import type {
   Cell,
@@ -22,6 +24,13 @@ const _sourceSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // D3: Cell load timeout timers to prevent stuck loading states
 const _cellLoadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const CELL_LOAD_TIMEOUT = 30_000; // 30s timeout for cell load requests
+
+/** Persist open notebook tab IDs + active tab to localStorage */
+function _persistNotebookTabs(openNotebooks: Record<string, unknown>, activeId: string | null) {
+  try {
+    cacheSet('nb-open-tabs', { tabs: Object.keys(openNotebooks), activeId }, TTL.LAST_NOTEBOOK);
+  } catch { /* localStorage unavailable in test/SSR */ }
+}
 
 function makeCell(type: CellType): Cell {
   const id = crypto.randomUUID();
@@ -75,7 +84,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   | 'prependCells' | 'setCellsOffset'
   | 'generateSlide' | 'updateSlideSections'
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
-  | 'openNotebookTab' | 'closeNotebookTab' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab'
+  | 'openNotebookTab' | 'closeNotebookTab' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab' | 'restoreOpenNotebookTabs'
   | 'appendStreamDelta' | 'flushStreamBuffer'
   | 'loadingCellIds' | 'requestCellLoad' | 'replaceCellStub'
 >> = (set, get) => ({
@@ -346,18 +355,22 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   },
 
   openNotebookTab: (notebookId, notebook, sessionId, workspaceDir) => {
-    set(state => ({
-      openNotebooks: {
+    set(state => {
+      const newOpen = {
         ...state.openNotebooks,
         [notebookId]: { notebook, sessionId, scrollY: 0, workspaceDir: workspaceDir ?? null },
-      },
-      activeNotebookTabId: notebookId,
-      notebook: notebook,  // keep backward compat
-      sessionId,
-      workspaceDir: workspaceDir ?? state.workspaceDir,
-      gitTabOpen: false,
-      activeTab: 'notebook' as const,
-    }));
+      };
+      _persistNotebookTabs(newOpen, notebookId);
+      return {
+        openNotebooks: newOpen,
+        activeNotebookTabId: notebookId,
+        notebook: notebook,  // keep backward compat
+        sessionId,
+        workspaceDir: workspaceDir ?? state.workspaceDir,
+        gitTabOpen: false,
+        activeTab: 'notebook' as const,
+      };
+    });
   },
 
   closeNotebookTab: (notebookId) => {
@@ -373,6 +386,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       const newActiveId = state.activeNotebookTabId === notebookId
         ? (remainingIds[0] ?? null)
         : state.activeNotebookTabId;
+      _persistNotebookTabs(rest, newActiveId);
       return {
         openNotebooks: rest,
         activeNotebookTabId: newActiveId,
@@ -396,6 +410,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       const remainingIds = Object.keys(rest);
       const activeRemoved = !state.activeNotebookTabId || !(state.activeNotebookTabId in rest);
       const newActiveId = activeRemoved ? (remainingIds[0] ?? null) : state.activeNotebookTabId;
+      _persistNotebookTabs(rest, newActiveId);
       return {
         openNotebooks: rest,
         activeNotebookTabId: newActiveId,
@@ -410,6 +425,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
 
   setActiveNotebookTab: (notebookId) => {
     set(state => {
+      _persistNotebookTabs(state.openNotebooks, notebookId);
       return {
         openNotebooks: state.openNotebooks,
         activeNotebookTabId: notebookId,
@@ -420,6 +436,24 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         editMode: false,
         pendingDeletes: new Set<string>(),
       };
+    });
+  },
+
+  restoreOpenNotebookTabs: () => {
+    const saved = cacheGet<{ tabs: string[]; activeId: string | null }>('nb-open-tabs', TTL.LAST_NOTEBOOK);
+    if (!saved || saved.tabs.length === 0) return;
+    const openNotebooks: Record<string, { notebook: any; sessionId: string; scrollY: number; workspaceDir: string | null }> = {};
+    for (const tabId of saved.tabs) {
+      const cached = _loadCachedNotebook(tabId);
+      if (cached) {
+        openNotebooks[tabId] = { notebook: cached, sessionId: '', scrollY: 0, workspaceDir: null };
+      }
+    }
+    if (Object.keys(openNotebooks).length === 0) return;
+    const activeId = saved.activeId && openNotebooks[saved.activeId] ? saved.activeId : Object.keys(openNotebooks)[0];
+    set({
+      openNotebooks,
+      activeNotebookTabId: activeId,
     });
   },
 

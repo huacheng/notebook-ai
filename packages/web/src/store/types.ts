@@ -168,6 +168,7 @@ export interface NotebookStore {
   closeProjectFileTabs(projectId: string, pathPrefix?: string): void;
   closeDeletedFileTabs(deletedPaths: string[]): void;
   setFileTabLoading(tabId: string, loading: boolean): void;
+  restoreOpenFileTabs(): void;
   setLeftSidebarSplitRatio(ratio: number): void;
   toggleFileViewerMaximized(): void;
   setSidebarWidth(px: number): void;
@@ -207,6 +208,7 @@ export interface NotebookStore {
   closeNotebookTab(notebookId: string): void;
   closeProjectNotebookTabs(projectId: string): void;
   setActiveNotebookTab(notebookId: string): void;
+  restoreOpenNotebookTabs(): void;
   appendStreamDelta(cellId: string, delta: string, blockType: 'text' | 'thinking'): void;
   flushStreamBuffer(cellId: string): string;
 

@@ -1,3 +1,4 @@
+import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import type { StateCreator } from 'zustand';
 import type { NotebookStore } from './types';
 import {
@@ -9,6 +10,22 @@ import {
   updateMarketplace as apiUpdateMarketplace,
   updatePlugin as apiUpdatePlugin,
 } from '../api/plugin';
+
+/** Persist open file tab references + active tab to localStorage */
+function _persistFileTabs(
+  openFiles: Record<string, { path: string; source: string; projectId?: string }>,
+  activeId: string | null,
+) {
+  try {
+    const tabs = Object.entries(openFiles).map(([tabId, f]) => ({
+      tabId,
+      path: f.path,
+      source: f.source,
+      ...(f.projectId ? { projectId: f.projectId } : {}),
+    }));
+    cacheSet('nb-open-files', { tabs, activeId }, TTL.LAST_NOTEBOOK);
+  } catch { /* localStorage unavailable in test/SSR */ }
+}
 
 function restartAllNotebooks(get: () => NotebookStore) {
   const { ws, openNotebooks } = get();
@@ -27,7 +44,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'clearSessionNotice' | 'setLatency'
   | 'setWsReconnectExhausted'
   | 'openFiles' | 'activeFileTabId' | 'fileViewerMaximized'
-  | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'closeDeletedFileTabs' | 'setFileTabLoading'
+  | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'closeDeletedFileTabs' | 'setFileTabLoading' | 'restoreOpenFileTabs'
   | 'toggleFileViewerMaximized'
   | 'leftSidebarSplitRatio' | 'setLeftSidebarSplitRatio'
   | 'rightPanelOpen' | 'rightPanelSplitRatio'
@@ -100,10 +117,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   openFileTab(file) {
     const tabId = `${file.source}::${file.path}`;
-    set(s => ({
-      openFiles: { ...s.openFiles, [tabId]: { ...file, loading: true } },
-      activeFileTabId: tabId,
-    }));
+    set(s => {
+      const newFiles = { ...s.openFiles, [tabId]: { ...file, loading: true } };
+      _persistFileTabs(newFiles, tabId);
+      return { openFiles: newFiles, activeFileTabId: tabId };
+    });
   },
 
   closeFileTab(tabId) {
@@ -113,6 +131,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       const newActive = s.activeFileTabId === tabId
         ? (ids[0] ?? null)
         : s.activeFileTabId;
+      _persistFileTabs(rest, newActive);
       return { openFiles: rest, activeFileTabId: newActive };
     });
   },
@@ -126,6 +145,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   closeAllFileTabs() {
+    _persistFileTabs({}, null);
     set({ openFiles: {}, activeFileTabId: null });
   },
 
@@ -139,9 +159,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       }
       const activeGone = s.activeFileTabId && !(s.activeFileTabId in remaining);
       const ids = Object.keys(remaining);
+      const newActive = activeGone ? (ids[0] ?? null) : s.activeFileTabId;
+      _persistFileTabs(remaining, newActive);
       return {
         openFiles: remaining,
-        activeFileTabId: activeGone ? (ids[0] ?? null) : s.activeFileTabId,
+        activeFileTabId: newActive,
       };
     });
   },
@@ -157,9 +179,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       }
       const activeGone = s.activeFileTabId && !(s.activeFileTabId in remaining);
       const ids = Object.keys(remaining);
+      const newActive = activeGone ? (ids[0] ?? null) : s.activeFileTabId;
+      _persistFileTabs(remaining, newActive);
       return {
         openFiles: remaining,
-        activeFileTabId: activeGone ? (ids[0] ?? null) : s.activeFileTabId,
+        activeFileTabId: newActive,
       };
     });
   },
@@ -170,6 +194,19 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (!entry) return s;
       return { openFiles: { ...s.openFiles, [tabId]: { ...entry, loading } } };
     });
+  },
+
+  restoreOpenFileTabs() {
+    const saved = cacheGet<{
+      tabs: { tabId: string; path: string; source: 'workspace' | 'library' | 'deliverables'; projectId?: string }[];
+      activeId: string | null;
+    }>('nb-open-files', TTL.LAST_NOTEBOOK);
+    if (!saved || saved.tabs.length === 0) return;
+    const openFiles: Record<string, { path: string; source: 'workspace' | 'library' | 'deliverables'; sessionId: string; projectId?: string; loading?: boolean }> = {};
+    for (const tab of saved.tabs) {
+      openFiles[tab.tabId] = { path: tab.path, source: tab.source, sessionId: '', ...(tab.projectId ? { projectId: tab.projectId } : {}), loading: true };
+    }
+    set({ openFiles, activeFileTabId: saved.activeId });
   },
 
   toggleFileViewerMaximized() {
