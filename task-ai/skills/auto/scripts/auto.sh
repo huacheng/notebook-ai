@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:auto implementation
-# Usage: auto.sh <notebook> [--stop|--status]
+# Usage: auto.sh <notebook> [--stop]
 
 set -euo pipefail
 # Load context discovery from lib.sh
@@ -30,7 +30,6 @@ shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --stop)   ACTION="stop"; shift ;;
-    --status) ACTION="status"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -66,15 +65,6 @@ os.rename(tmp, sys.argv[1])
 PYEOF
         # D3: Do NOT delete .auto-signal here — let the running loop detect .auto-stop and clean up
         echo "Auto loop stop requested."
-        exit 0
-        ;;
-    status)
-        if [[ -f "$SIGNAL_FILE" ]]; then
-            echo "[AUTO] Signal file exists:"
-            cat "$SIGNAL_FILE"
-        else
-            echo "[AUTO] No active auto loop signal"
-        fi
         exit 0
         ;;
     start)

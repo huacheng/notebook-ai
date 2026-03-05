@@ -20,7 +20,7 @@ arguments:
     description: "Notebook name (e.g., auth-refactor)"
     required: false
   - name: action
-    description: "Action: start, stop, or status"
+    description: "Action: start or stop"
     required: false
     default: start
 ---
@@ -49,7 +49,7 @@ Semantic understanding of user message → execute phase-appropriate action
 ## Usage
 
 ```
-/task-ai:auto <notebook_name> [--stop|--status]
+/task-ai:auto <notebook_name> [--stop]
 ```
 
 ## Four-Phase Flow
