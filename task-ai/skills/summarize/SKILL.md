@@ -1,6 +1,6 @@
 ---
 name: summarize
-description: Regenerate .summary.md files for context recovery or refresh
+description: "Regenerate .summary.md files for context recovery or refresh"
 model_tier: light
 auto_delegatable: true
 triggers:
@@ -16,7 +16,7 @@ triggers:
     User wants a formal task REPORT → report. User wants to capture EXPERIENCE → highlight.
 arguments:
   - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
+    description: "Notebook name (e.g., auth-refactor). Auto-detected from CWD or task branch if omitted"
     required: false
   - name: all
     description: "Also regenerate each sub-directory's .summary.md"
@@ -43,7 +43,7 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
 ## Execution Steps
 
 1. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`)
-2. **Read** `.status.json` — get `status`, `type`, `phase`, `completed_steps`, `depends_on`, metadata. If missing or corrupt, REJECT with error — valid status is required to generate an accurate summary
+2. **Read** `.status.json` — get `status`, `type`, `phase`, `completed_steps`, `depends_on`, metadata. If missing or corrupt, **release `.working/.lock`** and REJECT with error — valid status is required to generate an accurate summary
 3. **Read** `.target.md` if exists — requirements and objectives
 4. **Read** `.plan.md` if exists — current implementation plan
 5. **Read** `.analysis/` all files if directory exists (sorted by filename) — evaluation history
@@ -55,14 +55,14 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
    - `.bugfix/.summary.md` — condensed summary of all issues and fixes
    - `.test/.summary.md` — condensed summary of all criteria and results
    - `.notes/.summary.md` — condensed summary of all research and decisions
-10. **Generate + write** task-level `.summary.md` with condensed context:
+10. **Generate + write** task-level `.summary.md` (write to `.summary.md.tmp` then rename for crash safety) with condensed context:
     - Status, phase, progress (`completed_steps` from `.status.json` / total steps from `.plan.md`)
     - Plan overview (3-5 sentence summary)
     - Current state (what was last done, what's next)
     - Key decisions (architectural/design decisions)
     - Known issues (active issues, blockers, risks)
     - Lessons learned (patterns, workarounds, discoveries)
-11. **Git commit**: `task-ai(<notebook>):summarize regenerate context summary`
+11. **Git commit** (skip if no files changed): `task-ai(<notebook>):summarize regenerate context summary`
 12. **Release** `.working/.lock`
 
 ## State Transitions

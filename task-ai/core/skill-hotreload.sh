@@ -174,6 +174,12 @@ create_workspace_skill() {
         return 1
     fi
 
+    # D2: Validate skill name to prevent path traversal and injection
+    if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[ERROR] Invalid skill name: '$name'. Use only letters, digits, hyphens, underscores." >&2
+        return 1
+    fi
+
     local skills_dir="$NB_WORKSPACES_LIBRARY/skills"
     local skill_dir="$skills_dir/$name"
 
@@ -228,6 +234,12 @@ promote_skill() {
 
     if [[ -z "$candidate_name" ]]; then
         echo "Usage: promote_skill <candidate-name>" >&2
+        return 1
+    fi
+
+    # D2: Validate candidate name to prevent path traversal
+    if [[ ! "$candidate_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[ERROR] Invalid candidate name: '$candidate_name'. Use only letters, digits, hyphens, underscores." >&2
         return 1
     fi
 

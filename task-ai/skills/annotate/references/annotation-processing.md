@@ -39,8 +39,8 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 |-------|------|-------------|
 | `file` | string | Absolute path to the annotated file |
 | `type` | string | `'insert'` \| `'delete'` \| `'replace'` \| `'comment'` |
-| `selected` | string | User-selected text (max 80 chars) |
-| `cursor` | number | Character offset of selection start in source file text |
+| `selected` | string | User-selected text (max 80 chars, truncated by frontend; backend should still function with longer values) |
+| `cursor` | number | Character offset of selection start in source file text (must be >= 0 and <= file length) |
 
 **Type-specific fields**:
 
@@ -76,7 +76,7 @@ Selected: "performance"
 
 **Claude-side processing**: read the source file, seek to `cursor`, and use `selected` as confirmation anchor. `cursor` + `selected` together form a **dual positional anchor** — `cursor` provides the position, `selected` confirms the content. When multiple annotations target the same file, group by `file` and read each source file only once.
 
-**Anchor mismatch handling**: If the source text at `cursor` does not match `selected`, search for `selected` in a neighborhood window (cursor ± 200 chars). If a unique match is found within the window, use that position. If multiple matches or no match, report the annotation as unresolvable in the execution report and skip it — do not guess.
+**Anchor mismatch handling**: If the source text at `cursor` does not match `selected`, search for `selected` in a neighborhood window (cursor ± 200 chars, clamped to file boundaries). If a unique match is found within the window, use that position. If multiple matches or no match, report the annotation as unresolvable in the execution report and skip it — do not guess.
 
 **Batch ordering**: When multiple modify-type annotations (Delete/Replace/Insert) target the same file, apply them in **reverse cursor order** (highest offset first). This prevents earlier edits from invalidating the character offsets of later annotations. Comment annotations (which only append blockquotes) are order-independent.
 
@@ -84,8 +84,8 @@ Selected: "performance"
 
 Before writing annotation content (insertion, replacement, or comment text) to task `.md` files, apply sanitization:
 
-1. **Strip HTML comments**: Remove `<!-- ... -->` blocks (prevents hidden prompt injection directives)
-2. **Strip ANSI escape sequences**: Remove `\x1b[...` sequences (prevents terminal rendering exploits)
+1. **Strip HTML comments**: Remove `<!-- ... -->` blocks using non-greedy matching (`<!--.*?-->` with dotall) to handle multiple comments correctly (prevents hidden prompt injection directives)
+2. **Strip ANSI escape sequences**: Remove all ANSI escape sequences — CSI (`\x1b\[[\d;]*[A-Za-z]`), OSC (`\x1b\].*?\x07`), and other `\x1b`-prefixed sequences (prevents terminal rendering exploits)
 3. **Strip control characters**: Remove U+0000–U+001F (except `\n` and `\t`) and U+007F
 4. **Preserve user intent**: Do NOT strip markdown formatting, code blocks, or visible text — only remove hidden/invisible content
 

@@ -34,21 +34,27 @@ echo "Reading document: $FILE_PATH (Depth: $DEPTH)"
 # 1. Ingestion & Topic Extraction (Simulated)
 BASENAME=$(basename "$FILE_PATH")
 TOPIC="${BASENAME%.*}"
-# D2: Sanitize TOPIC for safe YAML embedding (strip control chars, quotes, colons)
-TOPIC=$(printf '%s' "$TOPIC" | tr -d '\n\r' | sed 's/[:"'"'"'`]/_/g' | head -c 120)
+# D2: Sanitize TOPIC for safe YAML embedding and path safety
+# Strip control chars, quotes, colons; also strip / and .. to prevent path traversal
+TOPIC=$(printf '%s' "$TOPIC" | tr -d '\n\r/' | sed 's/\.\./_/g; s/[:"'"'"'`#]/_/g' | head -c 120)
 # D3: Guard against empty topic after sanitization
 if [[ -z "$TOPIC" ]]; then
     TOPIC="unnamed-$(date +%s)"
 fi
-echo "[1/6] Extracted Topic: $TOPIC"
+echo "[1/7] Extracted Topic: $TOPIC"
 
 # 2. Library Deduplication (Layer 1) (Simulated)
-echo "[2/6] Deduplicating against library..."
+echo "[2/7] Deduplicating against library..."
+
+# D1: Handle depth=deep by logging delegation intent (actual research delegation is simulated)
+if [[ "$DEPTH" == "deep" ]]; then
+    echo "[2/7] Depth=deep: will delegate gap research to 'research --caller exec --scope gap' after dedup"
+fi
 
 # 3. Detox Pipeline (dynamic rules from .evolving-rules/sanitization/ + hardcoded fallback)
-echo "[3/6] Applying Detox pipeline..."
-# D3: cat with error handling
-CONTENT=$(cat "$FILE_PATH" 2>/dev/null || echo "")
+echo "[3/7] Applying Detox pipeline..."
+# D4: Defer full content read until after size check to avoid loading large files into memory
+CONTENT=""
 INJECTION_RISK="none"
 FINDINGS=""
 
@@ -96,23 +102,32 @@ done
 # D4: Enforce 50KB size limit per injection-rules.md Category 5
 # D1: Skip truncation if content was already replaced by detox (injection found)
 if [[ "$INJECTION_RISK" == "none" ]]; then
-    FILE_SIZE=$(wc -c < "$FILE_PATH" 2>/dev/null || echo 0)
+    # D3: Trim whitespace from wc output for reliable numeric comparison
+    FILE_SIZE=$(wc -c < "$FILE_PATH" 2>/dev/null | tr -d ' ' || echo 0)
     if [[ "$FILE_SIZE" -gt 51200 ]]; then
         CONTENT=$(head -c 51200 "$FILE_PATH" 2>/dev/null || echo "")
         CONTENT="${CONTENT}
 [TRUNCATED: content exceeded 50KB limit]"
         echo "[WARN] File exceeds 50KB, truncated" >&2
+    else
+        # D3: Read content with error handling (deferred from detox step for efficiency)
+        CONTENT=$(cat "$FILE_PATH" 2>/dev/null || echo "")
     fi
 fi
 
 # D1: Compute content hashes (required by injection-rules.md frontmatter schema)
 # content_hash_original = hash of raw file content before any sanitization
-HASH_ORIGINAL=$(sha256sum "$FILE_PATH" | cut -d' ' -f1)
+# D3: Handle sha256sum failure gracefully (e.g., file deleted between check and hash)
+HASH_ORIGINAL=$(sha256sum "$FILE_PATH" 2>/dev/null | cut -d' ' -f1)
+if [[ -z "$HASH_ORIGINAL" ]]; then
+    echo "[ERROR] Failed to compute hash for $FILE_PATH" >&2
+    exit 1
+fi
 
-# 4. Library Write Protocol (six-step per library-write-protocol.md)
+# 4. Library Write Protocol (six-step per skills/library/references/write-protocol.md)
 
 # Step 1: mkdir -p (idempotent)
-echo "[4/6] Writing to library..."
+echo "[4/7] Writing to library..."
 REF_DIR="$LIB_PATH/.memory/.references"
 if ! mkdir -p "$REF_DIR" 2>/dev/null; then
     echo "[ERROR] Failed to create library directory" >&2
@@ -166,10 +181,10 @@ LOCK_ACQUIRED=1
 # Step 3: Write file (.tmp → rename, POSIX atomic)
 REF_FILE="$REF_DIR/$TOPIC.md"
 
-# D3: Ensure lock release on exit (defined after REF_FILE is set)
+# D3: Set trap immediately after lock acquisition to guarantee cleanup on any exit
 cleanup() {
     [[ "$LOCK_ACQUIRED" -eq 1 ]] && release_lock "$LOCK_FILE"
-    rm -f "${REF_FILE}.tmp.$$" 2>/dev/null
+    rm -f "${REF_DIR}/${TOPIC}.md.tmp.$$" 2>/dev/null
 }
 trap cleanup EXIT
 TMP_FILE="${REF_FILE}.tmp.$$"
@@ -185,10 +200,10 @@ fi
 {
 cat <<_TASK_AI_REF_EOF_
 ---
-topic: $TOPIC
+topic: "$TOPIC"
 type: generic
 external: true
-source_url: "local://$FILE_PATH"
+source_url: "local://$(printf '%s' "$FILE_PATH" | sed 's/["\\]/\\&/g')"
 fetched_at: $DATE
 sanitized: true
 sanitized_at: $DATE
@@ -231,13 +246,14 @@ if ! mv "$TMP_FILE" "$REF_FILE" 2>/dev/null; then
 fi
 
 # Step 4: Acquire .changelog.lock, append, release
-echo "[5/6] Updating changelog and index..."
+echo "[5/7] Updating changelog and index..."
 CHANGELOG_LOCK="$LIB_PATH/.changelog.lock"
 if acquire_lock "$CHANGELOG_LOCK"; then
+    # D3: Use subshell-style error handling to ensure changelog lock release
     printf '%s | reference | .memory/.references/%s.md | topic:%s,source:local\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TOPIC" "$TOPIC" >> "$LIB_PATH/.changelog" 2>/dev/null \
         || echo "[WARN] Failed to append to changelog" >&2
-    release_lock "$CHANGELOG_LOCK"
+    release_lock "$CHANGELOG_LOCK" || true
 else
     echo "[WARN] Failed to acquire .changelog.lock, skipping changelog" >&2
 fi
@@ -247,9 +263,11 @@ INDEX_FILE="$REF_DIR/.index.md"
 INDEX_ROW="| $TOPIC | v$VERSION | — | local | $DATE | no | $INJECTION_RISK |"
 if [[ -f "$INDEX_FILE" ]]; then
     # Check if topic already has a row; update in-place or append
-    if grep -q "^| $TOPIC |" "$INDEX_FILE" 2>/dev/null; then
+    # D2: Escape TOPIC for safe use in grep/sed regex (dots, brackets, etc.)
+    TOPIC_ESCAPED=$(printf '%s' "$TOPIC" | sed 's/[.[\*^$()+?{}|]/\\&/g')
+    if grep -q "^| $TOPIC_ESCAPED |" "$INDEX_FILE" 2>/dev/null; then
         # D3: Use '#' as sed delimiter to avoid conflict with '|' in markdown tables
-        sed -i "s#^| $TOPIC |.*#$INDEX_ROW#" "$INDEX_FILE" 2>/dev/null \
+        sed -i "s#^| $TOPIC_ESCAPED |.*#$INDEX_ROW#" "$INDEX_FILE" 2>/dev/null \
             || echo "[WARN] Failed to update .index.md row" >&2
     else
         echo "$INDEX_ROW" >> "$INDEX_FILE"
@@ -264,14 +282,15 @@ _INDEX_EOF_
 fi
 
 # Step 6: Release directory-level .lock
+echo "[6/7] Releasing lock..."
 release_lock "$LOCK_FILE"
 LOCK_ACQUIRED=0
 
 # 5. Trigger Rebuild
-echo "[6/6] Triggering index rebuild..."
+echo "[7/7] Triggering index rebuild..."
 MAINTAIN_SH="$SCRIPT_DIR/../../library/scripts/maintain.sh"
 if [[ -x "$MAINTAIN_SH" ]]; then
-    if ! "$MAINTAIN_SH" --rebuild-index 2>&1; then
+    if ! "$MAINTAIN_SH" --rebuild-index; then
         echo "[WARN] maintain.sh --rebuild-index failed" >&2
     fi
 fi

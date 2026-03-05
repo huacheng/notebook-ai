@@ -23,10 +23,7 @@ arguments:
     description: "Natural language description for context review (e.g., '审查上面讨论的方案')"
     required: false
   - name: checkpoint
-    description: "Evaluation checkpoint: post-plan, mid-exec, post-exec, pre-merge"
-    required: false
-  - name: caller
-    description: "Inline caller: plan, exec, auto, skill-review, audit-validate"
+    description: "Evaluation checkpoint: post-plan, mid-exec, post-exec, pre-merge, skill-review, skill-deep-review, audit-validate"
     required: false
 ---
 
@@ -39,22 +36,23 @@ Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 
 ```
 /task-ai:check                           # Review current conversation context (plan/solution)
 /task-ai:check "<description>"           # Review with specified focus
-/task-ai:check <notebook> --checkpoint   # Lifecycle checkpoint review
-/task-ai:check --caller <caller>         # Inline call from other commands
+/task-ai:check <notebook> --checkpoint <checkpoint>  # Lifecycle checkpoint review
+/task-ai:check <notebook> --checkpoint skill-review --target <file>  # Skill validation
+/task-ai:check --checkpoint audit-validate  # Rule candidate validation
 ```
 
 **Parameter routing:**
 - No arguments → scope=context (review current conversation's plan/solution)
 - `check "<description>"` → scope=context with focus (e.g., "审查上面的修复方案")
 - `check <notebook> --checkpoint post-plan` → scope=lifecycle (task lifecycle checkpoint)
-- `check --caller skill-review --target <file>` → scope=skill (skill validation)
-- `check --caller audit-validate` → scope=rules (rule candidate validation)
+- `check <notebook> --checkpoint skill-review --target <file>` → scope=skill (skill validation)
+- `check --checkpoint audit-validate` → scope=rules (rule candidate validation)
 
 ---
 
 ## Scope Definitions
 
-check defines 4 scopes. Scopes context and lifecycle are **independent executions**. Scopes skill and rules are **inline protocols** (called via `--caller`).
+check defines 4 scopes. Scopes context and lifecycle are **independent executions**. Scopes skill and rules are **inline protocols** (called via `--checkpoint`).
 
 ---
 
@@ -178,8 +176,8 @@ This is the existing checkpoint-based review for task lifecycle. See Checkpoints
 
 ### §S3 scope=skill — Skill Validation
 
-**Caller**: `--caller skill-review` (inline)
-**Trigger**: `check --caller skill-review --target <skill.md>`
+**Caller**: `--checkpoint skill-review` (inline)
+**Trigger**: `check <notebook> --checkpoint skill-review --target <skill.md>`
 
 Validates skill files using six-dimension gated review. Implemented in `check.sh`.
 
@@ -187,8 +185,8 @@ Validates skill files using six-dimension gated review. Implemented in `check.sh
 
 ### §S4 scope=rules — Rule Candidate Validation
 
-**Caller**: `--caller audit-validate` (inline)
-**Trigger**: `check --caller audit-validate`
+**Caller**: `--checkpoint audit-validate` (inline)
+**Trigger**: `check --checkpoint audit-validate`
 
 Validates rule candidates in `.evolving-rules/*/candidates/`. Implemented in `check.sh`.
 

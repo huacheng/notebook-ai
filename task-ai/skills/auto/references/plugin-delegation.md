@@ -106,7 +106,7 @@ When a lifecycle skill reaches a delegation point, discover matching plugins in 
 
 ### Level 1: Seed Slot Check
 
-Match the current context against the 6 named slots above (`doc-parse` through `tdd`). Use the Trigger Condition column — if the condition is met, attempt to find a plugin matching the slot's Semantic Description.
+Match the current context against the 7 named capability slots above (`doc-parse` through `domain-*`). Use the Trigger Condition column — if the condition is met, attempt to find a plugin matching the slot's Semantic Description.
 
 **How to find plugins**: Use the system's available skill/tool list (the agent's installed plugins, MCP tools, slash commands). Match by semantic similarity between the slot description and the plugin's declared description/name.
 
@@ -194,7 +194,7 @@ Input and output limits vary by slot and model tier:
 
 **Tier Multipliers**: heavy (1.5×), medium (1.0×), light (0.7×)
 
-**Smart Truncation**: When input exceeds limit, preserve 40% head + tail with `[N chars omitted]` marker. For git diffs, prioritize `+`/`-` lines over context.
+**Smart Truncation**: When input exceeds limit, preserve first 40% + last 40% of content (omitting the middle 20%) with `[N chars omitted]` marker between them. For git diffs, prioritize `+`/`-` lines over context lines within each kept segment.
 
 **Implementation Reference**: `packages/server/src/task-ai/context-budget.ts`
 

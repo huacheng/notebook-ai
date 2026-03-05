@@ -15,8 +15,12 @@ FORMAT=""
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --format) FORMAT="${2:-}"; shift 2 2>/dev/null || shift ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    --format)
+      if [[ -z "${2:-}" ]]; then
+        echo "[ERROR] --format requires a value (full|summary)" >&2; exit 1
+      fi
+      FORMAT="$2"; shift 2 ;;
+    *) echo "[ERROR] Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
@@ -35,13 +39,24 @@ if [[ ! -f "$STATE_PY" ]]; then
     exit 1
 fi
 
-# D3: Concurrency — acquire .lock before proceeding
+# D3: Concurrency — acquire .lock before proceeding (with stale lock recovery)
 LOCK_FILE="$WORK_DIR/.lock"
 cleanup_lock() { rm -f "$LOCK_FILE"; }
-trap cleanup_lock EXIT
+trap cleanup_lock EXIT INT TERM
 if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
-    echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
-    exit 1
+    # D3: Stale lock recovery — check if holding PID is still alive
+    existing_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+    if [[ -n "$existing_pid" ]] && ! kill -0 "$existing_pid" 2>/dev/null; then
+        echo "[WARN] Removing stale .lock (PID $existing_pid is dead)" >&2
+        rm -f "$LOCK_FILE"
+        if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+            echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+            exit 1
+        fi
+    else
+        echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+        exit 1
+    fi
 fi
 
 # 1. Gather Metadata (D3: python3 calls with error handling)
@@ -67,9 +82,13 @@ fi
 FORMAT=${FORMAT:-full}
 
 # D1: Resolve deliverables directory (report goes to project deliverables, not .working/)
-NB_DIR="$(dirname "$WORK_DIR")"
-PROJECT_DIR="$(dirname "$NB_DIR")"
-DELIVERABLES_DIR="$PROJECT_DIR/.deliverables/$NOTEBOOK"
+if [[ -n "${NB_PROJECT_DELIVERABLES:-}" ]]; then
+    DELIVERABLES_DIR="$NB_PROJECT_DELIVERABLES/$NOTEBOOK"
+else
+    NB_DIR="$(dirname "$WORK_DIR")"
+    PROJECT_DIR="$(dirname "$NB_DIR")"
+    DELIVERABLES_DIR="$PROJECT_DIR/.deliverables/$NOTEBOOK"
+fi
 if ! mkdir -p "$DELIVERABLES_DIR" 2>/dev/null; then
     echo "[ERROR] Failed to create deliverables directory: $DELIVERABLES_DIR" >&2
     exit 1
@@ -85,7 +104,7 @@ collect_dir_files() {
     local dir="$1" pattern="$2" fallback="${3:-N/A}"
     if [[ ! -d "$dir" ]]; then echo "$fallback"; return; fi
     local files
-    files=$(find "$dir" -name "$pattern" -print 2>/dev/null | sort)
+    files=$(find "$dir" -maxdepth 1 -name "$pattern" -print 2>/dev/null | sort)
     if [[ -z "$files" ]]; then echo "$fallback"; return; fi
     local result=""
     while IFS= read -r f; do
@@ -99,12 +118,18 @@ $(cat "$f" 2>/dev/null)
 
 # --- Collect report sections ---
 
+# 1b. Summary overview from .summary.md (D1: SKILL.md step 4)
+SUMMARY_OVERVIEW=""
+if [[ -f "$WORK_DIR/.summary.md" ]]; then
+    SUMMARY_OVERVIEW=$(cat "$WORK_DIR/.summary.md" 2>/dev/null || true)
+fi
+
 # 2. Objective from .target.md
 OBJECTIVE=$(read_file_or "$WORK_DIR/.target.md" "N/A")
 
-# 3. Plan from .plan.md (first 30 lines for summary)
+# 3. Plan from .plan.md (full content for full format, first 30 lines for summary)
 if [[ -f "$WORK_DIR/.plan.md" ]]; then
-    PLAN_CONTENT=$(head -n 30 "$WORK_DIR/.plan.md")
+    PLAN_CONTENT=$(cat "$WORK_DIR/.plan.md")
 else
     PLAN_CONTENT="N/A"
 fi
@@ -135,20 +160,11 @@ $(cat "$WORK_DIR/.auto-timeline.md")
 "
 fi
 
-# 6. Verification from .test/ (all files: .md and .jsonl, sorted)
-VERIFICATION="N/A"
-if [[ -d "$WORK_DIR/.test" ]]; then
-    test_files=$(find "$WORK_DIR/.test" \( -name '*.md' -o -name '*.jsonl' \) -print 2>/dev/null | sort)
-    if [[ -n "$test_files" ]]; then
-        VERIFICATION=""
-        while IFS= read -r f; do
-            VERIFICATION+="### $(basename "$f")
-$(cat "$f" 2>/dev/null)
-
-"
-        done <<< "$test_files"
-    fi
-fi
+# 6. Verification from .test/ (all .md files, sorted; then .jsonl files, sorted)
+VERIFICATION_MD=$(collect_dir_files "$WORK_DIR/.test" '*.md' "")
+VERIFICATION_JSONL=$(collect_dir_files "$WORK_DIR/.test" '*.jsonl' "")
+VERIFICATION="${VERIFICATION_MD}${VERIFICATION_JSONL}"
+VERIFICATION=${VERIFICATION:-N/A}
 
 # 7. Analysis from .analysis/ (all files, sorted)
 ANALYSIS=$(collect_dir_files "$WORK_DIR/.analysis" '*.md' "N/A")
@@ -161,7 +177,7 @@ NOTES=$(collect_dir_files "$WORK_DIR/.notes" '*.md' "N/A")
 
 # 10. Git changes related to the task (D1: collect for all statuses if identifiable)
 CHANGES="N/A"
-git_log=$(git log --oneline --all --fixed-strings --grep="task-ai($NOTEBOOK)" 2>/dev/null || true)
+git_log=$(git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai($NOTEBOOK)" 2>/dev/null || true)
 if [[ -n "$git_log" ]]; then
     CHANGES="$git_log"
 fi
@@ -178,6 +194,12 @@ if [[ "$FORMAT" == "summary" ]]; then
     # Summary format: status, objective (1 line), key changes, verification result
     obj_line=$(grep -v -e '^#' -e '^$' "$WORK_DIR/.target.md" 2>/dev/null | head -n 1)
     obj_line=${obj_line:-N/A}
+    # D6: Format multi-line changes as code block for summary readability
+    if [[ "$CHANGES" == "N/A" ]]; then
+        changes_fmt="N/A"
+    else
+        changes_fmt=$(printf '\n```\n%s\n```' "$CHANGES")
+    fi
     REPORT_CONTENT="# Task Report: $TITLE (Summary)
 
 - **Status**: $STATUS
@@ -185,7 +207,7 @@ if [[ "$FORMAT" == "summary" ]]; then
 - **Created**: $CREATED
 - **Completed**: $COMPLETED
 - **Objective**: $obj_line
-- **Key Changes**: $CHANGES
+- **Key Changes**: $changes_fmt
 - **Verification**: $(head -n 5 "$WORK_DIR/.test/.summary.md" 2>/dev/null || echo "N/A")
 "
 else
@@ -198,6 +220,7 @@ else
 - **Completed**: $COMPLETED
 - **Duration**: $DURATION
 - **Type**: $TYPE
+$(if [[ -n "$SUMMARY_OVERVIEW" ]]; then printf '\n## Overview\n%s\n' "$SUMMARY_OVERVIEW"; fi)
 
 ${TIMELINE_SECTION}## Objective
 $OBJECTIVE
@@ -225,8 +248,12 @@ $NOTES
 "
 fi
 
-# 12. Write report (D3: error handling)
-if ! printf '%s' "$REPORT_CONTENT" > "$REPORT_FILE" 2>&1; then
+# 12. Write report (D3: atomic write via temp file)
+REPORT_TMP="${REPORT_FILE}.tmp.$$"
+if printf '%s' "$REPORT_CONTENT" > "$REPORT_TMP" 2>/dev/null && mv "$REPORT_TMP" "$REPORT_FILE" 2>/dev/null; then
+    :
+else
+    rm -f "$REPORT_TMP"
     echo "[WARN] Failed to write report to $REPORT_FILE" >&2
 fi
 
@@ -236,27 +263,32 @@ echo "Report written to $REPORT_FILE."
 # This script only generates reports; use highlight for library writes
 
 # 13. Git commit (D1: consistent with SKILL.md)
-if ! git add "$REPORT_FILE" 2>&1; then
+if ! git add "$REPORT_FILE" 2>/dev/null; then
     echo "[WARN] Failed to stage report file" >&2
-elif ! git commit -m "task-ai($NOTEBOOK):report generate completion report" 2>&1; then
+elif ! git commit -m "task-ai($NOTEBOOK):report generate completion report" 2>/dev/null; then
     echo "[WARN] Failed to commit report (may be no changes)" >&2
 fi
 
 # 13b. Library maintain hook (rebuild index after report commit)
 MAINTAIN_SH="$TASK_AI_ROOT/skills/library/scripts/maintain.sh"
 if [[ -x "$MAINTAIN_SH" ]]; then
-    if ! "$MAINTAIN_SH" --rebuild-index --rebuild-relations 2>&1; then
+    if ! "$MAINTAIN_SH" --rebuild-index --rebuild-relations 2>/dev/null; then
         echo "[WARN] maintain.sh failed" >&2
     fi
 fi
 
 # 14. Write .auto-signal (D1: consistent with SKILL.md, with actual timestamp)
 SIGNAL_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-if ! printf '{"step":"report","result":"(generated)","next":"(stop)","checkpoint":"","timestamp":"%s"}\n' "$SIGNAL_TS" > "$WORK_DIR/.auto-signal" 2>&1; then
+if ! printf '{"step":"report","result":"(generated)","next":"(stop)","checkpoint":"","timestamp":"%s"}\n' "$SIGNAL_TS" > "$WORK_DIR/.auto-signal" 2>/dev/null; then
     echo "[WARN] Failed to write .auto-signal" >&2
 fi
 
 # 15. Print report to screen
-cat "$REPORT_FILE"
+if [[ -f "$REPORT_FILE" ]]; then
+    cat "$REPORT_FILE"
+else
+    echo "[WARN] Report file not found, printing from memory" >&2
+    printf '%s' "$REPORT_CONTENT"
+fi
 
 echo "Report completed."

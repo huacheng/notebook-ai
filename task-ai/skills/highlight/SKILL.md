@@ -25,7 +25,7 @@ arguments:
 
 # /task-ai:highlight — Experience Distillation Engine
 
-Unified protocol for experience and thinking library writes. Defines 6 scopes covering all experience/thinking write operations across the task lifecycle. Also serves as an independent skill for comprehensive distillation (complete) and ad-hoc experience capture (adhoc).
+Unified protocol for experience and thinking library writes. Defines 7 scopes covering all experience/thinking write operations across the task lifecycle. Also serves as an independent skill for comprehensive distillation (complete), ad-hoc experience capture (adhoc), and experience-to-skill promotion (promote).
 
 ## Usage
 
@@ -57,6 +57,8 @@ Unified protocol for experience and thinking library writes. Defines 6 scopes co
 │  · .memory/.type-profiles│  · quarantine (security)           │
 │    (complete sync only)  │                                    │
 │  · quality_status        │                                    │
+│  · .skills/.candidates/  │                                    │
+│    (promote scope)       │                                    │
 └──────────────────────────┴───────────────────────────────────┘
 ```
 
@@ -67,7 +69,7 @@ Unified protocol for experience and thinking library writes. Defines 6 scopes co
 
 ## Scope Definitions
 
-highlight defines 6 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.6 are **independent executions** (run as standalone skill invocations).
+highlight defines 7 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.7 are **independent executions** (run as standalone skill invocations).
 
 ---
 
@@ -288,7 +290,7 @@ Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
 
 1. O_APPEND write to `<notebook>-<caller>-<YYYY-MM-DD>.md`
 2. O_APPEND append one row to `.memory/.thinking/raw/.index.md`
-3. No lock needed (filename contains notebook + caller + date, naturally unique)
+3. No lock needed (filename contains notebook + caller + date, naturally unique per day). Note: multiple calls within the same day append to the same file — O_APPEND ensures atomicity of individual writes
 
 #### Fault Isolation
 
@@ -661,6 +663,7 @@ highlight **does not change notebook status**. Regardless of scope, `.status.jso
 | quality-update | None (check manages status) |
 | complete | None (merge already set complete) |
 | adhoc | None (no notebook lifecycle) |
+| promote | None (batch operation, no notebook lifecycle) |
 
 ## Git
 
@@ -668,6 +671,7 @@ highlight **does not change notebook status**. Regardless of scope, `.status.jso
 |--------|---------------|
 | complete distillation | `task-ai(<notebook>):highlight complete distillation` |
 | adhoc capture | `task-ai(<scope>):highlight adhoc experience captured` |
+| promote | No independent commit (changelog update only; candidates are committed by subsequent skill-review) |
 
 > Inline calls (impl/verify/thinking-raw/quality-update) do not produce independent commits. Their changelog updates are included in the caller's git commit (e.g., exec's commit includes impl experience write changelog changes).
 
@@ -693,7 +697,7 @@ highlight **does not change notebook status**. Regardless of scope, `.status.jso
 
 All three must be met:
 1. `quality_status: verified` in experience frontmatter
-2. `usage_count >= 3` (counted from `.changelog` references)
+2. `usage_count >= 3` (counted from `.changelog` entries with `| referenced |` type only — excludes initial write entries)
 3. Contains structural patterns: `## Patterns` or `## Steps` headers
 
 #### Usage
@@ -742,7 +746,7 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 ## Notes
 
 - **Protocol, not runtime**: Inline scopes (§3.1–§3.4) define write format and steps. Calling skills execute these steps in their own context — highlight is not invoked as a separate skill for inline scopes
-- **Fault isolation is universal**: All 9 inline callers have the same guarantee — highlight protocol failure never blocks the caller's main flow
+- **Fault isolation is universal**: All inline caller commands (the 9 commands listed in §3.3, plus check for §3.4) have the same guarantee — highlight protocol failure never blocks the caller's main flow
 - **No state mutations**: highlight is transparent to the state machine. This is consistent with the former `light` behavior
 - **.type-profiles/ dual ownership**: research creates/updates profiles (knowledge acquisition); highlight syncs during complete (experience write-back). Both use Library Write Protocol locks for concurrency safety
-- **Concurrency**: Independent executions (complete, adhoc) acquire `.working/.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Independent executions (complete, adhoc) acquire `.working/.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`). promote does NOT acquire `.working/.lock` — it operates on library-level paths (`.skills/.candidates/`, `.changelog`) with its own `.changelog.lock`

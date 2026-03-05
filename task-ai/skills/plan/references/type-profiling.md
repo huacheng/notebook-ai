@@ -33,7 +33,7 @@ The `type` field uses a simple string with pipe separator for hybrids:
 | `<A>\|<B>` | `data-pipeline\|ml` | Hybrid — A is primary, B is secondary |
 | `<A>\|<B>\|<C>` | `software\|infrastructure\|dsp` | Multi-hybrid — first is primary, rest are secondary (rare) |
 
-**Validation regex**: Each segment must match `[a-zA-Z0-9_:-]+`. Full type field: `[a-zA-Z0-9_:|-]+` (pipe allowed as separator). Parsing: `type.split('|')` → `[0]` is primary, `[1:]` are secondary.
+**Validation regex**: Each segment must match `[a-zA-Z0-9_:-]+`. Full type field: `^[a-zA-Z0-9_:-]+(\|[a-zA-Z0-9_:-]+)*$` (no leading/trailing/consecutive pipes). Parsing: `type.split('|')` → `[0]` is primary, `[1:]` are secondary.
 
 **Experiences mapping**: For hybrid type `A|B`, `highlight` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. Plan reads `.summary.md` for all segments, drilling into individual entries when relevant.
 
@@ -111,7 +111,7 @@ Auto-maintained by research. Predefined seed types + dynamically discovered type
 1. **Seed**: `init` creates `.type-registry.md` (if missing) with the predefined types from `commands/task-ai.md` as seed rows
 2. **Grow**: When `research` classifies a type not in the registry, it appends a new row with discovery date and source task module name
 3. **Read**: `research` reads the registry during type classification to match against known types (both seed and discovered)
-4. **Shared**: The registry is a shared resource — types discovered by one task benefit future tasks. No lock needed (append-only, one writer at a time via task `.lock`)
+4. **Shared**: The registry is a shared resource — types discovered by one task benefit future tasks. Concurrent writes are rare (append-only, typically one task at a time) but if concurrent tasks run, `research` should coordinate via `$NB_WORKSPACES_LIBRARY/.type-registry.lock` before appending
 
 ### Why Auto-Expand?
 
@@ -284,7 +284,7 @@ research has **three type-related responsibilities**:
 
 ### 3. Custom type profiling (when no registry type fits)
 - Comprehensive web research to build the domain profile from scratch
-- Must cover all four profile sections with web-sourced best practices
+- Must cover all profile sections (Domain Classification, Phase Intelligence, Domain Methodology, Verification Standards, Implementation Patterns, Audit Adaptation, Sources) with web-sourced best practices
 - Identify the nearest known type(s) for partial methodology reuse
 - Register the new type in `.type-registry.md` for future tasks
 

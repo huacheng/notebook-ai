@@ -56,14 +56,18 @@ find_nb_context() {
   done
 
   local branch
-  branch=$(git branch --show-current 2>/dev/null)
-  if [[ "$branch" =~ ^task/ ]]; then
-    export NB_NOTEBOOK="${branch#task/}"
-    local nb_dir
-    nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null)
-    if [[ -n "$nb_dir" ]]; then
-      export NB_WORKING="$nb_dir/.working"
-      return 0
+  branch=$(git branch --show-current 2>/dev/null || true)
+  if [[ -n "$branch" && "$branch" =~ ^task/ ]]; then
+    local nb_name="${branch#task/}"
+    # D2: Validate notebook name from branch to prevent path traversal
+    if [[ "$nb_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      export NB_NOTEBOOK="$nb_name"
+      local nb_dir
+      nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
+      if [[ -n "$nb_dir" ]]; then
+        export NB_WORKING="$nb_dir/.working"
+        return 0
+      fi
     fi
   fi
 

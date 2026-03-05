@@ -49,7 +49,7 @@ Merge a completed task's branch into main, with automated conflict resolution an
 2. **Checkout main** (non-worktree) or already on main (worktree, from main worktree)
 3. **Attempt merge**:
    ```bash
-   git merge task/<notebook> --no-ff -m "task-ai(<notebook>):merge merge completed task"
+   git merge --no-ff -m "task-ai(<notebook>):merge merge completed task" -- task/<notebook>
    ```
 
 ### Phase 3: Conflict Resolution (if merge fails)
@@ -113,6 +113,7 @@ On successful merge:
 | `executing` | `complete` | Merge successful, `stage.current == stage.total` (final stage or single-stage) |
 | `executing` | `stage-done` | Merge successful, `stage.current < stage.total` (intermediate stage) |
 | `executing` | `executing` | Merge conflict unresolvable after 3 attempts (stays `executing` so merge can be retried after manual conflict resolution) |
+| `executing` | `executing` | Checkout failed, no ACCEPT verdict, or state transition failed (status unchanged, `.auto-signal` written for routing) |
 
 ## Git
 
@@ -133,6 +134,7 @@ On successful merge:
 | Conflict | `{ "step": "merge", "result": "conflict", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
 | Dependency not met | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 | No ACCEPT verdict | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "no-accept", "timestamp": "..." }` |
+| Checkout failed | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "checkout-failed", "timestamp": "..." }` |
 
 ## Notes
 

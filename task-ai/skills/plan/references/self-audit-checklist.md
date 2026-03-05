@@ -63,6 +63,8 @@ Read `.type-profile.md` to shift emphasis. Default weights are equal; adjustment
 | `documentation` | Maintainability↑ Correctness↑ |
 | `infrastructure` | Security↑↑ Reliability↑↑ |
 | `ml` | Performance↑ Architecture↑ |
+| `dsp` | Performance↑ Correctness↑ |
+| `science` | Correctness↑↑ Reliability↑ |
 
 For types not listed, apply equal weights. For hybrid types (`A|B`), merge weight adjustments from all segments.
 

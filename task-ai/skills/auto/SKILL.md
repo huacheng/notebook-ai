@@ -73,6 +73,7 @@ Deliverables + .target.md + .plan.md → check(D1-D6 scoring) → overall ≥ th
 | `review` / `executing` | `execution` | Executing plan steps |
 | `blocked` | `execution` (stalled) | Blocked, awaiting user intervention |
 | `complete` / `stage-done` | `finalization` | Merge, distill, report |
+| `cancelled` | — (terminal) | Loop stops immediately, no phase |
 
 ### Threshold & Retry Limits
 
@@ -390,9 +391,9 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
-| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate` |
+| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize` |
 | `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `stage-done`, `conflict`, `rejected` |
-| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `(stop)`, `(none)` |
+| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize`, `(stop)`, `(none)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `post-annotate`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
 | `compaction_count` | Integer | ≥ 0 |

@@ -5,7 +5,7 @@
 #        target.sh --finalize
 
 set -euo pipefail
-trap 'rm -f "${TMP_FILE:-}" "${TMP_STATUS:-}"' EXIT INT TERM
+trap 'rm -f "${TMP_FILE:-}" "${TMP_STATUS:-}"' EXIT INT TERM HUP
 
 # Parse arguments
 REFINE_MODE=0
@@ -150,6 +150,8 @@ fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mode 4: Write (create or replace objective)
+# Implements SKILL.md step 2c (Normal mode). Steps 2a (Stage Advance) and
+# 2b (Multi-stage Update) are handled by the agent, not this script.
 # ─────────────────────────────────────────────────────────────────────────────
 echo "Updating task objective in $TARGET_FILE..."
 
@@ -208,6 +210,11 @@ fi
 # NOTE: stage-done is NOT transitioned here — SKILL.md step 2a requires archive
 # (steps 4-5) BEFORE status change. The agent handles stage-done → planning
 # after performing archive operations. See SKILL.md "Atomicity" note.
+if [[ -f "$STATUS_FILE" ]]; then
+    if ! command -v jq &>/dev/null; then
+        echo "[WARN] jq not found — cannot update .status.json status transition" >&2
+    fi
+fi
 if [[ -f "$STATUS_FILE" ]] && command -v jq &>/dev/null; then
     NEW_STATUS=""
     case "$CURRENT_STATUS" in

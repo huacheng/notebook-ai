@@ -82,8 +82,8 @@ while [[ $# -gt 0 ]]; do
           ;;
         audit)
           echo "[maintain:audit] Running full library audit..."
-          # Full audit mode - run all maintenance tasks (D1: matches --all pipeline)
-          bash "$0" --rebuild-index --rebuild-relations --compact --check-staleness
+          # D3: Use resolved script path for recursive invocation (CWD may change)
+          bash "$SCRIPT_DIR/maintain.sh" --rebuild-index --rebuild-relations --compact --check-staleness
           ;;
         *)
           echo "Unknown mode: $MODE" >&2
@@ -126,28 +126,44 @@ while [[ $# -gt 0 ]]; do
               echo "[ERROR] Failed to create archive directory" >&2
               exit 1
           fi
+          # D1: Archive only entries older than 90 days (per SKILL.md spec)
+          CUTOFF_DATE=$(date -u -d "90 days ago" +%Y-%m-%dT%H:%M 2>/dev/null || date -u -v-90d +%Y-%m-%dT%H:%M 2>/dev/null || date -u +%Y-%m-%dT%H:%M)
           DATE_STR=$(date +%Y-%m)
           ARCHIVE_FILE="$ARCHIVE_DIR/$DATE_STR.md"
-          # H-MAINTAIN-1: Append to existing archive instead of overwriting
-          # D3: Create empty changelog FIRST to prevent data loss if interrupted
-          touch "${CHANGELOG}.new"
-          if [[ -f "$ARCHIVE_FILE" ]]; then
-              if ! cat "$CHANGELOG" >> "$ARCHIVE_FILE"; then
-                  echo "[WARN] Failed to append changelog to archive" >&2
-                  rm -f "${CHANGELOG}.new"
+          # Separate old entries (to archive) from recent entries (to keep)
+          AGED_LINES=0
+          touch "${CHANGELOG}.recent"
+          touch "${CHANGELOG}.aged"
+          while IFS= read -r line; do
+              # Extract ISO8601 timestamp from line start
+              line_ts="${line%% |*}"
+              line_ts="${line_ts## }"
+              if [[ "$line_ts" < "$CUTOFF_DATE" && "$line_ts" =~ ^[0-9]{4}-[0-9]{2} ]]; then
+                  echo "$line" >> "${CHANGELOG}.aged"
+                  ((AGED_LINES++)) || true
               else
+                  echo "$line" >> "${CHANGELOG}.recent"
+              fi
+          done < "$CHANGELOG"
+          if [[ $AGED_LINES -gt 0 ]]; then
+              # D3: Append aged entries to archive, then replace changelog with recent + marker
+              if ! cat "${CHANGELOG}.aged" >> "$ARCHIVE_FILE"; then
+                  echo "[WARN] Failed to append aged entries to archive" >&2
+                  rm -f "${CHANGELOG}.recent" "${CHANGELOG}.aged"
+              else
+                  # D1: Write compaction marker as first line (per SKILL.md spec)
+                  MARKER="# COMPACT $(date -u +%Y-%m-%d): archived $AGED_LINES lines -> .changelog-archive/$DATE_STR.md"
+                  { echo "$MARKER"; cat "${CHANGELOG}.recent"; } > "${CHANGELOG}.new"
                   mv "${CHANGELOG}.new" "$CHANGELOG"
-                  echo "Changelog appended to existing $ARCHIVE_FILE"
+                  rm -f "${CHANGELOG}.recent" "${CHANGELOG}.aged"
+                  echo "Changelog compacted: $AGED_LINES lines archived to $ARCHIVE_FILE"
               fi
           else
-              if ! cp "$CHANGELOG" "$ARCHIVE_FILE"; then
-                  echo "[WARN] Failed to copy changelog to archive" >&2
-                  rm -f "${CHANGELOG}.new"
-              else
-                  mv "${CHANGELOG}.new" "$CHANGELOG"
-                  echo "Changelog compacted to $ARCHIVE_FILE"
-              fi
+              rm -f "${CHANGELOG}.recent" "${CHANGELOG}.aged"
+              echo "[maintain:compact] No entries older than 90 days to archive"
           fi
+      else
+          echo "[maintain:compact] Changelog below 2000-line threshold, skipping"
       fi
       shift ;;
 
@@ -168,6 +184,12 @@ while [[ $# -gt 0 ]]; do
 
       if [[ -z "$SKILL_NAME" ]]; then
           echo "[ERROR] Usage: maintain.sh --promote-skill <skill-name> [--auto]" >&2
+          exit 1
+      fi
+
+      # D2: Validate skill name to prevent path traversal
+      if [[ ! "$SKILL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+          echo "[ERROR] Invalid skill name: '$SKILL_NAME'. Use only letters, digits, hyphens, underscores." >&2
           exit 1
       fi
 
@@ -275,13 +297,17 @@ while [[ $# -gt 0 ]]; do
           if [[ -f "$lockfile" ]]; then
               lock_pid=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['pid'])" "$lockfile" 2>/dev/null || echo "")
               if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
-                  echo "[maintain:all] Removing stale lock: $lockfile (pid $lock_pid dead)"
-                  rm -f "$lockfile"
+                  echo "[maintain:all] Recovering stale lock: $lockfile (pid $lock_pid dead)"
+                  # D2: Use rename-based recovery per write-protocol.md to avoid TOCTOU
+                  stale_name="${lockfile}.stale.$$"
+                  if mv "$lockfile" "$stale_name" 2>/dev/null; then
+                      rm -f "$stale_name"
+                  fi
               fi
           fi
       done < <(find "$LIB_PATH" -maxdepth 4 -name ".lock" 2>/dev/null)
-      # Run sub-tasks
-      bash "$0" --rebuild-index --rebuild-relations --compact --check-staleness
+      # D3: Use resolved script path for recursive invocation (CWD may change)
+      bash "$SCRIPT_DIR/maintain.sh" --rebuild-index --rebuild-relations --compact --check-staleness
       shift ;;
 
     *) echo "Unknown option: $1" >&2; exit 1 ;;

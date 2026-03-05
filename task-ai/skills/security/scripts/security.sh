@@ -37,8 +37,6 @@ if [[ "$ACTION" != "scan-skill" ]]; then
     fi
 fi
 
-NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
-
 verify_cmd() {
     local cmd="$1"
 
@@ -132,7 +130,8 @@ verify_cmd() {
     fi
 
     # 9. Config file tampering (Claude Code / MCP)
-    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qiE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore"; then
+    # D2: Match both redirect (>, >>) and tee writes to config files; also MCP enablement flags
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qiE ">+\s*\.claude/|>+\s*\.mcp\.json|>+\s*\.claudeignore|tee\s+(-a\s+)?\.claude/|tee\s+(-a\s+)?\.mcp\.json|tee\s+(-a\s+)?\.claudeignore|enableAllProjectMcpServers"; then
         risk="high"
         reason="Config file tampering"
     fi
@@ -246,21 +245,45 @@ audit_plan() {
     fi
 
     # Config file tampering (Claude Code / MCP)
-    if printf '%s\n' "$content" | grep -qiE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore|enableAllProjectMcpServers"; then
+    # D2: Match both redirect (>, >>) and tee writes to config files
+    if printf '%s\n' "$content" | grep -qiE ">+\s*\.claude/|>+\s*\.mcp\.json|>+\s*\.claudeignore|tee\s+(-a\s+)?\.claude/|tee\s+(-a\s+)?\.mcp\.json|tee\s+(-a\s+)?\.claudeignore|enableAllProjectMcpServers"; then
         risk="high"
         findings+=("config_tampering")
     fi
 
     # Sensitive path access in plan
-    if printf '%s\n' "$content" | grep -qiE "(cat|read|cp|curl.*-d).*(\~/\.claude|\~/\.ssh|\~/\.aws|/etc/shadow|credentials\.json)"; then
+    # D6: Consistent tilde escaping with verify_cmd rule 6; added ~/\.anthropic, ~/\.netrc, auth\.json
+    if printf '%s\n' "$content" | grep -qiE "(cat|read|cp|curl.*-d).*(~/\.claude|~/\.anthropic|~/\.ssh|~/\.aws|~/\.netrc|/etc/shadow|credentials\.json|auth\.json)"; then
         risk="high"
         findings+=("sensitive_path_access")
     fi
 
     # Secret exfiltration patterns in plan
-    if printf '%s\n' "$content" | grep -qE "(curl|wget|nc).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET|GITHUB_TOKEN)"; then
+    # D1: Parity with verify_cmd/scan_skill — include API_KEY and SECRET suffixes
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch|nc|ncat).*\\\$(ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET|GITHUB_TOKEN|API_KEY|SECRET)"; then
         risk="high"
         findings+=("secret_exfil")
+    fi
+
+    # DNS tunneling / covert exfiltration
+    # D1: Parity with verify_cmd rule 10 and scan_skill CORE-010
+    if printf '%s\n' "$content" | grep -qE "(nslookup|dig|host)\s+.*\\\$\("; then
+        risk="high"
+        findings+=("covert_channel:dns_tunnel")
+    fi
+
+    # SSRF to internal networks
+    # D1: Parity with verify_cmd rule 11 and scan_skill CORE-011
+    if printf '%s\n' "$content" | grep -qE "(curl|wget|fetch)\s.*https?://(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|0\.0\.0\.0|localhost|\[::1\])"; then
+        risk="high"
+        findings+=("ssrf:internal_network")
+    fi
+
+    # Reverse shell patterns
+    # D1: Parity with verify_cmd rule 12 and scan_skill CORE-012
+    if printf '%s\n' "$content" | grep -qE "(bash|sh|zsh)\s+-i\s+>&\s*/dev/tcp|nc\s+-e\s+/bin/(bash|sh)|mkfifo.*nc.*sh"; then
+        risk="high"
+        findings+=("reverse_shell")
     fi
 
     if [[ "$risk" == "high" ]]; then
@@ -405,7 +428,8 @@ scan_skill() {
     fi
 
     # CORE-006c: Config file writes
-    if printf '%s\n' "$content" | grep -qE ">\s*\.claude/|>\s*\.mcp\.json|>\s*\.claudeignore"; then
+    # D2: Match both redirect (>, >>) and tee writes to config files
+    if printf '%s\n' "$content" | grep -qE ">+\s*\.claude/|>+\s*\.mcp\.json|>+\s*\.claudeignore|tee\s+(-a\s+)?\.claude/|tee\s+(-a\s+)?\.mcp\.json|tee\s+(-a\s+)?\.claudeignore"; then
         risk="high"
         findings+=("config_file_tampering")
     fi
@@ -468,7 +492,7 @@ scan_skill() {
         findings+=("reverse_shell")
     fi
 
-    # 4. Output result
+    # Output result
     if [[ "$risk" == "high" ]]; then
         echo "[SECURITY] REJECT: Skill contains high-risk patterns"
         if [[ ${#findings[@]} -gt 0 ]]; then
@@ -480,7 +504,6 @@ scan_skill() {
         return 1
     else
         echo "[SECURITY] PASS: Skill static analysis passed"
-        echo "[SECURITY] Risk: $risk"
         return 0
     fi
 }

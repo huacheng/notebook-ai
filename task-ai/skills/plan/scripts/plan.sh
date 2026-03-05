@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # /task-ai:plan implementation
 # Usage: plan.sh [notebook] [--generate]
-#        plan.sh --refine "step:N description" | "add:step description" | "remove:step N"
+#        plan.sh --refine "refinement description text"
 #        plan.sh --finalize
 
 set -euo pipefail
@@ -20,8 +20,14 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --refine)
             REFINE_MODE=1
-            REFINE_CONTENT="${2:-}"
-            shift 2 || shift
+            # D2: Guard against missing or flag-like arguments
+            if [[ -n "${2:-}" ]] && [[ "${2:-}" != --* ]]; then
+                REFINE_CONTENT="$2"
+                shift 2
+            else
+                REFINE_CONTENT=""
+                shift
+            fi
             ;;
         --finalize)
             FINALIZE_MODE=1
@@ -75,6 +81,15 @@ fi
 # Mode 2: Refine (modify existing plan)
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$REFINE_MODE" -eq 1 ]]; then
+    # D1: Reject refinement on terminal statuses
+    REFINE_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>&1) || REFINE_STATUS=""
+    case "$REFINE_STATUS" in
+        complete|cancelled|stage-done)
+            echo "[ERROR] Cannot refine — task status is $REFINE_STATUS." >&2
+            exit 1
+            ;;
+    esac
+
     # D2: Validate refinement content is not empty
     if [[ -z "$REFINE_CONTENT" ]]; then
         echo "[ERROR] Refinement content cannot be empty." >&2
@@ -113,7 +128,7 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
         echo "[WARN] git commit failed (may be no changes)" >&2
     fi
 
-    echo "[plan] Refinement added: $REFINE_CONTENT"
+    echo "[plan] Refinement added: $REFINE_CONTENT_SAFE"
     exit 0
 fi
 
@@ -144,18 +159,23 @@ esac
 TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>&1) || TYPE=""
 if [[ -z "$TYPE" ]]; then
     TYPE="software" # Default for plan testing
+fi
+
+# D2: Validate type format BEFORE persisting (SKILL.md step 4)
+# Each pipe-separated segment must match [a-zA-Z0-9_:-]+; no leading/trailing/consecutive pipes
+if [[ -n "$TYPE" ]] && ! [[ "$TYPE" =~ ^[a-zA-Z0-9_:-]+(\|[a-zA-Z0-9_:-]+)*$ ]]; then
+    echo "[ERROR] Invalid type format: $TYPE (each segment must match [a-zA-Z0-9_:-]+, pipe-separated)" >&2
+    exit 1
+fi
+
+# D1: Persist type only after validation passes
+if ! python3 "$STATE_PY" get "$STATUS_JSON" type >/dev/null 2>&1; then
     if ! python3 "$STATE_PY" set "$STATUS_JSON" type "$TYPE" 2>&1; then
         echo "[WARN] Failed to set type in .status.json" >&2
     fi
 fi
 
 echo "Planning for task type: $TYPE"
-
-# D2: Validate type format (SKILL.md step 4)
-if [[ -n "$TYPE" ]] && ! [[ "$TYPE" =~ ^[a-zA-Z0-9_:|-]+$ ]]; then
-    echo "[ERROR] Invalid type format: $TYPE (must match [a-zA-Z0-9_:|-]+)" >&2
-    exit 1
-fi
 
 # 2. Generate .plan.md (Scaffold)
 # Archive existing plan only when re-planning (SKILL.md step 14)
@@ -164,7 +184,14 @@ if [[ -f "$PLAN_FILE" ]] && [[ "$CURRENT_STATUS_GUARD" == "review" || "$CURRENT_
     if [[ -f "$SUPERSEDED" ]]; then
         # Append numeric suffix if superseded file exists
         i=2
-        while [[ -f "$WORK_DIR/.plan-superseded-$i.md" ]]; do ((i++)); done
+        while [[ -f "$WORK_DIR/.plan-superseded-$i.md" ]]; do
+            ((i++))
+            # D3: Safety cap to prevent infinite loop on filesystem anomalies
+            if [[ $i -gt 100 ]]; then
+                echo "[ERROR] Too many superseded plans (>100) — aborting" >&2
+                exit 1
+            fi
+        done
         SUPERSEDED="$WORK_DIR/.plan-superseded-$i.md"
     fi
     # D3: mv with error handling - abort if fails to prevent data loss
@@ -246,8 +273,12 @@ if ! printf 'phase: plan-refinement\nentered_at: %s\nentered_by: /task-ai:plan\n
 fi
 
 # D1: Commit generated plan + test artifacts + session context
-# D3: git with error handling
-if ! git add "$PLAN_FILE" "$STATUS_JSON" "$SESSION_CONTEXT" 2>&1; then
+# D3: git with error handling; only add files that exist
+GIT_ADD_FILES=("$PLAN_FILE" "$STATUS_JSON")
+if [[ -f "$SESSION_CONTEXT" ]]; then
+    GIT_ADD_FILES+=("$SESSION_CONTEXT")
+fi
+if ! git add "${GIT_ADD_FILES[@]}" 2>&1; then
     echo "[WARN] git add failed" >&2
 fi
 # Also add test directory if it exists (VH stubs, criteria)

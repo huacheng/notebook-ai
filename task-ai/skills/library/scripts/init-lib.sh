@@ -171,11 +171,14 @@ fi
 if [[ ! -f .gitignore ]]; then
     cat > .gitignore <<EOF
 .changelog
+.changelog.lock
 .changelog-archive/.lock
 .memory/.thinking/raw/
 .memory/.thinking/patterns/.lock
 .inconsistency.log
 .ioc.md
+.plugin-registry.md
+.last-maintained
 **/.library-state.json
 **/.lock
 **/.lock.stale.*

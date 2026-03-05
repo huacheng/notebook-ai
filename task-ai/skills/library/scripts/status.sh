@@ -39,4 +39,19 @@ fi
 # 3. Check for Active Locks
 echo -e "
 --- Active Locks ---"
-find "$LIB_PATH" -maxdepth 4 -name ".lock" 2>/dev/null
+LOCK_COUNT=0
+while IFS= read -r lockfile; do
+    [[ -z "$lockfile" ]] && continue
+    ((LOCK_COUNT++)) || true
+    # D3: Show lock holder info and whether PID is still alive
+    lock_info=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(f'pid={d.get(\"pid\",\"?\")} session={d.get(\"session\",\"?\")} ts={d.get(\"timestamp\",\"?\")}')" "$lockfile" 2>/dev/null || echo "unreadable")
+    lock_pid=$(echo "$lock_info" | grep -oP 'pid=\K[0-9]+' || echo "")
+    if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
+        echo "  [ACTIVE] $lockfile ($lock_info)"
+    else
+        echo "  [STALE]  $lockfile ($lock_info)"
+    fi
+done < <(find "$LIB_PATH" -maxdepth 4 -name ".lock" 2>/dev/null)
+if [[ $LOCK_COUNT -eq 0 ]]; then
+    echo "  (none)"
+fi

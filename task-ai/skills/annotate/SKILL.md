@@ -68,23 +68,24 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 ## Execution Steps
 
 1. **Acquire `.working/.lock`** — if lock is held (e.g., auto is running), REJECT immediately (fast-fail, no queue). See §Concurrency
-2. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once
-3. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. Reject if any path escapes (prevents path traversal)
-4. **Determine file layer** for each annotation (Requirement / Planning / Evaluation / Methodology / Information)
-5. **Read `.status.json`** — validate status is not terminal (`complete` / `cancelled` / `stage-done`). If terminal, REJECT
+2. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once. If any JSONL line fails to parse or is missing required fields, **release `.working/.lock`** and REJECT with error identifying the malformed line
+3. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. If any path escapes, **release `.working/.lock`** and REJECT (prevents path traversal)
+4. **Determine file layer** for each annotation (Requirement / Planning / Evaluation / Methodology / Information). Files that don't match any known layer default to Information (lowest impact)
+5. **Read `.status.json`** — validate status is not terminal (`complete` / `cancelled`). If terminal, **release `.working/.lock`** and REJECT. Note: `stage-done` is non-terminal and accepts annotations
 6. **Read context files**: `.target.md` + `.plan.md` + `.test/` (latest criteria)
 7. **Read** the annotated source file(s)
 8. **Content sanitization**: strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (U+0000–U+001F except `\n` and `\t`, and U+007F) from annotation content before writing. Preserve markdown formatting and visible text
 9. **Triage** each annotation by type × file layer
 10. **Cross-impact assessment** (based on file layer × annotation type — see §Cross-Impact Assessment)
 11. **Execute changes**: write to source file. Comment annotations append `> 💬`/`> 📝` blockquotes — never modify existing content. Apply modify-type annotations in reverse cursor order (see `references/annotation-processing.md` §Batch ordering)
-12. **Update `.status.json`** per State Transitions (three-dimensional: `status × file_layer × annotation_type`):
+12. **Update `.status.json`** (atomic write via `.status.json.tmp` + rename) per State Transitions (three-dimensional: `status × file_layer × annotation_type`):
     - If new status is `re-planning`, set `phase: needs-check`
+    - If status is unchanged (including `stage-done`), preserve existing `phase`
     - Otherwise clear `phase` to `""`
     - Update `updated` timestamp
 13. **Write `.summary.md`** with condensed context reflecting annotation changes
 14. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value). Capture cross-impact assessment reasoning. Inline call failure MUST NOT block annotate's main flow
-15. **Git commit**: `task-ai(<notebook>):annotate annotations processed`
+15. **Git commit** (skip if all annotations were unresolvable and no files changed): `task-ai(<notebook>):annotate annotations processed`
 16. **Write `.auto-signal`** (route `next` by file layer — see §.auto-signal Routing)
 17. **Generate execution report** (print to screen)
 18. **Release `.working/.lock`**
@@ -103,7 +104,8 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | → `re-planning` | = `executing` | Heaviest case: mid-execution requirement change |
 | `re-planning` | = `re-planning` | = `re-planning` | Continue revision |
 | `blocked` | → `planning` | = `blocked` | Unblocking |
-| `complete`/`cancelled`/`stage-done` | REJECT | REJECT | Terminal states |
+| `stage-done` | = `stage-done` | = `stage-done` | Non-terminal; annotations preserved for next stage |
+| `complete`/`cancelled` | REJECT | REJECT | Terminal states |
 
 > **`planning` does not jump to `re-planning`**: `re-planning` presumes a reviewed plan exists. In `planning`, the plan may be a draft or absent. plan skill in `re-planning` runs gap analysis (assumes reviewed plan), while in `planning` it runs full planning. Jumping would cause plan skill to incorrectly downgrade. plan skill reads `.target.md` fresh each run — requirement changes are absorbed naturally.
 
@@ -117,7 +119,8 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | → `re-planning` | = `executing` | Mid-execution plan change |
 | `re-planning` | = `re-planning` | = `re-planning` | Continue revision |
 | `blocked` | → `planning` | = `blocked` | Unblocking |
-| `complete`/`cancelled`/`stage-done` | REJECT | REJECT | Terminal states |
+| `stage-done` | = `stage-done` | = `stage-done` | Non-terminal; annotations preserved for next stage |
+| `complete`/`cancelled` | REJECT | REJECT | Terminal states |
 
 ### Evaluation Layer — `.analysis/*.md`, `.test/*.md`
 
@@ -126,9 +129,10 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | `.analysis/*.md` | = `executing` (mark re-check) | = `executing` |
 | `executing` | `.test/*.md` | = `executing` (mark re-verify) | = `executing` |
 | `review` | `.analysis/*.md` | → `re-planning` | = `review` |
-| other | any evaluation file | = (keep current) | = (keep current) |
+| other (non-terminal) | any evaluation file | = (keep current) | = (keep current) |
+| `complete`/`cancelled` | any | REJECT | REJECT |
 
-> Evaluation layer annotations typically don't trigger `re-planning` directly — they flag for re-check/re-verify at the next verify/check run. Exception: review status + analysis modification = conclusion overturned → `re-planning`.
+> Terminal states are rejected at step 5 before reaching this table. Evaluation layer annotations typically don't trigger `re-planning` directly — they flag for re-check/re-verify at the next verify/check run. Exception: review status + analysis modification = conclusion overturned → `re-planning`.
 
 ### Methodology Layer — `.type-profile.md`
 
@@ -193,11 +197,13 @@ The `next` field routes by **(file layer, current status)**. Comment-only annota
 | Requirement `.target.md` | `review`/`executing` | `check` | Reviewed plan needs re-checking against changed requirements |
 | Requirement `.target.md` | `re-planning` | `check` | Requirements changed during re-planning, re-check needed |
 | Requirement `.target.md` | `blocked` | `plan` | Unblocking via requirement change, needs planning |
+| Requirement `.target.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
 | Planning `.plan.md` | `draft` | `plan` | Plan annotation triggers planning phase |
 | Planning `.plan.md` | `planning` | `check` | Plan modified, needs review |
 | Planning `.plan.md` | `review`/`executing` | `check` | Same |
 | Planning `.plan.md` | `re-planning` | `check` | Plan revised during re-planning, re-check needed |
 | Planning `.plan.md` | `blocked` | `plan` | Unblocking via plan change, needs planning |
+| Planning `.plan.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
 | Evaluation `.analysis/*` | any | `check` | Evaluation conclusion challenged |
 | Evaluation `.test/*` | any | `verify` | Test criteria/results changed |
 | Methodology `.type-profile.md` | any | `verify` | Methodology change affects verification |

@@ -27,7 +27,7 @@ arguments:
     required: false
     default: gap
   - name: caller
-    description: "Calling phase: target (default), plan, test, verify, check, exec, or library — determines output routing"
+    description: "Calling phase: target (default), plan, test, verify, check, exec, library, or audit — determines output routing"
     required: false
     default: target
   - name: phase
@@ -53,7 +53,7 @@ Collect external domain knowledge and organize it into `$NB_WORKSPACES_LIBRARY/.
 /task-ai:research "React Server Components" --scope deep
 
 # Notebook context (auto-detected or explicit)
-/task-ai:research [notebook] [--caller target|plan|test|verify|check|exec] [--phase objective|requirements] [--scope gap|deep]
+/task-ai:research [notebook] [--caller target|plan|test|verify|check|exec|library|audit] [--phase objective|requirements] [--scope gap|deep]
 ```
 
 ### Scope Modes
@@ -75,6 +75,8 @@ Collect external domain knowledge and organize it into `$NB_WORKSPACES_LIBRARY/.
 | `verify` | — | verify 内部检测到缺口 | `.references/testing-<type>.md` | `verify` |
 | `check` | — | check 内部检测到缺口 | `.references/<domain-standards>.md` | `check` |
 | `exec` | — | exec 内部遇到未知技术 | `.references/<impl-detail>.md` | `exec` |
+| `library` | — | library 维护触发 | `.references/<topic>.md` | `library` |
+| `audit` | — | 审计规则进化情报收集 | `.evolving-rules/`, `.test-corpus/` | `(stop)` |
 
 ## Trigger Rules
 

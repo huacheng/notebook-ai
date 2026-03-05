@@ -31,7 +31,7 @@ def rebuild_index():
             if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
             
             try:
-                content = p.read_text(encoding='utf-8')
+                content = p.read_text(encoding='utf-8', errors='ignore')
                 fm = parse_frontmatter(content)
                 
                 topic = fm.get('topic') or fm.get('title') or p.stem
@@ -56,13 +56,14 @@ def rebuild_index():
                 f.write('\n'.join(sorted(dir_rows)) + '\n')
             tmp_path.rename(index_md)
 
-    if master_rows:
-        # D3: Atomic write via tmp + rename
-        tmp_master = master_index_path.parent / '.master-index.md.tmp'
-        with open(tmp_master, 'w', encoding='utf-8') as f:
-            f.write("# Library Master Index\n\n| Topic | Type | Keywords | File Path | Source |\n|-------|------|----------|-----------|--------|\n")
+    # D1: Always write master index (even if empty) to ensure consistent state
+    tmp_master = master_index_path.parent / '.master-index.md.tmp'
+    with open(tmp_master, 'w', encoding='utf-8') as f:
+        f.write("# Library Master Index\n\n| Topic | Type | Keywords | File Path | Source |\n|-------|------|----------|-----------|--------|\n")
+        if master_rows:
             f.write('\n'.join(sorted(master_rows)) + '\n')
-        tmp_master.rename(master_index_path)
+    tmp_master.rename(master_index_path)
+    print(f"[rebuild-index] Master index: {len(master_rows)} entries")
 
 if __name__ == "__main__":
     rebuild_index()

@@ -191,6 +191,13 @@ def calculate_precision(rule_file: str, test_dir: str) -> float:
     if not pattern or pattern == '__audit_rule__':
         return 0.75  # Default for missing/audit patterns
 
+    # D3: Validate regex pattern before using it in re.search
+    try:
+        re.compile(pattern)
+    except re.error as e:
+        print(f"[ERROR] Invalid regex pattern in {rule_file}: {e}", file=sys.stderr)
+        return 0.0  # Invalid pattern gets worst score
+
     test_path = Path(test_dir)
     if not test_path.exists():
         return 0.75

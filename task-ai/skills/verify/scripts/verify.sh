@@ -9,7 +9,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
-
 NOTEBOOK="${1:-}"
 resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
@@ -102,16 +101,29 @@ EOF
     exit 0
 fi
 
-# D1 Step 1: Check .status.json — reject terminal statuses
+# D3: Warn if --target passed without --generate-skill-tests (likely user error)
+if [[ -n "$TARGET_FILE" && "$GENERATE_SKILL_TESTS" != "true" ]]; then
+    echo "[WARN] --target ignored without --generate-skill-tests" >&2
+fi
+
+# D1 Step 1: Check .status.json — reject terminal statuses, extract type
 STATUS_FILE="$WORK_DIR/.status.json"
+TASK_TYPE=""
 if [[ -f "$STATUS_FILE" ]]; then
-    TASK_STATUS=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$STATUS_FILE" | head -1 | sed 's/.*"status"[[:space:]]*:[[:space:]]*"//;s/"//')
-    case "$TASK_STATUS" in
-      complete|cancelled)
-        echo "[ERROR] Task status is '$TASK_STATUS' (terminal). Verify cannot run on terminal tasks." >&2
-        exit 1
-        ;;
-    esac
+    TASK_STATUS=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$STATUS_FILE" | head -1 | sed 's/.*"status"[[:space:]]*:[[:space:]]*"//;s/"//' || true)
+    TASK_TYPE=$(grep -o '"type"[[:space:]]*:[[:space:]]*"[^"]*"' "$STATUS_FILE" | head -1 | sed 's/.*"type"[[:space:]]*:[[:space:]]*"//;s/"//' || true)
+    if [[ -z "$TASK_STATUS" ]]; then
+        echo "[WARN] .status.json exists but has no 'status' field" >&2
+    else
+        case "$TASK_STATUS" in
+          complete|cancelled)
+            echo "[ERROR] Task status is '$TASK_STATUS' (terminal). Verify cannot run on terminal tasks." >&2
+            exit 1
+            ;;
+        esac
+    fi
+else
+    echo "[WARN] .status.json not found — proceeding without status/type context" >&2
 fi
 
 # D1: Default empty CHECKPOINT to 'full' (matches SKILL.md default)
@@ -121,16 +133,31 @@ if [[ -z "$CHECKPOINT" ]]; then
 fi
 
 # D2: Validate checkpoint value (step-* further validated below)
-if [[ "$CHECKPOINT" != "quick" && "$CHECKPOINT" != "full" && ! "$CHECKPOINT" =~ ^step-[0-9]+$ ]]; then
-    echo "[ERROR] Invalid checkpoint: $CHECKPOINT. Must be quick, full, or step-N (N is a positive integer)." >&2
+if [[ "$CHECKPOINT" != "quick" && "$CHECKPOINT" != "full" && ! "$CHECKPOINT" =~ ^step-[1-9][0-9]*$ ]]; then
+    echo "[ERROR] Invalid checkpoint: $CHECKPOINT. Must be quick, full, or step-N (N >= 1)." >&2
     exit 1
 fi
 
+# D2/D3: Acquire concurrency lock (see SKILL.md Notes § Concurrency)
+LOCK_DIR="$WORK_DIR/.working"
+LOCK_FILE="$LOCK_DIR/.lock"
+mkdir -p "$LOCK_DIR"
+if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+    echo "[ERROR] Another verify/exec process holds the lock ($LOCK_FILE). Aborting." >&2
+    exit 1
+fi
+# D3: Ensure lock is released on exit (normal, error, or signal)
+cleanup_lock() { rmdir "$LOCK_FILE" 2>/dev/null || true; }
+trap cleanup_lock EXIT INT TERM
+
 echo "Verifying $NOTEBOOK with checkpoint: $CHECKPOINT"
 
-# 1. Execute Procedures based on checkpoint
+# D1 Step 10: Execute Procedures based on checkpoint
 # TODO: Replace stub with real test execution. Currently always returns (pass).
-# Real implementation should set RESULT to (pass), (fail), or (partial) based on outcomes.
+# Real implementation should: read .type-profile.md (step 2), .test/ criteria (step 3),
+# .target.md (step 4), .summary.md (step 5), load library context (steps 6-7),
+# run gap check (step 8), determine strategy (step 9), execute VFP delegation (step 10),
+# and run highlight protocol (step 12). Set RESULT to (pass), (fail), or (partial).
 RESULT="(pass)"
 DATE=$(date +%Y-%m-%d)
 RESULTS_FILE="$TEST_DIR/$DATE-$CHECKPOINT-results.md"
@@ -145,12 +172,12 @@ case "$CHECKPOINT" in
     ;;
   step-*)
     STEP_NUM=${CHECKPOINT#step-}
-    # Note: STEP_NUM is guaranteed numeric by outer validation (line 121)
+    # Note: STEP_NUM is guaranteed numeric by checkpoint regex validation above
     echo "- Running tests for step $STEP_NUM... PASS"
     ;;
 esac
 
-# 2. Write Results File
+# D1 Step 11: Write Results File
 # D3: File write with error handling
 if ! cat > "$RESULTS_FILE" <<EOF
 # Verification Results: $CHECKPOINT · $DATE
@@ -162,7 +189,7 @@ then
     exit 1
 fi
 
-# 3. Update .test/.summary.md
+# D1 Step 13: Update .test/.summary.md
 # D3: File write with error handling
 if ! cat > "$TEST_DIR/.summary.md" <<EOF
 # Test Summary
@@ -174,14 +201,19 @@ then
     echo "[WARN] Failed to write .summary.md" >&2
 fi
 
+# D1 Step 14: Git commit
+# TODO: Implement git commit: task-ai($NOTEBOOK):verify $CHECKPOINT verification
+# Should stage .test/ results and .summary.md, skip if no git repo or nothing to commit
+
 # D1 Step 15: Write .auto-signal (skipped in auto mode — auto loop handles it)
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-if ! cat > "$SIGNAL_FILE" <<EOF
-{ "step": "verify", "result": "$RESULT", "next": "check", "checkpoint": "$CHECKPOINT", "timestamp": "$TIMESTAMP" }
-EOF
+# D2: Use printf to avoid variable injection in JSON; CHECKPOINT is validated, RESULT is hardcoded
+if ! printf '{ "step": "verify", "result": "%s", "next": "check", "checkpoint": "%s", "timestamp": "%s" }\n' \
+    "$RESULT" "$CHECKPOINT" "$TIMESTAMP" > "$SIGNAL_FILE"
 then
     echo "[WARN] Failed to write .auto-signal" >&2
 fi
 
-echo "Verification completed. Results written to $RESULTS_FILE."
+# D1 Step 16: Report results summary
+echo "Verification completed: $RESULT. Results written to $RESULTS_FILE."

@@ -9,9 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
 # Security script for command verification
-SECURITY_SH="$SCRIPT_DIR/../../security/scripts/security.sh"
+SECURITY_SH="$TASK_AI_ROOT/skills/security/scripts/security.sh"
 
-# D2: Run command with security verification (Pre-hook per SKILL.md L74)
+# D2: Run command with security verification (Pre-hook per SKILL.md §Per-Step Execution, step 3)
 # Usage: run_secure_cmd "command" "notebook"
 # Returns: command exit code, or 1 if security rejected
 #
@@ -36,7 +36,7 @@ run_secure_cmd() {
     if [[ -f "$SECURITY_SH" ]]; then
         local security_result
         security_result=$(bash "$SECURITY_SH" "$notebook" verify-cmd "$cmd" 2>&1)
-        if echo "$security_result" | grep -qw "REJECT"; then
+        if [[ "$security_result" == *"REJECT"* ]]; then
             echo "[exec] SECURITY REJECT — command blocked by security policy" >&2
             echo "$security_result" >&2
             return 1
@@ -45,9 +45,8 @@ run_secure_cmd() {
         echo "[exec] WARN: security.sh not found, skipping security check" >&2
     fi
 
-    # D2: Execute command safely (avoid eval injection)
-    # Use bash -c with '--' to prevent option injection
-    bash -c -- "$cmd"
+    # D2: Execute command via bash -c (security pre-checked above)
+    bash -c "$cmd"
 }
 
 NOTEBOOK="${1:-}"
@@ -75,7 +74,7 @@ fi
 
 STATUS_JSON="$WORK_DIR/.status.json"
 SESSION_CONTEXT="$WORK_DIR/.session-context"
-STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+STATE_PY="$TASK_AI_ROOT/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 SUMMARY_FILE="$WORK_DIR/.summary.md"
@@ -85,6 +84,26 @@ mkdir -p "$NOTES_DIR"
 if [[ ! -f "$STATE_PY" ]]; then
     echo "[ERROR] state.py not found: $STATE_PY" >&2
     exit 1
+fi
+
+# D3/D2: Concurrency — acquire .working/.lock before proceeding (per SKILL.md)
+LOCK_FILE="$WORK_DIR/.lock"
+cleanup_lock() { rm -f "$LOCK_FILE"; }
+trap cleanup_lock EXIT
+if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+    # D3: Stale lock recovery — check if holding PID is still alive
+    existing_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+    if [[ -n "$existing_pid" ]] && ! kill -0 "$existing_pid" 2>/dev/null; then
+        echo "[WARN] Removing stale .lock (PID $existing_pid is dead)" >&2
+        rm -f "$LOCK_FILE"
+        if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+            echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+            exit 1
+        fi
+    else
+        echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+        exit 1
+    fi
 fi
 
 # D1: Step 1 — Validate status is 'review' or 'executing'
@@ -97,12 +116,15 @@ fi
 # D1: Step 2 — Validate dependency gate
 DEPENDS_ON=$(python3 "$STATE_PY" get "$STATUS_JSON" depends_on 2>/dev/null || echo "")
 if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "None" && "$DEPENDS_ON" != "[]" ]]; then
-    echo "[INFO] Dependency check: depends_on=$DEPENDS_ON (full validation delegated to Claude agent)"
+    echo "[GATE] Dependency check required: depends_on=$DEPENDS_ON (full validation delegated to Claude agent)"
 fi
 
 # D1: Step 3 — Transition status to 'executing', clear phase
 if [[ "$CURRENT_STATUS" == "review" ]]; then
-    python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --phase "" 2>&1 || true
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status executing --phase "" 2>&1; then
+        echo "[ERROR] Failed to transition status to 'executing'" >&2
+        exit 1
+    fi
     echo "[exec] Status transitioned: review -> executing"
 fi
 
@@ -110,12 +132,13 @@ fi
 if [[ "$CURRENT_STATUS" == "executing" ]]; then
     echo "[exec] Resuming execution (NEEDS_FIX or continuation)."
     # Check for fix guidance files (Claude agent reads these for full context)
-    if [[ -d "$WORK_DIR/.bugfix" ]] && ls "$WORK_DIR/.bugfix/"*.md &>/dev/null; then
-        LATEST_BUGFIX=$(ls -t "$WORK_DIR/.bugfix/"*.md 2>/dev/null | head -1)
+    # D1: Sort by filename (reverse alpha) to match "most recent by filename date" per SKILL.md
+    LATEST_BUGFIX=$(find "$WORK_DIR/.bugfix" -maxdepth 1 -name '*.md' 2>/dev/null | sort -r | head -1)
+    if [[ -n "$LATEST_BUGFIX" ]]; then
         echo "[exec] Fix guidance available: $(basename "$LATEST_BUGFIX")"
     fi
-    if [[ -d "$WORK_DIR/.analysis" ]] && ls "$WORK_DIR/.analysis/"*.md &>/dev/null; then
-        LATEST_ANALYSIS=$(ls -t "$WORK_DIR/.analysis/"*.md 2>/dev/null | head -1)
+    LATEST_ANALYSIS=$(find "$WORK_DIR/.analysis" -maxdepth 1 -name '*.md' 2>/dev/null | sort -r | head -1)
+    if [[ -n "$LATEST_ANALYSIS" ]]; then
         echo "[exec] Analysis available: $(basename "$LATEST_ANALYSIS")"
     fi
 fi
@@ -130,7 +153,7 @@ fi
 if [[ ! -f "$WORK_DIR/.target.md" ]]; then
     echo "[WARN] .target.md not found — execution may lack requirements context" >&2
 fi
-if [[ ! -d "$WORK_DIR/.analysis" ]] || ! ls "$WORK_DIR/.analysis/"*.md &>/dev/null; then
+if [[ -z "$(find "$WORK_DIR/.analysis" -maxdepth 1 -name '*.md' 2>/dev/null | head -1)" ]]; then
     echo "[WARN] .analysis/ has no evaluation files — check may not have run" >&2
 fi
 
@@ -148,8 +171,9 @@ if [[ "$TOTAL_STEPS" -eq 0 ]]; then
 fi
 COMPLETED=$(python3 "$STATE_PY" get "$STATUS_JSON" completed_steps 2>/dev/null || echo "0")
 COMPLETED=${COMPLETED:-0}
-# D2: Validate COMPLETED contains only digits
+# D2: Validate COMPLETED contains only digits (D1/D6: warn on reset per SKILL.md)
 if [[ ! "$COMPLETED" =~ ^[0-9]+$ ]]; then
+    echo "[WARN] completed_steps value '$COMPLETED' is invalid (non-integer), resetting to 0" >&2
     COMPLETED=0
 fi
 
@@ -227,8 +251,9 @@ for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
     fi
 
     # 9.8 Record Notes
-    # D3: File write with error handling
-    if ! cat > "$NOTES_DIR/$DATE-step-$STEP-exec.md" <<EOF
+    # D3: Atomic file write with error handling
+    NOTE_FILE="$NOTES_DIR/$DATE-step-$STEP-exec.md"
+    if ! cat > "${NOTE_FILE}.tmp" <<EOF
 # Exec Note: Step $STEP
 - Status: Completed
 - Type: $TYPE
@@ -236,6 +261,8 @@ for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
 EOF
     then
         echo "[WARN] Failed to write exec note for step $STEP" >&2
+    else
+        mv "${NOTE_FILE}.tmp" "$NOTE_FILE"
     fi
 
     # 9.9 Update completed_steps
@@ -246,6 +273,9 @@ EOF
 
     echo "Step $STEP/$TOTAL_STEPS completed successfully."
 done
+
+# D1: Step 10 — Update .status.json timestamp after execution loop
+python3 "$STATE_PY" transition "$STATUS_JSON" --status executing 2>/dev/null || true
 
 # D1: Step 10 — Determine signal result before writing files
 if [[ -n "$TARGET_STEP" ]]; then

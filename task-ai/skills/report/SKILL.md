@@ -54,6 +54,10 @@ Generate a structured completion report for a task module, documenting what was 
 - **Duration**: <calculated>
 - **Type**: <task type>
 
+## Overview
+<!-- From .summary.md if exists — condensed context overview -->
+<!-- If .summary.md does not exist, omit this section -->
+
 ## Execution Timeline
 <!-- From .auto-timeline.md if exists (auto mode execution history) -->
 <!-- Include full table and flow line as-is -->
@@ -103,7 +107,7 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 7. **Read** `.analysis/` for evaluation history (all files, sorted by name, if exists)
 8. **Read** `.bugfix/` for issue history (all files, sorted by name, if exists)
 9. **Read** `.notes/` for research findings and experience log (all files, sorted by name, if exists)
-10. **Collect** git changes related to the task (if identifiable via `git log --oneline --all --fixed-strings --grep="task-ai(<notebook>)"`)
+10. **Collect** git changes related to the task (if identifiable via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"`)
 11. **Compose** report in requested format
 12. **Write** to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md`
 13. **Git commit**: `task-ai(<notebook>):report generate completion report`
@@ -144,5 +148,5 @@ Report is always a terminal step — `next` is always `(stop)`.
 - For `blocked` tasks, the report documents what was completed and what blocks remain
 - For `cancelled` tasks, the report documents the reason for cancellation
 - The report serves as a permanent record even after task files are archived
-- For `complete` tasks, report includes change history via `git log --oneline --all --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; works even after task branch deletion)
-- **Concurrency**: Report acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
+- For `complete` tasks, report includes change history via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; `--max-count=200` caps output for performance; works even after task branch deletion)
+- **Concurrency**: Report acquires `.working/.lock` before proceeding and releases on completion. Stale locks (holding PID is dead) are automatically recovered. (See Concurrency Protection in `commands/task-ai.md`)

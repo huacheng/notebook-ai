@@ -22,7 +22,7 @@ Request body for POST:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `taskDir` | string | (required) | Absolute path to notebook `.working/` directory in **main worktree** (e.g., `/nb-workspaces/auth-refactor/.working`). In worktree mode, this is still the main worktree path — NOT the task worktree path. Daemon's `fs.watch` monitors this path for `.auto-signal` |
+| `taskDir` | string | (required) | Absolute path to notebook `.working/` directory in **main worktree** (e.g., `/nb-workspaces/auth-refactor/.working`). In worktree mode, this is still the main worktree path — NOT the task worktree path. Daemon's `fs.watch` monitors this path for `.auto-signal`. **D2: Server MUST validate** that `taskDir` is under the configured `NB_WORKSPACES` root and ends with `/.working` — reject paths outside the workspace to prevent directory traversal |
 | `maxIterations` | number | 20 | Max plan/check/exec cycles before forced stop |
 | `timeoutMinutes` | number | 30 | Total execution time limit (minutes). User sets based on task difficulty |
 
@@ -100,7 +100,7 @@ On backend server restart, auto state is recovered from SQLite:
 
 1. **Read** all `task_auto` rows with `status = 'running'`
 2. **For each active row**:
-   2.1. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted agent from immediately exiting due to leftover stop file from pre-crash state)
+   2.1. **Delete stale files**: remove `.auto-stop` and `.auto-signal.tmp` if they exist in `task_dir` (prevents restarted agent from immediately exiting due to leftover stop file from pre-crash state; `.tmp` file indicates interrupted atomic write)
    2.2. Check session state via `ClaudeProcess`:
       - If agent process still alive (`session.agentProcess.isAlive()`) → re-establish monitoring (fs.watch + heartbeat)
       - If agent process exited → restart with backoff: send `/task-ai:auto` via `session.agentProcess.sendPrompt()` (agent's internal loop reads `.status.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection

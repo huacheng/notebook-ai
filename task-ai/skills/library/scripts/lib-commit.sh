@@ -18,10 +18,20 @@ if [[ "$1" == "--system" ]]; then
     COMMIT_PREFIX="task-ai(library)"
 else
     NOTEBOOK="$1"; shift
+    # D2: Validate notebook name to prevent commit message injection
+    if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[ERROR] Invalid notebook name: $NOTEBOOK" >&2
+        exit 1
+    fi
     COMMIT_PREFIX="task-ai($NOTEBOOK)"
 fi
 
 TYPE="$1"; shift
+# D2: Sanitize type and description for commit message safety
+if [[ ! "$TYPE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "[ERROR] Invalid commit type: $TYPE" >&2
+    exit 1
+fi
 DESC="$1"; shift
 FILES=("$@")
 

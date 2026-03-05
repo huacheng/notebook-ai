@@ -51,8 +51,8 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
    - Call `GET /api/task-auto/lookup?taskDir=<notebook_working_dir>` to find the session running this task's auto loop
    - If found (200): call `DELETE /api/sessions/<session_name>/task-auto`
    - If not found (404): no auto loop running, skip
-   - Delete `.auto-signal` file if exists
-   - Delete `.auto-stop` file if exists
+   - Delete `.working/.auto-signal` file if exists
+   - Delete `.working/.auto-stop` file if exists
    - Delete `.working/.lock` file if exists — first read lock content and verify the holder: (a) if holder `pid` is dead → delete lock (stale); (b) if holder `session` matches the auto session being cancelled → delete lock (same session); (c) if held by a **different live session** → REJECT with error identifying the holding session — user must stop that session first or use `cancel` from the holding session. Cancel does NOT force-override locks held by other live sessions to prevent concurrent write corruption
 4. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`). If lock is held by a different live session (not the auto session stopped in step 3), REJECT — user must stop that session first
 5. **If uncommitted changes exist**, git commit snapshot: `task-ai(<notebook>):cancel pre-cancel snapshot`
@@ -60,7 +60,7 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
    - Set `status` to `cancelled`
    - Update `updated` timestamp
    - If `--reason` provided, add `"cancel_reason"` field with the sanitized reason text
-7. **Write** `.summary.md` with condensed context: current status, cancellation reason, progress at time of cancellation (`completed_steps`), any known issues
+7. **Write** `.summary.md` with condensed context: previous status (before cancellation), cancellation reason, progress at time of cancellation (`completed_steps`), any known issues
 8. **Git commit**: `task-ai(<notebook>):cancel user cancelled`
 9. **Release** `.working/.lock`
 10. **If `--cleanup`**:
@@ -101,3 +101,4 @@ None — `cancel` does not write `.auto-signal`. It is a lifecycle-terminating c
 - Without `--cleanup`, the branch and worktree are preserved for reference
 - A cancelled task can be referenced by `report` for documentation purposes
 - **Concurrency**: Cancel acquires `.working/.lock` before modifying files and releases on completion (see Concurrency Protection in `commands/task-ai.md`). Lock cleanup for the auto session (step 3) is separate from cancel's own lock acquisition (step 4)
+- **Cleanup after lock release**: `--cleanup` (step 10) runs after lock release (step 9). This is intentional — worktree/branch removal is a git-level operation that does not modify `.working/` files. The brief window between lock release and cleanup is an accepted risk

@@ -7,8 +7,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Defaults
 DOMAIN=""
 OUTPUT_DIR=""
@@ -17,8 +15,8 @@ DRY_RUN=false
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --domain)  DOMAIN="$2"; shift 2 ;;
-        --output)  OUTPUT_DIR="$2"; shift 2 ;;
+        --domain)  [[ $# -ge 2 ]] || { echo "[ERROR] --domain requires a value" >&2; exit 1; }; DOMAIN="$2"; shift 2 ;;
+        --output)  [[ $# -ge 2 ]] || { echo "[ERROR] --output requires a value" >&2; exit 1; }; OUTPUT_DIR="$2"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -52,7 +50,7 @@ generate_sample_id() {
     local prefix="$1"
     local timestamp
     timestamp=$(date +%Y%m%d%H%M%S)
-    echo "${prefix}-${timestamp}-$(head -c2 /dev/urandom | od -An -tx1 | tr -d ' ')"
+    echo "${prefix}-${timestamp}-$(head -c2 /dev/urandom | od -An -tx1 | tr -d ' \t\n')"
 }
 
 # Create positive sample with CAUTION warning (D2 Security)

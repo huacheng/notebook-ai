@@ -40,7 +40,7 @@ After compaction (either active or system), the agent re-reads:
 - `.status.json` — status
 - `.summary.md` — task context (Recovery Header provides quick orientation)
 
-See "Compaction recovery" in Context Advantage section of main SKILL.md.
+See "Compaction recovery" in "Context Window Management & Quota Handling" section of main SKILL.md.
 
 ## Daemon Compaction Detection
 
@@ -58,9 +58,8 @@ const COMPACTION_INDICATORS = [
 
 function detectCompaction(output: string): boolean {
   const lower = output.toLowerCase();
-  return COMPACTION_INDICATORS.some(indicator =>
-    lower.includes(indicator.toLowerCase())
-  );
+  // D6: toLowerCase() normalizes the output; indicators are pre-lowercased constants
+  return COMPACTION_INDICATORS.some(indicator => lower.includes(indicator));
 }
 ```
 

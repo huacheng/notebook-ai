@@ -5,6 +5,12 @@
 
 set -euo pipefail
 
+# D3: Verify bc is available (used for floating-point arithmetic)
+if ! command -v bc &>/dev/null; then
+    echo "[ERROR] 'bc' is required but not installed." >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORE_DIR="$SCRIPT_DIR/../../../core"
 
@@ -17,6 +23,19 @@ EXPERIENCES_DIR="$LIB_PATH/.memory/.experiences"
 SKILLS_DIR="$LIB_PATH/.skills"
 CANDIDATES_DIR="$SKILLS_DIR/.candidates"
 CHANGELOG="$LIB_PATH/.changelog"
+
+# D2: Trap to clean up lock files owned by this process on unexpected exit
+_cleanup_locks() {
+    local lock_file="$LIB_PATH/.changelog.lock"
+    if [[ -f "$lock_file" ]]; then
+        local lock_pid
+        lock_pid=$(grep -o '"pid":[0-9]*' "$lock_file" 2>/dev/null | grep -o '[0-9]*' || true)
+        if [[ "$lock_pid" == "$$" ]]; then
+            rm -f "$lock_file" 2>/dev/null || true
+        fi
+    fi
+}
+trap _cleanup_locks EXIT
 
 # Thresholds
 MIN_USAGE_COUNT=3
@@ -53,9 +72,11 @@ parse_frontmatter() {
     local file="$1"
     local field="$2"
 
-    # Extract YAML frontmatter between --- markers
-    sed -n '/^---$/,/^---$/p' "$file" 2>/dev/null | \
-        grep -E "^${field}:" | \
+    # D3: Extract YAML frontmatter between first two --- markers only
+    # Uses awk to stop after the closing ---, avoiding false matches in body
+    # D2: Use -F (fixed-string) for field match to avoid regex injection from field names
+    awk 'NR==1 && /^---$/{f=1;next} f && /^---$/{exit} f' "$file" 2>/dev/null | \
+        grep -F "${field}:" | grep -E "^${field}:" | head -1 | \
         sed "s/^${field}:[[:space:]]*//" | \
         tr -d '"' | tr -d "'"
 }
@@ -73,10 +94,11 @@ count_usage() {
         return
     fi
 
-    # Count references in changelog (library search hits, etc.)
-    # D1: use -F for fixed-string match (paths contain regex metachar '.')
+    # D1: Count only 'referenced' type entries in changelog (actual usage by other tasks).
+    # Excludes the initial experience/skill-candidate write entries which are not real usage.
+    # Uses -F for fixed-string match (paths contain regex metachar '.').
     local count
-    count=$(grep -cF "$relative_path" "$CHANGELOG" 2>/dev/null || echo 0)
+    count=$(grep -F "$relative_path" "$CHANGELOG" 2>/dev/null | grep -c '| referenced |' 2>/dev/null || echo 0)
     echo "$count"
 }
 
@@ -86,8 +108,9 @@ count_usage() {
 has_structural_patterns() {
     local file="$1"
 
-    # Check for "## Patterns" or "## Steps" headers
-    # §3.7 trigger condition 3: "## Patterns" or "## Steps" headers
+    # Check for "## Patterns" or "## Steps" headers (prefix match — also matches
+    # "## Patterns Discovered" and similar variants, which is intentional)
+    # §3.7 trigger condition 3
     if grep -qE '^## (Patterns|Steps)' "$file" 2>/dev/null; then
         return 0
     fi
@@ -116,14 +139,23 @@ generate_slug() {
     local basename
     basename=$(basename "$file" .md)
 
-    # Remove common suffixes
+    # Remove common suffixes (order matters: strip -complete first, then stage prefix)
     basename="${basename%-complete}"
     basename="${basename%-impl}"
     basename="${basename%-verify}"
     basename="${basename%-adhoc}"
+    # D6: Strip -stage-N suffix (e.g., "notebook-stage-2" → "notebook")
+    basename=$(echo "$basename" | sed 's/-stage-[0-9]\+$//')
 
     # Convert to kebab-case
-    echo "$basename" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr ' ' '-'
+    local slug
+    slug=$(echo "$basename" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr ' ' '-')
+
+    # D3: Validate slug is non-empty after suffix stripping
+    if [[ -z "$slug" ]]; then
+        slug="unnamed-experience"
+    fi
+    echo "$slug"
 }
 
 #######################################
@@ -146,7 +178,7 @@ extract_skill_content() {
 
     # Extract key sections
     local patterns=""
-    local steps=""
+    local what_worked=""
     local context=""
 
     # Extract ## Patterns or ## Patterns Discovered
@@ -154,9 +186,9 @@ extract_skill_content() {
         patterns=$(extract_section "$exp_file" "Patterns")
     fi
 
-    # Extract ## What Worked
+    # D6: Extract ## What Worked (maps to "## Steps" in generated skill)
     if grep -q "^## What Worked" "$exp_file"; then
-        steps=$(extract_section "$exp_file" "What Worked")
+        what_worked=$(extract_section "$exp_file" "What Worked")
     fi
 
     # Extract ## Context
@@ -164,11 +196,15 @@ extract_skill_content() {
         context=$(extract_section "$exp_file" "Context")
     fi
 
+    # D2: Sanitize context snippet for YAML — remove quotes, colons at line start, and special chars
+    local safe_context
+    safe_context=$(echo "${context:0:100}" | tr -d '"'"'"'`' | tr '\n' ' ' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
     # Generate SKILL.md content
     cat <<EOF
 ---
 name: $skill_name
-description: "Auto-generated skill from verified experience. $(echo "${context:0:100}" | tr -d '"')"
+description: "Auto-generated skill from verified experience. $safe_context"
 model_tier: medium
 auto_delegatable: false
 triggers:
@@ -191,7 +227,7 @@ $context
 
 ## Steps
 
-$steps
+$what_worked
 
 ## Patterns
 
@@ -378,7 +414,7 @@ process_experience() {
     # D3: file writes — stderr must NOT mix into stdout (heredoc content)
     if ! extract_skill_content "$exp_file" "$slug" > "$candidate_dir/SKILL.md"; then
         echo "[promote]   ERROR: Failed to write SKILL.md" >&2
-        rm -rf "$candidate_dir"
+        rm -r "$candidate_dir"
         return 1
     fi
     if ! generate_trust_report "$exp_file" "$slug" "$usage_count" > "$candidate_dir/trust-report.md"; then
@@ -411,6 +447,16 @@ EOF
         if ( set -o noclobber; echo "{\"pid\":$$,\"session\":\"promote\",\"timestamp\":\"$(date -Iseconds)\"}" > "$changelog_lock" ) 2>/dev/null; then
             lock_acquired=true
             break
+        fi
+        # D3: Detect stale lock — if lock holder PID is dead, remove and retry
+        if [[ -f "$changelog_lock" ]]; then
+            local lock_pid
+            lock_pid=$(grep -o '"pid":[0-9]*' "$changelog_lock" 2>/dev/null | grep -o '[0-9]*' || true)
+            if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
+                echo "[promote]   Removing stale lock (pid $lock_pid is dead)" >&2
+                rm -f "$changelog_lock"
+                continue
+            fi
         fi
         sleep 0.2
         ((retry++)) || true
@@ -451,7 +497,8 @@ else
             if process_experience "$exp_file"; then
                 ((PROMOTED_COUNT++)) || true
             fi
-        done < <(find "$EXPERIENCES_DIR" -name "*.md" -type f ! -name ".index.md" ! -name ".summary.md" -print0 2>/dev/null)
+        # D4: Exclude index/summary files and stage-complete synthesis files (not individual experiences)
+        done < <(find "$EXPERIENCES_DIR" -name "*.md" -type f ! -name ".index.md" ! -name ".summary.md" ! -name "*-stage-*-complete.md" -print0 2>/dev/null)
     fi
 fi
 

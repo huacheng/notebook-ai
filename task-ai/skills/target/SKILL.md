@@ -20,7 +20,7 @@ arguments:
     description: "The task goal, requirements, and constraints (optional — omit to read current target)"
     required: false
   - name: --refine
-    description: "Append a refinement to existing target (used by agent during target-refinement phase)"
+    description: "Append a refinement to existing target (used by agent during target-refinement phase). Requires a value argument: --refine \"content\""
     required: false
   - name: --finalize
     description: "Exit target-refinement phase, signal target is ready for planning"
@@ -57,7 +57,7 @@ When `/target "..."` is called with content, the system enters **target-refineme
    - Refinements are appended to `## Refinements` section in `.target.md`
 3. **Exit**: `/plan` or `/target --finalize` clears `.session-context`
 
-### Agent Behavior (Prompt Injection)
+### Agent Behavior (Context Augmentation)
 
 When `.session-context` exists with `phase: target-refinement`, the agent receives:
 ```
@@ -85,7 +85,11 @@ Build a JWT authentication system
 
 ## Requirements
 
-<!-- ... -->
+<!-- List specific requirements -->
+
+## Constraints
+
+<!-- Any constraints or limitations -->
 ```
 
 ## Execution Steps
@@ -148,9 +152,9 @@ Build a JWT authentication system
 
 | Command | Type | Scope | Subject |
 | :--- | :--- | :--- | :--- |
-| `target` | `target` | `state` | `target update objective` |
-| `target --refine` | `target` | `state` | `target refine objective` |
-| `target` (stage advance) | `target` | `state` | `target stage <N+1> defined` |
+| `target` | `target` | `<notebook>` | `target update objective` |
+| `target --refine` | `target` | `<notebook>` | `target refine objective` |
+| `target` (stage advance) | `target` | `<notebook>` | `target stage <N+1> defined` |
 
 ## Notes
 

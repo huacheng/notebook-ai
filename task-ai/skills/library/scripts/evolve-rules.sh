@@ -61,9 +61,13 @@ for domain in "${DOMAINS[@]}"; do
     ACTIVE_DIR="$EVOLVING_RULES_DIR/$domain/active"
     REVIEW_DIR="$EVOLVING_RULES_DIR/$domain/review"
 
-    CANDIDATE_COUNT=$(find "$CANDIDATES_DIR" -name "*.yaml" 2>/dev/null | wc -l || echo 0)
-    ACTIVE_COUNT=$(find "$ACTIVE_DIR" -name "*.yaml" 2>/dev/null | wc -l || echo 0)
-    REVIEW_COUNT=$(find "$REVIEW_DIR" -name "*.yaml" 2>/dev/null | wc -l || echo 0)
+    CANDIDATE_COUNT=$(find "$CANDIDATES_DIR" -name "*.yaml" 2>/dev/null | wc -l)
+    ACTIVE_COUNT=$(find "$ACTIVE_DIR" -name "*.yaml" 2>/dev/null | wc -l)
+    REVIEW_COUNT=$(find "$REVIEW_DIR" -name "*.yaml" 2>/dev/null | wc -l)
+    # D3: Trim whitespace from wc -l output (macOS wc pads with spaces)
+    CANDIDATE_COUNT="${CANDIDATE_COUNT// /}"
+    ACTIVE_COUNT="${ACTIVE_COUNT// /}"
+    REVIEW_COUNT="${REVIEW_COUNT// /}"
 
     echo "  $domain: candidates=$CANDIDATE_COUNT, active=$ACTIVE_COUNT, review=$REVIEW_COUNT"
 done

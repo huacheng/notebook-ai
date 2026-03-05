@@ -18,6 +18,7 @@ derive_phase() {
         review|executing) echo "execution" ;;
         blocked) echo "execution" ;;
         complete|stage-done) echo "finalization" ;;
+        cancelled) echo "terminal" ;;
         *) echo "unknown" ;;
     esac
 }
@@ -31,11 +32,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 resolve_workdir ""
-NOTEBOOK="$NB_NOTEBOOK"
 STATUS_JSON="$WORK_DIR/.status.json"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 STOP_FILE="$WORK_DIR/.auto-stop"
-STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+# D6: Use SCRIPT_DIR for consistent path construction
+STATE_PY="$SCRIPT_DIR/../../../core/state.py"
+STATE_PY="$(cd "$(dirname "$STATE_PY")" && pwd)/$(basename "$STATE_PY")"
 
 if [[ ! -d "$WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
@@ -79,11 +81,24 @@ echo "Auto-mode: Starting loop from status: $STATUS (phase: $PHASE)"
 
 # 3. Determine next step based on status (D1-1: handle all statuses per SKILL.md)
 # D3: Recover iteration/compaction from existing signal if resuming
+# D4: Single python3 call to parse both fields (avoid reading file twice)
 ITERATION=1
 COMPACTION=0
 if [[ -f "$SIGNAL_FILE" ]]; then
-    ITERATION=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('iteration',1))" "$SIGNAL_FILE" 2>/dev/null || echo "1")
-    COMPACTION=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('compaction_count',0))" "$SIGNAL_FILE" 2>/dev/null || echo "0")
+    SIGNAL_RECOVERY=$(python3 -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    print(d.get('iteration', 1), d.get('compaction_count', 0))
+except Exception:
+    print('1 0')
+" "$SIGNAL_FILE" 2>/dev/null || echo "1 0")
+    ITERATION=$(echo "$SIGNAL_RECOVERY" | awk '{print $1}')
+    COMPACTION=$(echo "$SIGNAL_RECOVERY" | awk '{print $2}')
+    # D3: Validate recovered values are integers, fall back to defaults
+    [[ "$ITERATION" =~ ^[0-9]+$ ]] || ITERATION=1
+    [[ "$COMPACTION" =~ ^[0-9]+$ ]] || COMPACTION=0
 fi
 
 case "$STATUS" in
@@ -91,6 +106,11 @@ case "$STATUS" in
     # Phase 1: Check target status before routing
     TARGET_MD="$WORK_DIR/.target.md"
     if [[ -f "$TARGET_MD" ]]; then
+        # D1: Validate substantive content before any routing (per SKILL.md §Entry Point)
+        if [[ ! -s "$TARGET_MD" ]] || ! grep -qE '^##' "$TARGET_MD"; then
+            echo "[ERROR] .target.md is empty or has no sections — fill target before running auto"
+            exit 1
+        fi
         if grep -q '\[PROPOSED\]' "$TARGET_MD"; then
             echo "[PAUSE] Pending [PROPOSED] items in .target.md — review and confirm before continuing"
             exit 0
@@ -123,7 +143,8 @@ case "$STATUS" in
         RESULT="(pass)"
         NEXT_STEP="check"
         ;;
-      *)
+      needs-plan|""|*)
+        # D1: Explicitly match needs-plan per SKILL.md §Entry Point; empty/unknown defaults to plan
         STEP="plan"
         RESULT="(generated)"
         NEXT_STEP="check"

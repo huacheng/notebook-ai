@@ -36,7 +36,8 @@ Execute the implementation plan for a task module that has passed evaluation.
 ## Prerequisites
 
 - Task module must have status `review` (post-plan check passed) or `executing` (NEEDS_FIX continuation)
-- `.target.md` and at least one plan file must exist
+- `.target.md` should exist (warning if missing — provides requirements context)
+- At least one plan file (`.plan.md`) must exist
 - `.analysis/` should contain a PASS evaluation file (warning if empty/missing)
 - **Dependency gate**: All `depends_on` modules must meet their required status — simple string entries require `complete`, extended `{ module, min_status }` entries require at-or-past `min_status` (see depends_on Format in `commands/task-ai.md`). If any dependency is not met, exec REJECTS with error listing blocking dependencies and their current statuses
 
@@ -81,7 +82,7 @@ For each implementation step:
 7. **Verify** the step succeeded against `.test/` criteria using **domain-appropriate verification** (see per-type seed file or `.type-profile.md` for domain verification methods)
 8. **Record** what was done (files changed, commands run, tools invoked, approach taken)
 9. **Create** `.notes/<YYYY-MM-DD>-<summary>-exec.md` when implementation deviates from plan, an unexpected workaround is needed, or a non-obvious API behavior is discovered. Skip for straightforward steps that follow the plan exactly. For software types, include a **VFP Cycle Summary** section per step: `Red (N failing) → Green (N passing) → Refactor (yes/no)`
-10. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
+10. **Update** `.summary.md` (task-level) — overwrite with condensed summary including ALL notes from `.notes/`
 
 ### Issue Handling
 
@@ -177,5 +178,5 @@ For long-running executions, intermediate progress can be observed by:
 - **Experience invalidation**: If implementation reveals that a previously loaded experience file (`<notebook>-impl.md`, `-verify.md`, or `-eval.md`) provided guidance that contradicts actual runtime behavior (e.g., documented API signature doesn't match, performance claim is wrong), set `quality_status: invalidated` on that file — acquire `.memory/.experiences/.lock` → update frontmatter → write atomically (`.tmp → rename`) → append `experience` changelog line with tag `quality_status:invalidated` → release lock
 - **Concurrency**: Exec acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
 - **Reference collection**: Primary reference collection is handled by the `research` sub-command before planning. During execution, if you discover valuable implementation details via web searches, you may still save findings to `$NB_WORKSPACES_LIBRARY/.memory/.references/` — follow the full six-step Library Write Protocol (see `skills/library/SKILL.md`): acquire `.memory/.references/.lock` → sanitize content (ten categories, `references/injection-rules.md`) → apply source classification (`references/blocked-sources.md`) → write atomically → append `reference` changelog line → update `.memory/.references/.index.md` → release lock
-- **verify integration**: Per-step verification can optionally invoke `verify --checkpoint step-N` for domain-specific testing. For lightweight checks (build + lint), inline verification is sufficient
+- **`/task-ai:verify` integration**: Per-step verification can optionally invoke `verify --checkpoint step-N` for domain-specific testing. For lightweight checks (build + lint), inline verification is sufficient
 - **Auto-mode safety boundaries**: When exec runs within `auto` mode (unattended), the following operations are PROHIBITED unless the plan explicitly calls for them: modifying `.env` or credential files, running destructive commands (`rm -rf`, `git push --force`, `DROP TABLE`), installing system-level packages (`apt install`, `brew install`), sending external requests (email, webhook, API calls to production). Violation → stop execution and signal `(mid-exec)` for human review

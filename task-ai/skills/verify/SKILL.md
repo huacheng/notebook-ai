@@ -19,7 +19,7 @@ arguments:
     description: "Notebook name (e.g., auth-refactor)"
     required: false
   - name: checkpoint
-    description: "Verification scope: quick, full, or step-N"
+    description: "Verification scope: quick, full, or step-N (N >= 1)"
     required: false
     default: full
   - name: generate-skill-tests
@@ -52,7 +52,7 @@ When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, veri
 |------------|----------|-------|
 | `quick` | Lightweight check during execution | build + lint + type check |
 | `full` | Comprehensive post-execution verification | All `.test/` criteria + acceptance tests + regression tests |
-| `step-N` | Per-step verification during exec | Only criteria related to step N |
+| `step-N` | Per-step verification during exec (N >= 1) | Only criteria related to step N |
 
 ## Execution Steps
 

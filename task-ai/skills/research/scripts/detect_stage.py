@@ -2,14 +2,30 @@
 import sys
 import os
 
+MAX_FILE_SIZE = 1_048_576  # 1 MB safety limit (D2)
+
 def detect_stage(target_md_path):
     if not os.path.exists(target_md_path):
         print(f"ERROR: file {target_md_path} not found", file=sys.stderr)
         sys.exit(1)
 
-    with open(target_md_path, 'r', encoding='utf-8') as f:
-        t = f.read()
-    
+    # D2: Check file size before reading to prevent memory exhaustion
+    try:
+        file_size = os.path.getsize(target_md_path)
+        if file_size > MAX_FILE_SIZE:
+            print(f"ERROR: file too large ({file_size} bytes > {MAX_FILE_SIZE})", file=sys.stderr)
+            sys.exit(1)
+    except OSError as e:
+        print(f"ERROR: cannot stat {target_md_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        with open(target_md_path, 'r', encoding='utf-8') as f:
+            t = f.read()
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"ERROR: cannot read {target_md_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
     has_ri = '## Research Insights' in t
     has_o1 = '### O1:' in t
     has_o2 = '### O2:' in t
@@ -17,9 +33,9 @@ def detect_stage(target_md_path):
 
     def get_proposed_in_section(text, start_marker, next_marker=None):
         if start_marker not in text: return False
-        section = text.split(start_marker)[1]
+        section = text.split(start_marker, 1)[1]
         if next_marker and next_marker in section:
-            section = section.split(next_marker)[0]
+            section = section.split(next_marker, 1)[0]
         return '[PROPOSED]' in section
 
     if not has_ri or not has_o1:

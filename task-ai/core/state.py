@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import re
 import sys
 import argparse
 import os
@@ -38,7 +39,10 @@ def get_lock(status_path):
         sys.exit(1)
 
 def release_lock(fd, lock_path):
-    os.close(fd)
+    try:
+        os.close(fd)
+    except OSError:
+        pass
     try:
         os.remove(lock_path)
     except OSError:
@@ -60,6 +64,9 @@ def write_state(status_path, state):
     tmp_path = status_path + ".tmp"
     with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(state, f, indent=2)
+        # D3: Ensure data is flushed to disk before atomic rename
+        f.flush()
+        os.fsync(f.fileno())
     os.rename(tmp_path, status_path)
 
 def cmd_get(args):
@@ -76,10 +83,14 @@ def cmd_get(args):
     print(val if val is not None else '')
 
 def cmd_set(args):
+    # D2: Validate key name to prevent arbitrary state injection
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_.]*$', args.key):
+        print(f"[ERROR] Invalid key name: {args.key}", file=sys.stderr)
+        sys.exit(1)
     fd, lock_path = get_lock(args.file)
     try:
         state = read_state(args.file)
-        
+
         # Validations
         if args.key == 'status' and args.value not in VALID_STATUSES:
             print(f"[ERROR] Invalid status: {args.value}", file=sys.stderr)

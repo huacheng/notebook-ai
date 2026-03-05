@@ -22,7 +22,19 @@ def parse_frontmatter(content: str) -> dict:
             k, v = line.split(':', 1)
             current_key = k.strip()
             val = v.strip().strip('"').strip("'")
-            fm[current_key] = val if val else []
+            if not val:
+                # D1: Empty value after colon — could be a list header or truly empty
+                fm[current_key] = []
+            elif val.lower() == 'true':
+                fm[current_key] = True
+            elif val.lower() == 'false':
+                fm[current_key] = False
+            else:
+                # D1: Try numeric conversion for integer fields
+                try:
+                    fm[current_key] = int(val)
+                except ValueError:
+                    fm[current_key] = val
         elif stripped.startswith('-') and current_key:
             val = stripped[1:].strip().strip('"').strip("'")
             if isinstance(fm.get(current_key), list):

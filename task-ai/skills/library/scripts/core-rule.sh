@@ -28,6 +28,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 list_core_rules() {
+    if [[ ! -f "$SECURITY_SH" ]]; then
+        echo "[ERROR] security.sh not found at $SECURITY_SH" >&2
+        exit 1
+    fi
     echo -e "${BLUE}=== Core Rules (Security Floor) ===${NC}"
     echo ""
 

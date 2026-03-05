@@ -4,7 +4,7 @@ When evaluating a plan or implementation, apply all six dimensions (D1-D6) syste
 
 This is the L3 (deep audit) application of the unified six-dimension framework. L1 (plan self-audit) and L2 (check post-plan) use the same dimensions at shallower depth. See `plan/references/self-audit-checklist.md` for L1.
 
-**Type adaptation**: Base checkpoints below are universal. Read `.type-profile.md` for domain-specific criteria that augment or override base checkpoints. See [Domain Adaptation](#domain-adaptation) for how dimensions shift across task types.
+**Type adaptation**: Base checkpoints below are universal. Read `.type-profile.md` for domain-specific criteria that augment (never replace) base checkpoints. See [Domain Adaptation](#domain-adaptation) for how dimensions shift across task types.
 
 ## Table of Contents
 

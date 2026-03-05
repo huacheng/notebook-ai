@@ -18,11 +18,11 @@ arguments:
   - name: notebook
     description: "Notebook name (optional — detected from context if omitted)"
     required: false
-  - name: generate
+  - name: --generate
     description: "Generate or regenerate the implementation plan (flag, no value). Default behavior when invoked — the flag exists for explicitness in auto mode commands"
     required: false
   - name: --refine
-    description: "Append a refinement to existing plan (used by agent during plan-refinement phase)"
+    description: "Append a refinement to existing plan (used by agent during plan-refinement phase). Requires a quoted string value, e.g., --refine \"description\""
     required: false
   - name: --finalize
     description: "Exit plan-refinement phase, signal plan is ready for execution"
@@ -103,7 +103,7 @@ No explicit command needed from user.
      - **If no `## Research Insights`**: invoke research with `--scope full --caller plan` — full collection (backward compatible, works when user skips target research)
    - **Re-plan** (status `re-planning`/`review`/`executing`): invoke research with `--scope gap --caller plan` — incremental type refinement and reference collection
 3. **Read** `.type-profile.md` — research has created or updated this. Verify the type classification makes sense in context. If plan disagrees with research's classification, update `.type-profile.md` with rationale and adjust `type` in `.status.json`
-4. Validate type value: each pipe-separated segment matches `[a-zA-Z0-9_:-]+`, full field matches `[a-zA-Z0-9_:|-]+`. Ensure `type` in `.status.json` is set
+4. Validate type value: each pipe-separated segment matches `[a-zA-Z0-9_:-]+`, full field matches `^[a-zA-Z0-9_:-]+(\|[a-zA-Z0-9_:-]+)*$` (no leading/trailing/consecutive pipes). Ensure `type` in `.status.json` is set
 5. Read `.summary.md` if exists (condensed context from prior runs — primary context source)
 6. Read `.analysis/` latest file only if exists (address check feedback from NEEDS_REVISION)
 7. Read `.bugfix/` latest file only if exists (address most recent mid-exec issue from REPLAN)
@@ -132,7 +132,7 @@ No explicit command needed from user.
 22. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 23. Update `.status.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
 24. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
-25. **L1 六维自审** — scan `.plan.md` against `.target.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
+25. **L1 Six-Dimension Self-Audit** — scan `.plan.md` against `.target.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
     - Read `.plan.md`, `.target.md`, `.type-profile.md` (if exists)
     - D1 Correctness: requirements coverage, acceptance criteria mapping, input/output consistency
     - D2 Security: security-sensitive step identification, input validation coverage

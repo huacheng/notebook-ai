@@ -24,9 +24,9 @@ DRY_RUN=false
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --sources)     SOURCES_FILE="$2"; shift 2 ;;
-        --output)      OUTPUT_DIR="$2"; shift 2 ;;
-        --test-corpus) TEST_CORPUS_DIR="$2"; shift 2 ;;
+        --sources)     [[ $# -ge 2 ]] || { echo "[ERROR] --sources requires a value" >&2; exit 1; }; SOURCES_FILE="$2"; shift 2 ;;
+        --output)      [[ $# -ge 2 ]] || { echo "[ERROR] --output requires a value" >&2; exit 1; }; OUTPUT_DIR="$2"; shift 2 ;;
+        --test-corpus) [[ $# -ge 2 ]] || { echo "[ERROR] --test-corpus requires a value" >&2; exit 1; }; TEST_CORPUS_DIR="$2"; shift 2 ;;
         --dry-run)     DRY_RUN=true; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -50,9 +50,12 @@ echo "[intel-fetcher] Output: $OUTPUT_DIR"
 generate_rule_id() {
     local prefix="${1:-AUTO}"
     local domain="$2"
+    # D2: Sanitize prefix and domain to prevent injection via rule ID
+    prefix=$(echo "$prefix" | tr -cd 'A-Za-z0-9_-')
+    domain=$(echo "$domain" | tr -cd 'A-Za-z0-9_-')
     local timestamp
     timestamp=$(date +%Y%m%d%H%M%S)
-    echo "${prefix}-${domain^^}-${timestamp}-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' ')"
+    echo "${prefix}-${domain^^}-${timestamp}-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \t\n')"
 }
 
 # Create candidate rule YAML
@@ -80,10 +83,10 @@ create_candidate_rule() {
 # Source: $safe_source
 # Generated: $(date -Iseconds)
 
-id: $id
+id: "$id"
 name: "$safe_name"
 pattern: "$safe_pattern"
-domain: $domain
+domain: "$domain"
 source: "$safe_source"
 enabled: true
 case_insensitive: false
@@ -219,6 +222,7 @@ validate_api_response() {
 }
 
 # Fetch from NIST NVD API
+# NOTE: Called when YAML sources config specifies "nist_nvd" type (future: YAML dispatch)
 fetch_nist_nvd() {
     local url="$1"
     local params="$2"
@@ -258,6 +262,7 @@ fetch_nist_nvd() {
 }
 
 # Fetch from GitHub Advisories API
+# NOTE: Called when YAML sources config specifies "github_advisories" type (future: YAML dispatch)
 fetch_github_advisories() {
     local url="$1"
     local params="$2"
@@ -294,7 +299,8 @@ SAMPLE_CANDIDATES_DIR="$OUTPUT_DIR/security/candidates"
 mkdir -p "$SAMPLE_CANDIDATES_DIR"
 
 # Check if this is a fresh run (no candidates yet)
-EXISTING_COUNT=$(find "$OUTPUT_DIR" -name "*.yaml" -path "*/candidates/*" 2>/dev/null | wc -l || echo 0)
+# D4: Limit find depth to avoid scanning deep directory trees
+EXISTING_COUNT=$(find "$OUTPUT_DIR" -maxdepth 3 -name "*.yaml" -path "*/candidates/*" 2>/dev/null | wc -l || echo 0)
 
 if [[ "$EXISTING_COUNT" -eq 0 && "$DRY_RUN" == "false" ]]; then
     # Create sample candidate for testing the pipeline

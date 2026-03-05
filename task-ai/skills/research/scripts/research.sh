@@ -50,9 +50,9 @@ VALID_SCOPES="gap deep"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --caller) CALLER="$2"; shift 2 ;;
-    --phase)  PHASE="$2"; shift 2 ;;
-    --scope)  SCOPE="$2"; shift 2 ;;
+    --caller) [[ $# -ge 2 ]] || { echo "[ERROR] --caller requires a value" >&2; exit 1; }; CALLER="$2"; shift 2 ;;
+    --phase)  [[ $# -ge 2 ]] || { echo "[ERROR] --phase requires a value" >&2; exit 1; }; PHASE="$2"; shift 2 ;;
+    --scope)  [[ $# -ge 2 ]] || { echo "[ERROR] --scope requires a value" >&2; exit 1; }; SCOPE="$2"; shift 2 ;;
     --*)      echo "Unknown option: $1" >&2; exit 1 ;;
     *)
       # Positional argument: could be notebook name or topic
@@ -166,7 +166,13 @@ if [[ "$CALLER" == "audit" ]]; then
             if grep -q "$QUALITY_STATUS_VERIFIED" "$exp_file" 2>/dev/null; then
                 # R3: Validate content before copy (D2 security)
                 # Check 1: File size limit
-                FILE_SIZE=$(stat -f%z "$exp_file" 2>/dev/null || stat -c%s "$exp_file" 2>/dev/null || echo 0)
+                FILE_SIZE=$(stat -f%z "$exp_file" 2>/dev/null || stat -c%s "$exp_file" 2>/dev/null || echo "")
+                # D3: If stat failed for both platforms, skip the file
+                if [[ -z "$FILE_SIZE" ]]; then
+                    echo "[research:audit] Skip: $exp_file — cannot determine file size"
+                    ((SKIPPED_COUNT++)) || true
+                    continue
+                fi
                 if [[ "$FILE_SIZE" -gt "$MAX_EXPERIENCE_SIZE" ]]; then
                     echo "[research:audit] Skip: $exp_file exceeds size limit"
                     ((SKIPPED_COUNT++)) || true
@@ -195,7 +201,8 @@ if [[ "$CALLER" == "audit" ]]; then
                     fi
                 fi
             fi
-        done < <(find "$EXPERIENCES_DIR" -name "*-complete.md" -type f -print0 2>/dev/null)
+        # D4: Limit find depth for experience files
+        done < <(find "$EXPERIENCES_DIR" -maxdepth 3 -name "*-complete.md" -type f -print0 2>/dev/null)
         echo "[research:audit] Extracted $NEGATIVE_COUNT negative samples (skipped $SKIPPED_COUNT)"
     fi
 
@@ -241,13 +248,15 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
 
         # Generate filename from topic (sanitize + validate)
         FILENAME=$(echo "$TOPIC" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-' | head -c 50)
-        # D2/D3: Guard against empty filename
+        # D2/D3: Guard against empty, dash-only, or leading-dash filenames
+        FILENAME="${FILENAME#-}"  # Strip leading dash to prevent option confusion
         if [[ -z "$FILENAME" ]] || [[ "$FILENAME" == "-" ]]; then
             FILENAME="research-$(date +%s)"
         fi
         FILEPATH="$REFS_DIR/${FILENAME}.md"
         DATE=$(date +%Y-%m-%d)
-        TS=$(date +%s%3N)
+        # D3: %3N is GNU-only; provide portable fallback
+        TS=$(date +%s%3N 2>/dev/null || date +%s000)
 
         # Archive existing if deep mode
         if [[ "$SCOPE" == "deep" ]] && [[ -f "$FILEPATH" ]]; then

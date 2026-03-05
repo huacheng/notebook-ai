@@ -51,8 +51,10 @@ if [[ -n "$TYPE_FILTER" && -n "$MATCHES" ]]; then
     MATCHES=$(echo "$MATCHES" | awk -F '|' -v t="$TYPE_FILTER" 'index(tolower($3), tolower(t))' || true)
 fi
 
-# Apply limit
-MATCHES=$(echo "$MATCHES" | head -n "$LIMIT")
+# D1: Apply limit only if we have matches (avoid empty-string edge case)
+if [[ -n "$MATCHES" ]]; then
+    MATCHES=$(echo "$MATCHES" | head -n "$LIMIT")
+fi
 
 if [[ -z "$MATCHES" ]]; then
     echo "No direct matches found."

@@ -51,9 +51,12 @@ audit_log() {
     local details="${3:-}"
     local timestamp
     timestamp=$(date -Iseconds)
-    # Escape JSON special characters in details to prevent injection
+    # D2: Escape JSON special characters in details to prevent injection
     details="${details//\\/\\\\}"
     details="${details//\"/\\\"}"
+    details="${details//$'\n'/\\n}"
+    details="${details//$'\t'/\\t}"
+    details="${details//$'\r'/\\r}"
     local entry
     entry=$(printf '{"ts":"%s","action":"%s","status":"%s","details":"%s"}\n' \
         "$timestamp" "$action" "$status" "$details")
@@ -231,9 +234,17 @@ integrate_proposal() {
     echo ""
 
     # Extract info from proposal
-    local core_id=$(grep -E '^# Core Rule Proposal:' "$proposal_file" | grep -oE 'CORE-[0-9]+')
-    local pattern=$(grep -E '^- \*\*Pattern\*\*:' "$proposal_file" | sed 's/.*`\(.*\)`.*/\1/')
-    local name=$(grep -E '^- \*\*Name\*\*:' "$proposal_file" | sed 's/.*: //')
+    local core_id pattern name
+    core_id=$(grep -E '^# Core Rule Proposal:' "$proposal_file" | grep -oE 'CORE-[0-9]+' || true)
+    pattern=$(grep -E '^- \*\*Pattern\*\*:' "$proposal_file" | sed 's/.*`\(.*\)`.*/\1/' || true)
+    name=$(grep -E '^- \*\*Name\*\*:' "$proposal_file" | sed 's/.*: //' || true)
+
+    # D3: Validate extracted fields before proceeding
+    if [[ -z "$core_id" || -z "$pattern" || -z "$name" ]]; then
+        echo "[ERROR] Could not extract core_id, pattern, or name from proposal file" >&2
+        audit_log "integrate" "failed" "missing_fields in $(basename "$proposal_file")"
+        exit 1
+    fi
 
     echo "Generating code for: $core_id - $name"
     echo ""

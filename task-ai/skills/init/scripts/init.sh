@@ -8,9 +8,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
-# Ensure library exists before creating notebook (A pattern)
-ensure_library
-
 PROJECT_NAME="${1:-}"
 NOTEBOOK_NAME="${2:-}"
 TITLE="$NOTEBOOK_NAME"
@@ -31,8 +28,8 @@ while [[ $# -gt 0 ]]; do
       TITLE="$2"; shift 2 ;;
     --tags)
       if [[ $# -lt 2 ]]; then echo "[ERROR] --tags requires a value" >&2; exit 1; fi
-      # D1: Sanitize tags and guard against empty result
-      SANITIZED=$(printf '%s' "$2" | sed 's/[^a-zA-Z0-9_,-]//g')
+      # D1: Sanitize tags — strip invalid chars, collapse/trim commas, guard empty
+      SANITIZED=$(printf '%s' "$2" | sed 's/[^a-zA-Z0-9_,-]//g' | sed 's/,,*/,/g; s/^,//; s/,$//')
       if [[ -z "$SANITIZED" ]]; then
         TAGS="[]"
       else
@@ -44,15 +41,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-NB_ROOT="${NB_WORKSPACES_ROOT:-$(pwd)}"
+# D6: NB_WORKSPACES_ROOT is already exported by lib.sh; alias for brevity
+NB_ROOT="$NB_WORKSPACES_ROOT"
 TARGET_DIR="$NB_ROOT/$PROJECT_NAME/$NOTEBOOK_NAME"
 BRANCH_NAME="task/$NOTEBOOK_NAME"
 
-# 1. Validation
+# 1. Validation (SKILL.md Step 1 — before any side effects)
 if [[ ! "$PROJECT_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then echo "[ERROR] Invalid project name." >&2; exit 1; fi
 if [[ ! "$NOTEBOOK_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then echo "[ERROR] Invalid notebook name." >&2; exit 1; fi
 
-# 2. Collision Checks
+# 1b. Ensure library exists (SKILL.md Step 2 — idempotent, after validation)
+ensure_library
+
+# 2. Collision Checks (SKILL.md Steps 4-5)
 if [[ -d "$TARGET_DIR" ]]; then
     echo "[ERROR] Directory already exists: $TARGET_DIR" >&2
     exit 1
@@ -65,7 +66,12 @@ fi
 
 # 3. Clean working tree check (SKILL.md Step 6)
 # D3: Only block on tracked file modifications; untracked/gitignored files are allowed
-DIRTY_TRACKED=$(git status --porcelain 2>/dev/null | grep -v '^??' | head -1 || true)
+# D3: Verify git status succeeds before relying on its output
+GIT_STATUS_OUTPUT=$(git status --porcelain 2>&1) || {
+    echo "[ERROR] git status failed — cannot verify clean working tree." >&2
+    exit 1
+}
+DIRTY_TRACKED=$(printf '%s' "$GIT_STATUS_OUTPUT" | grep -v '^??' | head -1 || true)
 if [[ -n "$DIRTY_TRACKED" ]]; then
     echo "[ERROR] Uncommitted changes to tracked files detected. Please commit or stash first." >&2
     exit 1
@@ -76,36 +82,52 @@ CLEANUP_BRANCH=""
 CLEANUP_WORKTREE=""
 CLEANUP_DIR=""
 cleanup() {
-    if [[ -n "$CLEANUP_WORKTREE" && -d "$CLEANUP_WORKTREE" ]]; then
-        git worktree remove "$CLEANUP_WORKTREE" 2>/dev/null || true
-    fi
-    if [[ -n "$CLEANUP_BRANCH" ]]; then
-        git checkout - 2>/dev/null || true
-        git branch -d "$CLEANUP_BRANCH" 2>/dev/null || true
-    fi
     if [[ -n "$CLEANUP_DIR" && -d "$CLEANUP_DIR" ]]; then
         rm -rf "$CLEANUP_DIR"
+    fi
+    if [[ -n "$CLEANUP_WORKTREE" && -d "$CLEANUP_WORKTREE" ]]; then
+        git worktree remove --force "$CLEANUP_WORKTREE" 2>/dev/null || true
+    fi
+    if [[ -n "$CLEANUP_BRANCH" ]]; then
+        # D3: Only checkout previous branch in non-worktree mode
+        if [[ -z "$CLEANUP_WORKTREE" ]]; then
+            git checkout - 2>/dev/null || true
+        fi
+        git branch -d "$CLEANUP_BRANCH" 2>/dev/null || true
     fi
 }
 trap cleanup ERR INT TERM
 
-# 4. Git Operations
+# 4. Git Operations (SKILL.md Steps 7-9)
 git branch "$BRANCH_NAME" || { echo "[ERROR] Failed to create branch $BRANCH_NAME" >&2; exit 1; }
 CLEANUP_BRANCH="$BRANCH_NAME"
 
+# D4: Cache git toplevel to avoid repeated subprocess calls in worktree mode
+GIT_TOPLEVEL="$(git rev-parse --show-toplevel)"
+
 if [[ $USE_WORKTREE -eq 1 ]]; then
-    WORKTREE_PATH="$(pwd)/.worktrees/task-$NOTEBOOK_NAME"
+    # D1: Worktree at repo root per SKILL.md convention, not cwd
+    WORKTREE_PATH="$GIT_TOPLEVEL/.worktrees/task-$NOTEBOOK_NAME"
     git worktree add "$WORKTREE_PATH" "$BRANCH_NAME" || { echo "[ERROR] Failed to create worktree" >&2; exit 1; }
     CLEANUP_WORKTREE="$WORKTREE_PATH"
+    # D1: In worktree mode, files must be created inside the worktree directory
+    WT_TARGET_DIR="$WORKTREE_PATH/$( realpath -m --relative-to="$GIT_TOPLEVEL" "$TARGET_DIR" )"
+    WORKING_DIR="$WT_TARGET_DIR/.working"
+    CLEANUP_DIR="$WT_TARGET_DIR"
 else
     git checkout "$BRANCH_NAME" || { echo "[ERROR] Failed to checkout $BRANCH_NAME" >&2; exit 1; }
+    WORKING_DIR="$TARGET_DIR/.working"
+    CLEANUP_DIR="$TARGET_DIR"
 fi
-WORKING_DIR="$TARGET_DIR/.working"
-CLEANUP_DIR="$TARGET_DIR"
 
 # 4b. Ensure root .gitignore has task-ai entries (idempotent, SKILL.md Step 2)
 # D3: placed after checkout/worktree so tracked .gitignore edits don't block branch switch
-_ROOT_GI="$NB_ROOT/.gitignore"
+# D1: In worktree mode, edit .gitignore inside the worktree
+if [[ $USE_WORKTREE -eq 1 ]]; then
+  _ROOT_GI="$WORKTREE_PATH/$( realpath -m --relative-to="$GIT_TOPLEVEL" "$NB_ROOT" )/.gitignore"
+else
+  _ROOT_GI="$NB_ROOT/.gitignore"
+fi
 _GI_ENTRIES=(
   ".worktrees/"
   "**/.working/.auto-signal"
@@ -123,6 +145,8 @@ _GI_ENTRIES=(
   "**/.lock.stale.*"
 )
 _GI_CHANGED=0
+# D3: ensure parent directory exists (relevant in worktree mode with nested NB_ROOT)
+mkdir -p "$(dirname "$_ROOT_GI")"
 if [[ ! -f "$_ROOT_GI" ]]; then
   printf '%s\n' "${_GI_ENTRIES[@]}" > "$_ROOT_GI"
   _GI_CHANGED=1
@@ -136,7 +160,12 @@ else
 fi
 
 # 5. Project directory creation (SKILL.md Step 3)
-PROJECT_DIR="$NB_ROOT/$PROJECT_NAME"
+# D1: In worktree mode, create project dir inside worktree; otherwise in main tree
+if [[ $USE_WORKTREE -eq 1 ]]; then
+    PROJECT_DIR="$WORKTREE_PATH/$( realpath -m --relative-to="$GIT_TOPLEVEL" "$NB_ROOT/$PROJECT_NAME" )"
+else
+    PROJECT_DIR="$NB_ROOT/$PROJECT_NAME"
+fi
 if [[ ! -d "$PROJECT_DIR" ]]; then
     mkdir -p "$PROJECT_DIR"
 fi
@@ -149,14 +178,20 @@ if [[ ! -f "$PROJECT_DIR/.status.json" ]]; then
 PROJEOF
 fi
 
-# 6. Directory Creation
+# 6. Directory Creation (SKILL.md Step 10)
 mkdir -p "$WORKING_DIR"
 
-# 7. Metadata Creation (.status.json)
+# 7. Metadata Creation — .status.json (SKILL.md Step 11)
 # Sanitize TITLE: strip all control characters and ANSI escape residue, then escape for JSON
 TITLE=$(printf '%s' "$TITLE" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr -d '[:cntrl:]')
 SAFE_TITLE="${TITLE//\\/\\\\}"
 SAFE_TITLE="${SAFE_TITLE//\"/\\\"}"
+# D3: pre-compute worktree relative path (avoids && || antipattern in heredoc)
+if [[ $USE_WORKTREE -eq 1 ]]; then
+  WORKTREE_REL=".worktrees/task-$NOTEBOOK_NAME"
+else
+  WORKTREE_REL=""
+fi
 # D3: single timestamp to avoid inconsistency across second boundary
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 cat > "$WORKING_DIR/.status.json" <<EOF
@@ -171,7 +206,7 @@ cat > "$WORKING_DIR/.status.json" <<EOF
   "depends_on": [],
   "tags": $TAGS,
   "branch": "$BRANCH_NAME",
-  "worktree": "$( [[ $USE_WORKTREE -eq 1 ]] && echo ".worktrees/task-$NOTEBOOK_NAME" || echo "" )",
+  "worktree": "$WORKTREE_REL",
   "stage": {
     "current": 1,
     "total": 1,
@@ -180,7 +215,7 @@ cat > "$WORKING_DIR/.status.json" <<EOF
 }
 EOF
 
-# 8. Template Creation (.target.md)
+# 8. Template Creation — .target.md (SKILL.md Step 12)
 cat > "$WORKING_DIR/.target.md" <<EOF
 # Task Target: $SAFE_TITLE
 
@@ -194,7 +229,7 @@ cat > "$WORKING_DIR/.target.md" <<EOF
 <!-- Any constraints or limitations -->
 EOF
 
-# 9. Git Commit
+# 9. Git Commit (SKILL.md Step 13)
 # D1: in worktree mode, git operations must target the worktree directory
 if [[ $USE_WORKTREE -eq 1 ]]; then
     GIT_CMD=(git -C "$WORKTREE_PATH")
@@ -205,11 +240,11 @@ fi
 GIT_ADD_FILES=("$WORKING_DIR/.status.json" "$WORKING_DIR/.target.md")
 [[ -f "$PROJECT_DIR/.status.json" ]] && GIT_ADD_FILES+=("$PROJECT_DIR/.status.json")
 [[ "$_GI_CHANGED" -eq 1 && -f "$_ROOT_GI" ]] && GIT_ADD_FILES+=("$_ROOT_GI")
-if ! "${GIT_CMD[@]}" add "${GIT_ADD_FILES[@]}" 2>&1; then
+if ! "${GIT_CMD[@]}" add "${GIT_ADD_FILES[@]}"; then
     echo "[ERROR] git add failed" >&2
     exit 1
 fi
-if ! "${GIT_CMD[@]}" commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook" 2>&1; then
+if ! "${GIT_CMD[@]}" commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook"; then
     echo "[WARN] git commit failed (may be no changes)" >&2
 fi
 

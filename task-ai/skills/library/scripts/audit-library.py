@@ -22,11 +22,16 @@ def audit_library():
     if master_index_path.exists():
         with open(master_index_path, 'r', encoding='utf-8') as f:
             for line in f:
-                if line.startswith('|') and '.md' in line:
-                    parts = line.split('|')
+                line_stripped = line.strip()
+                if line_stripped.startswith('|') and '.md' in line_stripped:
+                    parts = line_stripped.split('|')
+                    # D1: Master index format: | Topic | Type | Keywords | File Path | Source |
+                    # parts[0]="" parts[1]=Topic parts[2]=Type parts[3]=Keywords parts[4]=File Path
                     if len(parts) >= 5:
                         path = parts[4].strip()
-                        indexed_files.add(path)
+                        # D1: Skip header and separator rows
+                        if path and path != 'File Path' and not path.startswith('-'):
+                            indexed_files.add(path)
 
     physical_files = set()
     staleness_threshold = 90
