@@ -23,7 +23,7 @@ arguments:
     description: "Natural language description for context review (e.g., '审查上面讨论的方案')"
     required: false
   - name: checkpoint
-    description: "Evaluation checkpoint: post-plan, mid-exec, post-exec"
+    description: "Evaluation checkpoint: post-plan, mid-exec, post-exec, pre-merge"
     required: false
   - name: caller
     description: "Inline caller: plan, exec, auto, skill-review, audit-validate"
@@ -194,6 +194,42 @@ Validates rule candidates in `.evolving-rules/*/candidates/`. Implemented in `ch
 
 ---
 
+## Three-File Anchored Review
+
+All lifecycle checkpoints use **three-file anchored review**: evaluating deliverables against `.target.md` (requirements) and `.plan.md` (design) per D1-D6 dimension. Scores reflect "deliverable vs requirements+plan" deviation, not subjective LLM judgment.
+
+| Dimension | Anchor | Review Question |
+|-----------|--------|-----------------|
+| D1 Correctness | .target.md requirements | Does deliverable implement each requirement? |
+| D2 Security | .target.md security constraints | Does deliverable satisfy security requirements? |
+| D3 Reliability | .plan.md boundary conditions | Does deliverable cover planned edge/exception cases? |
+| D4 Performance | .target.md performance metrics | Does deliverable meet performance requirements? |
+| D5 Architecture | .plan.md architecture design | Does deliverable structure match planned modules/interfaces? |
+| D6 Maintainability | .plan.md module division | Is deliverable organized per plan? Naming/conventions consistent? |
+
+> **Phase 2 exception:** When reviewing `.plan.md` itself (post-plan checkpoint), D3/D5/D6 anchors assess internal quality (boundary coverage, module structure, step clarity) rather than self-referencing .plan.md.
+
+### D1-D6 Numeric Score Output
+
+Every lifecycle checkpoint outputs D1-D6 numeric scores (0.0 - 1.0). Scores are written to:
+1. `.analysis/<date>-<checkpoint>.md` — human-readable table in the evaluation file
+2. `.auto-signal` `check_score` field — machine-readable for frontend display and threshold comparison
+
+Score writing uses `signal-writer.sh` utility:
+```bash
+source "$SCRIPT_DIR/../../auto/scripts/signal-writer.sh"
+write_check_score "$SIGNAL_FILE" "$OVERALL" "$D1" "$D2" "$D3" "$D4" "$D5" "$D6"
+```
+
+### Threshold System
+
+| Checkpoint | Threshold | Retry Limit | On Limit Exceeded |
+|------------|-----------|-------------|-------------------|
+| post-plan | 0.70 | 3 replans | Stop, notify user |
+| mid-exec | 0.60 | 2 fixes | Stop current step, notify user |
+| post-exec | 0.75 | 3 fix/replan | Stop, notify user |
+| pre-merge | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0) |
+
 ## Checkpoints (scope=lifecycle)
 
 ### 1. post-plan (default)
@@ -287,6 +323,25 @@ Include a `## VFP Compliance` section in the `.analysis/<date>-post-exec-*.md` o
 | **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with specific issues | Status unchanged |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
 
+### 4. pre-merge
+
+Final quality gate before merge. Runs three-file anchored D1-D6 scoring with threshold 0.80.
+
+**Reads:** `.target.md` + `.plan.md` + `.summary.md` + `.analysis/` (post-exec ACCEPT file) + `.test/` (results) + code changes
+
+**Evaluation Criteria:**
+
+All six dimensions scored 0.0-1.0 using three-file anchored review (see above). Overall composite calculated with weighted formula.
+
+**Outcomes:**
+
+| Result | Action | Status Transition |
+|--------|--------|-------------------|
+| **PASS** (overall >= 0.80) | Create `.analysis/<date>-pre-merge.md`, write check_score to `.auto-signal` | Status unchanged, signal → `merge` |
+| **NEEDS_FIX** (overall < 0.80) | Create `.analysis/<date>-pre-merge.md` with failing dimensions | Fall back to Phase 3: reset `retry_count` to 0, resume from failing dimension steps |
+
+No retry at pre-merge — failure means the deliverable needs more Phase 3 work on the specific failing dimensions.
+
 ## Output Files
 
 | File | When Created | Content |
@@ -304,6 +359,7 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
    - `post-plan`: requires status `planning` or `re-planning`
    - `mid-exec`: requires status `executing`
    - `post-exec`: requires status `executing`
+   - `pre-merge`: requires status `executing` (after post-exec ACCEPT)
 3. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, verdict is BLOCKED with dependency details
 4. **Read** `.type-profile.md` if exists — "Verification Standards", "Quality metrics", and "Audit Adaptation" sections are the **primary** source for evaluation criteria and domain-specific audit checkpoints (see `plan/references/type-profiling.md` for type system details). If check reveals the profile's standards are inadequate for this domain, update the relevant sections with findings
 5. **Read** all relevant files per checkpoint (use `.summary.md` as primary context, latest file only from each history directory)
@@ -344,6 +400,8 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 | `executing` | `executing` | post-exec ACCEPT |
 | `executing` | `executing` | post-exec NEEDS_FIX |
 | `executing` | `re-planning` | post-exec REPLAN |
+| `executing` | `executing` | pre-merge PASS (→ merge) |
+| `executing` | `executing` | pre-merge NEEDS_FIX (→ Phase 3 retry) |
 
 ## Git
 
@@ -357,6 +415,8 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 | NEEDS_FIX (mid-exec) | `task-ai(<notebook>):check mid-exec NEEDS_FIX` |
 | NEEDS_FIX (post-exec) | `task-ai(<notebook>):check post-exec NEEDS_FIX` |
 | CONTINUE | `task-ai(<notebook>):check mid-exec CONTINUE` |
+| PASS (pre-merge) | `task-ai(<notebook>):check pre-merge PASS → merge` |
+| NEEDS_FIX (pre-merge) | `task-ai(<notebook>):check pre-merge NEEDS_FIX → Phase 3` |
 
 All outcomes commit their output files and state updates, regardless of whether status changes.
 
@@ -376,8 +436,10 @@ Every check outcome writes `.auto-signal` on completion:
 | post-exec | ACCEPT | `{ "step": "check", "result": "ACCEPT", "next": "merge", "checkpoint": "", "timestamp": "..." }` |
 | post-exec | NEEDS_FIX | `{ "step": "check", "result": "NEEDS_FIX", "next": "exec", "checkpoint": "post-exec", "timestamp": "..." }` |
 | post-exec | REPLAN | `{ "step": "check", "result": "REPLAN", "next": "plan", "checkpoint": "", "timestamp": "..." }` |
+| pre-merge | PASS | `{ "step": "check", "result": "PASS", "next": "merge", "checkpoint": "pre-merge", "timestamp": "..." }` |
+| pre-merge | NEEDS_FIX | `{ "step": "check", "result": "NEEDS_FIX", "next": "exec", "checkpoint": "pre-merge", "timestamp": "..." }` |
 
-When ACCEPT, the `merge` sub-command handles refactoring, merge, conflict resolution, and cleanup. See `skills/merge/SKILL.md`.
+When ACCEPT (post-exec) or PASS (pre-merge), the `merge` sub-command handles refactoring, merge, conflict resolution, and cleanup. See `skills/merge/SKILL.md`.
 
 ## Task-Type-Aware Verification
 

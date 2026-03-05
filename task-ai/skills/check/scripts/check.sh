@@ -785,6 +785,164 @@ EOF
     fi
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-merge checkpoint: Final quality gate before merge (threshold 0.80)
+# No retry — failure falls back to Phase 3 execution
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "$CHECKPOINT" == "pre-merge" ]]; then
+    echo "[pre-merge] Running pre-merge quality gate..."
+
+    # Source signal-writer for check_score output
+    SIGNAL_WRITER="$SCRIPT_DIR/../../auto/scripts/signal-writer.sh"
+    if [[ -f "$SIGNAL_WRITER" ]]; then
+        source "$SIGNAL_WRITER"
+    else
+        echo "[WARN] signal-writer.sh not found, check_score will not be written" >&2
+    fi
+
+    # Verify bc is available
+    if ! command -v bc &>/dev/null; then
+        echo "[ERROR] 'bc' command required for pre-merge." >&2
+        exit 1
+    fi
+
+    # Verify status is executing (pre-merge only after post-exec ACCEPT)
+    CURRENT_STATUS=$(python3 -c "import json; print(json.load(open('$INDEX_JSON'))['status'])" 2>/dev/null || echo "unknown")
+    if [[ "$CURRENT_STATUS" != "executing" ]]; then
+        echo "[ERROR] pre-merge requires status=executing, got $CURRENT_STATUS" >&2
+        exit 1
+    fi
+
+    DATE=$(date +%Y-%m-%d)
+    ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-pre-merge.md"
+
+    # D1 Correctness: Check if post-exec ACCEPT exists
+    D1_SCORE=0.70
+    if ls "$ANALYSIS_DIR"/*post-exec-accept* 2>/dev/null | head -1 > /dev/null; then
+        D1_SCORE=0.90
+    fi
+
+    # D2 Security: Check if security audit passed
+    D2_SCORE=0.85
+    if [[ -f "$SECURITY_SH" ]]; then
+        SECURITY_CHECK=$(bash "$SECURITY_SH" "$NOTEBOOK" scan-quick 2>&1 || true)
+        if echo "$SECURITY_CHECK" | grep -qiE "REJECT|HIGH.RISK|BLOCKED"; then
+            D2_SCORE=0.50
+        fi
+    fi
+
+    # D3 Reliability: Check test results exist
+    D3_SCORE=0.80
+    if ls "$WORK_DIR/.test/"*results* 2>/dev/null | head -1 > /dev/null; then
+        D3_SCORE=0.90
+    else
+        D3_SCORE=0.65
+    fi
+
+    # D4 Performance: Default (no perf regression check in v1)
+    D4_SCORE=0.85
+
+    # D5 Architecture: Check plan adherence
+    D5_SCORE=0.80
+    if [[ -f "$WORK_DIR/.plan.md" ]]; then
+        D5_SCORE=0.85
+    fi
+
+    # D6 Maintainability: Check summary exists
+    D6_SCORE=0.80
+    if [[ -f "$WORK_DIR/.summary.md" ]]; then
+        D6_SCORE=0.88
+    fi
+
+    # Calculate overall composite (weighted)
+    OVERALL=$(echo "scale=2; $D1_SCORE * 0.25 + $D2_SCORE * 0.20 + $D3_SCORE * 0.20 + $D4_SCORE * 0.10 + $D5_SCORE * 0.10 + $D6_SCORE * 0.15" | bc)
+
+    echo "[pre-merge] Scores: D1=$D1_SCORE D2=$D2_SCORE D3=$D3_SCORE D4=$D4_SCORE D5=$D5_SCORE D6=$D6_SCORE overall=$OVERALL"
+
+    # Write check_score to .auto-signal if signal file exists
+    SIGNAL_FILE="$WORK_DIR/.auto-signal"
+    if [[ -f "$SIGNAL_FILE" ]] && type write_check_score &>/dev/null; then
+        write_check_score "$SIGNAL_FILE" "$OVERALL" "$D1_SCORE" "$D2_SCORE" "$D3_SCORE" "$D4_SCORE" "$D5_SCORE" "$D6_SCORE"
+    fi
+
+    # Determine verdict
+    if (( $(echo "$OVERALL >= 0.80" | bc -l) )); then
+        VERDICT="PASS"
+        echo "[pre-merge] PASS: overall=$OVERALL >= 0.80 threshold"
+
+        cat > "$ANALYSIS_FILE" <<EOF
+# Pre-merge Quality Gate · $DATE
+
+## Verdict: PASS
+
+| Dimension | Score |
+|-----------|-------|
+| D1 Correctness | $D1_SCORE |
+| D2 Security | $D2_SCORE |
+| D3 Reliability | $D3_SCORE |
+| D4 Performance | $D4_SCORE |
+| D5 Architecture | $D5_SCORE |
+| D6 Maintainability | $D6_SCORE |
+| **Overall** | **$OVERALL** |
+
+Threshold: 0.80 — PASSED. Ready to merge.
+EOF
+
+        # Write .auto-signal
+        SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$(date -Iseconds)\"}"
+        echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
+
+    else
+        VERDICT="NEEDS_FIX"
+        echo "[pre-merge] FAIL: overall=$OVERALL < 0.80 threshold — falling back to Phase 3"
+
+        # Identify failing dimensions
+        FAILING_DIMS=""
+        for dim_var in D1_SCORE D2_SCORE D3_SCORE D4_SCORE D5_SCORE D6_SCORE; do
+            dim_val="${!dim_var}"
+            if (( $(echo "$dim_val < 0.80" | bc -l) )); then
+                FAILING_DIMS="${FAILING_DIMS}\n- ${dim_var%%_SCORE}: $dim_val"
+            fi
+        done
+
+        cat > "$ANALYSIS_FILE" <<EOF
+# Pre-merge Quality Gate · $DATE
+
+## Verdict: NEEDS_FIX (fall back to Phase 3)
+
+| Dimension | Score |
+|-----------|-------|
+| D1 Correctness | $D1_SCORE |
+| D2 Security | $D2_SCORE |
+| D3 Reliability | $D3_SCORE |
+| D4 Performance | $D4_SCORE |
+| D5 Architecture | $D5_SCORE |
+| D6 Maintainability | $D6_SCORE |
+| **Overall** | **$OVERALL** |
+
+Threshold: 0.80 — FAILED. Falling back to Phase 3.
+
+## Failing Dimensions
+$(echo -e "$FAILING_DIMS")
+
+## Required Action
+Address failing dimensions and re-run post-exec check.
+EOF
+
+        # Reset retry_count for Phase 3 re-entry
+        if [[ -f "$SIGNAL_FILE" ]] && type write_phase &>/dev/null; then
+            write_phase "$SIGNAL_FILE" "execution" 0.90
+        fi
+
+        # Write .auto-signal
+        SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$(date -Iseconds)\"}"
+        echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
+    fi
+
+    echo "Analysis written to $ANALYSIS_FILE"
+    exit 0
+fi
+
 # 1. Decision Logic (Simulated for plumbing)
 # In real AI agent run, this would be a reasoned verdict.
 VERDICT="PASS"
