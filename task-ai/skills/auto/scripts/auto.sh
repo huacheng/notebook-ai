@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:auto implementation
-# Usage: auto.sh <notebook> [--stop]
+# Usage: auto.sh [--stop]
 
 set -euo pipefail
 # Load context discovery from lib.sh
@@ -21,18 +21,16 @@ derive_phase() {
     esac
 }
 
-NOTEBOOK="${1:-}"
-resolve_workdir "$NOTEBOOK"
-NOTEBOOK="$NB_NOTEBOOK"
-
 ACTION="start"  # Default action
-shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --stop)   ACTION="stop"; shift ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    *)        NOTEBOOK="${1:-}"; shift ;;
   esac
 done
+
+resolve_workdir "${NOTEBOOK:-}"
+NOTEBOOK="$NB_NOTEBOOK"
 STATUS_JSON="$WORK_DIR/.status.json"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 STOP_FILE="$WORK_DIR/.auto-stop"
