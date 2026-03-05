@@ -223,6 +223,10 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       set({ notebook: null, sessionId: null, activeNotebookId: null, workspaceDir: null });
       cacheRemove('nb-last-notebook');
     }
+    // Close the notebook tab from openNotebooks if it's open
+    if (notebookId in get().openNotebooks) {
+      get().closeNotebookTab(notebookId);
+    }
     cacheRemove(_cacheKey(notebookId));
     if (notebookForCleanup) {
       for (const cell of notebookForCleanup.cells) {
