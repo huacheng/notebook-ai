@@ -7193,7 +7193,8 @@ button:focus-visible {
 
 .mobile-actions-list {
   padding: var(--space-sm);
-  max-height: 50vh;
+  padding-bottom: 100px;
+  max-height: 60vh;
   overflow-y: auto;
 }
 

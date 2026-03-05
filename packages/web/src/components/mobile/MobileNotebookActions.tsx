@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 
@@ -165,8 +166,8 @@ export function MobileNotebookActions() {
         </button>
       )}
 
-      {/* Actions sheet */}
-      {open && (
+      {/* Actions sheet - portal to escape header stacking context */}
+      {open && createPortal(
         <div className="annotation-modal-overlay" onClick={() => setOpen(false)}>
           <div className="mobile-actions-sheet" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
             <div className="mobile-actions-header">
@@ -192,11 +193,12 @@ export function MobileNotebookActions() {
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Rerun confirmation modal */}
-      {showRerunModal && (
+      {showRerunModal && createPortal(
         <div className="annotation-modal-overlay" onClick={() => setShowRerunModal(false)}>
           <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: 'var(--font-size-lg)' }}>
@@ -210,11 +212,12 @@ export function MobileNotebookActions() {
               <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={() => { setShowRerunModal(false); rerunNotebook(); }}>{t('modal.rerun')}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Edit commit modal */}
-      {showCommitModal && (
+      {showCommitModal && createPortal(
         <div className="annotation-modal-overlay" onClick={() => setShowCommitModal(false)}>
           <div className="annotation-modal" onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: 'var(--font-size-lg)' }}>
@@ -228,7 +231,8 @@ export function MobileNotebookActions() {
               <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={() => { setShowCommitModal(false); useStore.getState().commitEdits(); setEditMode(false); }}>{t('modal.delete')}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
