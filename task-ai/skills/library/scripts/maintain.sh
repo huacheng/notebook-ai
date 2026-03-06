@@ -221,9 +221,16 @@ while [[ $# -gt 0 ]]; do
           echo "Found in .drafts/ (T2)"
       elif [[ -f "$ACTIVE_DIR/$SKILL_NAME/SKILL.md" ]]; then
           SKILL_FILE="$ACTIVE_DIR/$SKILL_NAME/SKILL.md"
-          CURRENT_TIER="T3/T4"
-          echo "Already at T3+ (active)"
-          exit 0
+          # Determine if T3 or T4 from frontmatter
+          CURRENT_TRUST=$(grep 'trust_tier:' "$SKILL_FILE" 2>/dev/null | head -1 | sed 's/.*trust_tier:\s*//' | tr -d ' ')
+          if [[ "$CURRENT_TRUST" == "T4" ]]; then
+              CURRENT_TIER="T4"
+              echo "Already at T4 (production-validated)"
+              exit 0
+          else
+              CURRENT_TIER="T3"
+              echo "Found in .active/ (T3) — checking production validation"
+          fi
       else
           echo "[ERROR] Skill '$SKILL_NAME' not found in .skills/.candidates/, .skills/.drafts/, or .skills/.active/" >&2
           exit 1
@@ -277,6 +284,65 @@ while [[ $# -gt 0 ]]; do
           else
               echo "[INFO] Score < 0.85, skill remains in .drafts/"
           fi
+      fi
+
+      # ─────────────────────────────────────────────────────────────────
+      # T3→T4 Production Validation (changelog-driven)
+      # Requires: usage_count >= 3 post-activation, zero REPLAN failures
+      # ─────────────────────────────────────────────────────────────────
+      if [[ "$CURRENT_TIER" == "T3" ]]; then
+          CHANGELOG="$LIB_PATH/.changelog"
+          SKILL_PATH=".skills/.active/$SKILL_NAME/SKILL.md"
+
+          echo ""
+          echo "--- Production Validation (T3→T4) ---"
+
+          if [[ ! -f "$CHANGELOG" ]]; then
+              echo "[INFO] No changelog found, cannot validate usage"
+              echo ""
+              echo "=== Promotion Complete ==="
+              exit 0
+          fi
+
+          # Count post-activation referenced entries for this skill
+          USAGE_COUNT=$(grep -c "| referenced | .*$SKILL_NAME" "$CHANGELOG" 2>/dev/null || echo 0)
+          echo "Usage count (referenced): $USAGE_COUNT"
+
+          if [[ "$USAGE_COUNT" -lt 3 ]]; then
+              echo "[INFO] Not enough usage (need >= 3, have $USAGE_COUNT), remains T3"
+              echo ""
+              echo "=== Promotion Complete ==="
+              exit 0
+          fi
+
+          # Check for REPLAN failures: any referenced notebook that later had replan
+          FAILURE_COUNT=0
+          # Extract unique notebooks that referenced this skill
+          REF_NOTEBOOKS=$(grep "| referenced | .*$SKILL_NAME" "$CHANGELOG" | \
+              sed 's/.*notebook:\([a-zA-Z0-9_-]*\).*/\1/' | sort -u)
+
+          for nb in $REF_NOTEBOOKS; do
+              # Check if this notebook had a REPLAN/invalidation after referencing
+              if grep -q "replan:true.*notebook:$nb\|invalidated.*notebook:$nb" "$CHANGELOG" 2>/dev/null; then
+                  FAILURE_COUNT=$((FAILURE_COUNT + 1))
+                  echo "[WARN] Notebook '$nb' had REPLAN after referencing this skill"
+              fi
+          done
+
+          echo "Failure count: $FAILURE_COUNT"
+
+          if [[ "$FAILURE_COUNT" -gt 0 ]]; then
+              echo "[INFO] REPLAN failures detected ($FAILURE_COUNT), remains T3"
+              echo ""
+              echo "=== Promotion Complete ==="
+              exit 0
+          fi
+
+          # All checks passed — promote T3→T4
+          sed -i 's/trust_tier: T3/trust_tier: T4/' "$ACTIVE_DIR/$SKILL_NAME/SKILL.md"
+          echo ""
+          echo "[PROMOTION] T3→T4: Promoted to production-validated"
+          echo "trust_tier updated to T4 in $ACTIVE_DIR/$SKILL_NAME/SKILL.md"
       fi
 
       echo ""
