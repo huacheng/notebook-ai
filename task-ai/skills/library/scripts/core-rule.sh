@@ -239,6 +239,8 @@ show_status() {
     local extended_count=0
     if [[ -d "$lib_dir/.evolving-rules/security/active" ]]; then
         extended_count=$(find "$lib_dir/.evolving-rules/security/active" -name "*.yaml" -o -name "*.yml" 2>/dev/null | wc -l)
+        # D3: Trim whitespace from wc -l output (macOS wc pads with spaces)
+        extended_count="${extended_count// /}"
     fi
 
     # Count pending proposals (runtime directory)
@@ -246,6 +248,7 @@ show_status() {
     local proposal_count=0
     if [[ -d "$proposal_dir" ]]; then
         proposal_count=$(find "$proposal_dir" -name "*.md" 2>/dev/null | wc -l)
+        proposal_count="${proposal_count// /}"
     fi
 
     echo "  Core Rules (hardcoded):     $core_count"

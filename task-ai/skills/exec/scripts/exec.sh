@@ -24,11 +24,11 @@ run_secure_cmd() {
 
     # D2: Validate required parameters
     if [[ -z "$cmd" ]]; then
-        echo "[exec] ERROR: run_secure_cmd requires a command argument" >&2
+        echo "[ERROR] run_secure_cmd requires a command argument" >&2
         return 1
     fi
     if [[ -z "$notebook" ]]; then
-        echo "[exec] ERROR: run_secure_cmd requires a notebook argument" >&2
+        echo "[ERROR] run_secure_cmd requires a notebook argument" >&2
         return 1
     fi
 
@@ -37,12 +37,12 @@ run_secure_cmd() {
         local security_result
         security_result=$(bash "$SECURITY_SH" "$notebook" verify-cmd "$cmd" 2>&1)
         if [[ "$security_result" == *"REJECT"* ]]; then
-            echo "[exec] SECURITY REJECT — command blocked by security policy" >&2
+            echo "[ERROR] SECURITY REJECT — command blocked by security policy" >&2
             echo "$security_result" >&2
             return 1
         fi
     else
-        echo "[exec] WARN: security.sh not found, skipping security check" >&2
+        echo "[WARN] security.sh not found, skipping security check" >&2
     fi
 
     # D2: Execute command via bash -c (security pre-checked above)
@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       TARGET_STEP="$2"; shift 2 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) echo "[ERROR] Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
@@ -144,7 +144,7 @@ fi
 # D1: Step 2 — Validate dependency gate
 DEPENDS_ON=$(python3 "$STATE_PY" get "$STATUS_JSON" depends_on 2>/dev/null || echo "")
 if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "None" && "$DEPENDS_ON" != "[]" ]]; then
-    echo "[GATE] Dependency check required: depends_on=$DEPENDS_ON (full validation delegated to Claude agent)" >&2
+    echo "[INFO] Dependency gate: depends_on present — validation delegated to AI agent caller" >&2
 fi
 
 # D1: Step 3 — Transition status to 'executing', clear phase
@@ -159,7 +159,7 @@ fi
 # D1: Step 6 — NEEDS_FIX resumption detection
 if [[ "$CURRENT_STATUS" == "executing" ]]; then
     echo "[exec] Resuming execution (NEEDS_FIX or continuation)."
-    # Check for fix guidance files (Claude agent reads these for full context)
+    # Check for fix guidance files (AI agent reads these for full context)
     # D1: Sort by filename (reverse alpha) to match "most recent by filename date" per SKILL.md
     LATEST_BUGFIX=$(find "$WORK_DIR/.bugfix" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_BUGFIX" ]]; then
@@ -270,8 +270,8 @@ for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
         echo "[VFP] Step $STEP: Red (VH) — checking pre-implementation test state..."
     fi
 
-    # 9.3 Implementation (delegated to Claude agent — stub records intent)
-    echo "[exec] Step $STEP: Implementation delegated to Claude agent."
+    # 9.3 Implementation (delegated to AI agent — stub records intent)
+    echo "[exec] Step $STEP: Implementation delegated to AI agent."
 
     # 9.4 VFP HS confirmation (VFP-applicable types)
     if [[ "$TYPE" == *"software"* ]]; then

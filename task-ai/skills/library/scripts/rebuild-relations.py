@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Rebuild .relations.jsonl from changelog and markdown cross-references (stdlib only, Python >= 3.9)."""
 import os
 import re
 import sys
@@ -12,7 +13,7 @@ def rebuild_relations():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))
     changelog_path = lib_path / '.changelog'
     relations_path = lib_path / '.relations.jsonl'
-    
+
     if not lib_path.exists(): return
 
     relations = []
@@ -44,13 +45,13 @@ def rebuild_relations():
     memory_path = lib_path / '.memory'
     if memory_path.exists():
         for p in memory_path.rglob('*.md'):
-            if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
+            if p.name.startswith('.'): continue
             try:
                 fm = parse_frontmatter(p.read_text(encoding='utf-8', errors='ignore'))
                 related = fm.get('related_references', [])
                 if isinstance(related, str):
                     related = [t.strip() for t in related.replace('[', '').replace(']', '').split(',')]
-                
+
                 for t in related:
                     if t:
                         relations.append({"s": str(p.relative_to(lib_path)), "p": "related-to", "o": t, "w": 1})

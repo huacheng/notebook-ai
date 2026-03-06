@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Library health audit — consistency, staleness, and orphan checks (stdlib only, Python >= 3.9)."""
 import os
 import sys
 from pathlib import Path
@@ -11,13 +12,13 @@ def audit_library():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))
     memory_path = lib_path / '.memory'
     master_index_path = lib_path / '.master-index.md'
-    
+
     if not lib_path.exists():
         print(f"[ERROR] Library path {lib_path} missing.")
         return
 
     print(f"--- Library Health Audit: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
-    
+
     indexed_files = set()
     if master_index_path.exists():
         with open(master_index_path, 'r', encoding='utf-8') as f:
@@ -38,15 +39,15 @@ def audit_library():
     stale_count = 0
     orphan_count = 0
     now = datetime.now()
-    
+
     if memory_path.exists():
         for p in memory_path.rglob('*.md'):
             # D6: Skip dot-prefixed files (includes .index.md, .summary.md, .lock, etc.)
             if p.name.startswith('.'): continue
-            
+
             rel_path = str(p.relative_to(lib_path))
             physical_files.add(rel_path)
-            
+
             try:
                 content = p.read_text(encoding='utf-8', errors='ignore')
                 fm = parse_frontmatter(content)
@@ -63,11 +64,11 @@ def audit_library():
 
     orphans = physical_files - indexed_files
     ghosts = indexed_files - physical_files
-    
+
     for o in orphans:
         print(f"[ORPHAN] File exists but not indexed: {o}")
         orphan_count += 1
-    
+
     for g in ghosts:
         print(f"[GHOST] Indexed but file missing: {g}")
 
@@ -81,7 +82,7 @@ def audit_library():
     print(f"- Stale References: {stale_count}")
     print(f"- Orphan Files: {orphan_count}")
     print(f"- Ghost Entries: {len(ghosts)}")
-    
+
     if not orphans and not ghosts and stale_count == 0:
         print("\n[RESULT] Library is HEALTHY.")
     else:

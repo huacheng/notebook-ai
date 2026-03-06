@@ -162,7 +162,7 @@ No explicit command needed from user.
 | `blocked` | `planning` | Unblocking changes |
 | `complete` | REJECT | Completed tasks cannot be re-planned |
 | `cancelled` | REJECT | Cancelled tasks cannot be re-planned |
-| `stage-done` | REJECT | Stage completed — use `target` to advance to next stage first |
+| `stage-done` | REJECT | Stage completed — use `/target` to advance to next stage first |
 
 ## Git
 

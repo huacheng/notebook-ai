@@ -65,10 +65,10 @@ if [[ -z "$MATCHES" ]]; then
     echo "No direct matches found."
 else
     echo "$MATCHES"
-    
+
     # Extract paths using robust awk column indexing
     HIT_PATHS=$(echo "$MATCHES" | awk -F '|' -v col="$COL_PATH" '{print $col}' | sed 's/ //g')
-    
+
     if [[ -f "$RELATIONS_JSONL" ]] && [[ -n "$HIT_PATHS" ]]; then
         echo -e "\n--- Layer 1.5: Relational Association ---"
         while read -r path; do

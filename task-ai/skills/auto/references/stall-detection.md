@@ -28,8 +28,8 @@ When stall is suspected, check the **last stream-json messages** for known stall
 | Continuation prompt | Last `assistant` message ends with or contains `Continue?`, `press enter`, `Press Enter to continue`, `to continue` (case-insensitive). Note: bare `continue` alone is too common — require it to appear as a question or prompt suffix to avoid false positives | Send `{"type":"human","message":"continue"}` via stream-json stdin |
 | Yes/No prompt | Last `assistant` message contains `(y/n)`, `(Y/N)`, `[y/N]`, `[Y/n]` | Send `{"type":"human","message":"y"}` via stream-json stdin |
 | Proceed prompt | Last `assistant` message contains `Do you want to proceed`, `Shall I continue` | Send `{"type":"human","message":"yes"}` via stream-json stdin |
-| Process exited | `ClaudeProcess` emits `close` event or stream ends | Agent session ended unexpectedly → restart auto session (see Server Recovery in `references/backend-api.md`) |
-| **Quota exhausted** | Last `assistant` or `system` message contains `rate limit`, `quota exceeded`, `usage limit`, `token limit`, `try again later` (case-insensitive) | **NOT a stall** — reset `stall_count` to 0, enter quota-wait mode (see `references/context-quota.md`) |
+| Process exited | `ClaudeProcess` emits `close` event or stream ends | Agent session ended unexpectedly → restart auto session (see Server Recovery in `backend-api.md`) |
+| **Quota exhausted** | Last `assistant` or `system` message contains `rate limit`, `quota exceeded`, `usage limit`, `token limit`, `try again later` (case-insensitive) | **NOT a stall** — reset `stall_count` to 0, enter quota-wait mode (see `context-quota.md`) |
 | No recognizable pattern | — | Log warning, continue polling (stall_count remains elevated from idle detection — no explicit increment needed here) |
 
 ## Content-Level Detection

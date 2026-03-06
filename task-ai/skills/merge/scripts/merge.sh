@@ -73,7 +73,8 @@ if [[ ! -d "$ANALYSIS_DIR" ]]; then
     reject_no_accept "Analysis directory not found. Run 'check --checkpoint post-exec' first."
 fi
 # D2: Use find instead of ls glob to avoid issues with special-char filenames
-LATEST_ANALYSIS=$(find "$ANALYSIS_DIR" -maxdepth 1 -name '*.md' -printf '%T@\t%p\n' 2>/dev/null | sort -rn | head -1 | cut -f2)
+# D6: Sort by filename (reverse alpha) — filenames are date-prefixed, consistent with exec.sh
+LATEST_ANALYSIS=$(find "$ANALYSIS_DIR" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
 if [[ -z "$LATEST_ANALYSIS" ]]; then
     reject_no_accept "No analysis files found in $ANALYSIS_DIR. Run 'check --checkpoint post-exec' first."
 fi

@@ -56,8 +56,8 @@ ensure_dir .memory/.references
 
 # Skills promotion pipeline (highlight promote scope)
 # - .candidates/: T1/T2 — promote.sh writes candidate skill files here
-# - .drafts/: T3 — L2 六维审查 >= 0.70，待人工确认
-# - .active/: T4 — L3 LLM深度审核通过，正式激活 (--add-dir 目标)
+# - .drafts/: T3 — L2 six-dimension review >= 0.70, pending human confirmation
+# - .active/: T4 — L3 LLM deep review passed, activated (--add-dir target)
 ensure_dir .skills/.candidates
 ensure_dir .skills/.drafts
 ensure_dir .skills/.active

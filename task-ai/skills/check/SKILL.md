@@ -159,6 +159,10 @@ Fix suggestion: Add rollback steps and handle case X.
 Verdict: NEEDS_REVISION
 ```
 
+#### Regression Test Protocol in Context Review
+
+When scope=context review identifies issues AND the reviewer proceeds to apply fixes (audit-and-fix mode), the Regression Test Protocol from `commands/references/test-strategy-by-type.md` applies — each fix requires RED→GREEN confirmation. See step 10 "Regression Test Protocol" in Execution Steps.
+
 #### Does NOT Write Files
 
 scope=context is conversational — no `.analysis/` files, no `.auto-signal`, no state changes. Output is direct response in conversation.
@@ -368,6 +372,15 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 10. **Evaluate** against criteria
     - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/task-ai:security <notebook> audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
     - **Optional delegation — code-review** (post-exec checkpoint only): Follow `auto/references/plugin-delegation.md` to attempt matching the `code-review` capability slot. If matched, invoke via Task subagent with a git diff summary as input — review results serve as supplementary evaluation evidence. No match or failure → continue standard inline evaluation
+    - **Regression Test Protocol (HARD GATE — applies to all findings that produce fixes)**: Every finding that results in a code/spec/config fix MUST include a regression test specification. Follow `commands/references/test-strategy-by-type.md` Regression Test Protocol:
+      1. Classify finding → (fix category, task type) → select test approach from Strategy Matrix
+      2. Write the regression test (RED) — must fail against current codebase
+      3. Run → confirm FAIL (RED)
+      4. Apply the fix
+      5. Run → confirm PASS (GREEN)
+      6. Run full test suite → confirm zero regressions
+    - **Exemptions** (from test-strategy-by-type.md): Pure typo fix (≤3 chars), comment-only change, historical doc annotation — these skip RED/GREEN but still require step 6 (full suite)
+    - When check operates in audit-and-fix mode (scope=context or delegated audit), this protocol is **non-negotiable**. Findings without regression tests are incomplete and MUST NOT be committed
 11. **Write** output files per outcome: evaluation to `.analysis/` or `.bugfix/` (per Outcomes tables above), and test results to `.test/<date>-<checkpoint>-results.md` when tests are evaluated (mid-exec and post-exec checkpoints)
     - **REPLAN with traceable reference**: if verdict is REPLAN AND evaluation identifies a specific `.memory/.references/<file>` as misleading (e.g., bad API docs caused wrong approach), increment `failure_count` in that reference file's frontmatter (acquire `.memory/.references/.lock` → read frontmatter → `failure_count++` → write atomically → append `reference` changelog update line → release lock)
 12. **Experience and quality updates** (skip for CONTINUE verdict — insufficient evaluation evidence):
@@ -455,6 +468,6 @@ Verification methods MUST match the task domain. Read `type` from `.status.json`
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `YYYY-MM-DD-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.status.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
 - **Concurrency**: Check acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
-- **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. See `references/six-dimension-audit.md` for the full checklist and domain adaptation table
+- **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. MUST follow `references/six-dimension-audit.md` Audit Workflow steps 1-9 in full — including steps 7-9 (regression test design, RED→GREEN confirmation, full suite verification). Skipping steps 7-9 makes the audit incomplete
 - **VFP applicability**: VFP applies when `type` contains `software` OR `.type-profile.md` contains `## Verification Cycle` section. See `commands/references/verification-first-protocol.md` for full applicability rules
 - **verify integration**: The `verify` sub-command can pre-run tests independently. When recent `verify` results exist (same day, matching checkpoint), check incorporates them instead of re-running. This is optional — check works standalone

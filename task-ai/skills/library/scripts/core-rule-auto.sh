@@ -349,7 +349,7 @@ Pipeline Steps:
 Safety Controls:
   [x] Historical backtest required (precision >= 0.98)
   [x] Six-dimension review must pass (>= 0.80)
-  [x] All decisions logged to .evolving-rules.log
+  [x] All decisions logged to .core-rule-proposals/.audit.log
   [x] Audit trail in .core-rule-proposals/
   [x] Git provides rollback safety net
 
@@ -440,6 +440,7 @@ cron_job() {
             local rules_dir="$LIB_DIR/.evolving-rules/security/active"
             if [[ -d "$rules_dir" ]]; then
                 local count=$(find "$rules_dir" -name "*.yaml" -o -name "*.yml" 2>/dev/null | wc -l)
+                count="${count// /}"
                 echo "[EXTENDED] Active rules: $count"
             else
                 echo "[EXTENDED] No active rules directory yet."

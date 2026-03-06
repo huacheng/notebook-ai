@@ -193,19 +193,21 @@ create_negative_sample() {
 
     cat > "$sample_file" <<EOF
 # Negative Sample: $sample_id
+# Domain: $domain
 # Description: $safe_desc
-# Expected: Should NOT match rule pattern (safe code)
+# Expected: Should NOT match (safe pattern, no false positive)
 # Generated: $(date -Iseconds)
 
 ## Safe Pattern
-
-This file contains a safe pattern that should NOT trigger false positives:
 
 \`\`\`
 $safe_pat
 \`\`\`
 
-This represents normal, safe code that should pass security checks.
+## Why This Is Safe
+
+This pattern represents normal, safe code that should pass security checks.
+Security rules should NOT flag this as a violation.
 EOF
 
     echo "[intel-fetcher] Created negative sample: $sample_file"

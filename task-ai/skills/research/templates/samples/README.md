@@ -4,7 +4,7 @@ Templates for generating test corpus samples used in precision calculation.
 
 ## Overview
 
-`sample-generator.sh` generates labeled positive/negative test samples for
+`scripts/sample-generator.sh` generates labeled positive/negative test samples for
 precision calculation. Samples are created using inline templates in the script.
 
 ## Template Variables (inline in script)
@@ -17,5 +17,5 @@ precision calculation. Samples are created using inline templates in the script.
 
 ## Extending
 
-To add new sample types, edit `sample-generator.sh` directly. Add new
+To add new sample types, edit `scripts/sample-generator.sh` directly. Add new
 `generate_<domain>_samples()` functions and register them in the `case` dispatch.

@@ -113,7 +113,7 @@ def cmd_transition(args):
     fd, lock_path = get_lock(args.file)
     try:
         state = read_state(args.file)
-        
+
         if args.status is not None:
             if args.status not in VALID_STATUSES:
                 print(f"[ERROR] Invalid status: {args.status}", file=sys.stderr)

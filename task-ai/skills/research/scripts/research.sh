@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # /task-ai:research implementation
-# Usage: research.sh [notebook] [--caller target|plan|test|verify|check|exec|library|audit] [--phase objective|requirements] [--scope gap|deep]
+# Usage: research.sh [notebook|"topic"] [--caller target|plan|test|verify|check|exec|library|audit] [--phase objective|requirements] [--scope gap|deep]
 # - notebook: optional, auto-detected from .working/ or task/* branch
+# - topic: natural language string (standalone research without notebook context)
 # - --scope: gap (default, incremental) or deep (force refresh)
 
 set -euo pipefail
@@ -294,7 +295,7 @@ if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
 
 RESEARCH_END
         # Replace placeholders with actual values (safe substitution)
-        # D2: Escape sed special chars in TOPIC: & (match ref), \ (escape), / (delimiter), newlines
+        # D2: Escape sed special chars in TOPIC: newlines, \ (escape), & (match ref), / (delimiter)
         TOPIC_ESCAPED="${TOPIC//$'\n'/ }"  # Strip newlines first
         TOPIC_ESCAPED="${TOPIC_ESCAPED//\\/\\\\}"  # Escape backslashes
         TOPIC_ESCAPED="${TOPIC_ESCAPED//&/\\&}"  # Then ampersands
@@ -365,7 +366,10 @@ elif [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
     fi
     echo "Detected stage: $STAGE"
 
-    if [[ "$STAGE" == PENDING* ]]; then
+    if [[ "$STAGE" == "UNKNOWN" ]]; then
+        echo "[ERROR] Could not detect O-stage from $TARGET_MD" >&2
+        exit 1
+    elif [[ "$STAGE" == PENDING* ]]; then
         PENDING_STAGE="${STAGE#PENDING:}"
         echo "[ABORT] Pending [PROPOSED] items in $PENDING_STAGE — review and confirm before continuing."
         exit 0

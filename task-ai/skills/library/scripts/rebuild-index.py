@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Rebuild all .index.md files and .master-index.md from filesystem state (stdlib only, Python >= 3.9)."""
 import os
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ def rebuild_index():
     lib_path = Path(os.getenv('NB_WORKSPACES_LIBRARY', os.getenv('NB_WORKSPACES_ROOT', '.') + '/.library'))
     memory_path = lib_path / '.memory'
     master_index_path = lib_path / '.master-index.md'
-    
+
     if not lib_path.exists(): return
 
     master_rows = []
@@ -30,7 +31,7 @@ def rebuild_index():
         # D1: For .experiences/, also collect per-subdirectory rows for sub-indexes
         subdir_rows: dict[Path, list[str]] = {}
         for p in dir_path.rglob('*.md'):
-            if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
+            if p.name.startswith('.'): continue
 
             try:
                 content = p.read_text(encoding='utf-8', errors='ignore')

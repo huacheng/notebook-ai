@@ -4,7 +4,14 @@ All sub-commands that write to `$NB_WORKSPACES_LIBRARY/` MUST follow the six-ste
 
 ## Six-Step Protocol
 
-> See `skills/library/references/write-protocol.md` (this file) for the canonical six-step protocol, changelog format, and append/overwrite rules.
+All library writers MUST execute these steps in order:
+
+1. **mkdir -p** — ensure target directory exists (idempotent)
+2. **Acquire lock** — create `<dir>/.lock` with `O_CREAT|O_EXCL`; write `{ "pid", "session", "timestamp" }`
+3. **Write file** — write content via `.tmp` + atomic `rename` (overwrite) or `O_APPEND` (append)
+4. **Changelog append** — append one line to `.changelog` via `.changelog.lock` (see format below)
+5. **Update index** — append/update row in directory `.index.md` and `.master-index.md`
+6. **Release lock** — close fd and remove `<dir>/.lock`
 
 ## Per-Directory Lock Table
 

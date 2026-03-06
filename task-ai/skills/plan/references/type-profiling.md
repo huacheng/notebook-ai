@@ -35,7 +35,7 @@ The `type` field uses a simple string with pipe separator for hybrids:
 
 **Validation regex**: Each segment must match `[a-zA-Z0-9_:-]+`. Full type field: `^[a-zA-Z0-9_:-]+(\|[a-zA-Z0-9_:-]+)*$` (no leading/trailing/consecutive pipes). Parsing: `type.split('|')` → `[0]` is primary, `[1:]` are secondary.
 
-**Experiences mapping**: For hybrid type `A|B`, `highlight` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. Plan reads `.summary.md` for all segments, drilling into individual entries when relevant.
+**Experiences mapping**: For hybrid type `A|B`, `highlight` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. `plan` reads `.summary.md` for all segments, drilling into individual entries when relevant.
 
 ## Type Determination Flow
 

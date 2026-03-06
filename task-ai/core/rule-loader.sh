@@ -171,9 +171,11 @@ load_rules_from_domain() {
         [[ -z "$id" ]] && continue
 
         # Parse pattern (single line only, skip multiline YAML)
-        local pattern_line=$(grep -E '^pattern:\s*".*"' "$rule_file" 2>/dev/null || \
-                           grep -E "^pattern:\s*'.*'" "$rule_file" 2>/dev/null || \
-                           grep -E '^pattern:\s*[^|>]' "$rule_file" 2>/dev/null | head -1)
+        local pattern_line
+        pattern_line=$(grep -E '^pattern:\s*".*"' "$rule_file" 2>/dev/null || \
+                       grep -E "^pattern:\s*'.*'" "$rule_file" 2>/dev/null || \
+                       grep -E '^pattern:\s*[^|>]' "$rule_file" 2>/dev/null || true)
+        pattern_line=$(echo "$pattern_line" | head -1)
         local pattern=$(echo "$pattern_line" | sed 's/pattern:\s*//' | tr -d '"' | tr -d "'")
 
         # For audit domain, pattern is optional (uses check_items instead)

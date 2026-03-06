@@ -47,7 +47,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 
 `library` is a **pure utility sub-command**: no task status changes, no `.auto-signal`, no participation in the automation loop.
 
-`$NB_WORKSPACES_LIBRARY` = `$NB_WORKSPACES_ROOT/.library/` (same path, shorter alias used throughout).
+`$NB_WORKSPACES_LIBRARY` = `$NB_WORKSPACES_ROOT/.library` (same path, shorter alias used throughout).
 
 ## Usage
 
@@ -237,7 +237,7 @@ Archive `.changelog` entries older than 90 days.
 2.  **Group aged entries** by month; write/append to `.changelog-archive/YYYY-MM.md`
 3.  **Write compaction marker** as first non-comment line of remaining `.changelog`:
    ```
-   # COMPACT 2026-02-21: archived 847 lines → .changelog-archive/2026-01.md
+   # COMPACT 2026-02-21: archived 847 lines -> .changelog-archive/2026-01.md
    ```
 4.  **Remove aged entries** from `.changelog` (retain marker + recent entries)
 5.  **Git add** `.changelog-archive/YYYY-MM.md` + commit: `task-ai(library):maintain archive YYYY-MM`

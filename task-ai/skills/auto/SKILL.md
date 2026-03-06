@@ -56,7 +56,7 @@ Semantic understanding of user message → execute phase-appropriate action
 | Phase | Progression | Reason |
 |-------|------------|--------|
 | Phase 1 (Target) | **User dialog confirms** | "What to build" — only user can define; LLM self-review creates coherence bias |
-| Phase 2-4 (Plan/Exec/Final) | **LLM auto-review** | "Is it correct?" — check(D1-D6) provides objective evaluation |
+| Phases 2-4 (Plan/Exec/Final) | **LLM auto-review** | "Is it correct?" — check(D1-D6) provides objective evaluation |
 
 Auto-review mechanism:
 ```
@@ -150,7 +150,7 @@ Phase 1 (Target) — must wait for user confirmation:
 | (O3 done) "Change item 2 to Y" / "OK all confirmed" | [PROPOSED] → [CONFIRMED], enter Phase 2 |
 | Silence | **Do not advance** — wait for user confirmation |
 
-Phase 2-4 — full auto, user can intervene:
+Phases 2-4 — full auto, user can intervene:
 
 | User says | Claude does |
 |-----------|------------|
@@ -275,7 +275,7 @@ model_tier → model
 
 #### Executor Plugin Delegation
 
-Beyond subagent delegation of individual sub-commands, exec supports **executor plugin delegation** — discovering and using execution engine plugins (e.g., `superpowers:subagent-driven-development`) to replace the default per-step inline loop. See `auto/references/plugin-delegation.md` §Executor Slot Table.
+Beyond subagent delegation of individual sub-commands, exec supports **executor plugin delegation** — discovering and using execution engine plugins (e.g., `superpowers:subagent-driven-development`) to replace the default per-step inline loop. See `references/plugin-delegation.md` §Executor Slot Table.
 
 This enables adaptive execution strategies:
 - Software tasks with clear test criteria → `subagent-driven-development` (fresh subagent per step + two-stage review)
@@ -316,7 +316,7 @@ User returns and says "continue":
 
 ### "Silent Continue" Mechanism
 
-Claude Code is request-response. Phase 2-4 "auto-advance without intervention" means:
+Claude Code is request-response. Phases 2-4 "auto-advance without intervention" means:
 - **Within same turn**: Claude finishes one sub-command, continues to next without waiting (continuous execution within single request)
 - **Across turns**: User must say "continue" or any message to trigger next round
 - Backend daemon can trigger: detects step complete with no follow-up → sends continuation prompt

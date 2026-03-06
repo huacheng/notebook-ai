@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified YAML parser for task-ai rule system.
+Unified YAML parser for task-ai rule system (stdlib only, Python >= 3.9).
 Used by: rule-loader.sh, check.sh (audit-validate), evolve-rules.sh
 
 Usage:
