@@ -513,7 +513,8 @@ while [[ $# -gt 0 ]]; do
       CRON_TAG="# task-ai:scheduled"
       # Use version-independent path: dynamically resolve latest plugin version at cron runtime
       PLUGIN_BASE="${HOME}/.claude/plugins/cache/moonview/task-ai"
-      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash -c 'MDIR=\$(ls -d \"$PLUGIN_BASE\"/*/skills/library/scripts/maintain.sh 2>/dev/null | sort -V | tail -1) && [ -n \"\$MDIR\" ] && bash \"\$MDIR\" --scheduled' $CRON_TAG"
+      CRON_LOG="$LIB_PATH/.scheduled.log"
+      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash -c 'MDIR=\$(ls -d \"$PLUGIN_BASE\"/*/skills/library/scripts/maintain.sh 2>/dev/null | sort -V | tail -1) && [ -n \"\$MDIR\" ] && bash \"\$MDIR\" --scheduled' >> \"$CRON_LOG\" 2>&1 $CRON_TAG"
 
       # Check if already installed (idempotent)
       EXISTING=$(crontab -l 2>/dev/null || true)
@@ -536,7 +537,12 @@ while [[ $# -gt 0 ]]; do
       CMD="--uninstall-cron"
       EXISTING=$(crontab -l 2>/dev/null || true)
       if echo "$EXISTING" | grep -q "task-ai:scheduled"; then
-          echo "$EXISTING" | grep -v "task-ai:scheduled" | crontab -
+          REMAINING=$(echo "$EXISTING" | grep -v "task-ai:scheduled" || true)
+          if [[ -n "$REMAINING" ]]; then
+              echo "$REMAINING" | crontab -
+          else
+              echo "" | crontab -
+          fi
           echo "[OK] Removed cron entry for maintain.sh --scheduled"
       else
           echo "[INFO] No task-ai:scheduled entry found, nothing to remove"
