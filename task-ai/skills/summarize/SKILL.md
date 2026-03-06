@@ -63,6 +63,7 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
     - Lessons learned (patterns, workarounds, discoveries)
 11. **Git commit** (skip if no files changed): `task-ai(<notebook>):summarize regenerate context summary`. If the commit fails (e.g., git error), log a warning and continue — summary files are already written
 12. **Release** `.working/.lock`
+13. **Report** result. Then output: "Summary regenerated. You may resume your current lifecycle step."
 
 ## State Transitions
 

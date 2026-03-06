@@ -15,9 +15,6 @@ triggers:
     User says "context is lost" or "refresh summaries" → summarize.
     User wants a formal task REPORT → report. User wants to capture EXPERIENCE → highlight.
 arguments:
-  - name: notebook
-    description: "Notebook name (e.g., auth-refactor). Auto-detected from CWD or task branch if omitted"
-    required: false
   - name: all
     description: "Also regenerate each sub-directory's .summary.md"
     required: false
@@ -30,8 +27,10 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
 ## Usage
 
 ```
-/task-ai:summarize <notebook_name> [--all]
+/task-ai:summarize [--all]
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## When to Use
 

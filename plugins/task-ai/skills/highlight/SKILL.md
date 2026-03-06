@@ -15,9 +15,6 @@ triggers:
     User wants to capture lessons or insights → highlight.
     User wants a formal task REPORT → report. User wants to refresh .summary.md → summarize.
 arguments:
-  - name: notebook
-    description: "Notebook name for task-context distillation (e.g., auth-refactor)"
-    required: false
   - name: description
     description: "Natural language description for ad-hoc experience capture (e.g., '总结下上面成功的操作经验')"
     required: false
@@ -30,15 +27,15 @@ Unified protocol for experience and thinking library writes. Defines 7 scopes co
 ## Usage
 
 ```
-/task-ai:highlight <notebook>         # scope=complete — comprehensive distillation
+/task-ai:highlight                    # scope=complete — comprehensive distillation (notebook auto-detected)
 /task-ai:highlight "<description>"    # scope=adhoc — conversation experience capture
-/task-ai:highlight                    # scope=complete on current notebook (if in context)
 ```
 
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+
 **Parameter routing:**
-- `highlight <notebook>` → scope=complete (independent execution, comprehensive distillation of a notebook)
+- No arguments → scope=complete (auto-detect notebook from CWD or task branch; error if not in notebook context)
 - `highlight "<description>"` → scope=adhoc (conversation experience capture)
-- No arguments → if in notebook context (CWD has `.working/.status.json`), equivalent to `highlight <current-notebook>`; otherwise error
 
 ## Architecture
 
@@ -356,7 +353,7 @@ This is highlight's core scope for comprehensive experience distillation.
 | Mode | Trigger | Primary Input | Auxiliary Input |
 |------|---------|--------------|-----------------|
 | **auto-complete** | Auto loop after merge | System files (see table below) | None (no conversation context) |
-| **manual-complete** | User runs `/task-ai:highlight <notebook>` | **Current conversation context** | System files (structural supplement) |
+| **manual-complete** | User runs `/task-ai:highlight` | **Current conversation context** | System files (structural supplement) |
 
 - auto-complete: agent starts independently, no conversation history, reads only from filesystem
 - manual-complete: user triggers in conversation, conversation context contains rich decision processes — use as primary distillation source

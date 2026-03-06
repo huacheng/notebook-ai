@@ -15,9 +15,6 @@ triggers:
     User asks HOW to implement something → plan.
     User asks WHAT to implement → target. User asks to INVESTIGATE options → research.
 arguments:
-  - name: notebook
-    description: "Notebook name (optional — detected from context if omitted)"
-    required: false
   - name: --generate
     description: "Generate or regenerate the implementation plan (flag, no value). Default behavior when invoked — the flag exists for explicitness in auto mode commands"
     required: false
@@ -37,7 +34,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 
 ```bash
 # Generate mode: create/regenerate plan, enter plan-refinement phase
-/task-ai:plan <notebook_name> [--generate]
+/task-ai:plan [--generate]
 
 # Refine mode: append refinement (agent calls this during conversation)
 /task-ai:plan --refine "Add caching layer between API and database"
@@ -45,6 +42,8 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 # Finalize mode: exit plan-refinement phase
 /task-ai:plan --finalize
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 `--generate` is the default behavior — the flag exists for explicitness when invoked from auto mode or scripts. Omitting it has the same effect.
 

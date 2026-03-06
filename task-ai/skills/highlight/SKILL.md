@@ -524,6 +524,7 @@ Steps:
    ```json
    { "step": "highlight", "result": "(distilled)", "next": "report", "checkpoint": "", "timestamp": "..." }
    ```
+10. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
 
 ---
 

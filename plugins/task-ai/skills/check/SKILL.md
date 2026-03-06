@@ -16,9 +16,6 @@ triggers:
     User in task lifecycle → check with checkpoint.
     User asks to RUN tests → verify. User asks to SEE task status → list.
 arguments:
-  - name: notebook
-    description: "Notebook name for lifecycle checkpoints (e.g., auth-refactor)"
-    required: false
   - name: description
     description: "Natural language description for context review (e.g., '审查上面讨论的方案')"
     required: false
@@ -36,16 +33,18 @@ Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 
 ```
 /task-ai:check                           # Review current conversation context (plan/solution)
 /task-ai:check "<description>"           # Review with specified focus
-/task-ai:check <notebook> --checkpoint <checkpoint>  # Lifecycle checkpoint review
-/task-ai:check <notebook> --checkpoint skill-review --target <file>  # Skill validation
+/task-ai:check --checkpoint <checkpoint>  # Lifecycle checkpoint review (notebook auto-detected)
+/task-ai:check --checkpoint skill-review --target <file>  # Skill validation
 /task-ai:check --checkpoint audit-validate  # Rule candidate validation
 ```
+
+**Notebook auto-detection:** When `--checkpoint` is used, the notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 **Parameter routing:**
 - No arguments → scope=context (review current conversation's plan/solution)
 - `check "<description>"` → scope=context with focus (e.g., "审查上面的修复方案")
-- `check <notebook> --checkpoint post-plan` → scope=lifecycle (task lifecycle checkpoint)
-- `check <notebook> --checkpoint skill-review --target <file>` → scope=skill (skill validation)
+- `check --checkpoint post-plan` → scope=lifecycle (task lifecycle checkpoint)
+- `check --checkpoint skill-review --target <file>` → scope=skill (skill validation)
 - `check --checkpoint audit-validate` → scope=rules (rule candidate validation)
 
 ---
@@ -128,23 +127,39 @@ Dimension weights and focus areas are **not hardcoded** — they adapt based on 
 
 > See `check/references/six-dimension-audit.md` §Domain Adaptation for seed table structure and `plan/references/type-profiling.md` for type system details.
 
-#### Output
+#### Output Modes
 
-Direct conversation response with:
+scope=context has two output modes, depending on whether check proceeds to fix issues:
+
+**Mode 1: Verdict-only** (default) — output conversation response, no file modifications:
 
 1. **Gate Progress Table** — which gates passed/failed
 2. **Blocking Issues** — if any gate failed, specific problems and fix suggestions
 3. **Optimization Suggestions** — from Gate 4 (if reached)
 4. **Verdict** — PASS / NEEDS_REVISION / BLOCKED
 
-#### Example
+**Mode 2: Audit-and-fix** — check identifies issues AND proceeds to apply fixes directly:
 
-User discusses a fix approach, then:
+Mode 2 is entered when the user's invocation implies fixing (e.g., "审查与修复", "audit and fix", "review and fix"), or when the user explicitly confirms to proceed with fixes after seeing Mode 1 output. When in Mode 2, each fix that modifies code/spec/config files MUST follow the RED→GREEN protocol:
+
+1. **Classify** finding → (fix category, task type) → select test approach from `commands/references/test-strategy-by-type.md` Strategy Matrix
+2. **Write** the regression test (RED) — must fail against current codebase
+3. **Run** → confirm FAIL (RED). If test passes unexpectedly, the finding may be invalid — reassess before proceeding
+4. **Apply** the fix
+5. **Run** → confirm PASS (GREEN)
+6. **Run** full test suite → confirm zero regressions
+7. Repeat for each finding that requires a file modification
+
+**Exemptions** (skip steps 2-5, still require step 6): Pure typo fix (≤3 chars), comment-only change, historical doc annotation.
+
+> **Trigger rule**: The RED→GREEN protocol is MANDATORY whenever check **directly modifies code/spec/config files**. It does NOT apply when check only renders a verdict. This is a hard gate — skipping RED→GREEN for non-exempt fixes is a protocol violation.
+
+#### Example (verdict-only)
+
 ```
 User: /task-ai:check
 ```
 
-Response:
 ```
 === Context Review: Fix Approach ===
 
@@ -159,22 +174,39 @@ Fix suggestion: Add rollback steps and handle case X.
 Verdict: NEEDS_REVISION
 ```
 
-#### Regression Test Protocol in Context Review
+#### Example (audit-and-fix)
 
-When scope=context review identifies issues AND the reviewer proceeds to apply fixes (audit-and-fix mode), the Regression Test Protocol from `commands/references/test-strategy-by-type.md` applies — each fix requires RED→GREEN confirmation. See step 10 "Regression Test Protocol" in Execution Steps.
+```
+User: /task-ai:check "六维审查与修复"
+```
 
-> **Trigger rule**: The protocol applies whenever check (or an agent acting on check's findings) **directly modifies code/spec/config files**. It does NOT apply when check only renders a verdict for another skill to act on. See [Regression Test Applicability](#regression-test-applicability) for the full trigger table.
+```
+=== Context Review: Audit-and-Fix ===
 
-#### Does NOT Write Files
+Gate 1 (D2 Security): PASS ✅
+Gate 2 (D1 Correctness): PASS ✅
+Gate 3 (D3 Reliability): FAIL ❌
+  Finding R1: missing error handling in foo.sh line 42
 
-scope=context is conversational — no `.analysis/` files, no `.auto-signal`, no state changes. Output is direct response in conversation.
+Applying fix R1:
+  RED: wrote test → bash tests/unit/foo-error.test.sh → FAIL ✓
+  FIX: added error handling to foo.sh:42
+  GREEN: bash tests/unit/foo-error.test.sh → PASS ✓
+  SUITE: full test suite → 0 regressions ✓
+
+Verdict: PASS (after fix)
+```
+
+#### Does NOT Write State Files
+
+scope=context does not write `.analysis/` files, `.auto-signal`, or update `.status.json`. In audit-and-fix mode, it modifies project source files (with RED→GREEN) but not task lifecycle state.
 
 ---
 
 ### §S2 scope=lifecycle — Task Lifecycle Checkpoint
 
 **Caller**: None (independent execution)
-**Trigger**: `/task-ai:check <notebook> --checkpoint <checkpoint>`
+**Trigger**: `/task-ai:check --checkpoint <checkpoint>` (notebook auto-detected)
 
 This is the existing checkpoint-based review for task lifecycle. See Checkpoints section below.
 
@@ -183,7 +215,7 @@ This is the existing checkpoint-based review for task lifecycle. See Checkpoints
 ### §S3 scope=skill — Skill Validation
 
 **Caller**: `--checkpoint skill-review` (inline)
-**Trigger**: `check <notebook> --checkpoint skill-review --target <skill.md>`
+**Trigger**: `check --checkpoint skill-review --target <skill.md>` (notebook auto-detected)
 
 Validates skill files using six-dimension gated review. Implemented in `check.sh`.
 
@@ -358,6 +390,15 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 
 ## Execution Steps
 
+### Scope Routing
+
+Before step 1, determine scope from invocation:
+
+- **No `--checkpoint`** → **scope=context**: execute §S1 flow directly (Input Identification → Gated Execution → Output Mode 1 or 2). Do NOT proceed to steps 1-19 below. If audit-and-fix mode is entered (Mode 2), the RED→GREEN protocol defined in §S1 is mandatory for each non-exempt fix
+- **`--checkpoint` present** → **scope=lifecycle/skill/rules**: proceed to steps 1-19 below
+
+### Lifecycle Steps (scope=lifecycle only)
+
 1. **Read** `.status.json` to get current task status
 2. **Validate** checkpoint is appropriate for current status:
    - `post-plan`: requires status `planning` or `re-planning`
@@ -372,7 +413,7 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 8. **Gap check**: if `.type-profile.md` lacks evaluation criteria OR `.references/` lacks domain evaluation standards/benchmarks for the task `type`, trigger `research --scope gap --caller check` to collect missing references before proceeding
 9. **Incorporate verify results**: If fresh verification results exist in `.test/` (from a prior `verify` run, same day and matching checkpoint), read and incorporate them. Otherwise, run verification procedures inline as part of evaluation — inline scope is limited to the criteria in the latest `.test/` criteria file only (build + test + acceptance). For comprehensive domain-adapted verification, invoke `verify` explicitly before `check`
 10. **Evaluate** against criteria
-    - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/task-ai:security <notebook> audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
+    - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/task-ai:security audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
     - **Optional delegation — code-review** (post-exec checkpoint only): Follow `auto/references/plugin-delegation.md` to attempt matching the `code-review` capability slot. If matched, invoke via Task subagent with a git diff summary as input — review results serve as supplementary evaluation evidence. No match or failure → continue standard inline evaluation
     - **Regression Test Protocol (HARD GATE)**: When check directly applies fixes (not just rendering a verdict), every non-exempt fix MUST follow the RED→GREEN protocol from `commands/references/test-strategy-by-type.md`:
       - 10a. Classify finding → (fix category, task type) → select test approach from Strategy Matrix
@@ -481,7 +522,7 @@ The Regression Test Protocol (step 10a-10f) triggers based on **who applies the 
 
 | Scope | Mode | Who Fixes? | RED→GREEN Required? | Why |
 |-------|------|-----------|:---:|-----|
-| **context** | Audit-and-fix | check itself | **Yes** | check directly modifies files → must prove each fix correct |
+| **context** | Audit-and-fix | check itself | **Yes** | check directly modifies files → must follow §S1 Mode 2 RED→GREEN steps |
 | **lifecycle** (post-plan) | Verdict only | plan (on NEEDS_REVISION) | No (check) / **Yes (plan)** | check renders verdict; plan applies fix with its own RED→GREEN |
 | **lifecycle** (mid-exec, post-exec) | Verdict only | exec (on NEEDS_FIX) | No (check) / **Yes (exec)** | check writes `.bugfix/` with test spec; exec executes RED→GREEN |
 | **lifecycle** (any) | L3 deep audit-and-fix | check itself | **Yes** | L3 audit directly modifies files → steps 7-9 mandatory |

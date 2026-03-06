@@ -14,10 +14,7 @@ triggers:
     Core intent: merge a completed task branch into main with conflict resolution.
     User says "merge" or "land it" → merge.
     User says "is it done?" → check post-exec. User says "commit" → git commit (not this skill).
-arguments:
-  - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
-    required: false
+arguments: []
 ---
 
 # /task-ai:merge — Merge Task Branch to Main
@@ -27,8 +24,10 @@ Merge a completed task's branch into main, with automated conflict resolution an
 ## Usage
 
 ```
-/task-ai:merge <notebook_name>
+/task-ai:merge
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Prerequisites
 

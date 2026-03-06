@@ -133,6 +133,21 @@ Build a JWT authentication system
    - **Read**: Read the content of `.working/.target.md`.
    - **Display**: Output the structured objective to the conversation window.
 4. **Validation**: Confirm the target reflects the user's intent.
+5. **Next Step Prompt** (MUST output after write mode completes — see table below).
+
+## Next Step Prompt
+
+After write mode (step 2) completes, output the exact next step based on the resulting status:
+
+| Resulting Status | Prompt (output verbatim) |
+|-----------------|--------------------------|
+| `planning` (from `draft`) | "Target defined. Next: `/task-ai:research --caller target` to deepen the objective, or `/task-ai:plan` to generate the implementation plan." |
+| `planning` (from `stage-done`) | "Stage <N+1> target defined. Next: `/task-ai:plan` to generate the implementation plan for this stage." |
+| `planning` (from `blocked`) | "Target revised. Next: `/task-ai:plan` to re-plan with the updated objective." |
+| `planning` / `re-planning` (refinement) | "Target updated. Next: `/task-ai:plan` to regenerate the plan with the revised objective." |
+| `executing` (mid-exec update) | "Target updated mid-execution. Impact analysis needed — review current plan against revised objective." |
+
+> **Why mandatory**: Without this prompt, the user has no clear signal of what to do next after defining the target. The target→plan transition is the most common point where users get stuck.
 
 ## State Transitions
 

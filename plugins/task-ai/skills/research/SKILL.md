@@ -16,9 +16,6 @@ triggers:
     User says "深化目标" → research --caller target (progressive O1→O2→O3).
     Ambiguous word "需求": user ANALYZING requirement gaps or proposing missing ones → research --caller target --phase requirements.
 arguments:
-  - name: notebook
-    description: "Notebook name (optional, auto-detected from .working/ or task/* branch)"
-    required: false
   - name: topic
     description: "Natural language topic to research (for standalone mode without notebook context)"
     required: false
@@ -52,9 +49,11 @@ Collect external domain knowledge and organize it into `$NB_WORKSPACES_LIBRARY/.
 /task-ai:research "OAuth 2.0 PKCE flow"
 /task-ai:research "React Server Components" --scope deep
 
-# Notebook context (auto-detected or explicit)
-/task-ai:research [notebook] [--caller target|plan|test|verify|check|exec|library|audit] [--phase objective|requirements] [--scope gap|deep]
+# Notebook context (auto-detected)
+/task-ai:research [--caller target|plan|test|verify|check|exec|library|audit] [--phase objective|requirements] [--scope gap|deep]
 ```
+
+**Notebook auto-detection:** When `--caller` is used, the notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). Standalone topic mode (quoted string) does not require notebook context.
 
 ### Scope Modes
 
@@ -104,9 +103,9 @@ Each phase reads `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` at ent
 ### 3. From target deepening (default, multi-stage)
 
 ```
-/task-ai:research <notebook_name>                                    # → auto-detect O1/O2/O3 stage
-/task-ai:research <notebook_name> --caller target --phase objective  # → explicit objective deepening
-/task-ai:research <notebook_name> --caller target --phase requirements
+/task-ai:research --caller target                     # → auto-detect O1/O2/O3 stage (notebook auto-detected)
+/task-ai:research --caller target --phase objective  # → explicit objective deepening
+/task-ai:research --caller target --phase requirements
 ```
 
 After writing the `.target.md` draft post-init, the user progressively deepens the objective through 3 stages (each stage stops after execution to await user confirmation):
@@ -121,7 +120,7 @@ After writing the `.target.md` draft post-init, the user progressively deepens t
 ### 4. From test preparation (manual)
 
 ```
-/task-ai:research <notebook_name> --caller test
+/task-ai:research --caller test
 ```
 
 Routes automatically based on `.status.json` status:
@@ -134,8 +133,8 @@ Routes automatically based on `.status.json` status:
 ### 5. Standalone (manual)
 
 ```
-/task-ai:research <notebook_name> --scope deep
-/task-ai:research <notebook_name> --scope gap
+/task-ai:research --scope deep
+/task-ai:research --scope gap
 ```
 
 Callable independently for preparatory research before any phase, or to supplement references mid-execution.

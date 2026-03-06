@@ -98,7 +98,10 @@ On successful merge:
    - **Elif `stage.current < stage.total`**: write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `stage-done` with stage.completed push → git commit `stage <N> completed`
    - **Else** (`current == total` or data inconsistency): write `.summary.md` → status → `complete` with branch/worktree retained → git commit `task completed`
 8. **Write** `.auto-signal` — MUST be written AFTER Phase 3 status update, so the daemon reads correct status when routing
-9. **Report** merge result
+9. **Report** merge result. Then output next step prompt based on outcome:
+    - `complete` → "Task merged and completed. Next: `/task-ai:highlight` to distill experience, then `/task-ai:report` for the completion report."
+    - `stage-done` → "Stage <N> merged. Next: `/task-ai:highlight` to distill stage experience, then `/task-ai:target` to define Stage <N+1> objective."
+    - Conflict unresolvable → "Merge conflict could not be resolved automatically. Please resolve manually, then retry `/task-ai:merge`."
 
 ## State Transitions
 
