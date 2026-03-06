@@ -39,9 +39,20 @@ describe('project creation scaffolding', () => {
     await mkdir(repoDir, { recursive: true });
 
     const { initWorkspaceMemory } = await import('../workspace.js');
-    await initWorkspaceMemory(repoDir);
+    await initWorkspaceMemory(repoDir, undefined, { skipClaudeSettings: true });
 
     expect(existsSync(path.join(repoDir, '.MEMORY.md'))).toBe(true);
+  });
+
+  it('does NOT create .claude/ during project init with skipClaudeSettings', async () => {
+    const repoDir = path.join(tmpRoot, 'new-project2');
+    await mkdir(repoDir, { recursive: true });
+
+    const { initWorkspaceMemory } = await import('../workspace.js');
+    await initWorkspaceMemory(repoDir, undefined, { skipClaudeSettings: true });
+
+    expect(existsSync(path.join(repoDir, '.MEMORY.md'))).toBe(true);
+    expect(existsSync(path.join(repoDir, '.claude'))).toBe(false);
   });
 });
 

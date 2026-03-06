@@ -88,7 +88,7 @@ export function uniqueSlug(baseSlug: string, userId?: string | null): string {
  * Safe to call multiple times — overwrites any existing .MEMORY.md.
  * This file is protected: users/Claude cannot modify it via API.
  */
-export async function initWorkspaceMemory(workspaceDir: string, projectPath?: string): Promise<void> {
+export async function initWorkspaceMemory(workspaceDir: string, projectPath?: string, opts?: { skipClaudeSettings?: boolean }): Promise<void> {
   mkdirSync(workspaceDir, { recursive: true });
   const libraryDir = getLibraryDir();
   const libRelPath = path.relative(workspaceDir, libraryDir);
@@ -135,32 +135,35 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
   await chmod(memoryPath, 0o444);
 
   // Create .claude/settings.json with SessionStart hook to auto-load .MEMORY.md
-  const claudeDir = path.join(workspaceDir, '.claude');
-  const settingsPath = path.join(claudeDir, 'settings.json');
-  mkdirSync(claudeDir, { recursive: true });
+  // Skip for project-level init (only needed in notebook worktrees)
+  if (!opts?.skipClaudeSettings) {
+    const claudeDir = path.join(workspaceDir, '.claude');
+    const settingsPath = path.join(claudeDir, 'settings.json');
+    mkdirSync(claudeDir, { recursive: true });
 
-  // Use absolute path for .MEMORY.md so the hook works regardless of Claude's cwd
-  const absoluteMemoryPath = path.join(workspaceDir, MEMORY_FILENAME);
-  const memoryLoadCommand = `cat "${absoluteMemoryPath}" 2>/dev/null || echo '无记忆文件'`;
-  const memoryLoadHook = {
-    command: memoryLoadCommand,
-    description: '加载记忆文件',
-  };
+    // Use absolute path for .MEMORY.md so the hook works regardless of Claude's cwd
+    const absoluteMemoryPath = path.join(workspaceDir, MEMORY_FILENAME);
+    const memoryLoadCommand = `cat "${absoluteMemoryPath}" 2>/dev/null || echo '无记忆文件'`;
+    const memoryLoadHook = {
+      command: memoryLoadCommand,
+      description: '加载记忆文件',
+    };
 
-  const settingsContent = JSON.stringify({
-    hooks: {
-      SessionStart: [memoryLoadHook],
-    },
-  }, null, 2);
+    const settingsContent = JSON.stringify({
+      hooks: {
+        SessionStart: [memoryLoadHook],
+      },
+    }, null, 2);
 
-  // If file exists and is read-only, temporarily make it writable
-  try {
-    await access(settingsPath, constants.F_OK);
-    await chmod(settingsPath, 0o644);
-  } catch {
-    // File doesn't exist yet
+    // If file exists and is read-only, temporarily make it writable
+    try {
+      await access(settingsPath, constants.F_OK);
+      await chmod(settingsPath, 0o644);
+    } catch {
+      // File doesn't exist yet
+    }
+
+    await writeFile(settingsPath, settingsContent, 'utf-8');
+    await chmod(settingsPath, 0o444);
   }
-
-  await writeFile(settingsPath, settingsContent, 'utf-8');
-  await chmod(settingsPath, 0o444);
 }
