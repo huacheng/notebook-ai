@@ -654,17 +654,19 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
     set((state) => {
       if (!state.notebook) return { lastCompletedCellId: null, lastAskQuestionCellId: null };
+      const updated = setCellStatusInNotebook(
+        { ...state.notebook, cells: state.notebook.cells.map((c) => c.id === cellId ? { ...c, outputs: [], execution_count: c.execution_count + 1 } : c) },
+        cellId, 'running',
+      );
+      const tabId = state.activeNotebookTabId;
+      const openSync = tabId && state.openNotebooks[tabId]
+        ? { openNotebooks: { ...state.openNotebooks, [tabId]: { ...state.openNotebooks[tabId], notebook: updated } } }
+        : {};
       return {
         lastCompletedCellId: null,
         lastAskQuestionCellId: null,
-        notebook: {
-          ...state.notebook,
-          cells: state.notebook.cells.map((c) =>
-            c.id === cellId
-              ? { ...c, outputs: [], status: 'running', execution_count: c.execution_count + 1 }
-              : c
-          ),
-        },
+        notebook: updated,
+        ...openSync,
       };
     });
 

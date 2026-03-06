@@ -75,6 +75,25 @@ function makeCell(type: CellType): Cell {
   };
 }
 
+/**
+ * Sync updated notebook to both top-level state.notebook and openNotebooks entry.
+ * Prevents drift between the two when local mutations happen before WS broadcasts.
+ */
+function _syncNotebook(
+  state: Pick<NotebookStore, 'notebook' | 'openNotebooks' | 'activeNotebookTabId'>,
+  updated: NonNullable<NotebookStore['notebook']>,
+): Partial<Pick<NotebookStore, 'notebook' | 'openNotebooks'>> {
+  const result: Partial<Pick<NotebookStore, 'notebook' | 'openNotebooks'>> = { notebook: updated };
+  const tabId = state.activeNotebookTabId;
+  if (tabId && state.openNotebooks[tabId]) {
+    result.openNotebooks = {
+      ...state.openNotebooks,
+      [tabId]: { ...state.openNotebooks[tabId], notebook: updated },
+    };
+  }
+  return result;
+}
+
 export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'notebook' | 'slideLoading' | 'notebookLoading'
   | 'cellsOffset' | 'loadingOlderCells'
@@ -167,13 +186,12 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     const cellWithSource = { ...cell, source, ...(images && images.length > 0 ? { images } : {}) };
     set((state) => {
       if (!state.notebook) return {};
-      return {
-        notebook: {
-          ...state.notebook,
-          cells: [...state.notebook.cells, cellWithSource],
-          metadata: { ...state.notebook.metadata, updated: new Date().toISOString() },
-        },
+      const updated = {
+        ...state.notebook,
+        cells: [...state.notebook.cells, cellWithSource],
+        metadata: { ...state.notebook.metadata, updated: new Date().toISOString() },
       };
+      return _syncNotebook(state, updated);
     });
     get().executeCell(cell.id);
   },
