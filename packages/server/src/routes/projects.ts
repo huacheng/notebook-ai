@@ -52,11 +52,16 @@ export function createProjectsRouter(
 
       // Create directory structure
       await mkdir(path.join(projectPath, '.deliverables'), { recursive: true });
+      await mkdir(path.join(projectPath, '.worktrees'), { recursive: true });
 
       // Write project .status.json
       await writeFile(path.join(projectPath, '.status.json'), JSON.stringify({
         id, title, status: 'active', created_at: now, updated_at: now,
       }, null, 2));
+
+      // Create project-level .gitignore and .MEMORY.md
+      await ensureLibrarySkeleton(workspacesRoot, projectPath);
+      await initWorkspaceMemory(projectPath);
 
       // Initialize git repo
       const git = new GitManager(projectPath);
@@ -771,26 +776,14 @@ export function createProjectsRouter(
             }
           }
 
-          // If merge requested and we have a branch, merge to main first
+          // If merge requested and we have a branch, selectively merge .deliverables/ only
           if (merge && branchName) {
-            const mergeResult = await git.mergeBranchToMain(project.path, branchName);
-            if (!mergeResult.success) {
-              return res.status(409).json({ error: mergeResult.message });
-            }
-            // Remove .notebook.json that was merged into master (it's a runtime artifact)
             try {
-              const mainEntries = await readdir(project.path);
-              const mergedNbFiles = mainEntries.filter((f) => f.endsWith('.notebook.json'));
-              if (mergedNbFiles.length > 0) {
-                const { simpleGit } = await import('simple-git');
-                const mainGit = simpleGit(project.path);
-                for (const f of mergedNbFiles) {
-                  await rm(path.join(project.path, f), { force: true });
-                  await mainGit.rm(f).catch(() => {});
-                }
-                await mainGit.commit('chore: remove merged .notebook.json artifacts').catch(() => {});
-              }
-            } catch { /* best-effort cleanup */ }
+              await git.mergeDeliverables(branchName);
+            } catch (mergeErr) {
+              const msg = mergeErr instanceof Error ? mergeErr.message : String(mergeErr);
+              return res.status(409).json({ error: `Merge failed: ${msg}` });
+            }
           }
 
           // Remove the worktree

@@ -1,10 +1,8 @@
 /**
  * Tests for DELETE /api/projects/:id/notebooks/by-path with merge parameter.
  *
- * Tests:
- * 1. ?merge=true merges worktree branch to main before deletion
- * 2. ?merge=false or absent deletes without merging
- * 3. Merge conflict returns 409
+ * merge=true uses mergeDeliverables (selective: only .deliverables/ is merged).
+ * merge=false deletes without merging.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -58,7 +56,7 @@ const mockSessionManager = {
 
 async function setupProjectWithWorktree() {
   const projectDir = path.join(tmpRoot, 'myproject');
-  await mkdir(projectDir, { recursive: true });
+  await mkdir(path.join(projectDir, '.deliverables'), { recursive: true });
 
   const git = simpleGit(projectDir);
   await git.init();
@@ -66,7 +64,8 @@ async function setupProjectWithWorktree() {
   await git.addConfig('user.name', 'Test');
 
   // Initial commit
-  await writeFile(path.join(projectDir, 'readme.txt'), 'initial', 'utf-8');
+  await writeFile(path.join(projectDir, '.deliverables', '.keep'), '', 'utf-8');
+  await writeFile(path.join(projectDir, '.gitignore'), '.worktrees/\n', 'utf-8');
   await git.add('-A');
   await git.commit('init');
 
@@ -77,12 +76,18 @@ async function setupProjectWithWorktree() {
   const worktreeDir = path.join(projectDir, '.worktrees', 'task-my-notebook');
   await git.raw(['worktree', 'add', worktreeDir, 'task/my-notebook']);
 
-  // Add some work in the worktree
+  // Add work in the worktree: deliverables + notebook artifacts
   const wtGit = simpleGit(worktreeDir);
-  await writeFile(path.join(worktreeDir, 'feature.txt'), 'feature content', 'utf-8');
+  await mkdir(path.join(worktreeDir, '.deliverables', 'output'), { recursive: true });
+  await mkdir(path.join(worktreeDir, '.working'), { recursive: true });
+  await mkdir(path.join(worktreeDir, '.claude'), { recursive: true });
+  await writeFile(path.join(worktreeDir, '.deliverables', 'output', 'report.pdf'), 'report', 'utf-8');
+  await writeFile(path.join(worktreeDir, '.working', '.status.json'), '{}', 'utf-8');
+  await writeFile(path.join(worktreeDir, '.claude', 'settings.json'), '{}', 'utf-8');
+  await writeFile(path.join(worktreeDir, '.MEMORY.md'), '# NB Memory', 'utf-8');
   await writeFile(path.join(worktreeDir, 'my-notebook.notebook.json'), '{"cells":[]}', 'utf-8');
   await wtGit.add('-A');
-  await wtGit.commit('add feature');
+  await wtGit.commit('add task work');
 
   return { projectDir, worktreeDir, git };
 }
@@ -96,7 +101,7 @@ function createTestApp(db: any) {
 }
 
 describe('DELETE /api/projects/:id/notebooks/by-path with merge', () => {
-  it('?merge=true merges worktree branch to main before deletion', async () => {
+  it('?merge=true merges only .deliverables/ to master, not notebook artifacts', async () => {
     const { projectDir, worktreeDir, git } = await setupProjectWithWorktree();
     const notebookPath = path.join(worktreeDir, 'my-notebook.notebook.json');
     const PROJECT_ID = 'test-project';
@@ -119,9 +124,13 @@ describe('DELETE /api/projects/:id/notebooks/by-path with merge', () => {
     // Verify worktree is deleted
     expect(existsSync(worktreeDir)).toBe(false);
 
-    // Verify feature.txt is now on master (merged)
-    const featureContent = await readFile(path.join(projectDir, 'feature.txt'), 'utf-8');
-    expect(featureContent).toBe('feature content');
+    // Verify .deliverables/ content is merged
+    expect(existsSync(path.join(projectDir, '.deliverables', 'output', 'report.pdf'))).toBe(true);
+
+    // Verify notebook artifacts are NOT on master
+    expect(existsSync(path.join(projectDir, '.working'))).toBe(false);
+    expect(existsSync(path.join(projectDir, '.claude'))).toBe(false);
+    expect(existsSync(path.join(projectDir, 'my-notebook.notebook.json'))).toBe(false);
 
     // Verify branch is deleted
     const branches = await git.branch(['-l']);
@@ -151,38 +160,50 @@ describe('DELETE /api/projects/:id/notebooks/by-path with merge', () => {
     // Verify worktree is deleted
     expect(existsSync(worktreeDir)).toBe(false);
 
-    // feature.txt should NOT exist on master (not merged)
-    expect(existsSync(path.join(projectDir, 'feature.txt'))).toBe(false);
+    // .deliverables/output should NOT exist (not merged)
+    expect(existsSync(path.join(projectDir, '.deliverables', 'output'))).toBe(false);
   });
 
-  it('merge conflict returns 409', async () => {
-    const { projectDir, worktreeDir, git } = await setupProjectWithWorktree();
-    const notebookPath = path.join(worktreeDir, 'my-notebook.notebook.json');
-    const PROJECT_ID = 'test-project';
+  it('merge=true with no deliverables still succeeds', async () => {
+    // Setup a worktree with no .deliverables/ changes
+    const projectDir = path.join(tmpRoot, 'proj2');
+    await mkdir(path.join(projectDir, '.deliverables'), { recursive: true });
 
-    // Create conflict: modify same file on master
-    await writeFile(path.join(projectDir, 'feature.txt'), 'main version', 'utf-8');
+    const git = simpleGit(projectDir);
+    await git.init();
+    await git.addConfig('user.email', 'test@test.com');
+    await git.addConfig('user.name', 'Test');
+    await writeFile(path.join(projectDir, '.deliverables', '.keep'), '', 'utf-8');
     await git.add('-A');
-    await git.commit('conflicting change on main');
+    await git.commit('init');
 
-    const db = createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test' });
+    await git.branch(['task/empty-nb']);
+    const worktreeDir = path.join(projectDir, '.worktrees', 'task-empty-nb');
+    await git.raw(['worktree', 'add', worktreeDir, 'task/empty-nb']);
+
+    // Only notebook artifact, no deliverables
+    const wtGit = simpleGit(worktreeDir);
+    await writeFile(path.join(worktreeDir, 'empty-nb.notebook.json'), '{}', 'utf-8');
+    await wtGit.add('-A');
+    await wtGit.commit('notebook only');
+
+    const PROJECT_ID = 'test-project-2';
+    const db = createMockDb({ id: PROJECT_ID, path: projectDir, title: 'Test2' });
+    const notebookPath = path.join(worktreeDir, 'empty-nb.notebook.json');
     db.createNotebook({
       userId: 'test-user',
-      title: 'Test Notebook',
+      title: 'Empty NB',
       workspaceDir: worktreeDir,
-      notebookPath: notebookPath,
+      notebookPath,
     });
 
     const app = createTestApp(db);
 
-    const relPath = '.worktrees/task-my-notebook';
-    const res = await request(app)
+    const relPath = '.worktrees/task-empty-nb';
+    await request(app)
       .delete(`/api/projects/${PROJECT_ID}/notebooks/by-path?path=${encodeURIComponent(relPath)}&merge=true`)
-      .expect(409);
+      .expect(204);
 
-    expect(res.body.error).toMatch(/conflict/i);
-
-    // Worktree should still exist
-    expect(existsSync(worktreeDir)).toBe(true);
+    expect(existsSync(worktreeDir)).toBe(false);
   });
 });

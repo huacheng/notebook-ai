@@ -163,7 +163,12 @@ export class GitManager {
    * Does NOT bring .working/ or *.notebook.json into main.
    */
   async mergeDeliverables(branch: string): Promise<void> {
-    await this.git.raw(['checkout', branch, '--', '.deliverables/']);
+    try {
+      await this.git.raw(['checkout', branch, '--', '.deliverables/']);
+    } catch {
+      // Branch may not have .deliverables/ — nothing to merge
+      return;
+    }
     await this.git.add('.deliverables/');
     const status = await this.git.status();
     if (status.staged.length > 0) {
