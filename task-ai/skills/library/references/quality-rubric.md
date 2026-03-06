@@ -4,7 +4,7 @@ Shared quality evaluation standard for sub-commands that optionally write to `.m
 
 **Writers**: `plan` (step 23), `check` (step 16). Other sub-commands (`exec`, `verify`, `research`) may also write when reasoning is complex or novel. Writing is optional — only document reasoning that provides reusable insight. Routine execution following established plans does not warrant a raw entry.
 
-**Write format**: `O_APPEND` to `.memory/.thinking/raw/<notebook>-<step>-<YYYY-MM-DD>.md` (no lock needed — filename is unique per notebook+step+date). After first creation, append one row to `.memory/.thinking/raw/.index.md` (O_APPEND, no lock). See `library/SKILL.md` `.memory/.thinking/raw/` Entry Format section for the full YAML frontmatter structure.
+**Write format**: `O_APPEND` to `.memory/.thinking/raw/<notebook>-<step>-<YYYY-MM-DD>.md` (no lock needed — filename is unique per notebook+step+date). After first creation, append one row to `.memory/.thinking/raw/.index.md` (O_APPEND, no lock). See `skills/library/SKILL.md` `.memory/.thinking/raw/` Entry Format section for the full YAML frontmatter structure.
 
 ## Three Dimensions
 

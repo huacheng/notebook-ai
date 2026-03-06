@@ -85,7 +85,7 @@ Generate a structured completion report for a task module, documenting what was 
 <!-- Status of depends_on modules from .status.json -->
 
 ## Lessons Learned
-<!-- Any notable patterns, workarounds, or discoveries -->
+<!-- From .notes/ if exists — notable patterns, workarounds, or discoveries -->
 ```
 
 ### Summary Format
@@ -98,7 +98,7 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 
 ## Execution Steps
 
-1. **Read** `.status.json` for task metadata (including `completed_steps`)
+1. **Read** `.status.json` for task metadata (status, title, created, completed, type, depends_on)
 2. **Read** `.target.md` for objectives
 3. **Read** `.plan.md` for implementation approach
 4. **Read** `.summary.md` if exists (condensed context overview)

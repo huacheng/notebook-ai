@@ -21,6 +21,8 @@ def parse_frontmatter(content: str) -> dict:
         if ':' in line and not stripped.startswith('-'):
             k, v = line.split(':', 1)
             current_key = k.strip()
+            if not current_key:
+                continue
             raw_val = v.strip()
             # D1: Track whether value was quoted (quoted booleans stay strings)
             was_quoted = (raw_val.startswith('"') and raw_val.endswith('"')) or \

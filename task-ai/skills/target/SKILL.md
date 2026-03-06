@@ -49,13 +49,13 @@ Define or review the core mission for a notebook. This command acts as the cogni
 
 ## Target-Refinement Phase
 
-When `/target "..."` is called with content, the system enters **target-refinement phase**:
+When `/task-ai:target "..."` is called with content, the system enters **target-refinement phase**:
 
-1. **Entry**: `/target "objective"` writes to `.target.md` and creates `.session-context`
+1. **Entry**: `/task-ai:target "objective"` writes to `.target.md` and creates `.session-context`
 2. **During phase**: Agent monitors conversation for objective refinements
-   - Agent detects user refining the goal → automatically calls `target --refine "content"`
+   - Agent detects user refining the goal → automatically calls `/task-ai:target --refine "content"`
    - Refinements are appended to `## Refinements` section in `.target.md`
-3. **Exit**: `/plan` or `/target --finalize` clears `.session-context`
+3. **Exit**: `/task-ai:plan` or `/task-ai:target --finalize` clears `.session-context`
 
 ### Agent Behavior (Context Augmentation)
 
@@ -150,11 +150,11 @@ Build a JWT authentication system
 
 ## Git
 
-| Command | Type | Scope | Subject |
-| :--- | :--- | :--- | :--- |
-| `target` | `target` | `<notebook>` | `target update objective` |
-| `target --refine` | `target` | `<notebook>` | `target refine objective` |
-| `target` (stage advance) | `target` | `<notebook>` | `target stage <N+1> defined` |
+| Command | Commit Message |
+| :--- | :--- |
+| `target` | `task-ai(<notebook>):target update objective` |
+| `target --refine` | `task-ai(<notebook>):target refine objective` |
+| `target` (stage advance) | `task-ai(<notebook>):target stage <N+1> defined` |
 
 ## Notes
 

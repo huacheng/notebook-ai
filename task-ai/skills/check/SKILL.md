@@ -52,7 +52,7 @@ Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 
 
 ## Scope Definitions
 
-check defines 4 scopes. Scopes context and lifecycle are **independent executions**. Scopes skill and rules are **inline protocols** (called via `--checkpoint`).
+check defines 4 scopes. Scopes context and lifecycle are **independent invocations**. Scopes skill and rules are **inline protocols** (called via `--checkpoint`).
 
 ---
 
@@ -452,7 +452,7 @@ Verification methods MUST match the task domain. Read `type` from `.status.json`
 - Each assessment creates a new file in `.analysis/` (full evaluation history preserved, latest = last by filename sort)
 - Each mid-exec issue creates a new file in `.bugfix/` (one issue per file, filename includes date + summary)
 - For `post-exec`, if tests exist (`.test/` criteria files), they MUST be run and pass for ACCEPT
-- Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `2024-01-15-post-exec-results.md`) documenting test outcomes
+- Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `YYYY-MM-DD-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.status.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
 - **Concurrency**: Check acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
 - **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. See `references/six-dimension-audit.md` for the full checklist and domain adaptation table

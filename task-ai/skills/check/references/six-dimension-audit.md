@@ -171,7 +171,7 @@ Every audit fix must have a regression test — see
 including the Strategy Matrix, Test Classification Rules, exemptions,
 and integration with test infrastructure.
 
-The audit workflow steps 7–9 apply this protocol:
-7. Design regression tests per the protocol
-8. Apply fixes, confirm RED → GREEN
-9. Run full suite, confirm zero regressions
+The audit workflow steps 7-9 apply this protocol:
+- **7.** Design regression tests per the protocol
+- **8.** Apply fixes, confirm RED → GREEN
+- **9.** Run full suite, confirm zero regressions

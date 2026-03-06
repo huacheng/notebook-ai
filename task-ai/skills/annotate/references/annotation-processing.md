@@ -24,7 +24,7 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 {"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
 ```
 
-**Batch (multiple annotations, same file)**:
+**Batch (multiple annotations, one or more files)**:
 
 ```jsonl
 {"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
@@ -40,7 +40,7 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 | `file` | string | Absolute path to the annotated file |
 | `type` | string | `'insert'` \| `'delete'` \| `'replace'` \| `'comment'` |
 | `selected` | string | User-selected text (max 80 chars, truncated by frontend; backend should still function with longer values) |
-| `cursor` | number | Character offset of selection start in source file text (must be >= 0 and <= file length) |
+| `cursor` | number | Character offset of selection start in source file text (must be >= 0 and < file length) |
 
 **Type-specific fields**:
 
@@ -66,7 +66,7 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 
 1. **Unique match**: `selected` appears once in source → return that position directly
 2. **Multiple matches**: use rendered-offset proportion to pick the closest occurrence
-3. **Zero matches** (e.g. markdown syntax stripped): fall back to proportional estimate
+3. **Zero matches** (e.g., markdown syntax stripped): fall back to proportional estimate
 
 ```
 Source:   See **important** note about *performance*
@@ -141,7 +141,7 @@ Triage each replace annotation:
 | **Plan content replacement** | Replaces existing plan | Delete original + insert replacement + cross-impact |
 | **Simple text replacement** | No plan impact | Replace directly |
 
-Cross-Impact Assessment: same rules as Delete (Section A).
+Cross-Impact Assessment: same rules as §A Delete Annotations.
 
 ### D. Comment Annotations
 
@@ -165,4 +165,4 @@ Comments **NEVER** trigger state transitions — this is uniform across all file
 | **Conflict resolutions** | Low/Medium conflicts resolved |
 | **Explanations provided** | Questions answered |
 | **Notes recorded** | Memos inserted |
-| **Pending confirmations** | High-level items awaiting review |
+| **Pending confirmations** | High-impact items awaiting user review |

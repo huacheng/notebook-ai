@@ -42,7 +42,7 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
 
 ## Execution Steps
 
-1. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`)
+1. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`). If lock is held by another live session, REJECT
 2. **Read** `.status.json` — get `status`, `type`, `phase`, `completed_steps`, `depends_on`, metadata. If missing or corrupt, **release `.working/.lock`** and REJECT with error — valid status is required to generate an accurate summary
 3. **Read** `.target.md` if exists — requirements and objectives
 4. **Read** `.plan.md` if exists — current implementation plan
@@ -62,7 +62,7 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
     - Key decisions (architectural/design decisions)
     - Known issues (active issues, blockers, risks)
     - Lessons learned (patterns, workarounds, discoveries)
-11. **Git commit** (skip if no files changed): `task-ai(<notebook>):summarize regenerate context summary`
+11. **Git commit** (skip if no files changed): `task-ai(<notebook>):summarize regenerate context summary`. If the commit fails (e.g., git error), log a warning and continue — summary files are already written
 12. **Release** `.working/.lock`
 
 ## State Transitions
@@ -84,7 +84,7 @@ None — `summarize` does not write `.auto-signal`. It is a recovery/maintenance
 ## Notes
 
 - **Utility, not lifecycle**: `summarize` is a maintenance tool for context recovery. It does not participate in the auto loop and does not write `.auto-signal`
-- **Non-destructive**: Only writes `.summary.md` files — never modifies source files (`.target.md`, `.plan.md`, etc.) or state files (`.status.json`)
+- **Non-destructive**: Only writes `.summary.md` files — never modifies source files (`.target.md`, `.plan.md`, etc.) or `.status.json`
 - **Graceful degradation**: If any source file (steps 3–8) exists but cannot be read (I/O error, encoding issue), skip it with a warning note in the generated summary — do not abort. Generate the best summary possible from available data
 - **Format compliance**: Generated `.summary.md` follows the format specified in `commands/task-ai.md` (Status/Phase/Progress header, Plan Overview, Current State, Key Decisions, Known Issues, Lessons Learned sections). Keep under ~200 lines
 - **Concurrency**: Summarize acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)

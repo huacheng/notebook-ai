@@ -9,7 +9,7 @@ The auto loop runs in a single long-lived agent session. As the conversation acc
 1. **First compaction at ≥ 82%**: Before each iteration (loop step 2.2), check context usage. At **≥ 82%** AND `compaction_count == 0`, construct and send the **Structured Compaction Prompt** (see template in main SKILL.md)
 2. **No subsequent active compaction**: After the first compaction (`compaction_count >= 1`), do NOT trigger additional active compactions regardless of usage level. This prevents compaction cascades that lose context continuity
 3. **Safety net**: Each sub-command writes `.summary.md` with a **Recovery Header** (see below), providing condensed recovery context
-4. **System compaction handling**: If Claude's system compaction occurs (≥95% threshold, uncontrollable), the daemon detects it and sends a recovery signal (see Daemon Compaction Detection below)
+4. **System compaction handling**: If Claude's system compaction occurs (approximate ≥95% threshold, uncontrollable), the daemon detects it and sends a recovery signal (see Daemon Compaction Detection below)
 
 ### Recovery Header for .summary.md
 
@@ -40,7 +40,7 @@ After compaction (either active or system), the agent re-reads:
 - `.status.json` — status
 - `.summary.md` — task context (Recovery Header provides quick orientation)
 
-See "Compaction recovery" in "Context Window Management & Quota Handling" section of main SKILL.md.
+See "Compaction recovery" in the "Context Window Management & Quota Handling" section of the main SKILL.md.
 
 ## Daemon Compaction Detection
 

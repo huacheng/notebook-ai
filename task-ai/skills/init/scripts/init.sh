@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:init implementation
-# Usage: init.sh <project_name> <notebook_name> [--title "Title"] [--tags "t1,t2"] [--worktree]
+# Usage: init.sh <project_name> <notebook_name> [--title "Task Title"] [--tags "t1,t2"] [--worktree]
 
 set -euo pipefail
 
@@ -24,10 +24,10 @@ shift 2 || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --title)
-      if [[ $# -lt 2 ]]; then echo "[ERROR] --title requires a value" >&2; exit 1; fi
+      if [[ $# -lt 2 ]]; then echo "[ERROR] --title requires a value." >&2; exit 1; fi
       TITLE="$2"; shift 2 ;;
     --tags)
-      if [[ $# -lt 2 ]]; then echo "[ERROR] --tags requires a value" >&2; exit 1; fi
+      if [[ $# -lt 2 ]]; then echo "[ERROR] --tags requires a value." >&2; exit 1; fi
       # D1: Sanitize tags — strip invalid chars, collapse/trim commas, guard empty
       SANITIZED=$(printf '%s' "$2" | sed 's/[^a-zA-Z0-9_,-]//g' | sed 's/,,*/,/g; s/^,//; s/,$//')
       if [[ -z "$SANITIZED" ]]; then
@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
       fi
       shift 2 ;;
     --worktree) USE_WORKTREE=1; shift ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) echo "[ERROR] Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
@@ -254,10 +254,10 @@ if ! "${GIT_CMD[@]}" commit -m "task-ai($NOTEBOOK_NAME):init initialize notebook
     echo "[WARN] git commit failed (may be no changes)" >&2
 fi
 
-# Success - disable cleanup trap
-trap - EXIT ERR INT TERM
+# Success — clear rollback state first, then remove trap
 CLEANUP_BRANCH=""
 CLEANUP_WORKTREE=""
 CLEANUP_DIR=""
+trap - EXIT ERR INT TERM
 
 echo "Initialized $NOTEBOOK_NAME under $PROJECT_NAME."

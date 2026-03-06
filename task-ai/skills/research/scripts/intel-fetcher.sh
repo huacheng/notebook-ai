@@ -32,8 +32,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ -z "$SOURCES_FILE" || ! -f "$SOURCES_FILE" ]]; then
+if [[ -z "$SOURCES_FILE" ]]; then
     echo "[ERROR] --sources <config.yaml> required" >&2
+    exit 1
+fi
+if [[ ! -f "$SOURCES_FILE" ]]; then
+    echo "[ERROR] Sources file not found: $SOURCES_FILE" >&2
     exit 1
 fi
 
@@ -81,6 +85,10 @@ create_candidate_rule() {
     safe_source="${safe_source//\$/\\\$}"
     safe_source="${safe_source//$'\n'/ }"
 
+    # D2: Sanitize domain for YAML output (strip non-alphanumeric except dash/underscore)
+    local safe_domain
+    safe_domain=$(echo "$domain" | tr -cd 'a-zA-Z0-9_-')
+
     cat > "$output_file" <<EOF
 # Auto-generated candidate rule
 # Source: $safe_source
@@ -89,7 +97,7 @@ create_candidate_rule() {
 id: "$id"
 name: "$safe_name"
 pattern: "$safe_pattern"
-domain: "$domain"
+domain: "$safe_domain"
 source: "$safe_source"
 enabled: true
 case_insensitive: false
@@ -160,7 +168,7 @@ EOF
 
 # Create negative test sample (should NOT match the rule)
 create_negative_sample() {
-    local safe_pattern="$1"
+    local pattern="$1"
     local domain="$2"
     local sample_id="$3"
     local description="$4"
@@ -170,7 +178,7 @@ create_negative_sample() {
     fi
 
     # D1: Escape $ in pattern/description to prevent shell expansion in heredoc
-    local safe_pat="${safe_pattern//\$/\\\$}"
+    local safe_pat="${pattern//\$/\\\$}"
     local safe_desc="${description//\$/\\\$}"
 
     local sample_dir="$TEST_CORPUS_DIR/$domain/negative"
@@ -205,10 +213,11 @@ EOF
 
 # I1: Validate API response for safety (D2 Security)
 # Returns 0 if response is valid JSON and safe, 1 otherwise
+MAX_API_RESPONSE_SIZE=1048576  # 1MB max response size (D2)
 validate_api_response() {
     local response="$1"
     local source_name="$2"
-    local max_size=1048576  # 1MB max response size
+    local max_size=$MAX_API_RESPONSE_SIZE
 
     # Check 1: Response size limit
     local response_size=${#response}
@@ -236,7 +245,7 @@ validate_api_response() {
 # NOTE: Called when YAML sources config specifies "nist_nvd" type (future: YAML dispatch)
 fetch_nist_nvd() {
     local url="$1"
-    local params="$2"
+    local params="$2"  # Reserved for future query parameter overrides
     local domain="${3:-security}"
 
     echo "[intel-fetcher] Fetching from NIST NVD..."
@@ -280,7 +289,7 @@ fetch_nist_nvd() {
 # NOTE: Called when YAML sources config specifies "github_advisories" type (future: YAML dispatch)
 fetch_github_advisories() {
     local url="$1"
-    local params="$2"
+    local params="$2"  # Reserved for future query parameter overrides
     local domain="${3:-security}"
 
     echo "[intel-fetcher] Fetching from GitHub Advisories..."

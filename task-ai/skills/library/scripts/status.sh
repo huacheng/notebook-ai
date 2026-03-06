@@ -11,7 +11,7 @@ LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 export NB_WORKSPACES_LIBRARY="$LIB_PATH"
 
 if [[ ! -d "$LIB_PATH" ]]; then
-    echo "[ERROR] Library not found."
+    echo "[ERROR] Library not found at $LIB_PATH" >&2
     exit 1
 fi
 
@@ -19,7 +19,7 @@ fi
 if [[ -f "$AUDIT_PY" ]]; then
     python3 "$AUDIT_PY"
 else
-    echo "[ERROR] audit-library.py missing."
+    echo "[ERROR] audit-library.py not found at $AUDIT_PY" >&2
     exit 1
 fi
 

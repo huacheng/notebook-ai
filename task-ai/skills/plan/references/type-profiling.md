@@ -102,8 +102,8 @@ Auto-maintained by research. Predefined seed types + dynamically discovered type
 | software | Programming, API, database, UI development | (seed) | — |
 | dsp | Digital signal processing, audio, frequency analysis | (seed) | — |
 | data-pipeline | Data transformation, ETL, migration | (seed) | — |
-| quantum-computing | Quantum circuit design and simulation | 2024-03-15 | quantum-sim |
-| game-design | Game mechanics, level design, balancing | 2024-04-02 | rpg-prototype |
+| quantum-computing | Quantum circuit design and simulation | 2025-03-15 | quantum-sim |
+| game-design | Game mechanics, level design, balancing | 2025-04-02 | rpg-prototype |
 ```
 
 ### Lifecycle

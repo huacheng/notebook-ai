@@ -59,7 +59,7 @@ Output a summary table of all notebooks:
 
 Output all fields from the notebook's `.working/.status.json` plus:
 - `.summary.md` content (if exists) — condensed context
-- `.target.md` first 10 lines — requirements preview
+- `.target.md` first 10 lines (preview, if exists) — requirements overview
 - File listing of `.working/` directory (system files and sub-directories)
 
 ### 3. Dependency Graph (`--deps`)
@@ -83,15 +83,15 @@ Extract status transition history from git log:
 git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100
 ```
 
-Use `--format="%h %ai %s"` to include abbreviated hash, author date (ISO format), and subject — providing the timestamps needed for timeline reconstruction. Use `--fixed-strings` to prevent `(` and `)` in the pattern from being interpreted as regex metacharacters. Limit to 100 entries (`-n 100`) to bound output size; most tasks have far fewer transitions.
+The format `%h %ai %s` includes abbreviated hash, author date (ISO format), and subject — providing the timestamps needed for timeline reconstruction. The `--fixed-strings` flag prevents `(` and `)` in the pattern from being interpreted as regex metacharacters. The `-n 100` limit bounds output size; most tasks have far fewer transitions.
 
 Parse commit messages to reconstruct the timeline of status changes.
 
 ## Execution Steps
 
-1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.working/.status.json` to discover notebooks. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT` (project/notebook/.working/)
-2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output).
-3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
+1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.working/.status.json`. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT`: project / notebook / `.working/`
+2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output)
+3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: validate that `notebook` argument is provided (REJECT if missing — timeline requires a specific notebook), then extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
 
 ## State Transitions
@@ -102,7 +102,7 @@ Parse commit messages to reconstruct the timeline of status changes.
 
 ## Git
 
-None — `list` does not create any commits (e.g., it will never create a `task-ai(<notebook>):feat ...` commit).
+None — `list` does not create any commits.
 
 ## .auto-signal
 

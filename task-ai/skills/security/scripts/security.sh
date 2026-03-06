@@ -69,7 +69,7 @@ verify_cmd() {
         local -a grep_opts=("-q" "-E")
         [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if printf '%s\n' "$cmd" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+        if printf '%s\n' "$cmd" | grep "${grep_opts[@]}" -- "$rule_pattern" 2>/dev/null; then
             risk="high"
             reason="dynamic:$rule_id"
             break
@@ -112,7 +112,7 @@ verify_cmd() {
 
     # 5. Path Traversal
     # D2: Only check for traversal patterns (../) not all absolute paths (too many false positives)
-    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "\.\./" ; then
+    if [[ "$risk" == "low" ]] && printf '%s\n' "$cmd" | grep -qE "\.\./"; then
         risk="high"
         reason="Path traversal detected"
     fi
@@ -204,7 +204,7 @@ audit_plan() {
         local -a grep_opts=("-q" "-E")
         [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if printf '%s\n' "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+        if printf '%s\n' "$content" | grep "${grep_opts[@]}" -- "$rule_pattern" 2>/dev/null; then
             risk="high"
             findings+=("dynamic:$rule_id")
         fi
@@ -363,7 +363,7 @@ scan_skill() {
         local -a grep_opts=("-q" "-E")
         [[ "$rule_case_insensitive" == "true" ]] && grep_opts+=("-i")
 
-        if printf '%s\n' "$content" | grep "${grep_opts[@]}" "$rule_pattern" 2>/dev/null; then
+        if printf '%s\n' "$content" | grep "${grep_opts[@]}" -- "$rule_pattern" 2>/dev/null; then
             risk="high"
             findings+=("dynamic:$rule_id")
         fi
@@ -376,7 +376,6 @@ scan_skill() {
     # To add new core rules, modify this code and release a new version.
     # =========================================================================
 
-    # D6: Removed unused code_blocks variable (dead code)
     # CORE rules scan full $content directly for better coverage
 
     # CORE-001: Destructive commands
@@ -424,7 +423,7 @@ scan_skill() {
         '\$\(.*\)'
     )
     for pattern in "${injection_patterns[@]}"; do
-        if printf '%s\n' "$content" | grep -qE "$pattern"; then
+        if printf '%s\n' "$content" | grep -qE -- "$pattern"; then
             risk="high"
             findings+=("injection:$pattern")
             break

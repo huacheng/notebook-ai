@@ -13,7 +13,7 @@ NOTEBOOK="${1:-}"
 resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
-# D2: Re-validate notebook name (find_nb_context path skips lib.sh validation)
+# D2: Re-validate notebook name (find_nb_context derives name from directory/branch without full sanitization)
 if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     echo "[ERROR] Invalid notebook name: $NOTEBOOK" >&2
     exit 1
@@ -25,7 +25,14 @@ if [[ ! -d "$WORK_DIR" ]]; then
 fi
 
 STATUS_JSON="$WORK_DIR/.status.json"
-STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+STATE_PY="$TASK_AI_ROOT/core/state.py"
+SIGNAL_FILE="$WORK_DIR/.auto-signal"
+
+# D3: Cleanup handler — remove temp files on exit
+cleanup_merge() {
+    rm -f "${SIGNAL_FILE}.tmp" 2>/dev/null || true
+}
+trap cleanup_merge EXIT INT TERM
 
 # D3: Check state.py existence before calling
 if [[ ! -f "$STATE_PY" ]]; then
@@ -42,7 +49,7 @@ fi
 
 # D1: Validate dependency gate (per SKILL.md step 2)
 DEPENDS_ON=$(python3 "$STATE_PY" get "$STATUS_JSON" depends_on 2>/dev/null || echo "")
-if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "[]" ]]; then
+if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "None" && "$DEPENDS_ON" != "[]" ]]; then
     echo "[INFO] Dependency gate: depends_on present — validation delegated to AI agent caller" >&2
 fi
 
@@ -52,9 +59,11 @@ reject_no_accept() {
     echo "[ERROR] $msg" >&2
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "$WORK_DIR/.auto-signal" <<EOSIG
+    # D3: Atomic write via .tmp + mv
+    cat > "${SIGNAL_FILE}.tmp" <<EOSIG
 {"step":"merge","result":"rejected","next":"(stop)","checkpoint":"no-accept","timestamp":"$ts"}
 EOSIG
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 }
 
@@ -68,7 +77,7 @@ LATEST_ANALYSIS=$(find "$ANALYSIS_DIR" -maxdepth 1 -name '*.md' -printf '%T@\t%p
 if [[ -z "$LATEST_ANALYSIS" ]]; then
     reject_no_accept "No analysis files found in $ANALYSIS_DIR. Run 'check --checkpoint post-exec' first."
 fi
-# D1: Use -E for portable extended regex; anchor "accept" to avoid matching "not-accept"
+# D1: Use extended regex; anchor "accept" after "verdict" to avoid matching "not-accept"
 if ! grep -qiE "post-exec-accept|verdict[: ]+accept" "$LATEST_ANALYSIS" 2>/dev/null; then
     reject_no_accept "No ACCEPT verdict found in latest analysis file. Run 'check --checkpoint post-exec' first."
 fi
@@ -76,12 +85,17 @@ fi
 # D3: Check for uncommitted changes that would block checkout
 if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     echo "[ERROR] Working tree has uncommitted changes. Commit or stash before merging." >&2
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
+{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
+EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 fi
 
 echo "Merging task: $NOTEBOOK"
 
-# 1. Resolve task branch
+# Resolve task branch from .status.json (default: task/<notebook>)
 TASK_BRANCH=$(python3 "$STATE_PY" get "$STATUS_JSON" branch 2>/dev/null || echo "")
 
 if [[ -z "$TASK_BRANCH" ]]; then
@@ -100,7 +114,7 @@ if ! git rev-parse --verify "refs/heads/$TASK_BRANCH" >/dev/null 2>&1; then
     exit 1
 fi
 
-# 2. Dynamically detect main branch (not hardcoded to master)
+# Dynamically detect main branch (not hardcoded to master)
 MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "")
 
 # D3: Fallback chain — try "main", then "master"
@@ -116,7 +130,7 @@ if [[ -z "$MAIN_BRANCH" ]] || ! git rev-parse --verify "refs/heads/$MAIN_BRANCH"
     fi
 fi
 
-# 3. Read multi-stage info (used after merge in Phase 4)
+# Read multi-stage info (used after merge in Phase 4)
 STAGE_CURRENT=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.current 2>/dev/null || echo "1")
 STAGE_TOTAL=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.total 2>/dev/null || echo "1")
 
@@ -135,13 +149,15 @@ fi
 
 echo "[GIT] Merging $TASK_BRANCH into $MAIN_BRANCH..."
 
-# 4. Phase 2: Execute actual git merge
+# Phase 2: Execute actual git merge
 if ! git checkout "$MAIN_BRANCH"; then
     echo "[ERROR] Failed to checkout $MAIN_BRANCH" >&2
     TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "$WORK_DIR/.auto-signal" <<EOF
+    # D3: Atomic write via .tmp + mv
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
 {"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
 EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 fi
 
@@ -150,16 +166,18 @@ MERGE_FAILED=0
 git merge --no-ff -m "task-ai($NOTEBOOK):merge merge completed task" -- "$TASK_BRANCH" || MERGE_FAILED=1
 
 if [[ "$MERGE_FAILED" -ne 0 ]]; then
-    echo "[ERROR] Merge conflict detected. Please resolve manually." >&2
+    echo "[ERROR] Merge failed (likely conflict). Please resolve manually." >&2
     # D3: Abort merge and write conflict signal
     git merge --abort 2>/dev/null || echo "[WARN] merge --abort failed" >&2
     git checkout "$TASK_BRANCH" 2>/dev/null || true
 
     # D1: Write conflict .auto-signal (per SKILL.md)
     TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "$WORK_DIR/.auto-signal" <<EOF
+    # D3: Atomic write via .tmp + mv
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
 {"step":"merge","result":"conflict","next":"(stop)","checkpoint":"","timestamp":"$TIMESTAMP"}
 EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 fi
 
@@ -168,7 +186,7 @@ fi
 # the merged codebase includes the final status. Checking out the task branch
 # would leave main without the status transition.
 
-# 5. Phase 4: Post-merge finalization — branch on stage info
+# Phase 4: Post-merge finalization — branch on stage info
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 if [[ "$STAGE_CURRENT" -lt "$STAGE_TOTAL" ]]; then
@@ -179,17 +197,19 @@ if [[ "$STAGE_CURRENT" -lt "$STAGE_TOTAL" ]]; then
     # D3: Transition failure is fatal — .auto-signal must not claim stage-done if status is still executing
     if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status stage-done; then
         echo "[ERROR] Failed to update status to stage-done. Merge succeeded but state update failed." >&2
-        # D3: Write .auto-signal so daemon can route even on state transition failure
-        cat > "$WORK_DIR/.auto-signal" <<EOFAIL
+        # D3: Write .auto-signal so daemon can route even on state transition failure (atomic)
+        cat > "${SIGNAL_FILE}.tmp" <<EOFAIL
 {"step":"merge","result":"rejected","next":"(stop)","checkpoint":"state-transition-failed","timestamp":"$TIMESTAMP"}
 EOFAIL
+        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
         exit 1
     fi
 
-    # Write .auto-signal for stage-done
-    cat > "$WORK_DIR/.auto-signal" <<EOF
+    # Write .auto-signal for stage-done (atomic)
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
 {"step":"merge","result":"stage-done","next":"highlight","checkpoint":"","timestamp":"$TIMESTAMP"}
 EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
 
     # Git commit stage state
     cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }
@@ -203,17 +223,19 @@ else
     # D3: Transition failure is fatal — .auto-signal must not claim success if status is still executing
     if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status complete; then
         echo "[ERROR] Failed to update status to complete. Merge succeeded but state update failed." >&2
-        # D3: Write .auto-signal so daemon can route even on state transition failure
-        cat > "$WORK_DIR/.auto-signal" <<EOFAIL
+        # D3: Write .auto-signal so daemon can route even on state transition failure (atomic)
+        cat > "${SIGNAL_FILE}.tmp" <<EOFAIL
 {"step":"merge","result":"rejected","next":"(stop)","checkpoint":"state-transition-failed","timestamp":"$TIMESTAMP"}
 EOFAIL
+        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
         exit 1
     fi
 
-    # Write .auto-signal for success
-    cat > "$WORK_DIR/.auto-signal" <<EOF
+    # Write .auto-signal for success (atomic)
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
 {"step":"merge","result":"success","next":"highlight","checkpoint":"","timestamp":"$TIMESTAMP"}
 EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
 
     # Git commit task state
     cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }

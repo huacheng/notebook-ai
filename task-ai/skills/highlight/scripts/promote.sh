@@ -14,7 +14,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORE_DIR="$SCRIPT_DIR/../../../core"
 
-# Load core library and ensure library exists (C pattern)
+# Load core library and ensure library directory exists
 source "$CORE_DIR/lib.sh"
 ensure_library
 
@@ -75,10 +75,10 @@ parse_frontmatter() {
 
     # D3: Extract YAML frontmatter between first two --- markers only
     # Uses awk to stop after the closing ---, avoiding false matches in body
-    # D2: Use -F (fixed-string) for field match to avoid regex injection from field names
+    # D2: Use -F (fixed-string) for field match to avoid regex injection from field names.
+    # Uses awk with index() (literal string match) to avoid interpolating field into a regex.
     awk 'NR==1 && /^---$/{f=1;next} f && /^---$/{exit} f' "$file" 2>/dev/null | \
-        grep -F "${field}:" | grep -E "^${field}:" | head -1 | \
-        sed "s/^${field}:[[:space:]]*//" | \
+        awk -v key="${field}:" 'index($0, key) == 1 { sub(key, ""); sub(/^[[:space:]]*/, ""); print; exit }' | \
         tr -d '"' | tr -d "'"
 }
 

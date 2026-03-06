@@ -76,12 +76,12 @@ For each implementation step:
    - **Optional delegation — capability check**: Before implementing, follow `auto/references/plugin-delegation.md` to check if the current step matches a capability slot: `type` containing `frontend`/`web`/`ui` → `frontend-design` slot; `type` containing `bugfix` or NEEDS_FIX resumption → `debugging` slot; `type` containing `software` with `.test/` criteria → `tdd` slot; otherwise → `domain-*` semantic scan. If matched, invoke via Task subagent — guidance is incorporated into the implementation approach. No match or failure → use existing inline methods
 4. **HS confirmation** (VFP-applicable types with VH stubs): After implementing, run the same step-specific tests:
    - **All Green (passing)** → record successful VH→HS transition, proceed
-   - **Still Red (failing)** → mark step as `NEEDS_FIX`, record failure details (which tests still fail and why). If minor, attempt a targeted fix and re-run. If unresolvable, signal `(mid-exec)` for check evaluation
+   - **Still Red (failing)** → mark step as `NEEDS_FIX`, record failure details (which tests still fail and why). If minor, attempt a targeted fix and re-run. If unresolvable, signal `(mid-exec)` for verify → check evaluation
 5. **Cumulative Green Gate (CGG)** (VFP-applicable types, after HS confirmation): Run all previously-passed VH stubs (step-1..N-1) to confirm no regressions. Append results to `.test/<date>-cumulative-green.jsonl`. For human VH types, store approval snapshots in `.test/hil-snapshots/`. On regression → fix (≤1 attempt) → re-run; still failing → signal `(mid-exec)`. Skip if step=1 or no VH stubs exist
 6. **Refactor window** (VFP-applicable types, after HS confirmation): With tests passing, check for obvious refactoring opportunities in the code just written (duplication, naming, dead code). If refactored, run the **full** test suite (not just step tests) to confirm no regressions. Skip if the step was straightforward with no refactoring opportunities
 7. **Verify** the step succeeded against `.test/` criteria using **domain-appropriate verification** (see per-type seed file or `.type-profile.md` for domain verification methods)
 8. **Record** what was done (files changed, commands run, tools invoked, approach taken)
-9. **Create** `.notes/<YYYY-MM-DD>-<summary>-exec.md` when implementation deviates from plan, an unexpected workaround is needed, or a non-obvious API behavior is discovered. Skip for straightforward steps that follow the plan exactly. For software types, include a **VFP Cycle Summary** section per step: `Red (N failing) → Green (N passing) → Refactor (yes/no)`
+9. **Create** `.notes/<YYYY-MM-DD>-<summary>-exec.md` when implementation deviates from plan, an unexpected workaround is needed, or a non-obvious API behavior is discovered. Skip for straightforward steps that follow the plan exactly. For VFP-applicable types, include a **VFP Cycle Summary** section per step: `Red (N failing) → Green (N passing) → Refactor (yes/no)`
 10. **Update** `.summary.md` (task-level) — overwrite with condensed summary including ALL notes from `.notes/`
 
 ### Issue Handling
@@ -90,7 +90,7 @@ For each implementation step:
 |-----------|--------|
 | Step succeeds | Record in progress log, continue |
 | Minor deviation needed | Adjust and document, continue |
-| Significant issue | Stop execution, signal `(mid-exec)`. Interactive: suggest `check --checkpoint mid-exec`. Auto: daemon routes to mid-exec evaluation |
+| Significant issue | Stop execution, signal `(mid-exec)`. Interactive: suggest `verify --checkpoint mid-exec` (then `check`). Auto: daemon routes to verify → check mid-exec evaluation |
 | Blocking dependency | Set status to `blocked`, report which dependency |
 
 ## Execution Steps
@@ -109,13 +109,13 @@ For each implementation step:
 8. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
 9. **For each step** (follow Per-Step Execution flow above):
    9.1. Read required files
-   9.2. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
+   9.2. **VH confirmation** — run step-specific VH stubs (VFP-applicable types only, see Per-Step step 2)
    9.3. Implement the change
-   9.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
-   9.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
-   9.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
+   9.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (VFP-applicable types only, see Per-Step step 4)
+   9.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (VFP-applicable types only, see Per-Step step 5)
+   9.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (VFP-applicable types only, see Per-Step step 6)
    9.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
-   9.8. Record result (include VFP cycle summary for software types)
+   9.8. Record result (include VFP cycle summary for VFP-applicable types)
    9.9. Update `.status.json` `completed_steps` to current step number
 10. **After all steps** (or on failure):
     - Update `.status.json` timestamp
@@ -171,8 +171,8 @@ For long-running executions, intermediate progress can be observed by:
 - The executor should follow project coding conventions (check CLAUDE.md if present)
 - When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` and `.analysis/` latest files, using the most recent by filename date as fix guidance (`.bugfix/` = mid-exec source, `.analysis/` = post-exec source)
 - When `--step N` is used, the executor verifies prerequisites for that step are met, then signals `(step-N)` on completion for mid-exec checkpoint
-- After successful execution of all steps, the user should run `/task-ai:check --checkpoint post-exec`
-- Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec evaluation by `check`
+- After successful execution of all steps, the user should run `/task-ai:verify --checkpoint post-exec` followed by `/task-ai:check --checkpoint post-exec`
+- Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec `verify` + `check` evaluation
 - **VFP protocol reference**: The Verification-First Protocol (VH confirmation, HS confirmation, Cumulative Green Gate, Refactor window) is defined in `commands/references/verification-first-protocol.md`. Refer to that document for full VFP applicability rules, VH stub design patterns, and CGG thresholds
 - **Evidence-based decisions**: When uncertain about APIs, library usage, or compatibility, use shell commands to verify (curl official docs, check installed versions, read node_modules source, etc.) before implementing
 - **Experience invalidation**: If implementation reveals that a previously loaded experience file (`<notebook>-impl.md`, `-verify.md`, or `-eval.md`) provided guidance that contradicts actual runtime behavior (e.g., documented API signature doesn't match, performance claim is wrong), set `quality_status: invalidated` on that file — acquire `.memory/.experiences/.lock` → update frontmatter → write atomically (`.tmp → rename`) → append `experience` changelog line with tag `quality_status:invalidated` → release lock

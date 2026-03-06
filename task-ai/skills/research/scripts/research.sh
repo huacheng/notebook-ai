@@ -35,7 +35,6 @@ post_write_maintain() {
     fi
 }
 
-
 # Parse arguments
 NOTEBOOK=""
 TOPIC=""
@@ -96,7 +95,7 @@ WORK_DIR=""
 if [[ -n "$NOTEBOOK" ]] || [[ -z "$TOPIC" ]]; then
     resolve_workdir "${NOTEBOOK:-}" 2>/dev/null && {
         NOTEBOOK="$NB_NOTEBOOK"
-        # resolve_workdir exports WORK_DIR (not NB_WORKDIR)
+        # resolve_workdir sets WORK_DIR via export
     } || true
 fi
 
@@ -167,7 +166,8 @@ if [[ "$CALLER" == "audit" ]]; then
             if grep -q "$QUALITY_STATUS_VERIFIED" "$exp_file" 2>/dev/null; then
                 # R3: Validate content before copy (D2 security)
                 # Check 1: File size limit
-                FILE_SIZE=$(stat -f%z "$exp_file" 2>/dev/null || stat -c%s "$exp_file" 2>/dev/null || echo "")
+                # D3: Linux stat first (primary platform), macOS fallback second
+                FILE_SIZE=$(stat -c%s "$exp_file" 2>/dev/null || stat -f%z "$exp_file" 2>/dev/null || echo "")
                 # D3: If stat failed for both platforms, skip the file
                 if [[ -z "$FILE_SIZE" ]]; then
                     echo "[research:audit] Skip: $exp_file — cannot determine file size"
@@ -318,7 +318,7 @@ RESEARCH_END
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Notebook-context research (target/plan/test/verify/check/exec)
+# Notebook-context research (requires WORK_DIR and .target.md)
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ -z "$WORK_DIR" ]] || [[ ! -f "$TARGET_MD" ]]; then
     echo "[ERROR] No notebook context and no topic provided" >&2
@@ -411,7 +411,7 @@ else
         fi
     fi
 
-    # After research writes to library
+    # Trigger maintenance (agent may have written to library during research)
     post_write_maintain
 
     # D1: Write .auto-signal per SKILL.md — route back to calling phase

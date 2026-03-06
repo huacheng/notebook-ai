@@ -5,7 +5,7 @@ External plugin delegation for task-ai lifecycle skills. Enables runtime discove
 ## Design Principles
 
 - **No hardcoded plugin names** — runtime semantic matching adapts to plugin install/uninstall/update
-- **Task subagent isolation** — external plugins execute in isolated context; main session receives only a summary (<=500 chars)
+- **Task subagent isolation** — external plugins execute in isolated context; main session receives only a summary (<=500 chars default, per-slot overrides apply)
 - **Graceful degradation** — no matching plugin or invocation failure falls back to existing inline logic
 - **Minimal intrusion** — each SKILL.md adds 2-4 delegation lines referencing this shared protocol
 
@@ -163,7 +163,7 @@ Created on first successful delegation. Updated on each new capability discovery
 # Plugin Capability Registry
 
 | Slot | Category | Semantic Description | Applicable Phases | Match Signal | Last Matched Plugin | Updated |
-|------|----------|---------------------|-------------------|-------------|--------------------:|---------|
+|------|----------|---------------------|-------------------|-------------|---------------------|--------:|
 | doc-parse | capability | Parse binary documents to markdown | research | extension:.pdf/.docx/.xlsx/.pptx | document-skills:pdf | 2024-01-15 |
 | frontend-design | capability | UI/UX component guidance | exec | type:frontend\|web\|ui | frontend-design:frontend-design | 2024-01-20 |
 | plan-executor | executor | Plan-driven implementation engine | exec | semantic:.plan.md has TDD steps + test criteria | superpowers:subagent-driven-development | 2024-01-25 |

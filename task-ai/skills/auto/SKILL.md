@@ -359,7 +359,7 @@ Fields:
 - `next`: what the agent will execute next (or `"(stop)"`)
 - `checkpoint`: context hint (e.g., `"post-plan"`, `"mid-exec"`, `"post-exec"`, `"pre-merge"`). Empty when not applicable
 - `iteration`: current iteration count. **Auto-mode only** — absent in manual execution
-- `compaction_count`: context compaction invocations within current iteration. **Auto-mode only**. Reset to `0` each iteration. If `>= 3` → stop with warning (see Compaction frequency limit)
+- `compaction_count`: context compaction invocations within current auto session. **Auto-mode only**. Reset to `0` on normal iteration advance. On compaction recovery, incremented by 1 (NOT reset). If `>= 3` → stop with warning (see Compaction frequency limit)
 - `vfp_cycles_completed`: VH→HS cycles completed during Phase 3 execution. **Auto-mode only**, software types only
 - `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (complete/stage-done)
 - `phase_progress`: float 0-1, progress within current phase
@@ -481,7 +481,7 @@ The auto skill runs this loop within a single Claude session:
    2.6. Increment iteration counter
    2.7. If next == "(stop)" → break loop
    2.8. Set current step = next step → continue loop
-3. Cleanup: delete .auto-signal, report final status
+3. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
 
 ## Detailed Loop Logic
 
@@ -638,6 +638,6 @@ Auto mode inherits git behavior from each sub-command. No additional git commits
 - Auto mode starts by entering `/task-ai:auto` in the prompt input window (notebook is auto-detected from CWD or git branch context)
 - Daemon's only active intervention is writing `.auto-stop`; all other activity is passive monitoring
 - `.auto-signal` and `.auto-stop` are transient files — should be in `.gitignore`
-- **Known trade-off**: First entry on `executing` status always runs `check --checkpoint post-exec`. If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration
+- **Known trade-off**: First entry on `executing` status always runs verify → check (post-exec). If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration
 - **Plugin delegation**: External plugin delegation works naturally. Skills invoke plugins via Task tool, creating isolated subagents
 - **Self-service bias**: check evaluates its own LLM output — structural bias toward high scores. v1 mitigates via three-file anchored review. Future: external verification signals (coverage, lint, user feedback) as score calibration

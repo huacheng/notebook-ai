@@ -26,8 +26,8 @@ def audit_library():
                 if line_stripped.startswith('|') and '.md' in line_stripped:
                     parts = line_stripped.split('|')
                     # D1: Master index format: | Topic | Type | Keywords | File Path | Source |
-                    # parts[0]="" parts[1]=Topic parts[2]=Type parts[3]=Keywords parts[4]=File Path
-                    if len(parts) >= 5:
+                    # parts[0]="" parts[1]=Topic parts[2]=Type parts[3]=Keywords parts[4]=File Path parts[5]=Source
+                    if len(parts) >= 6:
                         path = parts[4].strip()
                         # D1: Skip header and separator rows
                         if path and path != 'File Path' and not path.startswith('-'):
@@ -41,7 +41,8 @@ def audit_library():
     
     if memory_path.exists():
         for p in memory_path.rglob('*.md'):
-            if p.name.startswith('.') or p.name in ('.index.md', '.summary.md'): continue
+            # D6: Skip dot-prefixed files (includes .index.md, .summary.md, .lock, etc.)
+            if p.name.startswith('.'): continue
             
             rel_path = str(p.relative_to(lib_path))
             physical_files.add(rel_path)

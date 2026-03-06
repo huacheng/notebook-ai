@@ -4,7 +4,7 @@ All sub-commands that write to `$NB_WORKSPACES_LIBRARY/` MUST follow the six-ste
 
 ## Six-Step Protocol
 
-> See `commands/references/library-write-protocol.md` for the canonical six-step protocol, changelog format, and append/overwrite rules.
+> See `skills/library/references/write-protocol.md` (this file) for the canonical six-step protocol, changelog format, and append/overwrite rules.
 
 ## Per-Directory Lock Table
 
@@ -68,7 +68,7 @@ Used by `maintain` to count usage for `effectiveness_mark` candidate detection.
 | topic | versions | marked_version | source_domain | last_verified | stale | injection_risk |
 |-------|---------|----------------|---------------|---------------|-------|----------------|
 | jwt-auth | v1,v2,v3 | v2 | auth0.com | 2026-01-10 | no | none |
-| redis-session | v1 | — | redis.io | 2025-06-01 | yes⚠ | low |
+| redis-session | v1 | — | redis.io | 2025-06-01 | yes(!) | low |
 ```
 
 ### `.memory/.experiences/<type>/.index.md`
@@ -116,13 +116,13 @@ Flat index of all library files — used for cold-start full-match when `changel
 # Library Master Index
 <!-- Updated by: init (skeleton), all writers (append), maintain --rebuild-index (rebuild) -->
 
-| path | type | topic/type/problem | quality_status | effectiveness_mark | last_verified | source |
-|------|----|---------------------|----------------|--------------------|---------------|--------|
-| .memory/.references/jwt-auth-v3.md | reference | jwt-auth | active | ✓ | 2026-01-10 | system |
-| .memory/.experiences/software/auth-refactor-complete.md | experience | software | verified | ✓ | 2026-02-01 | system |
-| .memory/.type-profiles/software.md | type-profile | software | — | — | 2026-02-10 | system |
-| .memory/.thinking/patterns/replan-loop.md | pattern | replan-loop | validated | — | 2026-02-15 | system |
-| company-docs/api-spec.md | user-import | — | — | — | — | user-import |
+| Topic | Type | Keywords | File Path | Source |
+|-------|------|----------|-----------|--------|
+| jwt-auth | reference | jwt, auth, session | .memory/.references/jwt-auth-v3.md | system |
+| software | experience | auth, refactor | .memory/.experiences/software/auth-refactor-complete.md | system |
+| software | type-profile | methodology | .memory/.type-profiles/software.md | system |
+| replan-loop | pattern | replan, loop | .memory/.thinking/patterns/replan-loop.md | system |
+| api-spec | user-import | | company-docs/api-spec.md | user-import |
 ```
 
 Writers append one row after each write (step 5 extended for master index). `maintain --rebuild-index` rebuilds it from ground truth.

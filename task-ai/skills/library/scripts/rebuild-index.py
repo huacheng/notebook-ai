@@ -51,7 +51,7 @@ def rebuild_index():
                 # D1: Track rows per immediate subdirectory for per-type indexes
                 if sub_dir_name == '.experiences' and p.parent != dir_path:
                     subdir_rows.setdefault(p.parent, []).append(row)
-            except (IOError, UnicodeDecodeError) as e:
+            except (OSError, UnicodeDecodeError, ValueError) as e:
                 print(f"[ERROR] Failed to read {p}: {e}")
 
         if dir_rows:

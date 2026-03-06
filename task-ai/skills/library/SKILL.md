@@ -43,7 +43,7 @@ arguments:
 
 # /task-ai:library — Knowledge Library Management
 
-The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross-task experiences, external references, domain type profiles, and Thinking CoT patterns. This sub-command provides four operations: `search`, `list`, `status`, and `maintain`.
+The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross-task experiences, external references, domain type profiles, and Thinking CoT patterns. This sub-command provides five operations: `search`, `list`, `status`, `maintain`, and `evolve`.
 
 `library` is a **pure utility sub-command**: no task status changes, no `.auto-signal`, no participation in the automation loop.
 
@@ -154,7 +154,7 @@ By default, `search` returns Layer 1 results and their Layer 2 summaries. Full c
 6.  **Sort results** by score DESC; apply **4000-token context budget** — load files until budget exhausted; always include top-scored result regardless of budget
 7.  **Print scored results** table with file path, score, and match rationale
 
-### 2. `list [--type <type>]`
+### `list [--type <type>]`
 
 List library contents by category.
 
@@ -168,7 +168,7 @@ List library contents by category.
 6.  **If `--type` specified**: filter all tables to matching type or pipe-separated segments
 7.  **Print formatted summary tables**
 
-### 3. `status`
+### `status`
 
 Audit library health across six dimensions.
 
@@ -182,7 +182,7 @@ Audit library health across six dimensions.
 6.  **Changelog size**: count lines and bytes; warn if approaching 2000-line compact threshold
 7.  **Print structured health report** — do **not** modify any files
 
-### 4. `maintain`
+### `maintain`
 
 Maintenance operations. `report` automatically triggers a lightweight compact-check (step count only, no I/O) after its own `.auto-signal` write.
 
@@ -258,7 +258,7 @@ Report stale knowledge without auto-triggering `research`.
 
 Run `--rebuild-index` → `--compact` → `--check-staleness` in sequence. Also sweep for stale `.lock` files: for each `.lock` file in library, read its `pid`; if `kill -0 <pid>` fails → remove stale lock and log cleanup.
 
-### 5. `evolve`
+### `evolve`
 
 Security rules evolution loop — discovers new threats and evolves Core/Extended rules.
 
@@ -294,7 +294,8 @@ Security rules evolution loop — discovers new threats and evolves Core/Extende
 
 #### State Files
 
-- `.library/.core-rule-proposals/.last-scan` — Unix timestamp of last scan
+- `.library/.core-rule-proposals/.last-scan-core` — Unix timestamp of last Core Rules scan
+- `.library/.core-rule-proposals/.last-scan-extended` — Unix timestamp of last Extended Rules sync
 - `.library/.core-rule-proposals/.audit.log` — JSON Lines audit trail
 
 **User triggers evolution manually** — task-ai does not run background daemons.
@@ -303,7 +304,7 @@ Security rules evolution loop — discovers new threats and evolves Core/Extende
 
 ## Library Write Protocol
 
-> **See `commands/references/library-write-protocol.md`** for the full six-step write protocol (mkdir → acquire lock → write file → changelog append → update index → release lock), changelog line format, append vs overwrite rules, and `.summary.md` staleness notes.
+> **See `skills/library/references/write-protocol.md`** for the full six-step write protocol (mkdir → acquire lock → write file → changelog append → update index → release lock), changelog line format, append vs overwrite rules, and `.summary.md` staleness notes.
 
 ---
 

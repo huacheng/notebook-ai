@@ -49,7 +49,8 @@ while [[ $# -gt 0 ]]; do
           fi
 
           # Extract entries with ts > LAST_TS
-          # Changelog format: - [type] file.md | action | ts=<timestamp>
+          # Changelog format: <ISO8601Z> | <type> | <subpath> | <tags>
+          # Quick mode looks for ts=<epoch_ms> in tags (appended by writers)
           NEW_FILES=()
           while IFS= read -r line; do
               if [[ "$line" =~ ts=([0-9]+) ]]; then
@@ -107,11 +108,17 @@ while [[ $# -gt 0 ]]; do
     --evolve)
       EVOLVE_SCRIPT="$SCRIPT_DIR/evolve-rules.sh"
       if [[ -f "$EVOLVE_SCRIPT" ]]; then
+          EVOLVE_DOMAIN="${2:-all}"
           # D3: evolve-rules execution with error handling
-          if ! bash "$EVOLVE_SCRIPT" --domain "${2:-all}" --mode auto; then
+          if ! bash "$EVOLVE_SCRIPT" --domain "$EVOLVE_DOMAIN" --mode auto; then
               echo "[WARN] evolve-rules.sh failed" >&2
           fi
-          shift 2 2>/dev/null || shift
+          # D3: Shift safely — consume domain arg only if it was present
+          if [[ $# -ge 2 && "${2:-}" != --* ]]; then
+              shift 2
+          else
+              shift
+          fi
       else
           echo "[ERROR] evolve-rules.sh not found" >&2
           exit 1

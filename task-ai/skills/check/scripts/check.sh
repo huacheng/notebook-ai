@@ -87,8 +87,13 @@ else
             exit 1
         fi
     fi
-    # D3: Release lock on exit (normal or error)
-    trap 'rm -f "$LOCK_FILE"' EXIT
+    # D3: Release lock and clean temp files on exit (normal or error)
+    cleanup() {
+        rm -f "$LOCK_FILE" 2>/dev/null || true
+        rm -f "$WORK_DIR"/.auto-signal.tmp.$$ 2>/dev/null || true
+        rm -f "$WORK_DIR"/.analysis/*.tmp.$$ 2>/dev/null || true
+    }
+    trap cleanup EXIT
 
     ANALYSIS_DIR="$WORK_DIR/.analysis"
     mkdir -p "$ANALYSIS_DIR"
@@ -115,7 +120,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
 
     echo "[audit-validate] Validating candidate rules in $EVOLVING_RULES_DIR"
 
-    # B3: Audit log for traceability
+    # D6: Audit log for traceability
     AUDIT_LOG="$LIB_PATH/.evolving-rules/.audit.log"
     mkdir -p "$(dirname "$AUDIT_LOG")"
 
@@ -161,7 +166,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
         echo "$result"
     }
 
-    # B2: D2 Security check before activation
+    # D2: Security check before activation
     check_rule_security() {
         local rule_file="$1"
         local rule_id="$2"
@@ -200,7 +205,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
         if [[ -d "$TEST_CORPUS/positive" ]] || [[ -d "$TEST_CORPUS/negative" ]]; then
             TEST_DIR="$TEST_CORPUS"
         else
-            # B1 fix: Fallback to legacy directories if no labeled corpus
+            # D3: Fallback to legacy directories if no labeled corpus
             case "$domain" in
                 security)     TEST_DIR="$LIB_PATH/.memory/.experiences" ;;
                 sanitization) TEST_DIR="$LIB_PATH/.memory/.references" ;;
@@ -217,7 +222,7 @@ if [[ "$CHECKPOINT" == "audit-validate" ]]; then
             CANDIDATE_ID="${CANDIDATE_NAME%.yaml}"
             PRECISION=$(calculate_precision "$candidate" "$TEST_DIR")
 
-            # B2: Gate 1 - D2 Security check (blocking)
+            # D2: Gate 1 - Security check (blocking)
             if ! check_rule_security "$candidate" "$CANDIDATE_ID"; then
                 # D3: mv with error handling
                 if ! mv "$candidate" "$REVIEW_DIR/" 2>/dev/null; then
@@ -296,6 +301,8 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
     # Prepare output
     DATE=$(date +%Y-%m-%d)
     SKILL_NAME=$(basename "${TARGET_FILE%.*}")
+    # D2: Sanitize skill name — allow only alphanumeric, dash, underscore
+    SKILL_NAME=$(echo "$SKILL_NAME" | tr -cd 'a-zA-Z0-9_-')
     ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-skill-review-$SKILL_NAME.md"
 
     #############################################
@@ -331,7 +338,7 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
     fi
 
     # Clamp score
-    D2_SCORE=$(echo "if ($D2_SCORE < 0) 0 else $D2_SCORE" | bc)
+    D2_SCORE=$(echo "scale=2; if ($D2_SCORE < 0) 0 else $D2_SCORE" | bc)
 
     if (( $(echo "$D2_SCORE < $GATE_THRESHOLD" | bc -l) )); then
         echo "Gate 1 FAIL: D2_SCORE=$D2_SCORE < $GATE_THRESHOLD"
@@ -375,7 +382,7 @@ if [[ "$CHECKPOINT" == "skill-review" ]]; then
         fi
 
         # Clamp score
-        D1_SCORE=$(echo "if ($D1_SCORE < 0) 0 else $D1_SCORE" | bc)
+        D1_SCORE=$(echo "scale=2; if ($D1_SCORE < 0) 0 else $D1_SCORE" | bc)
 
         if (( $(echo "$D1_SCORE < $GATE_THRESHOLD" | bc -l) )); then
             echo "Gate 2 FAIL: D1_SCORE=$D1_SCORE < $GATE_THRESHOLD"
@@ -562,14 +569,16 @@ Note: T4 requires L3 (skill-deep-review) with score >= 0.85
 EOF
 
         # ─────────────────────────────────────────────────────────────────
-        # Auto-move based on trust tier (T2→T3)
+        # Auto-move: promote to T3 (candidates → drafts)
         # ─────────────────────────────────────────────────────────────────
         LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
         SKILL_PARENT_DIR=$(dirname "$TARGET_FILE")
         SKILL_SLUG=$(basename "$SKILL_PARENT_DIR")
+        # D2: Sanitize slug for use in paths
+        SKILL_SLUG=$(echo "$SKILL_SLUG" | tr -cd 'a-zA-Z0-9_-.')
 
-        # Check if skill is in .candidates/ (eligible for T2→T3 move)
-        # L2 can only promote to T3 (L3 required for T4)
+        # Check if skill is in .candidates/ (eligible for T3 promotion)
+        # L2 promotes to T3 max (L3 required for T4)
         if [[ "$SKILL_PARENT_DIR" == *".candidates"* ]]; then
             if [[ "$TRUST_TIER" == "T3" ]]; then
                 DRAFTS_TARGET="$LIB_PATH/.skills/.drafts/$SKILL_SLUG"
@@ -620,8 +629,12 @@ if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
 
     DATE=$(date +%Y-%m-%d)
     SKILL_NAME=$(basename "${TARGET_FILE%.*}")
+    # D2: Sanitize skill name — allow only alphanumeric, dash, underscore
+    SKILL_NAME=$(echo "$SKILL_NAME" | tr -cd 'a-zA-Z0-9_-')
     SKILL_PARENT_DIR=$(dirname "$TARGET_FILE")
     SKILL_SLUG=$(basename "$SKILL_PARENT_DIR")
+    # D2: Sanitize slug for use in paths
+    SKILL_SLUG=$(echo "$SKILL_SLUG" | tr -cd 'a-zA-Z0-9_-.')
     ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-skill-deep-review-$SKILL_NAME.md"
 
     # Verify skill is in .drafts/ (T3)
@@ -691,7 +704,7 @@ if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
         L3_D2_ISSUES="${L3_D2_ISSUES}\n- Prompt injection vulnerability"
     fi
 
-    L3_D2_SCORE=$(echo "if ($L3_D2_SCORE < 0) 0 else $L3_D2_SCORE" | bc)
+    L3_D2_SCORE=$(echo "scale=2; if ($L3_D2_SCORE < 0) 0 else $L3_D2_SCORE" | bc)
     echo "L3.2 Semantic Security: $L3_D2_SCORE"
 
     #############################################
@@ -800,7 +813,7 @@ EOF
                 echo "[PROMOTION] Skill is now ACTIVE and available for hot-reload"
             fi
         else
-            echo "[SKIP] Already exists in .skills/"
+            echo "[SKIP] Already exists in .skills/.active/"
         fi
     fi
 
@@ -823,7 +836,9 @@ if [[ "$CHECKPOINT" == "post-plan" ]]; then
             VERDICT="REPLAN"
             DATE=$(date +%Y-%m-%d)
             ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-$CHECKPOINT-security-blocked.md"
-            cat > "$ANALYSIS_FILE" <<EOF
+            # D3: Atomic write via temp file
+            ANALYSIS_TMP="$ANALYSIS_FILE.tmp.$$"
+            cat > "$ANALYSIS_TMP" <<EOF
 # Security Audit: post-plan · $DATE
 - Verdict: REPLAN
 - Reason: Security audit blocked the plan
@@ -834,13 +849,16 @@ $AUDIT_OUTPUT
 ## Required Action
 Review and revise the plan to remove dangerous operations.
 EOF
+            mv -f "$ANALYSIS_TMP" "$ANALYSIS_FILE"
             # D3: python3 call with error handling
             if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>/dev/null; then
                 echo "[WARN] Failed to transition status to re-planning" >&2
             fi
             # D1: Write .auto-signal per SKILL.md step 18 (REPLAN → checkpoint empty per signal table)
+            # D3: Atomic write — auto loop may read signal concurrently
             SIGNAL_JSON="{\"step\":\"check\",\"result\":\"REPLAN\",\"next\":\"plan\",\"checkpoint\":\"\",\"timestamp\":\"$(date -Iseconds)\"}"
-            echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
+            SIGNAL_TMP="$WORK_DIR/.auto-signal.tmp.$$"
+            echo "$SIGNAL_JSON" > "$SIGNAL_TMP" && mv -f "$SIGNAL_TMP" "$WORK_DIR/.auto-signal"
             echo "Check completed. Security blocked. Analysis: $ANALYSIS_FILE"
             exit 0
         fi
@@ -954,20 +972,22 @@ Threshold: 0.80 — PASSED. Ready to merge.
 EOF
 
         # Write .auto-signal (merge with existing check_score if present)
+        # D2: Pass timestamp as argument to avoid shell interpolation in Python code
+        MERGE_TS=$(date -Iseconds)
         if [[ -f "$WORK_DIR/.auto-signal" ]] && command -v python3 &>/dev/null; then
             python3 -c "
 import json, sys
 try:
     with open(sys.argv[1]) as f: d = json.load(f)
 except Exception: d = {}
-d.update({'step':'check','result':'PASS','next':'merge','checkpoint':'pre-merge','timestamp':'$(date -Iseconds)'})
+d.update({'step':'check','result':'PASS','next':'merge','checkpoint':'pre-merge','timestamp':sys.argv[2]})
 with open(sys.argv[1],'w') as f: json.dump(d,f)
-" "$WORK_DIR/.auto-signal" 2>/dev/null || {
-                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$(date -Iseconds)\"}"
+" "$WORK_DIR/.auto-signal" "$MERGE_TS" 2>/dev/null || {
+                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$MERGE_TS\"}"
                 echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
             }
         else
-            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$(date -Iseconds)\"}"
+            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$MERGE_TS\"}"
             echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
         fi
 
@@ -1014,20 +1034,22 @@ EOF
         fi
 
         # Write .auto-signal (merge with existing check_score if present)
+        # D2: Pass timestamp as argument to avoid shell interpolation in Python code
+        FIX_TS=$(date -Iseconds)
         if [[ -f "$WORK_DIR/.auto-signal" ]] && command -v python3 &>/dev/null; then
             python3 -c "
 import json, sys
 try:
     with open(sys.argv[1]) as f: d = json.load(f)
 except Exception: d = {}
-d.update({'step':'check','result':'NEEDS_FIX','next':'exec','checkpoint':'pre-merge','retry_count':0,'timestamp':'$(date -Iseconds)'})
+d.update({'step':'check','result':'NEEDS_FIX','next':'exec','checkpoint':'pre-merge','retry_count':0,'timestamp':sys.argv[2]})
 with open(sys.argv[1],'w') as f: json.dump(d,f)
-" "$WORK_DIR/.auto-signal" 2>/dev/null || {
-                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$(date -Iseconds)\"}"
+" "$WORK_DIR/.auto-signal" "$FIX_TS" 2>/dev/null || {
+                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$FIX_TS\"}"
                 echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
             }
         else
-            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$(date -Iseconds)\"}"
+            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$FIX_TS\"}"
             echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
         fi
     fi
@@ -1078,8 +1100,8 @@ case "$VERDICT" in
         echo "[WARN] Failed to transition status to review" >&2
     fi
     ;;
-  ACCEPT|CONTINUE)
-    # ACCEPT/CONTINUE keep current status unchanged
+  ACCEPT|CONTINUE|NEEDS_REVISION|NEEDS_FIX)
+    # ACCEPT/CONTINUE/NEEDS_REVISION/NEEDS_FIX keep current status unchanged
     ;;
   REPLAN)
     if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>/dev/null; then
@@ -1094,13 +1116,16 @@ case "$VERDICT" in
 esac
 
 # Output Analysis File
+# D3: Atomic write via temp file
 DATE=$(date +%Y-%m-%d)
 ANALYSIS_FILE="$ANALYSIS_DIR/$DATE-$CHECKPOINT-${VERDICT,,}.md"
-cat > "$ANALYSIS_FILE" <<EOF
+ANALYSIS_TMP="$ANALYSIS_FILE.tmp.$$"
+cat > "$ANALYSIS_TMP" <<EOF
 # Evaluation: $CHECKPOINT · $DATE
 - Verdict: $VERDICT
 - Rationale: Plumbing stub — full LLM-driven evaluation not yet implemented for this checkpoint.
 EOF
+mv -f "$ANALYSIS_TMP" "$ANALYSIS_FILE"
 
 # D1: Write .auto-signal per SKILL.md Step 18
 # D6: checkpoint field follows SKILL.md .auto-signal table:
@@ -1112,6 +1137,8 @@ case "$VERDICT" in
     SIGNAL_NEXT="merge"; SIGNAL_CP="" ;;
   CONTINUE)
     SIGNAL_NEXT="exec"; SIGNAL_CP="" ;;
+  NEEDS_REVISION)
+    SIGNAL_NEXT="plan"; SIGNAL_CP="" ;;
   NEEDS_FIX)
     SIGNAL_NEXT="exec"; SIGNAL_CP="$CHECKPOINT" ;;
   REPLAN)
@@ -1121,7 +1148,9 @@ case "$VERDICT" in
   *)
     SIGNAL_NEXT="unknown"; SIGNAL_CP="" ;;
 esac
+# D3: Atomic write — auto loop may read signal concurrently
 SIGNAL_JSON="{\"step\":\"check\",\"result\":\"$VERDICT\",\"next\":\"$SIGNAL_NEXT\",\"checkpoint\":\"$SIGNAL_CP\",\"timestamp\":\"$(date -Iseconds)\"}"
-echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
+SIGNAL_TMP="$WORK_DIR/.auto-signal.tmp.$$"
+echo "$SIGNAL_JSON" > "$SIGNAL_TMP" && mv -f "$SIGNAL_TMP" "$WORK_DIR/.auto-signal"
 
 echo "Check completed. Analysis written to $ANALYSIS_FILE."

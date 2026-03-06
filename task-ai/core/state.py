@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "stage-done", "complete", "blocked", "cancelled"}
 
 def get_lock(status_path):
+    """Acquire an exclusive lock for the status file. Uses O_CREAT|O_EXCL for atomicity."""
     lock_path = status_path + ".lock"
     try:
         fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -113,7 +114,7 @@ def cmd_transition(args):
     try:
         state = read_state(args.file)
         
-        if args.status:
+        if args.status is not None:
             if args.status not in VALID_STATUSES:
                 print(f"[ERROR] Invalid status: {args.status}", file=sys.stderr)
                 sys.exit(1)

@@ -106,7 +106,7 @@ if ! mkdir -p "$DELIVERABLES_DIR" 2>/dev/null; then
 fi
 REPORT_FILE="$DELIVERABLES_DIR/.report.md"
 
-# --- Helper: read file content or fallback (D3: cat with 2>/dev/null) ---
+# --- Helper: read file content or fallback (D3: cat with error suppression, returns fallback on failure) ---
 read_file_or() { cat "$1" 2>/dev/null || echo "${2:-N/A}"; }
 
 # --- Helper: collect all files from a directory into markdown subsections ---
@@ -291,8 +291,13 @@ if [[ -x "$MAINTAIN_SH" ]]; then
 fi
 
 # 14. Write .auto-signal (D1: consistent with SKILL.md, with actual timestamp)
+# D3: Atomic write via temp file + rename (consistent with auto.sh pattern)
+SIGNAL_TMP="$WORK_DIR/.auto-signal.tmp.$$"
 SIGNAL_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-if ! printf '{"step":"report","result":"(generated)","next":"(stop)","checkpoint":"","timestamp":"%s"}\n' "$SIGNAL_TS" > "$WORK_DIR/.auto-signal" 2>/dev/null; then
+if printf '{"step":"report","result":"(generated)","next":"(stop)","checkpoint":"","timestamp":"%s"}\n' "$SIGNAL_TS" > "$SIGNAL_TMP" 2>/dev/null && mv "$SIGNAL_TMP" "$WORK_DIR/.auto-signal" 2>/dev/null; then
+    :
+else
+    rm -f "$SIGNAL_TMP"
     echo "[WARN] Failed to write .auto-signal" >&2
 fi
 

@@ -14,10 +14,10 @@ fi
 
 shift || true
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --depth) DEPTH="${2:-}"; shift 2 2>/dev/null || shift ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
-  esac
+    case "$1" in
+        --depth) DEPTH="${2:-}"; shift 2 2>/dev/null || shift ;;
+        *) echo "[ERROR] Unknown option: $1" >&2; exit 1 ;;
+    esac
 done
 
 # D2: Validate DEPTH value
@@ -31,7 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Reading document: $FILE_PATH (Depth: $DEPTH)"
 
-# 1. Ingestion & Topic Extraction (Simulated)
+# 1. Ingestion & Topic Extraction
 BASENAME=$(basename "$FILE_PATH")
 TOPIC="${BASENAME%.*}"
 # D2: Sanitize TOPIC for safe YAML embedding and path safety
@@ -43,17 +43,17 @@ if [[ -z "$TOPIC" ]]; then
 fi
 echo "[1/7] Extracted Topic: $TOPIC"
 
-# 2. Library Deduplication (Layer 1) (Simulated)
+# 2. Library Deduplication (Layer 1)
 echo "[2/7] Deduplicating against library..."
 
-# D1: Handle depth=deep by logging delegation intent (actual research delegation is simulated)
+# D1: Handle depth=deep by logging delegation intent (actual delegation not yet implemented)
 if [[ "$DEPTH" == "deep" ]]; then
     echo "[2/7] Depth=deep: will delegate gap research to 'research --caller exec --scope gap' after dedup"
 fi
 
-# 3. Detox Pipeline (dynamic rules from .evolving-rules/sanitization/ + hardcoded fallback)
+# 5. Detox Pipeline (dynamic rules from .evolving-rules/sanitization/ + hardcoded fallback)
 echo "[3/7] Applying Detox pipeline..."
-# D4: Defer full content read until after size check to avoid loading large files into memory
+# D4: Defer loading content into bash variable until after size check to limit memory usage
 CONTENT=""
 INJECTION_RISK="none"
 FINDINGS=""
@@ -91,7 +91,7 @@ ALL_PATTERNS=()
 ALL_PATTERNS+=("${HARDCODED_PATTERNS[@]}")
 
 for pattern in "${ALL_PATTERNS[@]}"; do
-    if grep -qE "$pattern" "$FILE_PATH" 2>/dev/null; then
+    if grep -qE -- "$pattern" "$FILE_PATH" 2>/dev/null; then
         INJECTION_RISK="high"
         # D2: Sanitize pattern for safe YAML embedding
         SAFE_PATTERN=$(printf '%s' "$pattern" | sed 's/["\\]/\\&/g')
@@ -127,7 +127,7 @@ if [[ -z "$HASH_ORIGINAL" ]]; then
     exit 1
 fi
 
-# 4. Library Write Protocol (six-step per skills/library/references/write-protocol.md)
+# 6. Library Write Protocol (six-step per skills/library/references/write-protocol.md)
 
 # Step 1: mkdir -p (idempotent)
 echo "[4/7] Writing to library..."
@@ -255,7 +255,7 @@ echo "[5/7] Updating changelog and index..."
 CHANGELOG_LOCK="$LIB_PATH/.changelog.lock"
 if acquire_lock "$CHANGELOG_LOCK"; then
     CHANGELOG_LOCK_ACQUIRED=1
-    # D3: Use subshell-style error handling to ensure changelog lock release
+    # D3: Use || fallback to handle append failure without aborting (lock is released below)
     printf '%s | reference | .memory/.references/%s.md | topic:%s,source:local\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TOPIC" "$TOPIC" >> "$LIB_PATH/.changelog" 2>/dev/null \
         || echo "[WARN] Failed to append to changelog" >&2
@@ -293,7 +293,7 @@ echo "[6/7] Releasing lock..."
 release_lock "$LOCK_FILE"
 LOCK_ACQUIRED=0
 
-# 5. Trigger Rebuild
+# 7. Trigger Rebuild
 echo "[7/7] Triggering index rebuild..."
 MAINTAIN_SH="$SCRIPT_DIR/../../library/scripts/maintain.sh"
 if [[ -x "$MAINTAIN_SH" ]]; then

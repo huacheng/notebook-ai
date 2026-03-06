@@ -1,6 +1,6 @@
 ---
 name: merge
-description: "Merge completed task branch to main — with conflict resolution and verification retry. Does not delete branches or worktrees. Triggered after check post-exec ACCEPT verdict confirms all tests pass."
+description: "Merge completed task branch to main — with conflict resolution and verification retry. Does not delete branches or worktrees. Triggered after check post-exec ACCEPT verdict."
 model_tier: medium
 auto_delegatable: false
 triggers:
@@ -49,8 +49,9 @@ Merge a completed task's branch into main, with automated conflict resolution an
 2. **Checkout main** (non-worktree) or already on main (worktree, from main worktree)
 3. **Attempt merge**:
    ```bash
-   git merge --no-ff -m "task-ai(<notebook>):merge merge completed task" -- task/<notebook>
+   git merge --no-ff -m "task-ai(<notebook>):merge merge completed task" -- <task-branch>
    ```
+   Where `<task-branch>` is read from `.status.json` `branch` field (defaults to `task/<notebook>` if unset).
 
 ### Phase 3: Conflict Resolution (if merge fails)
 

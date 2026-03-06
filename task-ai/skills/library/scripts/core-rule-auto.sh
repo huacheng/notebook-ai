@@ -262,7 +262,7 @@ integrate_proposal() {
     echo ""
 
     if [[ "$REQUIRE_HUMAN_APPROVAL" == "true" ]]; then
-        echo -e "${RED}⚠️  HUMAN APPROVAL REQUIRED${NC}"
+        echo -e "${RED}[!] HUMAN APPROVAL REQUIRED${NC}"
         echo ""
         echo "To integrate this rule:"
         echo "  1. Review the code above"
@@ -347,11 +347,11 @@ Pipeline Steps:
 └─────────────────────────────────────────────────────────────────┘
 
 Safety Controls:
-  ✓ Historical backtest required (precision >= 0.98)
-  ✓ Six-dimension review must pass (>= 0.80)
-  ✓ All decisions logged to .evolving-rules.log
-  ✓ Audit trail in .core-rule-proposals/
-  ✓ Git provides rollback safety net
+  [x] Historical backtest required (precision >= 0.98)
+  [x] Six-dimension review must pass (>= 0.80)
+  [x] All decisions logged to .evolving-rules.log
+  [x] Audit trail in .core-rule-proposals/
+  [x] Git provides rollback safety net
 
 One-click full automation:
   library core-rule-auto auto-pipeline

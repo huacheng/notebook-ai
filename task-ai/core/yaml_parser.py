@@ -55,7 +55,8 @@ def parse_yaml_file(filepath: str) -> dict:
                 multiline_buffer = []
 
         # Parse key: value
-        match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*)$', stripped)
+        # D1: Allow hyphens in YAML keys (e.g., case-insensitive, source-url)
+        match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$', stripped)
         if match:
             key = match.group(1)
             value = match.group(2).strip()

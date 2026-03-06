@@ -258,6 +258,7 @@ case "$DOMAIN" in
     security)     generate_security_samples ;;
     sanitization) generate_sanitization_samples ;;
     audit)        generate_audit_samples ;;
+    # D6: Unreachable — domain already validated above; kept as defensive guard
     *)            echo "[ERROR] Unknown domain: $DOMAIN" >&2; exit 1 ;;
 esac
 

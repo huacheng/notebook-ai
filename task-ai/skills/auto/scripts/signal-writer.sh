@@ -16,6 +16,7 @@ write_check_score() {
     # D2: Pass values as arguments to python, not inline interpolation
     python3 - "$signal_file" "$overall" "$d1" "$d2" "$d3" "$d4" "$d5" "$d6" <<'PYEOF'
 import json, sys, os
+from datetime import datetime, timezone
 signal_file = sys.argv[1]
 try:
     overall, d1, d2, d3, d4, d5, d6 = [float(x) for x in sys.argv[2:9]]
@@ -38,6 +39,8 @@ signal['check_score'] = {
     'd3_reliability': d3, 'd4_performance': d4, 'd5_architecture': d5,
     'd6_maintainability': d6,
 }
+# D1: Update timestamp on every signal modification
+signal['timestamp'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 # D3: Atomic write via temp file + rename
 tmp = signal_file + '.tmp'
 with open(tmp, 'w') as f:
@@ -68,6 +71,7 @@ write_phase() {
     # D2: Pass values as arguments to python, not inline interpolation
     python3 - "$signal_file" "$phase" "$progress" <<'PYEOF'
 import json, sys, os
+from datetime import datetime, timezone
 signal_file, phase = sys.argv[1], sys.argv[2]
 try:
     progress = float(sys.argv[3])
@@ -86,6 +90,8 @@ except (json.JSONDecodeError, ValueError) as e:
     sys.exit(1)
 signal['phase'] = phase
 signal['phase_progress'] = progress
+# D1: Update timestamp on every signal modification
+signal['timestamp'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 tmp = signal_file + '.tmp'
 with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)
@@ -105,6 +111,7 @@ increment_retry() {
 
     python3 - "$signal_file" <<'PYEOF'
 import json, sys, os
+from datetime import datetime, timezone
 signal_file = sys.argv[1]
 try:
     with open(signal_file, 'r') as f:
@@ -113,6 +120,8 @@ except (json.JSONDecodeError, ValueError) as e:
     print(f"[ERROR] Corrupted signal file: {e}", file=sys.stderr)
     sys.exit(1)
 signal['retry_count'] = signal.get('retry_count', 0) + 1
+# D1: Update timestamp on every signal modification
+signal['timestamp'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 tmp = signal_file + '.tmp'
 with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)
@@ -140,6 +149,7 @@ append_delegation_failure() {
     # D2: Pass failure string as argument, not inline interpolation
     python3 - "$signal_file" "$failure" <<'PYEOF'
 import json, sys, os
+from datetime import datetime, timezone
 signal_file, failure = sys.argv[1], sys.argv[2]
 try:
     with open(signal_file, 'r') as f:
@@ -151,6 +161,8 @@ failures = signal.get('delegation_failures', [])
 if failure not in failures:
     failures.append(failure)
 signal['delegation_failures'] = failures
+# D1: Update timestamp on every signal modification
+signal['timestamp'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 tmp = signal_file + '.tmp'
 with open(tmp, 'w') as f:
     json.dump(signal, f, indent=2)

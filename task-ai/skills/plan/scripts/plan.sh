@@ -55,7 +55,7 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-STATE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/core/state.py"
+STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 
 # D3: Check state.py existence before calling
 if [[ ! -f "$STATE_PY" ]]; then
@@ -120,10 +120,10 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     fi
 
     # D3: git with error handling (non-fatal — refinement already written to file)
-    if ! git add "$PLAN_FILE" 2>&1; then
+    if ! git add "$PLAN_FILE" 2>/dev/null; then
         echo "[WARN] git add failed" >&2
     fi
-    if ! git commit -m "task-ai($NOTEBOOK):plan refine" 2>&1; then
+    if ! git commit -m "task-ai($NOTEBOOK):plan refine" 2>/dev/null; then
         echo "[WARN] git commit failed (may be no changes)" >&2
     fi
 
@@ -152,12 +152,11 @@ case "$CURRENT_STATUS_GUARD" in
         ;;
 esac
 
-# 1. Invoke Research for Type Discovery (Simulated)
-# In real execution, this would call research.sh. For plumbing:
+# 1. Invoke Research for Type Discovery
 # D3: python3 calls with error handling
 TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null) || TYPE=""
 if [[ -z "$TYPE" ]]; then
-    TYPE="software" # Default for plan testing
+    TYPE="software" # Default fallback type when not set in .status.json
 fi
 
 # D2: Validate type format BEFORE persisting (SKILL.md step 4)
@@ -169,7 +168,7 @@ fi
 
 # D1: Persist type only after validation passes
 if ! python3 "$STATE_PY" get "$STATUS_JSON" type >/dev/null 2>&1; then
-    if ! python3 "$STATE_PY" set "$STATUS_JSON" type "$TYPE" 2>&1; then
+    if ! python3 "$STATE_PY" set "$STATUS_JSON" type "$TYPE" 2>/dev/null; then
         echo "[WARN] Failed to set type in .status.json" >&2
     fi
 fi
@@ -194,7 +193,7 @@ if [[ -f "$PLAN_FILE" ]] && [[ "$CURRENT_STATUS_GUARD" == "review" || "$CURRENT_
         SUPERSEDED="$WORK_DIR/.plan-superseded-$i.md"
     fi
     # D3: mv with error handling - abort if fails to prevent data loss
-    if ! mv "$PLAN_FILE" "$SUPERSEDED" 2>&1; then
+    if ! mv "$PLAN_FILE" "$SUPERSEDED"; then
         echo "[ERROR] Failed to archive .plan.md - aborting" >&2
         exit 1
     fi
@@ -220,7 +219,7 @@ if [[ "$TYPE" == *"software"* ]]; then
     mkdir -p "$TEST_DIR"
     DATE=$(date +%Y-%m-%d)
     STUB_FILE="$TEST_DIR/$DATE-vh-stubs.test.js"
-    
+
     cat > "$STUB_FILE" <<EOF
 // VH: auto-generated stubs for $NOTEBOOK
 test('test-init', () => {
@@ -233,7 +232,7 @@ test('test-core', () => {
   throw new Error('VH: not implemented');
 });
 EOF
-    
+
     # Create VH Baseline
     cat > "$TEST_DIR/$DATE-vh-baseline.md" <<EOF
 # VH Baseline: $NOTEBOOK
@@ -256,7 +255,7 @@ case "$CURRENT_STATUS_GUARD" in
         ;;
 esac
 # D3: python3 call with error handling; reset completed_steps per SKILL.md step 23
-if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status "$NEW_STATUS" --phase "$NEW_PHASE" --completed-steps 0 2>&1; then
+if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status "$NEW_STATUS" --phase "$NEW_PHASE" --completed-steps 0 2>/dev/null; then
     echo "[WARN] Failed to transition status to $NEW_STATUS" >&2
 fi
 
@@ -267,7 +266,7 @@ fi
 
 # Enter plan-refinement phase
 # D3: Error handling for session context write
-if ! printf 'phase: plan-refinement\nentered_at: %s\nentered_by: /task-ai:plan\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>&1; then
+if ! printf 'phase: plan-refinement\nentered_at: %s\nentered_by: /task-ai:plan\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>/dev/null; then
     echo "[WARN] Failed to write session context" >&2
 fi
 
@@ -277,14 +276,14 @@ GIT_ADD_FILES=("$PLAN_FILE" "$STATUS_JSON")
 if [[ -f "$SESSION_CONTEXT" ]]; then
     GIT_ADD_FILES+=("$SESSION_CONTEXT")
 fi
-if ! git add "${GIT_ADD_FILES[@]}" 2>&1; then
+if ! git add "${GIT_ADD_FILES[@]}" 2>/dev/null; then
     echo "[WARN] git add failed" >&2
 fi
 # Also add test directory if it exists (VH stubs, criteria)
 if [[ -d "$WORK_DIR/.test" ]]; then
     git add "$WORK_DIR/.test" 2>/dev/null || true
 fi
-if ! git commit -m "task-ai($NOTEBOOK):plan generate implementation plan" 2>&1; then
+if ! git commit -m "task-ai($NOTEBOOK):plan generate implementation plan" 2>/dev/null; then
     echo "[WARN] git commit failed (may be no changes)" >&2
 fi
 

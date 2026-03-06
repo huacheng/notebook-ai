@@ -268,7 +268,7 @@ quality:
 
 #### Content Structure
 
-Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
+Follow `$NB_WORKSPACES_LIBRARY/references/quality-rubric.md` H/M/L self-assessment standards.
 
 ```markdown
 ## CoT Capture — <caller> phase (<date>)
@@ -348,7 +348,7 @@ check REPLAN may also need to update `.memory/.references/` `failure_count`. Thi
 **Caller**: None (not inline)
 **Independent execution**: **Yes** — auto loop step after merge; manual invocation
 
-This is highlight's core scope, carrying all logic previously in report steps 13-15.
+This is highlight's core scope for comprehensive experience distillation.
 
 #### Trigger & Dual Modes
 
@@ -746,7 +746,7 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 ## Notes
 
 - **Protocol, not runtime**: Inline scopes (§3.1–§3.4) define write format and steps. Calling skills execute these steps in their own context — highlight is not invoked as a separate skill for inline scopes
-- **Fault isolation is universal**: All inline caller commands (the 9 commands listed in §3.3, plus check for §3.4) have the same guarantee — highlight protocol failure never blocks the caller's main flow
+- **Fault isolation is universal**: All inline caller commands (the 9 commands listed in §3.3, plus check's additional §3.4 quality-update role) have the same guarantee — highlight protocol failure never blocks the caller's main flow
 - **No state mutations**: highlight is transparent to the state machine. This is consistent with the former `light` behavior
 - **.type-profiles/ dual ownership**: research creates/updates profiles (knowledge acquisition); highlight syncs during complete (experience write-back). Both use Library Write Protocol locks for concurrency safety
 - **Concurrency**: Independent executions (complete, adhoc) acquire `.working/.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`). promote does NOT acquire `.working/.lock` — it operates on library-level paths (`.skills/.candidates/`, `.changelog`) with its own `.changelog.lock`

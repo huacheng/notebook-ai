@@ -18,7 +18,7 @@ derive_phase() {
         review|executing) echo "execution" ;;
         blocked) echo "execution" ;;
         complete|stage-done) echo "finalization" ;;
-        cancelled) echo "terminal" ;;
+        cancelled) echo "terminal" ;;  # Not in signal validation whitelist; auto exits before writing signal
         *) echo "unknown" ;;
     esac
 }
@@ -27,7 +27,7 @@ ACTION="start"  # Default action
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --stop)   ACTION="stop"; shift ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) echo "[ERROR] Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
@@ -117,7 +117,7 @@ case "$STATUS" in
         elif ! grep -q '## Research Insights' "$TARGET_MD" || \
              [ "$(sed -n '/## Research Insights/,/^## /{ /^## /d; /^[[:space:]]*$/d; p; }' "$TARGET_MD" | wc -l)" -eq 0 ]; then
             STEP="research"
-            RESULT="(o1-collected)"
+            RESULT="(collected)"
             NEXT_STEP="(stop)"
         else
             STEP="plan"

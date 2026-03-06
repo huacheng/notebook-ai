@@ -20,10 +20,12 @@ shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --checkpoint)
-      if [[ $# -lt 2 ]]; then echo "[ERROR] --checkpoint requires a value" >&2; exit 1; fi
+      # D3: Guard against missing option value; D2: reject --option as value
+      if [[ $# -lt 2 || "$2" == --* ]]; then echo "[ERROR] --checkpoint requires a value" >&2; exit 1; fi
       CHECKPOINT="$2"; shift 2 ;;
     --target)
-      if [[ $# -lt 2 ]]; then echo "[ERROR] --target requires a value" >&2; exit 1; fi
+      # D3: Guard against missing option value; D2: reject --option as value
+      if [[ $# -lt 2 || "$2" == --* ]]; then echo "[ERROR] --target requires a value" >&2; exit 1; fi
       TARGET_FILE="$2"; shift 2 ;;
     --generate-skill-tests) GENERATE_SKILL_TESTS=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -161,7 +163,7 @@ if ! mkdir "$LOCK_FILE" 2>/dev/null; then
     fi
 fi
 # D3: Record owning PID for stale lock detection
-echo $$ > "$LOCK_FILE/pid"
+echo "$$" > "$LOCK_FILE/pid"
 # D3: Ensure lock is released and temp files cleaned on exit (normal, error, or signal)
 cleanup() {
     rm -rf "$LOCK_FILE" 2>/dev/null || true
@@ -216,7 +218,11 @@ mv -f "$RESULTS_TMP" "$RESULTS_FILE"
 # D1 Step 13: Update .test/.summary.md
 # D3: File write with error handling
 # Note: Full implementation should aggregate ALL criteria & results files in .test/
-RESULT_COUNT=$(find "$TEST_DIR" -maxdepth 1 -name '*-results.md' 2>/dev/null | wc -l)
+# D3: Use compgen glob for reliable file counting (avoids find|wc edge cases)
+RESULT_COUNT=0
+if compgen -G "$TEST_DIR"'/*-results.md' > /dev/null 2>&1; then
+    RESULT_COUNT=$(compgen -G "$TEST_DIR"'/*-results.md' | wc -l)
+fi
 if ! cat > "$TEST_DIR/.summary.md" <<EOF
 # Test Summary
 - Last Checkpoint: $CHECKPOINT

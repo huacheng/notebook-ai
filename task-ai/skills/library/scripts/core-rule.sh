@@ -38,7 +38,7 @@ list_core_rules() {
     # Extract CORE-XXX comments from security.sh
     grep -E '^\s*# CORE-[0-9]+' "$SECURITY_SH" | while read -r line; do
         local id=$(echo "$line" | grep -oE 'CORE-[0-9]+[a-z]?')
-        local desc=$(echo "$line" | sed 's/.*CORE-[0-9]*[a-z]*:\s*//')
+        local desc=$(echo "$line" | sed 's/.*CORE-[0-9]*[a-z]*:[[:space:]]*//')
         printf "  ${GREEN}%-12s${NC} %s\n" "$id" "$desc"
     done
 
@@ -155,7 +155,7 @@ $(validate_pattern "$pattern" 2>&1 || echo "Run: library core-rule validate '$pa
 **To submit**: Create a PR with this proposal and the code change.
 EOF
 
-    echo -e "${GREEN}✓ Proposal created: $proposal_file${NC}"
+    echo -e "${GREEN}[OK] Proposal created: $proposal_file${NC}"
     echo ""
     echo "Next steps:"
     echo "  1. Edit the proposal file to add rationale and test cases"
@@ -190,9 +190,9 @@ validate_pattern() {
     # Test 1: Pattern syntax is valid
     echo -n "Pattern syntax: "
     if echo "test" | grep -qE "$pattern" 2>/dev/null || [[ $? -le 1 ]]; then
-        echo -e "${GREEN}✓ Valid${NC}"
+        echo -e "${GREEN}[OK] Valid${NC}"
     else
-        echo -e "${RED}✗ Invalid regex${NC}"
+        echo -e "${RED}[FAIL] Invalid regex${NC}"
         return 1
     fi
 
@@ -207,9 +207,9 @@ EOF
 
     echo -n "Safe skill (should PASS): "
     if echo "hello world" | grep -qE "$pattern"; then
-        echo -e "${RED}✗ FALSE POSITIVE - matches safe content${NC}"
+        echo -e "${RED}[FAIL] FALSE POSITIVE - matches safe content${NC}"
     else
-        echo -e "${GREEN}✓ Correctly passes${NC}"
+        echo -e "${GREEN}[OK] Correctly passes${NC}"
     fi
 
     # Test 3: Self-test (pattern should match itself in a malicious context)
@@ -228,7 +228,11 @@ show_status() {
     echo ""
 
     # Count core rules
-    local core_count=$(grep -cE '^\s*# CORE-[0-9]+' "$SECURITY_SH" 2>/dev/null || echo 0)
+    # D3: Guard against missing security.sh
+    local core_count=0
+    if [[ -f "$SECURITY_SH" ]]; then
+        core_count=$(grep -cE '^\s*# CORE-[0-9]+' "$SECURITY_SH" 2>/dev/null || echo 0)
+    fi
 
     # Count extended rules
     local lib_dir="${NB_WORKSPACES_LIBRARY:-.library}"

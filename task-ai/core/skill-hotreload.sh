@@ -15,7 +15,8 @@ set -euo pipefail
 #   1. Enterprise skills (managed settings)
 #   2. Personal skills (~/.claude/skills/)
 #   3. Project skills (.claude/skills/)
-#   4. Workspace skills ($NB_WORKSPACES_LIBRARY/skills/) via --add-dir
+#   4. Plugin skills (where plugin enabled)
+#   5. Workspace skills ($NB_WORKSPACES_LIBRARY/skills/) via --add-dir
 
 # Resolve library path
 NB_WORKSPACES_LIBRARY="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
@@ -147,7 +148,7 @@ list_workspace_skills() {
     for skill_dir in "$skills_dir"/*/; do
         if [[ -f "$skill_dir/SKILL.md" ]]; then
             local name=$(basename "$skill_dir")
-            local desc=$(grep -E '^description:' "$skill_dir/SKILL.md" 2>/dev/null | head -1 | sed 's/^description:\s*//' || echo "(no description)")
+            local desc=$(grep -E '^description:' "$skill_dir/SKILL.md" 2>/dev/null | head -1 | sed 's/^description:[[:space:]]*//' || echo "(no description)")
             echo "  /$name — $desc"
             ((count++)) || true
         fi

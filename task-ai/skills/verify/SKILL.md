@@ -125,7 +125,7 @@ The `checkpoint` field in verify's signal carries **the verification scope** (wh
 | full | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "full", "timestamp": "..." }` |
 | step-N | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "step-N", "timestamp": "..." }` |
 
-Result values: `(pass)`, `(fail)`, `(partial)` — see Result Values table above.
+Result values use the same `(pass)`, `(fail)`, `(partial)` notation defined in the Result Values table above.
 
 **Auto routing note**: In the auto loop, verify's checkpoint field is informational for the daemon. The auto loop determines the correct `check` checkpoint from the triggering context (e.g., after `plan` → `check --checkpoint post-plan`; after `exec (done)` → `check --checkpoint post-exec`; after `exec (mid-exec)` → `check --checkpoint mid-exec`).
 

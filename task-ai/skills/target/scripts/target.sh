@@ -5,7 +5,7 @@
 #        target.sh --finalize
 
 set -euo pipefail
-trap 'rm -f "${TMP_FILE:-}" "${TMP_STATUS:-}"' EXIT INT TERM HUP
+trap 'rm -f "${TMP_FILE:-}" "${TMP_STATUS:-}"' EXIT ERR INT TERM HUP
 
 # Parse arguments
 REFINE_MODE=0
@@ -77,13 +77,13 @@ if [[ "$CURRENT_STATUS" == "stage-done" ]] && [[ -n "${OBJECTIVE:-}" || "$REFINE
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mode 1: Finalize (exit target-refinement, merge refinements)
+# Mode 1: Finalize (exit target-refinement phase)
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$FINALIZE_MODE" -eq 1 ]]; then
     if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: target-refinement" "$SESSION_CONTEXT"; then
         rm -f "$SESSION_CONTEXT"
         echo "[target] Target finalized. Exited target-refinement phase."
-        echo "[target] Run /plan to generate implementation plan."
+        echo "[target] Run /task-ai:plan to generate implementation plan."
     else
         echo "[target] Not in target-refinement phase."
     fi
@@ -114,7 +114,7 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     fi
 
     if [[ ! -f "$TARGET_FILE" ]]; then
-        echo "[ERROR] Cannot refine - no target file exists. Use /target first." >&2
+        echo "[ERROR] Cannot refine — no target file exists. Use /task-ai:target first." >&2
         exit 1
     fi
 
@@ -211,9 +211,9 @@ else
       !in_obj { print $0 }
       END { if (!found) { print "## Objective"; print ""; print ENVIRON["AWK_OBJ"] } }
     ' "$TARGET_FILE" > "$TMP_FILE"
-    # D3: mv with error handling - abort if fails to prevent data loss
+    # D3: mv with error handling — abort if fails to prevent data loss
     if ! mv "$TMP_FILE" "$TARGET_FILE" 2>/dev/null; then
-        echo "[ERROR] Failed to update $TARGET_FILE - original preserved" >&2
+        echo "[ERROR] Failed to update $TARGET_FILE — original preserved" >&2
         exit 1
     fi
 fi
@@ -225,8 +225,7 @@ fi
 # after performing archive operations. See SKILL.md "Atomicity" note.
 if [[ -f "$STATUS_FILE" ]] && ! command -v jq &>/dev/null; then
     echo "[WARN] jq not found — cannot update .status.json status transition" >&2
-fi
-if [[ -f "$STATUS_FILE" ]] && command -v jq &>/dev/null; then
+elif [[ -f "$STATUS_FILE" ]]; then
     NEW_STATUS=""
     case "$CURRENT_STATUS" in
         draft|blocked)  NEW_STATUS="planning" ;;
@@ -261,9 +260,9 @@ echo "Objective successfully updated and committed."
 # Enter target-refinement phase
 # D2: Variables are safe here (controlled values), but use explicit format
 # D3: Error handling for session context write
-if ! printf 'phase: target-refinement\nentered_at: %s\nentered_by: /task-ai:target\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>/dev/null; then
+if ! printf 'phase: target-refinement\nentered_at: %s\nentered_by: /task-ai:target\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$SESSION_CONTEXT" 2>/dev/null; then
     echo "[WARN] Failed to write session context" >&2
 fi
 
 echo "[target] Entered target-refinement phase."
-echo "[target] Continue discussing to refine. Use /plan when ready."
+echo "[target] Continue discussing to refine. Use /task-ai:plan when ready."

@@ -123,7 +123,8 @@ load_rules_from_domain() {
 
         # Parse JSON output using bash (jq not guaranteed)
         # Format: [{"id": "...", "pattern": "...", "case_insensitive": false, ...}, ...]
-        # D6: Use grep -oP to extract complete JSON objects, not tr which splits fields
+        # D6: Use grep -oP (PCRE) to extract complete JSON objects.
+        # Note: -oP requires GNU grep; macOS users need `brew install grep`.
         while IFS= read -r obj; do
             [[ -z "$obj" ]] && continue
 

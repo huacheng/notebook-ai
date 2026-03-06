@@ -11,7 +11,7 @@ source "$SCRIPT_DIR/../../../core/lib.sh"
 # Security script for command verification
 SECURITY_SH="$TASK_AI_ROOT/skills/security/scripts/security.sh"
 
-# D2: Run command with security verification (Pre-hook per SKILL.md §Per-Step Execution, step 3)
+# D2: Run command with security verification (Pre-hook per SKILL.md §Per-Step Execution, step 3 Security Audit)
 # Usage: run_secure_cmd "command" "notebook"
 # Returns: command exit code, or 1 if security rejected
 #
@@ -32,7 +32,7 @@ run_secure_cmd() {
         return 1
     fi
 
-    # D3: Security audit before execution - warn if security script missing
+    # D3: Security audit before execution — warn if security script missing
     if [[ -f "$SECURITY_SH" ]]; then
         local security_result
         security_result=$(bash "$SECURITY_SH" "$notebook" verify-cmd "$cmd" 2>&1)
@@ -86,8 +86,8 @@ if [[ ! -f "$STATE_PY" ]]; then
     exit 1
 fi
 
-# D3/D2: Concurrency — acquire .working/.lock before proceeding (per SKILL.md)
-# Uses mkdir-based lock (same mechanism as verify.sh) so they interlock correctly
+# D2/D3: Concurrency — acquire .working/.lock before proceeding (per SKILL.md)
+# Uses mkdir-based lock (same path as verify.sh/check.sh for mutual exclusion)
 LOCK_DIR="$WORK_DIR/.working"
 LOCK_FILE="$LOCK_DIR/.lock"
 mkdir -p "$LOCK_DIR"
@@ -109,7 +109,7 @@ TRAP_EOF
         mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE" 2>/dev/null || true
     fi
     rm -rf "$LOCK_FILE" 2>/dev/null || true
-    rm -f "$WORK_DIR"/.auto-signal.tmp "$WORK_DIR"/.summary.md.tmp 2>/dev/null || true
+    rm -f "${SIGNAL_FILE}.tmp" "${SUMMARY_FILE}.tmp" 2>/dev/null || true
     rm -f "$NOTES_DIR"/*.tmp 2>/dev/null || true
 }
 trap cleanup_exec EXIT INT TERM
@@ -144,7 +144,7 @@ fi
 # D1: Step 2 — Validate dependency gate
 DEPENDS_ON=$(python3 "$STATE_PY" get "$STATUS_JSON" depends_on 2>/dev/null || echo "")
 if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "None" && "$DEPENDS_ON" != "[]" ]]; then
-    echo "[GATE] Dependency check required: depends_on=$DEPENDS_ON (full validation delegated to Claude agent)"
+    echo "[GATE] Dependency check required: depends_on=$DEPENDS_ON (full validation delegated to Claude agent)" >&2
 fi
 
 # D1: Step 3 — Transition status to 'executing', clear phase
@@ -185,7 +185,7 @@ if [[ -z "$(find "$WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/n
     echo "[WARN] .analysis/ has no evaluation files — check may not have run" >&2
 fi
 
-# 1. Step Discovery (from .plan.md)
+# Step Discovery — extract steps from .plan.md
 PLAN_MD="$WORK_DIR/.plan.md"
 if [[ -f "$PLAN_MD" ]]; then
     TOTAL_STEPS=$(grep -cE '^##\s+Step\s+[0-9]+' "$PLAN_MD" 2>/dev/null || echo "0")
@@ -199,7 +199,7 @@ if [[ "$TOTAL_STEPS" -eq 0 ]]; then
 fi
 COMPLETED=$(python3 "$STATE_PY" get "$STATUS_JSON" completed_steps 2>/dev/null || echo "0")
 COMPLETED=${COMPLETED:-0}
-# D2: Validate COMPLETED contains only digits (D1/D6: warn on reset per SKILL.md)
+# D1/D2: Validate COMPLETED contains only digits (warn on reset per SKILL.md)
 if [[ ! "$COMPLETED" =~ ^[0-9]+$ ]]; then
     echo "[WARN] completed_steps value '$COMPLETED' is invalid (non-integer), resetting to 0" >&2
     COMPLETED=0
@@ -207,7 +207,7 @@ fi
 
 echo "Executing $NOTEBOOK. Progress: $COMPLETED/$TOTAL_STEPS"
 
-# 2. Execution Loop
+# Execution Loop — determine next step
 NEXT_STEP=$((COMPLETED + 1))
 
 if [[ $NEXT_STEP -gt $TOTAL_STEPS ]]; then
@@ -243,7 +243,7 @@ if [[ -n "$TARGET_STEP" ]]; then
     fi
 fi
 
-# 3. Determine task type for VFP applicability
+# Determine task type for VFP applicability
 # D3: python3 call with fallback
 TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
 # D1: Empty string is valid — indicates unknown type, VFP checks will be skipped
@@ -265,7 +265,7 @@ EXEC_CHECKPOINT="post-exec"
 for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
     echo "--- Executing Step $STEP/$TOTAL_STEPS ---"
 
-    # 9.2 VFP VH confirmation (software types only)
+    # 9.2 VFP VH confirmation (VFP-applicable types)
     if [[ "$TYPE" == *"software"* ]]; then
         echo "[VFP] Step $STEP: Red (VH) — checking pre-implementation test state..."
     fi
@@ -273,7 +273,7 @@ for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
     # 9.3 Implementation (delegated to Claude agent — stub records intent)
     echo "[exec] Step $STEP: Implementation delegated to Claude agent."
 
-    # 9.4 VFP HS confirmation (software types only)
+    # 9.4 VFP HS confirmation (VFP-applicable types)
     if [[ "$TYPE" == *"software"* ]]; then
         echo "[VFP] Step $STEP: Green (HS) — post-implementation test confirmation."
     fi
@@ -285,7 +285,7 @@ for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
 # Exec Note: Step $STEP
 - Status: Completed
 - Type: $TYPE
-- VFP: $(if [[ "$TYPE" == *"software"* ]]; then echo "Red -> Green -> Refactor (Pass)"; else echo "N/A (non-software type)"; fi)
+- VFP: $(if [[ "$TYPE" == *"software"* ]]; then echo "Red -> Green -> Refactor (Pass)"; else echo "N/A (non-VFP type)"; fi)
 EOF
     then
         echo "[WARN] Failed to write exec note for step $STEP" >&2

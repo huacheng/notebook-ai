@@ -37,6 +37,12 @@ DESC="$1"; shift
 DESC=$(printf '%s' "$DESC" | tr -d '\n\r' | cut -c1-200)
 FILES=("$@")
 
+# D3: Validate at least one file was specified
+if [[ ${#FILES[@]} -eq 0 ]]; then
+    echo "[ERROR] No files specified to commit" >&2
+    exit 1
+fi
+
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 
 if [[ ! -d "$LIB_PATH/.git" ]]; then
