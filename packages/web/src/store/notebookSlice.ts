@@ -84,7 +84,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   | 'prependCells' | 'setCellsOffset'
   | 'generateSlide' | 'updateSlideSections'
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
-  | 'openNotebookTab' | 'closeNotebookTab' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab' | 'restoreOpenNotebookTabs'
+  | 'openNotebookTab' | 'closeNotebookTab' | 'closeNotebookTabByPath' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab' | 'restoreOpenNotebookTabs'
   | 'appendStreamDelta' | 'flushStreamBuffer'
   | 'loadingCellIds' | 'requestCellLoad' | 'replaceCellStub'
 >> = (set, get) => ({
@@ -397,6 +397,12 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         pendingDeletes: new Set<string>(),
       };
     });
+  },
+
+  closeNotebookTabByPath: (wsPath: string) => {
+    const normalized = wsPath.replace(/\/+$/, '');
+    const match = Object.entries(get().openNotebooks).find(([, e]) => e.workspaceDir === normalized);
+    if (match) get().closeNotebookTab(match[0]);
   },
 
   closeProjectNotebookTabs: (projectId) => {

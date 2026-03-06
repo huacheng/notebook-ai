@@ -505,7 +505,14 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
   } : {};
 
   const handleDeleteDone = () => {
-    useStore.getState().closeProjectFileTabs(projectId, relPath.endsWith('/') ? relPath : relPath + '/');
+    const store = useStore.getState();
+    store.closeProjectFileTabs(projectId, relPath.endsWith('/') ? relPath : relPath + '/');
+    // Close the notebook tab if its workspaceDir matches the deleted path
+    const projPath = store.activeProjectPath;
+    if (projPath) {
+      const fullPath = relPath.startsWith('/') ? relPath : `${projPath}/${relPath}`;
+      store.closeNotebookTabByPath(fullPath);
+    }
     setShowDeleteModal(false);
     onClose();
     onDeleted?.();

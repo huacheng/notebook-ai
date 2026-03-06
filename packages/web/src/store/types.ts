@@ -206,6 +206,7 @@ export interface NotebookStore {
   // ── Multi-notebook actions ────────────────────────────────────────────
   openNotebookTab(notebookId: string, notebook: Notebook, sessionId: string, workspaceDir?: string | null): void;
   closeNotebookTab(notebookId: string): void;
+  closeNotebookTabByPath(wsPath: string): void;
   closeProjectNotebookTabs(projectId: string): void;
   setActiveNotebookTab(notebookId: string): void;
   restoreOpenNotebookTabs(): void;

@@ -408,7 +408,12 @@ export function MobileNotebooksList() {
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => deleteProjectNotebook(activeProjectId, deleteTarget.path)}
           onDone={() => {
-            useStore.getState().closeProjectFileTabs(activeProjectId, deleteTarget.path.endsWith('/') ? deleteTarget.path : deleteTarget.path + '/');
+            const store = useStore.getState();
+            store.closeProjectFileTabs(activeProjectId, deleteTarget.path.endsWith('/') ? deleteTarget.path : deleteTarget.path + '/');
+            const projPath = store.activeProjectPath;
+            if (projPath) {
+              store.closeNotebookTabByPath(`${projPath}/${deleteTarget.path}`);
+            }
             setDeleteTarget(null);
             fetchNotebooks();
           }}
