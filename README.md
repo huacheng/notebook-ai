@@ -27,7 +27,7 @@ An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude
 - **Token Auth** — Shared-secret authentication with timing-safe compare and brute-force lockout
 - **System Preflight** — Plugin version check and cron job status monitoring
 - **Export** — Notebooks as HTML or zip bundles
-- **task-ai Plugin** — Structured task lifecycle management with 18 subcommands:
+- **[task-ai Plugin](https://github.com/huacheng/moonview)** — Structured task lifecycle management with 18 subcommands:
   - *init → target → plan → check → exec → merge → report* — full development lifecycle
   - Six-dimension gated review (Correctness, Security, Reliability, Performance, Architecture, Maintainability)
   - Domain-aware type profiling with seed templates (software, infrastructure, data-pipeline, ML, etc.)
