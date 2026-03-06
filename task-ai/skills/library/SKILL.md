@@ -401,6 +401,7 @@ All external content written to `.library/.memory/.references/` MUST be sanitise
 |-----------|---------------|
 | `maintain --compact` | `task-ai(library):maintain archive YYYY-MM` |
 | `maintain --rebuild-index` | `task-ai(library):maintain rebuild index` |
+| `maintain --scheduled` | No commit (T3→T4 changes are uncommitted; caller should commit if needed) |
 | `search`, `list`, `status`, `--check-staleness` | No commit |
 
 ## .auto-signal

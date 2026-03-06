@@ -179,6 +179,7 @@ if [[ ! -f .gitignore ]]; then
 .ioc.md
 .plugin-registry.md
 .last-maintained
+.last-scheduled
 **/.library-state.json
 **/.lock
 **/.lock.stale.*

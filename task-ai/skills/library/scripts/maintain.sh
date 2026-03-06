@@ -31,9 +31,10 @@ _validate_t3_to_t4() {
         return 1
     fi
 
-    # Count post-activation referenced entries
+    # Count post-activation referenced entries (exact skill directory match)
+    local skill_pattern="| referenced | .*/${skill_name}/SKILL.md"
     local usage_count
-    usage_count=$(grep -c "| referenced | .*$skill_name" "$changelog" 2>/dev/null || echo 0)
+    usage_count=$(grep -c "$skill_pattern" "$changelog" 2>/dev/null || echo 0)
     echo "Usage count (referenced): $usage_count"
 
     if [[ "$usage_count" -lt 3 ]]; then
@@ -44,7 +45,7 @@ _validate_t3_to_t4() {
     # Check for REPLAN failures
     local failure_count=0
     local ref_notebooks
-    ref_notebooks=$(grep "| referenced | .*$skill_name" "$changelog" | \
+    ref_notebooks=$(grep "$skill_pattern" "$changelog" | \
         sed 's/.*notebook:\([a-zA-Z0-9_-]*\).*/\1/' | sort -u)
 
     local nb
