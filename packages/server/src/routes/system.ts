@@ -75,21 +75,11 @@ async function checkTaskAiPlugin(): Promise<PreflightAlert | null> {
   // 2. Get latest version from remote marketplace tags
   const remoteVersion = await getRemoteLatestTag(MOONVIEW_REPO);
 
-  // 3. Fallback: read local marketplace.json cache
-  let marketplaceVersion: string | null = null;
-  if (!remoteVersion) {
-    for (const mpPath of [
-      path.join(base, 'marketplaces', 'moonview', '.claude-plugin', 'marketplace.json'),
-      path.join(base, 'marketplaces', 'moonview', 'marketplace.json'),
-    ]) {
-      const mp = await readJson<{ plugins?: Array<{ name?: string; version?: string }> }>(mpPath);
-      const entry = mp?.plugins?.find((p) => p.name === 'task-ai');
-      if (entry?.version) { marketplaceVersion = entry.version; break; }
-    }
-  }
+  // If remote unreachable, skip version check — local version is fine
+  if (!remoteVersion) return null;
 
-  // 4. Compare: remote > local → suggest update
-  const latest = remoteVersion ?? marketplaceVersion;
+  // 3. Compare: remote > local → suggest update
+  const latest = remoteVersion;
   if (latest && compareSemver(latest, localVersion) > 0) {
     return {
       id: 'plugin-task-ai-update',
