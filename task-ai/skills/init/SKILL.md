@@ -120,7 +120,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
 | `.target.md` | Task requirements / objectives | `init` (always) |
 | `.analysis/` | Evaluation history (one file per assessment) | `check` (on demand) |
 | `.test/` | Test criteria & results (one file per phase) | `plan`/`exec`/`check` (on demand) |
-| `.bugfix/` | Issue history (one file per mid-exec issue) | `check` (on demand) |
+| `.bugfix/` | Issue history (one file per NEEDS_FIX issue, with regression test spec) | `check` (on demand) |
 | `.notes/` | Research notes & experience log (one file per entry) | `plan`/`exec` (on demand) |
 | `.summary.md` | Condensed context summary | `plan`/`check`/`exec` (on demand) |
 | `[deliverables-dir]/.report.md` | Completion report (written to deliverables directory, not .working/) | `report` (on demand) |
