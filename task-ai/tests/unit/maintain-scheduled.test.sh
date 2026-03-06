@@ -142,7 +142,24 @@ LOG
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test 5: --scheduled --force bypasses timestamp check
+# Test 5: --scheduled includes security rules evolution check
+# ─────────────────────────────────────────────────────────────────────────────
+test_scheduled_security_evolve() {
+    setup
+
+    OUTPUT=$(bash "$MAINTAIN_SH" --scheduled 2>&1 || true)
+
+    if echo "$OUTPUT" | grep -qiE "security.*rules|core.*rules|evolv"; then
+        pass "--scheduled includes security rules evolution check"
+    else
+        fail "--scheduled missing security rules evolution (output: $OUTPUT)"
+    fi
+
+    teardown
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test 6: --scheduled --force bypasses timestamp check
 # ─────────────────────────────────────────────────────────────────────────────
 test_scheduled_force() {
     setup
@@ -169,6 +186,7 @@ test_scheduled_first_run
 test_scheduled_skips_recent
 test_scheduled_runs_when_due
 test_scheduled_checks_t3_skills
+test_scheduled_security_evolve
 test_scheduled_force
 
 echo ""

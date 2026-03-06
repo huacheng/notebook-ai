@@ -392,7 +392,7 @@ while [[ $# -gt 0 ]]; do
 
     # ─────────────────────────────────────────────────────────────────────────
     # --scheduled: periodic auto-maintenance (cron-friendly, timestamp-gated)
-    # Runs: staleness check, T3→T4 validation, changelog compact check
+    # Runs: staleness check, T3→T4 validation, changelog compact check, security rules evolution
     # Usage: maintain.sh --scheduled [--force]
     # ─────────────────────────────────────────────────────────────────────────
     --scheduled)
@@ -471,9 +471,21 @@ while [[ $# -gt 0 ]]; do
           echo "  No T3 skills eligible for T4 promotion"
       fi
 
-      # 3. Changelog size check
+      # 3. Security rules evolution check
       echo ""
-      echo "--- [3/3] Changelog Size Check ---"
+      echo "--- [3/4] Security Rules Evolution ---"
+      CORE_RULE_AUTO="$SCRIPT_DIR/core-rule-auto.sh"
+      if [[ -f "$CORE_RULE_AUTO" ]]; then
+          if ! bash "$CORE_RULE_AUTO" cron-job 2>&1; then
+              echo "  [WARN] core-rule-auto cron-job failed" >&2
+          fi
+      else
+          echo "  core-rule-auto.sh not found, skipping"
+      fi
+
+      # 4. Changelog size check
+      echo ""
+      echo "--- [4/4] Changelog Size Check ---"
       CHANGELOG="$LIB_PATH/.changelog"
       if [[ -f "$CHANGELOG" ]]; then
           LINE_COUNT=$(wc -l < "$CHANGELOG")
