@@ -499,7 +499,9 @@ while [[ $# -gt 0 ]]; do
     --install-cron)
       CMD="--install-cron"
       CRON_TAG="# task-ai:scheduled"
-      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash \"$SCRIPT_DIR/maintain.sh\" --scheduled $CRON_TAG"
+      # Use version-independent path: dynamically resolve latest plugin version at cron runtime
+      PLUGIN_BASE="${HOME}/.claude/plugins/cache/moonview/task-ai"
+      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash -c 'MDIR=\$(ls -d \"$PLUGIN_BASE\"/*/skills/library/scripts/maintain.sh 2>/dev/null | sort -V | tail -1) && [ -n \"\$MDIR\" ] && bash \"\$MDIR\" --scheduled' $CRON_TAG"
 
       # Check if already installed (idempotent)
       EXISTING=$(crontab -l 2>/dev/null || true)
