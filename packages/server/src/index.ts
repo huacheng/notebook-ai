@@ -137,6 +137,11 @@ sessionManager.onAutoSave = (notebookDbId, cellCount) => {
   });
 };
 
+// Persist Claude session ID to DB for --resume after server restart.
+sessionManager.onClaudeSessionId = (sessionId, claudeSessionId) => {
+  db.updateClaudeSessionId(sessionId, claudeSessionId);
+};
+
 // ── REST: Health ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => {

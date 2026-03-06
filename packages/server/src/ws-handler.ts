@@ -409,6 +409,7 @@ export function setupWebSocket(
                 const result = await sessionManager.reconnectSession(
                   session_id, row.notebook_path, row.workspace_dir,
                   notebook, row.jsonl_path, row.notebook_id,
+                  undefined, row.claude_session_id ?? undefined,
                 );
                 session = result.session;
                 if (!result.reconnected) {
@@ -420,6 +421,7 @@ export function setupWebSocket(
                     jsonl_path: null,
                     cwd: row.workspace_dir,
                     status: 'active',
+                    claude_session_id: null,
                     created_at: new Date().toISOString(),
                   });
                 }

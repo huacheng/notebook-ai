@@ -175,6 +175,9 @@ export class SessionManager {
   /** Optional callback invoked after a successful auto-save to sync DB metadata. */
   onAutoSave?: (notebookDbId: string, cellCount: number) => void;
 
+  /** Optional callback to persist Claude session ID to DB (for --resume after server restart). */
+  onClaudeSessionId?: (sessionId: string, claudeSessionId: string) => void;
+
   /**
    * Creates a new notebook session: spawns a persistent `claude -p` process,
    * waits for it to initialise, and wires its stdout to the JSONL message handler.
@@ -182,8 +185,9 @@ export class SessionManager {
    * @param notebookPath  Absolute path to the .notebook.json file.
    * @param cwd           Working directory for the Claude process.
    * @param gitRoot       Root directory for GitManager (defaults to cwd).
+   * @param resumeSessionId  Claude CLI session ID to resume (for context recovery after server restart).
    */
-  async createSession(notebookPath: string, cwd: string, gitRoot?: string): Promise<NotebookSession> {
+  async createSession(notebookPath: string, cwd: string, gitRoot?: string, resumeSessionId?: string): Promise<NotebookSession> {
     // Derive a short, deterministic session name from the notebook path.
     const hash = crypto
       .createHash('sha1')
@@ -292,6 +296,8 @@ export class SessionManager {
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
+    // If resumeSessionId is provided (e.g. after server restart), pass it to --resume
+    // so Claude CLI recovers its conversation context.
     await session.agentProcess.start(
       (raw: unknown) => this.handleJsonlMessage(session, raw),
       (code) => {
@@ -305,10 +311,11 @@ export class SessionManager {
           this.completeCell(session, cellId, true);
         }
       },
+      resumeSessionId,
     );
 
     this.sessions.set(sessionName, session);
-    console.log(`[session] Created session "${sessionName}" for "${notebookPath}"`);
+    console.log(`[session] Created session "${sessionName}" for "${notebookPath}"${resumeSessionId ? ` (resumed ${resumeSessionId})` : ''}`);
 
     // Start heartbeat timer for stuck detection and queue processing
     this.startHeartbeat(sessionName);
@@ -634,9 +641,10 @@ export class SessionManager {
     _jsonlPath?: string | null,
     notebookDbId?: string,
     gitRoot?: string,
+    resumeSessionId?: string,
   ): Promise<{ session: NotebookSession; reconnected: boolean }> {
     const existed = this.sessions.has(sessionName);
-    const session = await this.createSession(notebookPath, cwd, gitRoot);
+    const session = await this.createSession(notebookPath, cwd, gitRoot, resumeSessionId);
     if (!existed) {
       // Preserve model from session (read from ~/.claude/settings.json) if notebook has none
       const defaultModel = session.notebook.metadata.model;
@@ -1361,6 +1369,8 @@ export class SessionManager {
         if ((sysMsg.subtype === 'init' || sysMsg.subtype === 'hook_started') && sysMsg.session_id && !session.claudeSessionId) {
           session.claudeSessionId = sysMsg.session_id;
           console.log(`[session ${session.id}] Captured Claude session_id from ${sysMsg.subtype}: ${sysMsg.session_id}`);
+          // Persist to DB so server restart can --resume this session
+          this.onClaudeSessionId?.(session.id, sysMsg.session_id);
         }
         // Log hook events for debugging .MEMORY.md loading
         if (sysMsg.subtype === 'hook_started' || sysMsg.subtype === 'hook_completed') {

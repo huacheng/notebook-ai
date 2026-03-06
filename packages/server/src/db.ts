@@ -27,6 +27,7 @@ export interface SessionRow {
   jsonl_path: string | null;
   cwd: string;
   status: 'active' | 'closed';
+  claude_session_id: string | null;
   created_at: string;
   closed_at: string | null;
 }
@@ -151,6 +152,11 @@ export class NotebookDb {
     // D4-3: index on notebooks.project_id for JOIN performance
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_notebooks_project_id ON notebooks(project_id)`);
 
+    // Migration: add claude_session_id to sessions (for --resume after server restart)
+    try {
+      this.db.exec(`ALTER TABLE sessions ADD COLUMN claude_session_id TEXT`);
+    } catch (_err: unknown) { /* column already exists */ }
+
     // ── Users & Invite Codes (multi-user support) ─────────────────────────────
     // First create tables with new schema (or they already exist with old schema)
     this.db.exec(`
@@ -268,8 +274,8 @@ export class NotebookDb {
 
   createSessionRecord(session: Omit<SessionRow, 'closed_at'>): SessionRow {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO sessions (id, notebook_id, tmux_session, jsonl_path, cwd, status, created_at)
-      VALUES (@id, @notebook_id, @tmux_session, @jsonl_path, @cwd, @status, @created_at)
+      INSERT OR REPLACE INTO sessions (id, notebook_id, tmux_session, jsonl_path, cwd, status, claude_session_id, created_at)
+      VALUES (@id, @notebook_id, @tmux_session, @jsonl_path, @cwd, @status, @claude_session_id, @created_at)
     `);
     stmt.run(session);
     return this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(session.id) as SessionRow;
@@ -290,6 +296,10 @@ export class NotebookDb {
       WHERE s.tmux_session = ? AND s.status = ?
       ORDER BY s.created_at DESC LIMIT 1
     `).get(sessionName, 'active') as any;
+  }
+
+  updateClaudeSessionId(sessionId: string, claudeSessionId: string): void {
+    this.db.prepare('UPDATE sessions SET claude_session_id = ? WHERE id = ?').run(claudeSessionId, sessionId);
   }
 
   closeSessionRecord(id: string): void {

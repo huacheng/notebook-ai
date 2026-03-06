@@ -66,6 +66,7 @@ export async function openNotebookByPath(
       const result = await sessionManager.reconnectSession(
         activeSessionRow.tmux_session, safePath, existingRow.workspace_dir,
         notebook, activeSessionRow.jsonl_path, notebookId,
+        undefined, activeSessionRow.claude_session_id ?? undefined,
       );
       return { notebookId, notebook, sessionId: result.session.id, workspaceDir: cwd };
     }
@@ -90,7 +91,7 @@ export async function openNotebookByPath(
   db.createSessionRecord({
     id: session.id, notebook_id: notebookId,
     tmux_session: session.id, jsonl_path: null,
-    cwd, status: 'active', created_at: new Date().toISOString(),
+    cwd, status: 'active', claude_session_id: null, created_at: new Date().toISOString(),
   });
 
   return { notebookId, notebook, sessionId: session.id, workspaceDir: cwd };
@@ -288,6 +289,7 @@ export function createNotebooksRouter(
         jsonl_path: null,
         cwd: workspaceDir,
         status: 'active',
+        claude_session_id: null,
         created_at: now,
       });
 
@@ -386,6 +388,7 @@ export function createNotebooksRouter(
           notebook,
           activeSessionRow?.jsonl_path,
           notebookId,
+          undefined, activeSessionRow?.claude_session_id ?? undefined,
         );
         sessionId = result.session.id;
         reconnected = result.reconnected;
@@ -399,11 +402,16 @@ export function createNotebooksRouter(
             jsonl_path: null,
             cwd: row.workspace_dir,
             status: 'active',
+            claude_session_id: null,
             created_at: new Date().toISOString(),
           });
         }
       } else {
-        const session = await sessionManager.createSession(row.notebook_path, row.workspace_dir);
+        // Check if there's a persisted Claude session ID from previous server run
+        const prevClaudeSessionId = activeSessionRow?.claude_session_id ?? null;
+        const session = await sessionManager.createSession(
+          row.notebook_path, row.workspace_dir, undefined, prevClaudeSessionId ?? undefined,
+        );
         // Preserve model from session (read from ~/.claude/settings.json) if notebook has none
         const defaultModel = session.notebook.metadata.model;
         session.notebook = notebook;
@@ -421,6 +429,7 @@ export function createNotebooksRouter(
           jsonl_path: null,
           cwd: row.workspace_dir,
           status: 'active',
+          claude_session_id: prevClaudeSessionId,
           created_at: new Date().toISOString(),
         });
       }
