@@ -34,24 +34,16 @@ describe('project creation scaffolding', () => {
     expect(existsSync(path.join(repoDir, '.gitignore'))).toBe(true);
   });
 
-  it('creates .MEMORY.md during project init (project-level)', async () => {
+  it('does NOT create .MEMORY.md or .claude/ at project level', async () => {
     const repoDir = path.join(tmpRoot, 'new-project');
-    await mkdir(repoDir, { recursive: true });
+    await mkdir(path.join(repoDir, '.deliverables'), { recursive: true });
 
-    const { initWorkspaceMemory } = await import('../workspace.js');
-    await initWorkspaceMemory(repoDir, undefined, { skipClaudeSettings: true });
+    // Project init only calls ensureLibrarySkeleton, not initWorkspaceMemory
+    const { ensureLibrarySkeleton } = await import('../task-init.js');
+    await ensureLibrarySkeleton(tmpRoot, repoDir);
 
-    expect(existsSync(path.join(repoDir, '.MEMORY.md'))).toBe(true);
-  });
-
-  it('does NOT create .claude/ during project init with skipClaudeSettings', async () => {
-    const repoDir = path.join(tmpRoot, 'new-project2');
-    await mkdir(repoDir, { recursive: true });
-
-    const { initWorkspaceMemory } = await import('../workspace.js');
-    await initWorkspaceMemory(repoDir, undefined, { skipClaudeSettings: true });
-
-    expect(existsSync(path.join(repoDir, '.MEMORY.md'))).toBe(true);
+    expect(existsSync(path.join(repoDir, '.gitignore'))).toBe(true);
+    expect(existsSync(path.join(repoDir, '.MEMORY.md'))).toBe(false);
     expect(existsSync(path.join(repoDir, '.claude'))).toBe(false);
   });
 });

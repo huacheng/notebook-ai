@@ -59,9 +59,8 @@ export function createProjectsRouter(
         id, title, status: 'active', created_at: now, updated_at: now,
       }, null, 2));
 
-      // Create project-level .gitignore and .MEMORY.md
+      // Create project-level .gitignore
       await ensureLibrarySkeleton(workspacesRoot, projectPath);
-      await initWorkspaceMemory(projectPath, undefined, { skipClaudeSettings: true });
 
       // Initialize git repo
       const git = new GitManager(projectPath);
