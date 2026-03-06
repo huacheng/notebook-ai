@@ -50,7 +50,7 @@ _validate_t3_to_t4() {
 
     local nb
     for nb in $ref_notebooks; do
-        if grep -q "replan:true.*notebook:$nb\|invalidated.*notebook:$nb" "$changelog" 2>/dev/null; then
+        if grep -q "replan:true.*notebook:${nb}\(,\|$\)\|invalidated.*notebook:${nb}\(,\|$\)" "$changelog" 2>/dev/null; then
             failure_count=$((failure_count + 1))
             echo "[WARN] Notebook '$nb' had REPLAN after referencing this skill"
         fi
