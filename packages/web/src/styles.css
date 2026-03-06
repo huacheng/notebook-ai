@@ -1640,7 +1640,6 @@ textarea.cell-input {
   box-sizing: border-box;
   min-height: 80px;
   max-height: 200px;
-  overflow-y: auto;
   padding: var(--space-sm) var(--space-md);
   background: #ffffff;
   border: 1.5px solid var(--border-default);
@@ -1652,7 +1651,8 @@ textarea.cell-input {
   line-height: 1.75;
   resize: none;
   outline: none;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -5137,11 +5137,7 @@ button:focus-visible {
 
 /* ── TOC ─────────────────────────────────────────────────────── */
 .fv-md-toc {
-  position: sticky;
-  top: 8px;
-  float: right;
-  z-index: 5;
-  margin-left: 12px;
+  position: relative;
 }
 .fv-md-toc__toggle {
   display: flex;
@@ -5303,6 +5299,16 @@ button:focus-visible {
   float: right;
   z-index: 10;
   margin-bottom: -32px;
+}
+.fv-render__sticky-toolbar {
+  position: sticky;
+  top: 8px;
+  float: right;
+  z-index: 10;
+  margin-bottom: -32px;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
 }
 .fv-render__ann-cards {
   display: flex;

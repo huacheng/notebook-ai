@@ -98,7 +98,9 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     if (!el) return;
     el.style.height = 'auto';
     const maxHeight = mobile ? 120 : 200;
-    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    const newHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${newHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [mobile]);
 
   useEffect(() => { resize(); }, [text, resize]);

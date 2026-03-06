@@ -222,16 +222,22 @@ function InteractiveOptionsWrapper({ item, cellId }: { item: ToolItem; cellId?: 
 
 function RunningStatus({ cellId, outputs, source }: { cellId: string; outputs: CellOutputItem[]; source: string }) {
   const t = useT();
-  const startRef = useRef(Date.now());
+  // Use started_at from the cell (persisted in store) so the timer survives tab switches.
+  // Falls back to Date.now() for backward compat (cells without started_at).
+  const cellStartedAt = useStore((s) => {
+    const cell = s.notebook?.cells.find((c) => c.id === cellId) as any;
+    return cell?.started_at as number | undefined;
+  });
+  const startRef = useRef(cellStartedAt ?? Date.now());
   const thinkStartRef = useRef<number | null>(null);
   const thinkAccum = useRef(0);
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    startRef.current = Date.now();
+    startRef.current = cellStartedAt ?? Date.now();
     thinkStartRef.current = null;
     thinkAccum.current = 0;
-  }, [cellId]);
+  }, [cellId, cellStartedAt]);
 
   useEffect(() => {
     const iv = setInterval(() => setTick((t) => t + 1), 1000);

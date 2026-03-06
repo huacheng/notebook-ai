@@ -37,7 +37,7 @@ describe('interrupt (Esc)', () => {
     });
     stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
     sendPromptSpy = vi.spyOn(AgentProcess.prototype, 'sendPrompt').mockImplementation(() => {});
-    interruptSpy = vi.spyOn(AgentProcess.prototype, 'interrupt');
+    interruptSpy = vi.spyOn(AgentProcess.prototype, 'interrupt').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -108,21 +108,28 @@ describe('interrupt (Esc)', () => {
 
   it('interruptCell() calls agent interrupt() and sets _interrupted flag', async () => {
     const session = await createSessionWithRunningCell();
+    // Mock isAlive to return true (mocked start() doesn't set proc)
+    const isAliveSpy = vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(true);
 
     await sm.interruptCell(session.id);
 
     expect(interruptSpy).toHaveBeenCalledTimes(1);
     expect((session as any)._interrupted).toBe(true);
+
+    isAliveSpy.mockRestore();
   });
 
   it('interruptCell() clears _rerunQueue', async () => {
     const session = await createSessionWithRunningCell();
+    const isAliveSpy = vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(true);
     // Simulate an active rerun queue
     (session as any)._rerunQueue = ['c2'];
 
     await sm.interruptCell(session.id);
 
     expect((session as any)._rerunQueue).toBeUndefined();
+
+    isAliveSpy.mockRestore();
   });
 
   it('interruptCell() throws for non-existent session', async () => {
@@ -266,12 +273,14 @@ describe('interrupt (Esc)', () => {
     });
 
     const session = await createSessionWithRunningCell();
+    const isAliveSpy = vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(true);
 
     // Set up a rerun queue (simulating mid-rerun)
     (session as any)._rerunQueue = ['c2'];
 
     // Interrupt
     await sm.interruptCell(session.id);
+    isAliveSpy.mockRestore();
 
     // Simulate Claude returning a result after SIGINT
     onMessage({ type: 'result', result: 'interrupted', is_error: true });

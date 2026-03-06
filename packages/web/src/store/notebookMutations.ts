@@ -21,6 +21,10 @@ export function setCellStatusInNotebook(nb: Notebook, cellId: string, status: Ce
   const cells = nb.cells.map((c) => {
     if (c.id !== cellId) return c;
     changed = true;
+    // Set started_at when cell begins running (used by RunningStatus timer)
+    if (status === 'running') {
+      return { ...c, status, started_at: Date.now() };
+    }
     return { ...c, status };
   });
   return changed ? { ...nb, cells } : nb;

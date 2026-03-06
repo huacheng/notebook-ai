@@ -65,10 +65,9 @@ export function useAnnotationPersistence({
 
   // Load on filePath change: L1 instant + L2 async merge
   useEffect(() => {
-    if (!ws || wsStatus !== 'connected') return;
     annLoadedRef.current = false;
 
-    // L1: instant from localStorage
+    // L1: instant from localStorage (always reset, even without WS)
     let localUpdatedAt = 0;
     const saved = cacheGet<FileAnnotations>(storageKey(notebookId, filePath), TTL.ANNOTATION);
     if (saved) {
@@ -76,6 +75,11 @@ export function useAnnotationPersistence({
       localUpdatedAt = saved.updatedAt ?? 0;
     } else {
       setAnnotations(EMPTY_FILE_ANNOTATIONS);
+    }
+
+    if (!ws || wsStatus !== 'connected') {
+      annLoadedRef.current = true;
+      return;
     }
 
     // L2: async from server

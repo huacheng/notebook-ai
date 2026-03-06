@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from 'react';
+import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { useT } from '../i18n';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -399,6 +400,41 @@ export function FileViewerRender({
     container.scrollTop = newScrollTop;
   }, [pdfScale]);
 
+  // ── Scroll position persistence across file tab switches ──────────────
+  const scrollKeyRef = useRef(`fv-scroll-${filePath}`);
+
+  // Restore saved scroll position when filePath changes (file tab switch)
+  useEffect(() => {
+    scrollKeyRef.current = `fv-scroll-${filePath}`;
+    const container = containerRef.current;
+    if (!container) return;
+    const id = requestAnimationFrame(() => {
+      const saved = cacheGet<number>(scrollKeyRef.current, TTL.SCROLL);
+      if (saved !== null && containerRef.current) {
+        containerRef.current.scrollTop = saved;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [filePath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Save scroll position on scroll (debounced 200ms)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let timer = 0;
+    function onScroll() {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        cacheSet(scrollKeyRef.current, container!.scrollTop);
+      }, 200);
+    }
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      clearTimeout(timer);
+    };
+  }, [filePath]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Restore highlights from persisted annotation data (after file re-open)
   useEffect(() => {
     if (annotations.items.length === 0) return;
@@ -633,8 +669,8 @@ export function FileViewerRender({
 
   return (
     <div ref={containerRef} className="fv-render" onMouseUp={handleMouseUp}>
-      {/* Annotation dropdown — top-right corner */}
-      <div className="fv-render__ann-overlay">
+      {/* Sticky toolbar — annotation dropdown + (for md) TOC, right-aligned */}
+      <div className="fv-render__sticky-toolbar">
         <FileAnnotationDropdown
           annotations={annotations}
           onSendAll={handleSendAll}
@@ -645,6 +681,9 @@ export function FileViewerRender({
           isSent={isSent}
           sendableCount={sendableCount}
         />
+        {isMd && mdHeadings.length > 0 && (
+          <MarkdownToc headings={mdHeadings} isOpen={tocOpen} onToggle={handleTocToggle} />
+        )}
       </div>
 
       {/* Highlight overlays + margin tags with connecting lines */}
@@ -714,9 +753,6 @@ export function FileViewerRender({
         >
           {isMd && (
             <div className="fv-render__markdown" ref={mdRef}>
-              {mdHeadings.length > 0 && (
-                <MarkdownToc headings={mdHeadings} isOpen={tocOpen} onToggle={handleTocToggle} />
-              )}
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}

@@ -594,8 +594,17 @@ export class SessionManager {
     delete session._rerunQueue;
 
     session._interrupted = true;
-    session.agentProcess.interrupt();
-    // Claude CLI will emit a 'result' message → completeCell() handles the rest
+
+    if (session.agentProcess.isAlive()) {
+      session.agentProcess.interrupt();
+      // Claude CLI will emit a 'result' message → completeCell() handles the rest
+    } else {
+      // Process is dead (e.g., after server restart) — force-complete any stale running cell
+      const cellId = findRunningCellId(session.notebook);
+      if (cellId) {
+        this.completeCell(session, cellId, true);
+      }
+    }
   }
 
   async closeSession(sessionId: string): Promise<void> {
