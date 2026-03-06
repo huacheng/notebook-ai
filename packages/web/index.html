@@ -9,18 +9,47 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#1c1917" />
-    <!-- Fonts: non-blocking (media swap trick prevents render-blocking) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" /></noscript>
-    <!-- LXGW WenKai Mono (CJK 等宽字体, non-blocking) -->
-    <link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkaimono-regular.css" onload="this.onload=null;this.rel='stylesheet'" />
-    <link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkaimono-bold.css" onload="this.onload=null;this.rel='stylesheet'" />
+    <!-- Fonts: loaded asynchronously via JS to avoid blocking page load -->
+    <script>
+      (function(){
+        var fonts=[
+          'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap',
+          'https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkaimono-regular.css',
+          'https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkaimono-bold.css'
+        ];
+        fonts.forEach(function(href){
+          var l=document.createElement('link');
+          l.rel='stylesheet';l.href=href;
+          document.head.appendChild(l);
+        });
+      })();
+    </script>
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkaimono-regular.css" />
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkaimono-bold.css" />
+    </noscript>
     <title>Notebook AI</title>
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.onerror=function(m,s,l,c,e){
+        var d=document.getElementById('root');
+        if(d&&!d.children.length){
+          d.innerHTML='<pre style="color:red;padding:20px;font-size:14px;word-break:break-all">'+
+            'JS Error: '+m+'\nSource: '+s+':'+l+':'+c+
+            (e&&e.stack?'\n\nStack:\n'+e.stack:'')+'</pre>';
+        }
+      };
+      window.addEventListener('unhandledrejection',function(ev){
+        var d=document.getElementById('root');
+        if(d&&!d.children.length){
+          d.innerHTML='<pre style="color:red;padding:20px;font-size:14px;word-break:break-all">'+
+            'Unhandled Promise: '+(ev.reason&&ev.reason.stack||ev.reason)+'</pre>';
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

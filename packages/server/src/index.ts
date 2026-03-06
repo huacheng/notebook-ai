@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import https from 'https';
@@ -49,6 +50,7 @@ if (process.env['NODE_ENV'] === 'production') {
 
 const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
+app.use(compression());
 app.use(express.json());
 
 // Build ALLOWED_ORIGINS dynamically from all network interfaces
