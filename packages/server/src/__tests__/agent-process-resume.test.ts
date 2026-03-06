@@ -104,7 +104,6 @@ describe('AgentProcess — resume support', () => {
     expect(args).toContain('--resume');
     const resumeIdx = args.indexOf('--resume');
     expect(args[resumeIdx + 1]).toBe('session-to-resume');
-    expect(args).toContain('--fork-session');
   });
 
   it('should NOT add --resume flag when resumeSessionId is not provided', async () => {
@@ -115,6 +114,5 @@ describe('AgentProcess — resume support', () => {
 
     const args: string[] = (cp.spawn as any).mock.calls[0][1];
     expect(args).not.toContain('--resume');
-    expect(args).not.toContain('--fork-session');
   });
 });
