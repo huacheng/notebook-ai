@@ -27,6 +27,14 @@ An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude
 - **Token Auth** — Shared-secret authentication with timing-safe compare and brute-force lockout
 - **System Preflight** — Plugin version check and cron job status monitoring
 - **Export** — Notebooks as HTML or zip bundles
+- **task-ai Plugin** — Structured task lifecycle management with 18 subcommands:
+  - *init → target → plan → check → exec → merge → report* — full development lifecycle
+  - Six-dimension gated review (Correctness, Security, Reliability, Performance, Architecture, Maintainability)
+  - Domain-aware type profiling with seed templates (software, infrastructure, data-pipeline, ML, etc.)
+  - Verification-first protocol (Red→Green TDD enforcement)
+  - Shared knowledge library with cross-task experience distillation
+  - Security guardian — audits plans and intercepts high-risk commands before execution
+  - Auto mode — conversational four-phase flow with automatic review and subagent delegation
 
 ## Quick Start
 
