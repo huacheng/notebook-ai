@@ -93,10 +93,25 @@ app.use('/api/auth', createAuthRouter());
 
 if (process.env['NODE_ENV'] === 'production') {
   const webDistPath = path.resolve(import.meta.dirname, '../../web/dist');
-  app.use(express.static(webDistPath));
-  // SPA fallback: serve index.html for non-API routes
+  // Hashed assets: long cache (1 year)
+  app.use('/assets', express.static(path.join(webDistPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  // Other static files (favicon, manifest, etc.): short cache
+  app.use(express.static(webDistPath, {
+    maxAge: '5m',
+    setHeaders(res, filePath) {
+      // index.html must never be cached so new deploys take effect immediately
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
+  }));
+  // SPA fallback: serve index.html for non-API routes (no-cache)
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) return next();
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(webDistPath, 'index.html'));
   });
 }

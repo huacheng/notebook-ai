@@ -1,5 +1,9 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Fragment, Slice, type Node as PmNode } from '@tiptap/pm/model';
 import DOMPurify from 'dompurify';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useStore } from '../store';
@@ -13,6 +17,83 @@ const SERVER_SAVE_DEBOUNCE = 200;
 
 // Generate localStorage key for draft
 const EDITOR_DRAFT_PREFIX = 'fv-editor-draft:';
+
+/* ── TipTap Extensions ────────────────────────────────────── */
+
+/** Render each space character as a translucent dot via inline decoration. */
+const WhitespaceDisplay = Extension.create({
+  name: 'whitespaceDisplay',
+  addProseMirrorPlugins() {
+    const key = new PluginKey('whitespaceDisplay');
+    function build(doc: PmNode) {
+      const decos: Decoration[] = [];
+      doc.descendants((node: PmNode, pos: number) => {
+        if (!node.isText || !node.text) return;
+        for (let i = 0; i < node.text.length; i++) {
+          if (node.text[i] === ' ') {
+            decos.push(Decoration.inline(pos + i, pos + i + 1, { class: 'fv-ws-dot' }));
+          }
+        }
+      });
+      return DecorationSet.create(doc, decos);
+    }
+    return [new Plugin({
+      key,
+      state: {
+        init(_, state) { return build(state.doc); },
+        apply(tr, old) { return tr.docChanged ? build(tr.doc) : old; },
+      },
+      props: {
+        decorations(state) { return key.getState(state); },
+      },
+    })];
+  },
+});
+
+/** Convert Tab key to two spaces. */
+const TabToSpaces = Extension.create({
+  name: 'tabToSpaces',
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        this.editor.commands.insertContent('  ');
+        return true;
+      },
+    };
+  },
+});
+
+/**
+ * Prevent ProseMirror from converting pasted newlines into separate paragraphs
+ * (which adds extra blank lines on save). Instead, insert hard breaks.
+ */
+const PasteAsPlainText = Extension.create({
+  name: 'pasteAsPlainText',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      key: new PluginKey('pasteAsPlainText'),
+      props: {
+        handlePaste(view, event) {
+          const text = event.clipboardData?.getData('text/plain');
+          if (!text) return false;
+          event.preventDefault();
+          const { schema, tr } = view.state;
+          const lines = text.split(/\r?\n/);
+          const nodes: PmNode[] = [];
+          lines.forEach((line, i) => {
+            if (i > 0) nodes.push(schema.nodes.hardBreak.create());
+            if (line) nodes.push(schema.text(line));
+          });
+          const fragment = Fragment.from(nodes);
+          view.dispatch(tr.replaceSelection(new Slice(fragment, 0, 0)));
+          return true;
+        },
+      },
+    })];
+  },
+});
+
+/* ── Component ────────────────────────────────────────────── */
 
 interface FileViewerEditorProps {
   content: string;
@@ -28,6 +109,7 @@ export function FileViewerEditor({ content, format, sessionId, filePath, source,
   const [saving, setSaving] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [lineCount, setLineCount] = useState(1);
 
   // Compute effective session ID for WS messages (matches backend pseudo-session format)
   const effectiveSessionId = useMemo(() => {
@@ -74,11 +156,16 @@ export function FileViewerEditor({ content, format, sessionId, filePath, source,
   }, [draftKey, content, format]);
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, WhitespaceDisplay, TabToSpaces],
     content: initialContent,
+    onCreate: ({ editor: ed }) => {
+      setLineCount(ed.getText().split('\n').length);
+    },
     onUpdate: ({ editor: ed }) => {
       const fmt = formatRef.current;
       const currentContent = fmt === 'html' ? ed.getHTML() : ed.getText();
+
+      setLineCount(ed.getText().split('\n').length);
 
       // D2: Skip save if content too large
       if (currentContent.length > MAX_EDITOR_CONTENT_SIZE) return;
@@ -174,7 +261,14 @@ export function FileViewerEditor({ content, format, sessionId, filePath, source,
           {saving ? 'Saving…' : autoSaving ? 'Syncing…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error ✕' : 'Save'}
         </button>
       </div>
-      <EditorContent editor={editor} className="fv-editor__content" />
+      <div className="fv-editor__body">
+        <div className="fv-editor__gutter" aria-hidden="true">
+          {Array.from({ length: lineCount }, (_, i) => (
+            <div key={i} className="fv-editor__line-no">{i + 1}</div>
+          ))}
+        </div>
+        <EditorContent editor={editor} className="fv-editor__content" />
+      </div>
     </div>
   );
 }

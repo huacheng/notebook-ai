@@ -1640,6 +1640,7 @@ textarea.cell-input {
   box-sizing: border-box;
   min-height: 80px;
   max-height: 200px;
+  overflow-y: auto;
   padding: var(--space-sm) var(--space-md);
   background: #ffffff;
   border: 1.5px solid var(--border-default);
@@ -4924,6 +4925,23 @@ button:focus-visible {
 .fv-render__text-zoom-wrapper {
   /* Semantic container for CSS-scaled text content; transform is inline */
 }
+/* Plain text / JSON with line numbers (reuses fv-code-lines) */
+.fv-render__lined-text {
+  display: flex;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+.fv-render__lined-text .fv-code-lines {
+  background: var(--bg-cell-hover, #f5f5f4);
+  border-right: 1px solid var(--border-default);
+}
+.fv-render__lined-text pre {
+  flex: 1;
+  margin: 0;
+  padding: var(--space-md);
+  overflow-x: auto;
+}
 .fv-render__text {
   white-space: pre-wrap;
   font-family: var(--font-mono);
@@ -5705,18 +5723,91 @@ button:focus-visible {
 }
 .fv-editor__save:disabled { opacity: 0.5; cursor: not-allowed; }
 .fv-editor__save:hover:not(:disabled) { background: var(--color-primary-dark); }
+
+/* Editor body: gutter + content side by side, shared scroll */
+.fv-editor__body {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  background: #fafaf9;
+}
+
+/* Line number gutter */
+.fv-editor__gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 48px;
+  padding-top: 12px;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid var(--border-default);
+  background: var(--bg-cell-hover, #f5f5f4);
+}
+.fv-editor__line-no {
+  padding: 0 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  opacity: 0.55;
+}
+
+/* Editor content area */
 .fv-editor__content {
   flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
+  padding: 12px 16px;
+  min-width: 0;
 }
 .fv-editor__content .ProseMirror {
   outline: none;
   min-height: 200px;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-base);
+  font-family: var(--font-mono);
+  font-size: 13px;
   line-height: 1.7;
   color: var(--text-primary);
+  caret-color: var(--color-primary);
+  white-space: pre;
+  overflow-x: visible;
+}
+/* Blinking cursor emphasis */
+.fv-editor__content .ProseMirror:focus {
+  animation: none;
+}
+.fv-editor__content .ProseMirror.ProseMirror-focused {
+  caret-color: var(--color-primary);
+}
+
+/* Whitespace dot visualization */
+.fv-ws-dot {
+  position: relative;
+}
+.fv-ws-dot::before {
+  content: '·';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Remove default paragraph margin inside editor (prevents extra blank lines) */
+.fv-editor__content .ProseMirror p {
+  margin: 0;
+}
+.fv-editor__content .ProseMirror pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.fv-editor__content .ProseMirror code {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 /* ============================================================

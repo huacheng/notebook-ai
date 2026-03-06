@@ -228,6 +228,21 @@ function CodeRenderer({ content, language }: { content: string; language: string
   );
 }
 
+// ── Plain text with line numbers ──────────────────────────────────────────
+function TextWithLineNumbers({ content, className }: { content: string; className?: string }) {
+  const lines = content.split('\n');
+  return (
+    <div className="fv-render__lined-text">
+      <div className="fv-code-lines">
+        {lines.map((_, i) => (
+          <div key={i} className="fv-code-line-number">{i + 1}</div>
+        ))}
+      </div>
+      <pre className={className}>{content}</pre>
+    </div>
+  );
+}
+
 // ── PPTX Placeholder ──────────────────────────────────────────────────────
 function PptxPlaceholder({ buffer, filename }: { buffer: Uint8Array; filename: string }) {
   const t = useT();
@@ -712,13 +727,13 @@ export function FileViewerRender({
             </div>
           )}
           {!isMd && isJson && (
-            <pre className="fv-render__json">{formatJsonContent(content)}</pre>
+            <TextWithLineNumbers content={formatJsonContent(content)} className="fv-render__json" />
           )}
           {!isMd && !isJson && codeLanguage && (
             <CodeRenderer content={content} language={codeLanguage} />
           )}
           {!isMd && !isJson && !codeLanguage && (
-            <pre className="fv-render__text">{content}</pre>
+            <TextWithLineNumbers content={content} className="fv-render__text" />
           )}
         </div>
       )}

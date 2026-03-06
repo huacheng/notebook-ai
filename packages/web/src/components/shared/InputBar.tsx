@@ -37,6 +37,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cmdBtnsRef = useRef<HTMLDivElement>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropCaretRef = useRef<number | null>(null);
 
   const submitPrompt = useStore((s) => s.submitPrompt);
   const queuePrompt = useStore((s) => s.queuePrompt);
@@ -332,12 +333,33 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onDrop={(e) => {
-            e.preventDefault();
             const MAX_DROP = 10000;
             const dropped = e.dataTransfer.getData('text/plain').slice(0, MAX_DROP);
-            if (dropped) setText((prev) => prev ? `${prev}\n${dropped}` : dropped);
+            if (!dropped) { e.preventDefault(); return; }
+            e.preventDefault();
+            const el = textareaRef.current;
+            if (!el) return;
+            // dropCaretRef was set by onDragOver to track cursor at drop point
+            const pos = dropCaretRef.current ?? el.selectionStart ?? el.value.length;
+            const before = el.value.slice(0, pos);
+            const after = el.value.slice(pos);
+            setText(before + dropped + after);
+            requestAnimationFrame(() => {
+              const cursorPos = pos + dropped.length;
+              el.setSelectionRange(cursorPos, cursorPos);
+              el.focus();
+            });
           }}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            // Move caret to drag position for visual feedback + capture drop position
+            const el = textareaRef.current;
+            if (!el) return;
+            el.focus();
+            // After focus, browser may update selectionStart based on mouse position
+            dropCaretRef.current = el.selectionStart;
+          }}
           disabled={disabled}
           placeholder={editMode ? t('input.editModePlaceholder') : t('input.placeholderWithHints')}
           rows={mobile ? 1 : 3}

@@ -211,7 +211,17 @@ export function setupWebSocket(
       if (TEXT_EXTS.has(ext)) format = 'text';
       else if (BINARY_FORMAT[ext]) format = BINARY_FORMAT[ext];
       else if (IMAGE_EXTS.has(ext)) format = 'image';
-      else format = 'unsupported';
+      else {
+        // Unknown extension: probe for binary content
+        const probe = Buffer.alloc(8192);
+        const fd = await fs.open(filePath, 'r');
+        try {
+          const { bytesRead } = await fd.read(probe, 0, 8192, 0);
+          format = probe.subarray(0, bytesRead).includes(0) ? 'unsupported' : 'text';
+        } finally {
+          await fd.close();
+        }
+      }
 
       if (format === 'unsupported') return;
 
@@ -712,7 +722,16 @@ export function setupWebSocket(
             } else if (IMAGE_EXTS.has(ext)) {
               format = 'image';
             } else {
-              format = 'unsupported';
+              // Unknown extension: probe for binary content (check first 8KB for null bytes)
+              const probe = Buffer.alloc(8192);
+              const fd = await fs.open(safePath, 'r');
+              try {
+                const { bytesRead } = await fd.read(probe, 0, 8192, 0);
+                const isBinaryFile = probe.subarray(0, bytesRead).includes(0);
+                format = isBinaryFile ? 'unsupported' : 'text';
+              } finally {
+                await fd.close();
+              }
             }
 
             sendToClient(ws, { type: 'file-open-meta', session_id, size: stat.size, mtime: stat.mtimeMs, format });
