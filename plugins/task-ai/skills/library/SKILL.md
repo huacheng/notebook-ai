@@ -99,6 +99,19 @@ $NB_WORKSPACES_ROOT/
     │           ├── .lock                  # Directory write lock (gitignore)
     │           ├── .index.md              # problem-type → file lookup table
     │           └── <problem-type>.md
+    ├── .skills/                              # Experience-to-skill promotion pipeline
+    │   ├── .candidates/                      # T1: auto-promoted candidates (from highlight promote)
+    │   │   └── <slug>/
+    │   │       ├── SKILL.md
+    │   │       └── trust-report.md
+    │   ├── .drafts/                          # T2: passed check skill-review (score ≥ 0.70)
+    │   │   └── <slug>/
+    │   │       ├── SKILL.md
+    │   │       └── trust-report.md
+    │   └── .active/                          # T3/T4: human-reviewed / production-validated
+    │       └── <name>/
+    │           ├── SKILL.md
+    │           └── trust-report.md
     └── <user-imported>/                   # User-imported files/folders (non-dot-prefixed)
         └── ...                            # Any structure; indexed by maintain --rebuild-index
 
@@ -221,7 +234,7 @@ Rebuild all `.index.md` files and `.master-index.md` from actual filesystem stat
 1.  **For each library sub-directory**: glob all `.md` files, read their frontmatter
 2.  **Rebuild each `.index.md`** from ground truth — file frontmatter wins over stale index entries
 3.  **Acquire directory-level `.lock`** before writing each `.index.md`; release after
-4.  **Rebuild `.master-index.md`**: scan all files across `.memory/.experiences/`, `.memory/.references/`, `.memory/.type-profiles/`, and `.memory/.thinking/patterns/`; also scan all user-imported folders (non-dot-prefixed names in `$NB_WORKSPACES_LIBRARY/`); overwrite `.master-index.md` with complete flat index (topic, type, keywords, file path, source). This restores the cold-start fallback for the three-tier Changelog Consumption Protocol degradation path
+4.  **Rebuild `.master-index.md`**: scan all files across `.memory/.experiences/`, `.memory/.references/`, `.memory/.type-profiles/`, `.memory/.thinking/patterns/`, `.skills/.candidates/`, `.skills/.drafts/`, and `.skills/.active/`; also scan all user-imported folders (non-dot-prefixed names in `$NB_WORKSPACES_LIBRARY/`); overwrite `.master-index.md` with complete flat index (topic, type, keywords, file path, source, and for `.skills/` entries: trust_tier T1–T4). This restores the cold-start fallback for the three-tier Changelog Consumption Protocol degradation path
 5.  **IOC scan**: extract all outbound URLs from `.memory/.references/` files; tally domain counts; write/overwrite `.ioc.md` if any domain appears in ≥ 3 documents; format: `| domain | doc_count | first_seen | last_seen | risk | note |`
 6.  **Fix `effectiveness_mark` uniqueness violations**: if multiple files in same topic scope or same notebook-type scope share `effectiveness_mark: true`, keep the one with latest `last_verified_at`, clear others (acquire lock before clearing)
 7.  **Clear `.inconsistency.log`** (all issues resolved by rebuild)

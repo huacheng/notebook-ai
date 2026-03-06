@@ -612,7 +612,7 @@ fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Handle skill-deep-review checkpoint (L3 LLM Semantic Review)
-# T3→T4 promotion: >= 0.85 composite → move to .skills/<name>/
+# T3→T4 promotion: >= 0.85 composite → move to .skills/.active/<name>/
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
     if ! command -v bc &>/dev/null; then

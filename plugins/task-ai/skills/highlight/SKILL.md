@@ -58,6 +58,7 @@ Unified protocol for experience and thinking library writes. Defines 7 scopes co
 │    (complete sync only)  │                                    │
 │  · quality_status        │                                    │
 │  · .skills/.candidates/  │                                    │
+│    .drafts/ .active/     │                                    │
 │    (promote scope)       │                                    │
 └──────────────────────────┴───────────────────────────────────┘
 ```
@@ -740,7 +741,7 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 
 1. `check --checkpoint skill-review --target SKILL.md` → six-dimension audit
 2. Score >= 0.70 → move to `.skills/.drafts/` (T2)
-3. Human review → move to `.skills/<name>/` (T3)
+3. Human review → move to `.skills/.active/<name>/` (T3)
 4. Production validation → T4 (fully verified)
 
 ## Notes

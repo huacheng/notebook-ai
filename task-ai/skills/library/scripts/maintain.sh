@@ -225,7 +225,7 @@ while [[ $# -gt 0 ]]; do
           echo "Already at T4 (active)"
           exit 0
       else
-          echo "[ERROR] Skill '$SKILL_NAME' not found in .candidates/, .drafts/, or .skills/" >&2
+          echo "[ERROR] Skill '$SKILL_NAME' not found in .skills/.candidates/, .skills/.drafts/, or .skills/.active/" >&2
           exit 1
       fi
 
