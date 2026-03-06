@@ -466,7 +466,7 @@ Verification methods MUST match the task domain. Read `type` from `.status.json`
 - **Judgment bias**: When uncertain between PASS and NEEDS_REVISION, prefer NEEDS_REVISION. When uncertain between ACCEPT and NEEDS_FIX, prefer NEEDS_FIX. False negatives (extra iteration) are cheaper than false positives (bad code merged).
 - Evaluation should be thorough but pragmatic — focus on blocking issues, not style preferences
 - Each assessment creates a new file in `.analysis/` (full evaluation history preserved, latest = last by filename sort)
-- Each mid-exec issue creates a new file in `.bugfix/` (one issue per file, filename includes date + summary)
+- Each NEEDS_FIX issue (mid-exec or post-exec) creates a new file in `.bugfix/` (one issue per file, filename includes date + summary, with regression test spec)
 - For `post-exec`, if tests exist (`.test/` criteria files), they MUST be run and pass for ACCEPT
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `YYYY-MM-DD-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.status.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
