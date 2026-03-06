@@ -84,7 +84,7 @@ async function checkTaskAiPlugin(): Promise<PreflightAlert | null> {
     return {
       id: 'plugin-task-ai-update',
       severity: 'info',
-      message: `task-ai plugin update available: ${localVersion} → ${latest}`,
+      message: `task-ai@moonview update available: ${localVersion} → ${latest}`,
       action: '/api/plugin/update',
     };
   }

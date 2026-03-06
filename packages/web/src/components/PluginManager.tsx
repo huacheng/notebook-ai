@@ -3,10 +3,10 @@ import { useStore } from '../store';
 import { useT } from '../i18n';
 
 const DEFAULT_MARKETPLACES: { name: string; repo: string }[] = [
+  { name: 'moonview', repo: 'huacheng/moonview' },
   { name: 'anthropic-agent-skills', repo: 'anthropics/skills' },
   { name: 'claude-code-plugins', repo: 'anthropics/claude-code' },
   { name: 'claude-plugins-official', repo: 'anthropics/claude-plugins-official' },
-  { name: 'moonview', repo: 'huacheng/moonview' },
 ];
 
 export function PluginManager() {
@@ -59,13 +59,23 @@ export function PluginManager() {
     (m) => !DEFAULT_MARKETPLACES.some((d) => d.name === m.name),
   ) ?? [];
 
-  // Group plugins by marketplace
+  // Group plugins by marketplace, moonview first, task-ai first within each group
   const pluginsByMarketplace = new Map<string, typeof pluginStatus extends null ? never : NonNullable<typeof pluginStatus>['plugins']>();
   for (const p of pluginStatus?.plugins ?? []) {
     const list = pluginsByMarketplace.get(p.marketplace) ?? [];
-    list.push(p);
+    if (p.name === 'task-ai') {
+      list.unshift(p);
+    } else {
+      list.push(p);
+    }
     pluginsByMarketplace.set(p.marketplace, list);
   }
+  // Sort marketplace groups: moonview first
+  const sortedEntries = [...pluginsByMarketplace.entries()].sort(([a], [b]) => {
+    if (a === 'moonview') return -1;
+    if (b === 'moonview') return 1;
+    return 0;
+  });
 
   return (
     <div className="pm-container">
@@ -184,7 +194,7 @@ export function PluginManager() {
         {pluginsByMarketplace.size === 0 && (
           <p className="pm-empty">{t('plugin.noPlugins')}</p>
         )}
-        {[...pluginsByMarketplace.entries()].map(([marketplace, plugins]) => (
+        {sortedEntries.map(([marketplace, plugins]) => (
           <div key={marketplace} className="pm-plugin-group">
             <div className="pm-plugin-group-header">{marketplace}</div>
             {plugins.map((p) => {

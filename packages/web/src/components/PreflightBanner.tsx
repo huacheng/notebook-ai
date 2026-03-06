@@ -7,8 +7,10 @@ export function PreflightBanner() {
   const fetchPreflight = useStore(s => s.fetchPreflight);
   const dismissPreflightAlert = useStore(s => s.dismissPreflightAlert);
   const installCron = useStore(s => s.installCron);
+  const updatePlugin = useStore(s => s.updatePlugin);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     fetchPreflight();
@@ -24,11 +26,24 @@ export function PreflightBanner() {
     setConfirmId(null);
   }
 
+  async function handleUpdatePlugin() {
+    setUpdating(true);
+    await updatePlugin('task-ai@moonview');
+    setUpdating(false);
+    dismissPreflightAlert('plugin-task-ai-update');
+    fetchPreflight();
+  }
+
   return (
     <div className="preflight-banner">
       {visible.map(alert => (
         <div key={alert.id} className={`preflight-alert preflight-${alert.severity}`}>
           <span className="preflight-msg">{alert.message}</span>
+          {alert.id === 'plugin-task-ai-update' && (
+            <button className="preflight-action" onClick={handleUpdatePlugin} disabled={updating}>
+              {updating ? 'Updating...' : 'Update'}
+            </button>
+          )}
           {alert.id === 'cron-task-ai' && !confirmId && (
             <button className="preflight-action" onClick={() => setConfirmId(alert.id)}>
               Set up
