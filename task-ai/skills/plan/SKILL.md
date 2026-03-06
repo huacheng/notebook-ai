@@ -115,17 +115,24 @@ No explicit command needed from user.
 13. Read `.notes/` latest file only if exists (prior research findings and experience)
 14. **If re-planning** (status is `re-planning` or `review`/`executing` transitioning to re-plan): archive existing `.plan.md` — rename to `.plan-superseded.md` (append numeric suffix if already exists, e.g., `.plan-superseded-2.md`). This prevents `exec` from reading outdated steps alongside the new plan
 15. Generate implementation plan using **domain-appropriate methodology** (incorporating check feedback, bugfix history, prior notes, cross-task experience, and researched best practices)
+    - **Re-plan regression check**: When re-planning due to check NEEDS_REVISION, read the latest `.analysis/` file's findings. After generating the new plan, verify each finding is addressed: for each issue flagged by check, confirm the new `.plan.md` contains the corrective content (contract test: grep for expected content). Log unaddressed findings as warnings in the step 28 report
     - **Optional delegation — brainstorm**: On first plan generation (no existing `.plan.md`), follow `auto/references/plugin-delegation.md` to attempt matching the `brainstorm` capability slot. If matched, invoke via Task subagent — exploration results serve as supplementary planning input. No match or failure → continue normally
 16. Write plan to `.plan.md` in the task module
 17. Write `.test/<YYYY-MM-DD>-plan-criteria.md` with **domain-appropriate** verification criteria: acceptance criteria from `.target.md` + per-step test cases using methods standard in the task domain. On re-plan, write `.test/<YYYY-MM-DD>-replan-criteria.md` incorporating lessons from previous `.test/` results files
-18. **VH stub generation** (software types only): When `type` (from `.status.json`) contains `software`, generate executable failing verification hypothesis stubs from the criteria:
-    - Extract each plan step's verification points from the criteria file written in step 17
-    - Generate `<workspace>/.test/<YYYY-MM-DD>-vh-stubs.test.*` (language/framework determined by `.type-profile.md` or project conventions)
-    - Each stub contains: test description, assertion placeholder, expected failure marker `// VH: not implemented`
-    - Run the VH stubs once to confirm **all fail** (VH baseline state)
-    - Write `.test/<YYYY-MM-DD>-vh-baseline.md` recording: total VH stubs count, per-step stub mapping, run output confirming all failures
-    - In `.plan.md`, annotate each implementation step with its corresponding VH stub references (e.g., `[VH: test-auth-login, test-auth-logout]`)
-    - If any stub unexpectedly passes → log warning in baseline file ("stub X passed without implementation — test may be trivially satisfied, review assertion strength")
+18. **Verification baseline generation**: Generate a RED baseline appropriate to the task type, ensuring each plan step has a verifiable test before implementation begins:
+    - **software types** (`type` contains `software`): Generate executable failing VH stubs:
+      - Extract each plan step's verification points from the criteria file written in step 17
+      - Generate `<workspace>/.test/<YYYY-MM-DD>-vh-stubs.test.*` (language/framework determined by `.type-profile.md` or project conventions)
+      - Each stub contains: test description, assertion placeholder, expected failure marker `// VH: not implemented`
+      - Run the VH stubs once to confirm **all fail** (VH baseline state)
+      - Write `.test/<YYYY-MM-DD>-vh-baseline.md` recording: total VH stubs count, per-step stub mapping, run output confirming all failures
+      - In `.plan.md`, annotate each implementation step with its corresponding VH stub references (e.g., `[VH: test-auth-login, test-auth-logout]`)
+      - If any stub unexpectedly passes → log warning in baseline file ("stub X passed without implementation — test may be trivially satisfied, review assertion strength")
+    - **non-software types**: Generate a contract test baseline using the domain-appropriate test approach from `commands/references/test-strategy-by-type.md` Strategy Matrix:
+      - Extract key verification points from each plan step
+      - Write `.test/<YYYY-MM-DD>-contract-baseline.md` with per-step verification specs: test approach (content validation, schema check, link check, etc.), RED assertion (what fails before implementation), GREEN expectation (what passes after)
+      - In `.plan.md`, annotate each implementation step with its verification method (e.g., `[Contract: schema-validate, link-check]`)
+      - This ensures `exec` has a concrete RED→GREEN pathway for every step, regardless of task type
 19. **Update** `.test/.summary.md` — overwrite with condensed summary of ALL criteria & results files in `.test/`
 20. Create `.notes/<YYYY-MM-DD>-<summary>-plan.md` with research findings and key decisions
 21. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
@@ -141,7 +148,10 @@ No explicit command needed from user.
     - D5 Architecture: module boundaries, incremental delivery, separation of concerns
     - D6 Maintainability: step executability, terminology consistency, test traceability
     - **Weight adjustment**: read `.type-profile.md` to shift emphasis (e.g., `software` → Security↑ Reliability↑, `infrastructure` → Security↑↑ Reliability↑↑). Full weight table in `references/self-audit-checklist.md` section 2
-    - If issues found → edit `.plan.md` directly (no `.analysis/` files — that is check's responsibility)
+    - If issues found → fix in `.plan.md` with regression verification:
+      - For each non-exempt fix (per `commands/references/test-strategy-by-type.md` exemptions), verify the fix using a contract test: grep/regex confirming the corrected content is present and the defective content is absent. This is the "Spec text" test approach from the Strategy Matrix
+      - Exempt fixes (pure typo ≤3 chars, comment-only) may skip individual verification
+      - No `.analysis/` files — that is check's responsibility
     - If no issues → skip, proceed to step 26
     - **Non-fatal**: if self-audit fails (exception/timeout), skip and proceed to step 26. Log "Self-audit: skipped (error)" for step 28 report
 26. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
@@ -189,3 +199,4 @@ Plan methodology MUST adapt to the task domain. Different domains require differ
 - **Evidence-based decisions**: Primary domain research is handled by the `research` sub-command (step 2). For plan-specific decisions, use shell commands to verify claims (curl docs/APIs, npm info, etc.) rather than relying solely on internal knowledge
 - **Concurrency**: Plan acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`). Reference writing is handled by the `research` sub-command (which manages its own `.memory/.references/.lock`)
 - **Task-type-aware test design**: `.test/` criteria must use domain-appropriate verification methods (e.g., unit tests for code, SSIM/PSNR for image processing, SNR for audio/DSP, schema validation for data pipelines). Research established best practices for the task domain before writing test criteria. See `commands/references/test-strategy-by-type.md` for the full domain test strategy reference
+- **Regression test in plan**: Plan's primary role is to DESIGN tests (step 17-18), not execute the full RED→GREEN cycle (that is exec's job per `commands/references/test-strategy-by-type.md` Phase Responsibilities). However, plan's L1 self-audit (step 25) and re-plan regression check (step 15) both apply fixes to `.plan.md` — these must include contract-test verification per the Regression Test Protocol. Step 18 generates the RED baseline that exec will use for RED→GREEN
