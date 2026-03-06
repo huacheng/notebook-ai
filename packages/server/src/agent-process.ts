@@ -45,7 +45,7 @@ export class AgentProcess {
         args.push('--model', this.model);
       }
       if (resumeSessionId) {
-        args.push('--resume', resumeSessionId);
+        args.push('--resume', resumeSessionId, '--fork-session');
       }
       if (this.systemPrompt) {
         args.push('--append-system-prompt', this.systemPrompt);

@@ -413,6 +413,9 @@ export class SessionManager {
     // Skip resume when the process crashed (SIGINT death) — the session is unrecoverable.
     const resumeSessionId = opts?.skipResume ? undefined : session.claudeSessionId;
 
+    // Reset claudeSessionId so the new process's session_id will be captured
+    session.claudeSessionId = undefined;
+
     // Stop old process
     session.agentProcess.stop();
 
