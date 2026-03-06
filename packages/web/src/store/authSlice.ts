@@ -2,28 +2,31 @@ import type { StateCreator } from 'zustand';
 import type { NotebookStore } from './types';
 
 export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'authToken' | 'authRequired' | 'authError' | 'authRetryAfter' | 'authLoading' | 'authVerifying'
-  | 'checkAuthStatus' | 'login' | 'logout' | 'register' | 'clearAuthError'
+  | 'authToken' | 'authRequired' | 'authMode' | 'authError' | 'authRetryAfter' | 'authLoading' | 'authVerifying'
+  | 'preflightAlerts' | 'preflightDismissed'
+  | 'checkAuthStatus' | 'login' | 'loginWithToken' | 'logout' | 'register' | 'clearAuthError'
+  | 'fetchPreflight' | 'dismissPreflightAlert' | 'installCron'
 >> = (set, get) => ({
   authToken: sessionStorage.getItem('nb-auth-token'),
   authRequired: null,
+  authMode: null,
   authError: null,
   authRetryAfter: 0,
   authLoading: false,
-  authVerifying: true, // True until token validation completes
+  authVerifying: true,
+  preflightAlerts: [],
+  preflightDismissed: new Set<string>(),
 
   async checkAuthStatus() {
     set({ authVerifying: true });
     try {
       const res = await fetch('/api/auth/status');
-      const data = (await res.json()) as { authEnabled: boolean };
-      set({ authRequired: data.authEnabled });
+      const data = (await res.json()) as { authEnabled: boolean; authMode?: 'token' | 'password' };
+      set({ authRequired: data.authEnabled, authMode: data.authMode ?? 'password' });
 
       if (data.authEnabled) {
         const token = get().authToken;
         if (token) {
-          // Validate stored token via /verify (not /login)
-          // to avoid triggering brute-force rate limiting.
           const check = await fetch('/api/auth/verify', {
             headers: { 'Authorization': `Bearer ${token}` },
           });
@@ -36,7 +39,6 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
     } catch {
       set({ authRequired: false });
     } finally {
-      // Token validation complete — safe to render authenticated components
       set({ authVerifying: false });
     }
   },
@@ -56,7 +58,27 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       }
       const data = (await res.json()) as { token: string };
       sessionStorage.setItem('nb-auth-token', data.token);
-      // Login success — token is validated, no need to verify again
+      set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
+    } catch {
+      set({ authError: 'Failed to connect to server.', authLoading: false });
+    }
+  },
+
+  async loginWithToken(token: string) {
+    set({ authLoading: true, authError: null });
+    try {
+      const res = await fetch('/api/auth/login-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error: string; retryAfter?: number };
+        set({ authError: data.error, authRetryAfter: data.retryAfter ?? 0, authLoading: false });
+        return;
+      }
+      const data = (await res.json()) as { token: string };
+      sessionStorage.setItem('nb-auth-token', data.token);
       set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
     } catch {
       set({ authError: 'Failed to connect to server.', authLoading: false });
@@ -92,5 +114,38 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
 
   clearAuthError() {
     set({ authError: null, authRetryAfter: 0 });
+  },
+
+  async fetchPreflight() {
+    try {
+      const token = get().authToken;
+      const res = await fetch('/api/system/preflight', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { alerts: Array<{ id: string; severity: string; message: string; action?: string }> };
+        set({ preflightAlerts: data.alerts });
+      }
+    } catch { /* ignore */ }
+  },
+
+  dismissPreflightAlert(id: string) {
+    const dismissed = new Set(get().preflightDismissed);
+    dismissed.add(id);
+    set({ preflightDismissed: dismissed });
+  },
+
+  async installCron() {
+    try {
+      const token = get().authToken;
+      const res = await fetch('/api/system/install-cron', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        // Refresh preflight to clear the alert
+        get().fetchPreflight();
+      }
+    } catch { /* ignore */ }
   },
 });

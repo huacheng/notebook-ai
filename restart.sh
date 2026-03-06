@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # restart.sh — Restart notebook-ai server (ports 3000 + 3002)
-# Usage: ./restart.sh [--prod]
-#   --prod  Build and run production version
-#   (default) Run development server with hot reload
+# Usage: ./restart.sh [--dev]
+#   --dev   Run development server with hot reload
+#   (default) Build and run production version
 set -euo pipefail
 
-PROD_MODE=false
-if [[ "${1:-}" == "--prod" ]]; then
-  PROD_MODE=true
+PROD_MODE=true
+if [[ "${1:-}" == "--dev" ]]; then
+  PROD_MODE=false
 fi
 
 PORTS="3000 3002"
@@ -45,6 +45,14 @@ done
 echo "==> Ports $PORTS are free."
 
 cd "$(dirname "$0")"
+
+# Load environment variables from .env
+if [ -f ".env" ]; then
+  set -a
+  source .env
+  set +a
+  echo "==> Loaded .env"
+fi
 
 # ── Auto-generate HTTPS cert with all local IPs ─────────────────────────────
 CERT_DIR="packages/web"

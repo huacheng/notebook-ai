@@ -9,7 +9,9 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { NotebookCreationPanel } from './components/NotebookCreationPanel';
 import { GitHistoryPanel } from './components/GitHistoryPanel';
 import { LoginPage } from './components/LoginPage';
+import { TokenLoginPage } from './components/TokenLoginPage';
 import { RegisterPage } from './components/RegisterPage';
+import { PreflightBanner } from './components/PreflightBanner';
 import { PluginManager } from './components/PluginManager';
 import { ModelManager } from './components/ModelManager';
 import { MobileApp } from './components/mobile/MobileApp';
@@ -342,6 +344,7 @@ function AuthenticatedApp() {
           </div>
         );
       })()}
+      <PreflightBanner />
       <div className={`app-body${hasActiveFile && fileViewerMaximized ? ' app-body--fv-maximized' : ''}`}>
         <ProjectSidebar />
         <div className="app-divider" onMouseDown={startLeftDrag} />
@@ -408,11 +411,13 @@ export default function App() {
   const t = useMemo(() => createT(language), [language]);
   const authRequired = useStore((s) => s.authRequired);
   const authToken = useStore((s) => s.authToken);
+  const authMode = useStore((s) => s.authMode);
   const authError = useStore((s) => s.authError);
   const authLoading = useStore((s) => s.authLoading);
   const authVerifying = useStore((s) => s.authVerifying);
   const checkAuthStatus = useStore((s) => s.checkAuthStatus);
   const login = useStore((s) => s.login);
+  const loginWithToken = useStore((s) => s.loginWithToken);
   const [showRegister, setShowRegister] = useState(false);
 
   const isMobile = useIsMobile();
@@ -434,11 +439,17 @@ export default function App() {
     );
   }
 
-  // Auth required but no token — show login or register page
+  // Auth required but no token — show login page based on authMode
   if (authRequired && !authToken) {
     return (
       <I18nProvider value={t}>
-        {showRegister ? (
+        {authMode === 'token' ? (
+          <TokenLoginPage
+            onLogin={loginWithToken}
+            error={authError}
+            loading={authLoading}
+          />
+        ) : showRegister ? (
           <RegisterPage onBack={() => setShowRegister(false)} />
         ) : (
           <LoginPage

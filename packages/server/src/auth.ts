@@ -12,6 +12,14 @@ const TRUST_PROXY = !!process.env['TRUST_PROXY'];
  */
 export const authEnabled = process.env['NB_AUTH_DISABLED'] !== '1';
 
+/**
+ * Auth mode: 'token' (default) or 'password'.
+ * - token: single shared secret via NB_AUTH_TOKEN env var
+ * - password: user/password with database (multi-user, future)
+ */
+export const authMode: 'token' | 'password' =
+  (process.env['NB_AUTH_MODE'] === 'password') ? 'password' : 'token';
+
 // ── Brute-force protection ──────────────────────────────────────────────────
 
 interface FailRecord {
@@ -443,12 +451,59 @@ export function handleLogout(req: Request, res: Response): void {
   res.json({ ok: true });
 }
 
+// ── Token login endpoint ─────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/login-token — authenticate with a shared secret token.
+ * Body: { token }
+ * Returns: { ok: true, token } (session token) on success
+ */
+export async function handleTokenLogin(req: Request, res: Response): Promise<void> {
+  const ip = getClientIp(req);
+  const { blocked, retryAfterSec } = checkRateLimit(ip);
+  if (blocked) {
+    res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfterSec}s.`, retryAfter: retryAfterSec });
+    return;
+  }
+
+  const { token } = req.body as { token?: unknown };
+
+  if (typeof token !== 'string' || !token) {
+    const lockSec = recordFailure(ip);
+    res.status(401).json({ error: `Token is required. Locked for ${lockSec}s.`, retryAfter: lockSec });
+    return;
+  }
+
+  const expected = process.env['NB_AUTH_TOKEN'];
+  if (!expected) {
+    res.status(500).json({ error: 'NB_AUTH_TOKEN not configured on server.' });
+    return;
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  const tokenBuf = Buffer.from(token);
+  const expectedBuf = Buffer.from(expected);
+  const valid = tokenBuf.length === expectedBuf.length &&
+    crypto.timingSafeEqual(tokenBuf, expectedBuf);
+
+  if (!valid) {
+    const lockSec = recordFailure(ip);
+    res.status(401).json({ error: `Invalid token. Locked for ${lockSec}s.`, retryAfter: lockSec });
+    return;
+  }
+
+  // Create session token (reuse existing session infrastructure)
+  const sessionToken = createSessionToken('token-user', 'token@local');
+  clearFailures(ip);
+  res.json({ ok: true, token: sessionToken, userId: 'token-user', email: 'token@local' });
+}
+
 // ── Auth status endpoint ────────────────────────────────────────────────────
 
 export function handleAuthStatus(_req: Request, res: Response): void {
   // Auth is always required for frontend — NB_AUTH_DISABLED only disables
   // server-side checks for testing, it doesn't change frontend requirements.
-  res.json({ authEnabled: true });
+  res.json({ authEnabled: true, authMode });
 }
 
 // ── Middleware ───────────────────────────────────────────────────────────────
@@ -461,6 +516,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   // Always allow auth endpoints and health check.
   if (
     req.path === '/api/auth/login' ||
+    req.path === '/api/auth/login-token' ||
     req.path === '/api/auth/register' ||
     req.path === '/api/auth/status' ||
     req.path === '/api/auth/verify' ||

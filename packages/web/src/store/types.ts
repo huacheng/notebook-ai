@@ -22,6 +22,7 @@ export interface NotebookStore {
   // ── Auth state ─────────────────────────────────────────────────────────
   authToken: string | null;
   authRequired: boolean | null;
+  authMode: 'token' | 'password' | null;
   authError: string | null;
   authRetryAfter: number;
   authLoading: boolean;
@@ -115,12 +116,20 @@ export interface NotebookStore {
   commandsLoaded: boolean;
   setCommands: (commands: Command[]) => void;
 
+  // ── Preflight alerts ─────────────────────────────────────────────────
+  preflightAlerts: Array<{ id: string; severity: string; message: string; action?: string }>;
+  preflightDismissed: Set<string>;
+
   // ── Auth actions ───────────────────────────────────────────────────────
   checkAuthStatus(): Promise<void>;
   login(email: string, password: string): Promise<void>;
+  loginWithToken(token: string): Promise<void>;
   logout(): void;
   register(username: string, password: string, inviteCode: string): Promise<boolean>;
   clearAuthError(): void;
+  fetchPreflight(): Promise<void>;
+  dismissPreflightAlert(id: string): void;
+  installCron(): Promise<void>;
 
   // ── Sidebar / history actions ──────────────────────────────────────────
   toggleSidebar(): void;
