@@ -2,7 +2,7 @@
 # Library Maintain Script
 # Usage: maintain.sh [--mode quick|audit] [--rebuild-index] [--rebuild-relations]
 #        [--compact] [--check-staleness] [--all] [--evolve] [--promote-skill <name>]
-#        [--scheduled [--force]]
+#        [--scheduled [--force]] [--install-cron] [--uninstall-cron]
 
 set -euo pipefail
 
@@ -492,6 +492,41 @@ while [[ $# -gt 0 ]]; do
 
       echo ""
       echo "=== Scheduled Maintenance Complete ==="
+      break
+      ;;
+
+    # --install-cron: add maintain.sh --scheduled to user's crontab
+    --install-cron)
+      CMD="--install-cron"
+      CRON_TAG="# task-ai:scheduled"
+      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash \"$SCRIPT_DIR/maintain.sh\" --scheduled $CRON_TAG"
+
+      # Check if already installed (idempotent)
+      EXISTING=$(crontab -l 2>/dev/null || true)
+      if echo "$EXISTING" | grep -q "task-ai:scheduled"; then
+          echo "[INFO] Cron entry already installed, skipping"
+      else
+          # Append new entry, preserving existing crontab (filter empty lines from empty crontab)
+          if [[ -n "$EXISTING" ]]; then
+              (echo "$EXISTING"; echo "$CRON_CMD") | crontab -
+          else
+              echo "$CRON_CMD" | crontab -
+          fi
+          echo "[OK] Installed cron entry for maintain.sh --scheduled"
+      fi
+      break
+      ;;
+
+    # --uninstall-cron: remove maintain.sh --scheduled from user's crontab
+    --uninstall-cron)
+      CMD="--uninstall-cron"
+      EXISTING=$(crontab -l 2>/dev/null || true)
+      if echo "$EXISTING" | grep -q "task-ai:scheduled"; then
+          echo "$EXISTING" | grep -v "task-ai:scheduled" | crontab -
+          echo "[OK] Removed cron entry for maintain.sh --scheduled"
+      else
+          echo "[INFO] No task-ai:scheduled entry found, nothing to remove"
+      fi
       break
       ;;
 
