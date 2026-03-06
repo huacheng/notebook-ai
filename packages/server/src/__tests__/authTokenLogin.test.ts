@@ -57,6 +57,13 @@ describe('Auth-token login mode', () => {
     expect(fn).toContain('checkRateLimit');
   });
 
+  it('handleTokenLogin should reject token shorter than 24 chars', () => {
+    const fnStart = AUTH_SRC.indexOf('function handleTokenLogin');
+    const fnEnd = AUTH_SRC.indexOf('\n}', fnStart) + 2;
+    const fn = AUTH_SRC.slice(fnStart, fnEnd);
+    expect(fn).toContain('.length < 24');
+  });
+
   it('handleTokenLogin should create session token on success', () => {
     const fnStart = AUTH_SRC.indexOf('function handleTokenLogin');
     const fnEnd = AUTH_SRC.indexOf('\n}', fnStart) + 2;

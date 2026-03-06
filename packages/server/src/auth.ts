@@ -475,8 +475,8 @@ export async function handleTokenLogin(req: Request, res: Response): Promise<voi
   }
 
   const expected = process.env['NB_AUTH_TOKEN'];
-  if (!expected) {
-    res.status(500).json({ error: 'NB_AUTH_TOKEN not configured on server.' });
+  if (!expected || expected.length < 24) {
+    res.status(500).json({ error: 'NB_AUTH_TOKEN not configured or too short (min 24 chars).' });
     return;
   }
 
