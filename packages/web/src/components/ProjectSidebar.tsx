@@ -555,6 +555,7 @@ function FileBrowser() {
   const authToken = useStore(s => s.authToken);
   const openFileTab = useStore(s => s.openFileTab);
   const importProjectNotebook = useStore(s => s.importProjectNotebook);
+  const workspaceDir = useStore(s => s.workspaceDir);
 
   const projectTitle = useStore(s => s.projects.find(p => p.id === s.activeProjectId)?.title ?? 'Project');
 
@@ -759,6 +760,7 @@ function FileBrowser() {
         <span className="file-browser-title">{projectTitle}</span>
       </div>
       <FileSection
+        key={workspaceDir ?? 'root'}
         baseUrl={`/api/projects/${activeProjectId}`}
         authToken={authToken}
         onFileClick={handleFileClick}
