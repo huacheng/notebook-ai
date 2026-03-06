@@ -123,7 +123,6 @@ Zod schema package defining the complete data contract: notebook format, cell ty
 |---|---|---|
 | `NB_AUTH_MODE` | `token` | Auth mode: `token` or `password` |
 | `NB_AUTH_TOKEN` | *(required)* | Shared secret for token auth (min 24 chars) |
-| `PORT` | `3002` | Backend API port |
 | `NB_WORKSPACES_ROOT` | `~/nb-workspaces` | Root directory for projects and notebooks |
 | `NB_WORKSPACES_LIBRARY` | `$NB_WORKSPACES_ROOT/.library` | Shared knowledge library |
 | `TRUST_PROXY` | *(unset)* | Set to trust `X-Forwarded-For` behind a reverse proxy |
