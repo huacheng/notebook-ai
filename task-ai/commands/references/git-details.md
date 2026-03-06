@@ -48,7 +48,6 @@ task-ai(auth-refactor):feat add user auth middleware
 task-ai(auth-refactor):fix fix token expiration check
 task-ai(auth-refactor):exec step 2/5 done
 task-ai(auth-refactor):check post-exec ACCEPT
-task-ai(auth-refactor):refactor cleanup before merge
 task-ai(auth-refactor):merge merge completed task
 task-ai(auth-refactor):merge resolve merge conflict
 task-ai(auth-refactor):merge task completed
