@@ -179,8 +179,8 @@ export class AgentProcess {
 
   /** Send SIGINT to interrupt current generation without killing the process. */
   interrupt(): void {
-    if (!this.proc || this.proc.killed) return;
-    this.proc.kill('SIGINT');
+    if (!this.isAlive()) return;
+    this.proc!.kill('SIGINT');
   }
 
   /** Terminates the persistent agent process. */
