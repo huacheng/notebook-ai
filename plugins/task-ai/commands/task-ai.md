@@ -211,7 +211,13 @@ The auto daemon's signal validation whitelist (see `auto/SKILL.md`) accepts all 
 
 ## Input Validation
 
-All sub-commands that accept `<project>` and/or `<notebook>` MUST validate the path before processing:
+All sub-commands auto-detect the notebook from context. Detection priority (first match wins):
+
+1. **CWD-based**: Walk up from CWD to find `.working/.status.json` — extract notebook and project from the directory path
+2. **Branch-based**: If CWD detection fails, read current git branch. If it matches `task/<notebook>`, resolve the notebook directory from `$NB_WORKSPACES_ROOT`
+3. **Neither**: REJECT with error "No active task context detected. Enter a notebook directory or switch to a task branch."
+
+The resolved `<project>` and `<notebook>` paths MUST be validated before processing:
 
 | Check | Rule | Example |
 |-------|------|---------|

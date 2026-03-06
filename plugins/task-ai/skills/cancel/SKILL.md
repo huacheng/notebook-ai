@@ -66,7 +66,7 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 10. **If `--cleanup`**:
     - Remove worktree: `git worktree remove .worktrees/task-<notebook>`
     - Delete branch: `git branch -d task/<notebook>` (safe delete — warns if unmerged). If `-d` fails because the branch has unmerged work, report warning to user with the unmerged commit count. User can manually run `git branch -D task/<notebook>` to force-delete
-11. **Report** cancellation result
+11. **Report** cancellation result. Then output: "Task cancelled. Use `/task-ai:report` to document the cancellation if needed."
 
 ## State Transitions
 

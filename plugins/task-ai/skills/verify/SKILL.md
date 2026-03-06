@@ -85,7 +85,7 @@ When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, veri
 13. **Update** `.test/.summary.md` — overwrite with condensed summary of ALL criteria & results files in `.test/`
 14. **Git commit**: `task-ai(<notebook>):verify <checkpoint> verification`
 15. **Write** `.auto-signal`: `{ "step": "verify", "result": "(pass|fail|partial)", "next": "check", "checkpoint": "<checkpoint>", "timestamp": "..." }`
-16. **Report** results summary to user
+16. **Report** results summary to user. Then output next step prompt: "Verification complete. Next: `/task-ai:check --checkpoint <checkpoint>` to evaluate the results and render a verdict." (substitute the actual checkpoint value)
 
 ## Result Values
 

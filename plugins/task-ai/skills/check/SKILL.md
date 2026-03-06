@@ -436,7 +436,16 @@ Before step 1, determine scope from invocation:
 16. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture quality judgment and ACCEPT/REPLAN decision reasoning. Inline call failure MUST NOT block check's main flow
 17. **Git commit**: per outcome (see Git section below). All outcomes commit their output files and state updates, regardless of whether status changes
 18. **Write** `.auto-signal` with verdict, next action, and checkpoint (see .auto-signal section below)
-19. **Report** evaluation result with detailed reasoning
+19. **Report** evaluation result with detailed reasoning. Then output next step prompt based on verdict:
+    - PASS (post-plan) → "Plan approved. Ready to execute — say 'auto' to start the automatic execution loop, or `/task-ai:exec` to execute manually step by step."
+    - NEEDS_REVISION (post-plan) → "Plan needs revision. Next: `/task-ai:plan` to revise based on the feedback above."
+    - ACCEPT (post-exec) → "Implementation accepted. Next: `/task-ai:merge` to merge the task branch."
+    - NEEDS_FIX (mid/post-exec) → "Issues found. Next: `/task-ai:exec` to apply fixes based on the findings above."
+    - REPLAN → "Fundamental issues found. Next: `/task-ai:plan` to re-plan based on the feedback above."
+    - CONTINUE (mid-exec) → "Progress OK. Next: `/task-ai:exec` to continue implementation."
+    - BLOCKED → "Task blocked. Manual intervention required."
+    - PASS (pre-merge) → "Pre-merge check passed. Next: `/task-ai:merge` to merge."
+    - NEEDS_FIX (pre-merge) → "Pre-merge issues found. Next: `/task-ai:exec` to fix before merge."
 
 ## State Transitions
 

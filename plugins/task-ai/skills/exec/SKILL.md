@@ -133,7 +133,10 @@ For each implementation step:
     - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
     - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
     - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
-11. **Report** execution summary with per-step results
+11. **Report** execution summary with per-step results. Then output next step prompt based on outcome:
+    - All steps done → "Execution complete. Next: `/task-ai:check --checkpoint post-exec` to evaluate the result."
+    - Significant issue mid-exec → "Issue encountered. Next: `/task-ai:check --checkpoint mid-exec` to evaluate and determine fix approach."
+    - Blocked → "Execution blocked. Awaiting manual intervention to resolve the blocking dependency."
 
 ## State Transitions
 

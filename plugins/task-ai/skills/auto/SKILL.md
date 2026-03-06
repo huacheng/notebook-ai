@@ -5,11 +5,11 @@ model_tier: heavy
 auto_delegatable: false
 triggers:
   keywords:
-    zh: [自动, 全自动, 自动跑, 自动执行, 一键, 跑全流程, 继续]
-    en: [auto, autopilot, run automatically, hands-off, full cycle, end to end, continue]
+    zh: [自动, 全自动, 自动跑, 自动执行, 一键, 跑全流程, 继续, 开始auto, auto开始, 开启auto, 启动auto]
+    en: [auto, autopilot, run automatically, hands-off, full cycle, end to end, continue, start auto, go auto]
   phrases:
-    zh: [自动跑一遍, 全自动执行, 一键跑完, 从头到尾自动, 停止自动, 继续执行]
-    en: [run it automatically, start autopilot, run the full cycle, hands-off execution, stop auto]
+    zh: [自动跑一遍, 全自动执行, 一键跑完, 从头到尾自动, 停止自动, 继续执行, auto 开始, 开始 auto, 开启 auto, 启动 auto, 开始自动]
+    en: [run it automatically, start autopilot, run the full cycle, hands-off execution, stop auto, start auto mode]
   disambiguate: >
     Core intent: orchestrate the entire task lifecycle through conversation.
     Notebook existence IS the context — no "auto mode" activation needed.

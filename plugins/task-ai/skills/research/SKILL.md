@@ -204,6 +204,13 @@ Callable independently for preparatory research before any phase, or to suppleme
 19. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture technology selection and feasibility reasoning from research process. Inline call failure MUST NOT block research's main flow
 20. **Git commit**: `task-ai(<notebook>):research collect references` (skip if no files written; include `.type-profile.md` and `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` if updated)
 21. **Write** `.auto-signal`: `{ "step": "research", "result": "(collected)" or "(sufficient)", "next": "<caller>", "checkpoint": "post-research", "timestamp": "..." }` — `next` field routes back to the calling phase (default: `plan`; if `--caller verify` → `verify`; if `--caller check` → `check`; if `--caller exec` → `exec`; if `--caller library` → `library`)
+22. **Report** research summary. Then output next step prompt based on caller:
+    - `--caller target` (O1/O2/O3) → "Research stage complete. Please review the insights above and confirm or revise before continuing."
+    - `--caller target` (objective-complete) → "All research stages confirmed. Next: `/task-ai:plan` to generate the implementation plan."
+    - `--caller plan` or default → "References collected. Next: `/task-ai:plan` to generate/revise the plan."
+    - `--caller verify` → "References collected. Resuming verification."
+    - `--caller check` → "References collected. Resuming evaluation."
+    - `--caller exec` → "References collected. Resuming execution."
 
 ## --caller target: Target Deepening Steps
 
@@ -268,6 +275,7 @@ Output appended to `.target.md`:
 
 `.auto-signal`: `result: "(o1-collected)"`, `next: "(stop)"`, `checkpoint: "post-o1"`
 Git commit: `task-ai(<notebook>):research deepen target background`
+Output message: "O1 background research complete. Research stage complete — please review the insights above and confirm or revise before continuing."
 
 **O2: Feasibility & Constraints** (feasibility and constraint analysis)
 
@@ -296,6 +304,7 @@ Output appended to `.target.md` (within `## Research Insights`):
 
 `.auto-signal`: `result: "(o2-collected)"`, `next: "(stop)"`, `checkpoint: "post-o2"`
 Git commit: `task-ai(<notebook>):research deepen target feasibility`
+Output message: "O2 feasibility analysis complete. Research stage complete — please review the insights above and confirm or revise before continuing."
 
 **O3: Refined Objective** (objective refinement)
 
@@ -318,10 +327,11 @@ Output appended to `.target.md` (within `## Research Insights`):
 
 `.auto-signal`: `result: "(o3-collected)"`, `next: "(stop)"`, `checkpoint: "post-o3"`
 Git commit: `task-ai(<notebook>):research deepen target objective`
+Output message: "O3 refined objective complete. Research stage complete — please review the insights above and confirm or revise before continuing."
 
 **Objective Complete**: When T0 detects all stages done (no `[PROPOSED]` residuals):
 `.auto-signal`: `result: "(objective-complete)"`, `next: "(stop)"`
-No git commit (nothing written). Output message: "All objective stages complete — run `--phase requirements` to continue."
+No git commit (nothing written). Output message: "Objective Complete — All research stages confirmed. Next: `/task-ai:research --caller target --phase requirements` to propose requirements, or `/task-ai:plan` to generate the implementation plan."
 
 ### --phase requirements: Requirements Deepening
 

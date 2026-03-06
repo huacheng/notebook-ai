@@ -155,7 +155,7 @@ No explicit command needed from user.
     - **Non-fatal**: if self-audit fails (exception/timeout), skip and proceed to step 26. Log "Self-audit: skipped (error)" for step 28 report
 26. **Git commit**: `task-ai(<notebook>):plan generate implementation plan`
 27. **Write** `.auto-signal`: `{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "..." }`
-28. Report plan summary to user. Include self-audit summary: "Self-audit: N issues found and corrected" or "Self-audit: clean" or "Self-audit: skipped (error)"
+28. Report plan summary to user. Include self-audit summary: "Self-audit: N issues found and corrected" or "Self-audit: clean" or "Self-audit: skipped (error)". Then output next step prompt verbatim: "Plan generated. Next: `/task-ai:check --checkpoint post-plan` to review the plan (runs verify automatically)."
 
 **Context management (plan)**: When `.summary.md` exists, read it as the primary context source for plan generation instead of reading all files from `.analysis/`, `.bugfix/`, `.notes/`. Only read the latest file from each directory for the most recent assessment/issue/note. See also `skills/exec/SKILL.md` for the equivalent exec-phase context rule.
 

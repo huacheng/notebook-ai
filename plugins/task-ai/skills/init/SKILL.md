@@ -167,7 +167,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
     <!-- Any constraints or limitations -->
     ```
 13. **Git commit**: `task-ai(<notebook_name>):init initialize notebook`
-14. **Report**: path, files created, branch name, worktree path (if any), next step hint
+14. **Report**: path, files created, branch name, worktree path (if any). Then output next step prompt verbatim: "Notebook initialized. Next: fill in `.target.md` with your objective and requirements, then run `/task-ai:target` to confirm, or directly describe your goal in the conversation."
 
 ## Git
 
