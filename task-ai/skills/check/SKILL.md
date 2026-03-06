@@ -324,7 +324,7 @@ Include a `## VFP Compliance` section in the `.analysis/<date>-post-exec-*.md` o
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
 | **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md`, write `.test/<date>-post-exec-results.md` | Status unchanged (`executing`), signal → `merge` sub-command |
-| **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with specific issues | Status unchanged |
+| **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with evaluation + `.bugfix/<date>-<summary>.md` per fix item (with regression test spec per §Regression Test Applicability) | Status unchanged |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
 
 ### 4. pre-merge
@@ -351,7 +351,7 @@ No retry at pre-merge — failure means the deliverable needs more Phase 3 work 
 | File | When Created | Content |
 |------|-------------|---------|
 | `.analysis/<date>-<summary>.md` | post-plan, mid-exec (BLOCKED), post-exec, pre-merge | Feasibility analysis, blocking analysis, or issue list. One file per assessment, preserving evaluation history |
-| `.bugfix/<date>-<summary>.md` | mid-exec (NEEDS_FIX, REPLAN) | Issue analysis, root cause, fix approach. One file per issue |
+| `.bugfix/<date>-<summary>.md` | mid-exec (NEEDS_FIX, REPLAN), post-exec (NEEDS_FIX) | Issue analysis, root cause, fix approach, regression test spec. One file per issue |
 | `.test/<date>-<checkpoint>-results.md` | mid-exec, post-exec | Test outcomes for criteria verification. One file per checkpoint evaluation |
 
 When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also overwrite that directory's `.summary.md` with a condensed summary of all entries in the directory.
