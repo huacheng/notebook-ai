@@ -106,7 +106,7 @@ No explicit command needed from user.
 4. Validate type value: each pipe-separated segment matches `[a-zA-Z0-9_:-]+`, full field matches `^[a-zA-Z0-9_:-]+(\|[a-zA-Z0-9_:-]+)*$` (no leading/trailing/consecutive pipes). Ensure `type` in `.status.json` is set
 5. Read `.summary.md` if exists (condensed context from prior runs — primary context source)
 6. Read `.analysis/` latest file only if exists (address check feedback from NEEDS_REVISION)
-7. Read `.bugfix/` latest file only if exists (address most recent mid-exec issue from REPLAN)
+7. Read `.bugfix/` latest file only if exists (address most recent issue from mid-exec or post-exec REPLAN)
 8. Read `.test/` latest criteria and results files if exists (incorporate lessons learned)
 9. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
 10. Read `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/.summary.md` if exists — condensed cross-task experience from completed tasks of the same domain type (apply directory-safe transform: `:` → `-` in type for directory name, e.g., `science:astro` → `science-astro`). For hybrid types (`A|B`), read summary files for **all** pipe-separated segments. If summary references specific entries relevant to current task, read those `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<module>.md` files for detail

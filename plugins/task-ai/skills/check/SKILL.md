@@ -324,7 +324,7 @@ Include a `## VFP Compliance` section in the `.analysis/<date>-post-exec-*.md` o
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
 | **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md`, write `.test/<date>-post-exec-results.md` | Status unchanged (`executing`), signal → `merge` sub-command |
-| **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with specific issues | Status unchanged |
+| **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with evaluation + `.bugfix/<date>-<summary>.md` per fix item (with regression test spec per §Regression Test Applicability) | Status unchanged |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
 
 ### 4. pre-merge
@@ -351,7 +351,7 @@ No retry at pre-merge — failure means the deliverable needs more Phase 3 work 
 | File | When Created | Content |
 |------|-------------|---------|
 | `.analysis/<date>-<summary>.md` | post-plan, mid-exec (BLOCKED), post-exec, pre-merge | Feasibility analysis, blocking analysis, or issue list. One file per assessment, preserving evaluation history |
-| `.bugfix/<date>-<summary>.md` | mid-exec (NEEDS_FIX, REPLAN) | Issue analysis, root cause, fix approach. One file per issue |
+| `.bugfix/<date>-<summary>.md` | mid-exec (NEEDS_FIX, REPLAN), post-exec (NEEDS_FIX) | Issue analysis, root cause, fix approach, regression test spec. One file per issue |
 | `.test/<date>-<checkpoint>-results.md` | mid-exec, post-exec | Test outcomes for criteria verification. One file per checkpoint evaluation |
 
 When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also overwrite that directory's `.summary.md` with a condensed summary of all entries in the directory.
@@ -466,7 +466,7 @@ Verification methods MUST match the task domain. Read `type` from `.status.json`
 - **Judgment bias**: When uncertain between PASS and NEEDS_REVISION, prefer NEEDS_REVISION. When uncertain between ACCEPT and NEEDS_FIX, prefer NEEDS_FIX. False negatives (extra iteration) are cheaper than false positives (bad code merged).
 - Evaluation should be thorough but pragmatic — focus on blocking issues, not style preferences
 - Each assessment creates a new file in `.analysis/` (full evaluation history preserved, latest = last by filename sort)
-- Each mid-exec issue creates a new file in `.bugfix/` (one issue per file, filename includes date + summary)
+- Each NEEDS_FIX issue (mid-exec or post-exec) creates a new file in `.bugfix/` (one issue per file, filename includes date + summary, with regression test spec)
 - For `post-exec`, if tests exist (`.test/` criteria files), they MUST be run and pass for ACCEPT
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `YYYY-MM-DD-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.status.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
