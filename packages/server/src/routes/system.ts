@@ -108,14 +108,16 @@ export function createSystemRouter(): IRouter {
   const router = Router();
 
   // GET /preflight — unified system health check
+  // Uses Promise.allSettled so a slow git ls-remote doesn't block the whole response
   router.get('/preflight', async (_req, res) => {
     const alerts: PreflightAlert[] = [];
-    const [pluginAlert, cronAlert] = await Promise.all([
+    const results = await Promise.allSettled([
       checkTaskAiPlugin(),
       checkCronScheduled(),
     ]);
-    if (pluginAlert) alerts.push(pluginAlert);
-    if (cronAlert) alerts.push(cronAlert);
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value) alerts.push(r.value);
+    }
     res.json({ alerts });
   });
 
