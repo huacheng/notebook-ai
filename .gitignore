@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 certs/
 .env
+*.db
 .worktrees/
 AiTasks/**/.tmp-annotations.json
 AiTasks/**/.auto-signal
