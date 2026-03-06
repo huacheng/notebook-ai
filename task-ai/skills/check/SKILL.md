@@ -163,6 +163,8 @@ Verdict: NEEDS_REVISION
 
 When scope=context review identifies issues AND the reviewer proceeds to apply fixes (audit-and-fix mode), the Regression Test Protocol from `commands/references/test-strategy-by-type.md` applies — each fix requires RED→GREEN confirmation. See step 10 "Regression Test Protocol" in Execution Steps.
 
+> **Trigger rule**: The protocol applies whenever check (or an agent acting on check's findings) **directly modifies code/spec/config files**. It does NOT apply when check only renders a verdict for another skill to act on. See [Regression Test Applicability](#regression-test-applicability) for the full trigger table.
+
 #### Does NOT Write Files
 
 scope=context is conversational — no `.analysis/` files, no `.auto-signal`, no state changes. Output is direct response in conversation.
@@ -372,15 +374,16 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 10. **Evaluate** against criteria
     - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/task-ai:security <notebook> audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
     - **Optional delegation — code-review** (post-exec checkpoint only): Follow `auto/references/plugin-delegation.md` to attempt matching the `code-review` capability slot. If matched, invoke via Task subagent with a git diff summary as input — review results serve as supplementary evaluation evidence. No match or failure → continue standard inline evaluation
-    - **Regression Test Protocol (HARD GATE — applies to all findings that produce fixes)**: Every finding that results in a code/spec/config fix MUST include a regression test specification. Follow `commands/references/test-strategy-by-type.md` Regression Test Protocol:
-      1. Classify finding → (fix category, task type) → select test approach from Strategy Matrix
-      2. Write the regression test (RED) — must fail against current codebase
-      3. Run → confirm FAIL (RED)
-      4. Apply the fix
-      5. Run → confirm PASS (GREEN)
-      6. Run full test suite → confirm zero regressions
-    - **Exemptions** (from test-strategy-by-type.md): Pure typo fix (≤3 chars), comment-only change, historical doc annotation — these skip RED/GREEN but still require step 6 (full suite)
-    - When check operates in audit-and-fix mode (scope=context or delegated audit), this protocol is **non-negotiable**. Findings without regression tests are incomplete and MUST NOT be committed
+    - **Regression Test Protocol (HARD GATE)**: When check directly applies fixes (not just rendering a verdict), every non-exempt fix MUST follow the RED→GREEN protocol from `commands/references/test-strategy-by-type.md`:
+      - 10a. Classify finding → (fix category, task type) → select test approach from Strategy Matrix
+      - 10b. Write the regression test (RED) — must fail against current codebase
+      - 10c. Run → confirm FAIL (RED)
+      - 10d. Apply the fix
+      - 10e. Run → confirm PASS (GREEN)
+      - 10f. Run full test suite → confirm zero regressions
+    - **Exemptions** (from test-strategy-by-type.md): Pure typo fix (≤3 chars), comment-only change, historical doc annotation — these skip RED/GREEN (steps 10a-10e) but still require step 10f (full suite)
+    - See [Regression Test Applicability](#regression-test-applicability) for which scopes and modes trigger this protocol
+    - **Lifecycle NEEDS_FIX output**: When check renders NEEDS_FIX (not fixing itself), the `.bugfix/` file MUST include a regression test specification for each finding — test approach, RED assertion, expected GREEN behavior — so that `exec` can execute the RED→GREEN protocol when applying the fix
 11. **Write** output files per outcome: evaluation to `.analysis/` or `.bugfix/` (per Outcomes tables above), and test results to `.test/<date>-<checkpoint>-results.md` when tests are evaluated (mid-exec and post-exec checkpoints)
     - **REPLAN with traceable reference**: if verdict is REPLAN AND evaluation identifies a specific `.memory/.references/<file>` as misleading (e.g., bad API docs caused wrong approach), increment `failure_count` in that reference file's frontmatter (acquire `.memory/.references/.lock` → read frontmatter → `failure_count++` → write atomically → append `reference` changelog update line → release lock)
 12. **Experience and quality updates** (skip for CONTINUE verdict — insufficient evaluation evidence):
@@ -468,6 +471,35 @@ Verification methods MUST match the task domain. Read `type` from `.status.json`
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `YYYY-MM-DD-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.status.json` MUST be validated: if any dependency is not met (simple string → `complete`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
 - **Concurrency**: Check acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
-- **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. MUST follow `references/six-dimension-audit.md` Audit Workflow steps 1-9 in full — including steps 7-9 (regression test design, RED→GREEN confirmation, full suite verification). Skipping steps 7-9 makes the audit incomplete
+- **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. MUST follow `references/six-dimension-audit.md` Audit Workflow steps 1-9 in full. When L3 audit **directly applies fixes** (audit-and-fix mode), steps 7-9 (regression test design, RED→GREEN confirmation, full suite verification) are mandatory per Regression Test Applicability table. When L3 audit only renders a verdict, embed test specs in output for downstream actor
 - **VFP applicability**: VFP applies when `type` contains `software` OR `.type-profile.md` contains `## Verification Cycle` section. See `commands/references/verification-first-protocol.md` for full applicability rules
 - **verify integration**: The `verify` sub-command can pre-run tests independently. When recent `verify` results exist (same day, matching checkpoint), check incorporates them instead of re-running. This is optional — check works standalone
+
+## Regression Test Applicability
+
+The Regression Test Protocol (step 10a-10f) triggers based on **who applies the fix**:
+
+| Scope | Mode | Who Fixes? | RED→GREEN Required? | Why |
+|-------|------|-----------|:---:|-----|
+| **context** | Audit-and-fix | check itself | **Yes** | check directly modifies files → must prove each fix correct |
+| **lifecycle** (post-plan) | Verdict only | plan (on NEEDS_REVISION) | No (check) / **Yes (plan)** | check renders verdict; plan applies fix with its own RED→GREEN |
+| **lifecycle** (mid-exec, post-exec) | Verdict only | exec (on NEEDS_FIX) | No (check) / **Yes (exec)** | check writes `.bugfix/` with test spec; exec executes RED→GREEN |
+| **lifecycle** (any) | L3 deep audit-and-fix | check itself | **Yes** | L3 audit directly modifies files → steps 7-9 mandatory |
+| **lifecycle** (pre-merge) | Verdict only | exec (on NEEDS_FIX) | No (check) / **Yes (exec)** | check identifies failing dimensions; exec fixes with RED→GREEN |
+| **skill** (skill-review) | Evaluate + promote | nobody (score only) | **No** | check evaluates and optionally moves files; no code/spec fix |
+| **skill** (skill-deep-review) | Evaluate + promote | nobody (score only) | **No** | same as skill-review |
+| **rules** (audit-validate) | Evaluate + move | nobody (move only) | **No** | check moves candidate files between directories; no content fix |
+| **delegated** (subagent from auto/exec) | Audit-and-fix | delegated agent | **Yes** | agent applies fixes on check's behalf → same as context mode |
+
+**Key principle**: The protocol binds to the **actor who modifies files**, not to the check command itself. When check only evaluates, it embeds test specs in its output (`.bugfix/`, `.analysis/`) for the downstream actor to execute.
+
+**Lifecycle NEEDS_FIX `.bugfix/` format**: Each finding section MUST include:
+```markdown
+### Regression Test
+- **Category**: [Runtime code | Spec text | Fixture data | ...]
+- **Test approach**: [from Strategy Matrix]
+- **RED assertion**: [what to test, expected FAIL before fix]
+- **GREEN expectation**: [expected PASS after fix]
+```
+
+This ensures `exec` has everything needed to run RED→GREEN without re-analyzing the issue.
