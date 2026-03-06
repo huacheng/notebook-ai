@@ -15,9 +15,6 @@ triggers:
     User says "do it" or "start implementing" → exec.
     User says "plan how to do it" → plan. User says "run it automatically" → auto.
 arguments:
-  - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
-    required: false
   - name: step
     description: "Execute a specific step number (optional, executes all if omitted)"
     required: false
@@ -30,8 +27,10 @@ Execute the implementation plan for a task module that has passed evaluation.
 ## Usage
 
 ```
-/task-ai:exec <notebook_name> [--step N]
+/task-ai:exec [--step N]
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Prerequisites
 
@@ -72,7 +71,7 @@ For each implementation step:
    - **Expected: all Red (failing)** → proceed to implementation
    - **Unexpected: any Green (passing)** → log warning in `.notes/`: "Step N: test X was Green before implementation — test may be trivially satisfied or implementation leaked from a prior step". Continue implementation but flag for review
 3. **Implement** the change using **domain-appropriate methods** as described in the plan (see `init/references/seed-types/<type>.md` for per-type seed methodology, or `.type-profile.md` for task-specific guidance)
-   - **Security Audit (Pre-hook)**: Before issuing any shell command that modifies state (file deletion, system config, package installation, network requests), MUST invoke `/task-ai:security <notebook> verify-cmd "<command>"`. If verdict is `REJECT`, execution is halted immediately, signal `(mid-exec)`, state becomes `NEEDS_FIX`, and trigger lineage tracing to invalidate the source reference.
+   - **Security Audit (Pre-hook)**: Before issuing any shell command that modifies state (file deletion, system config, package installation, network requests), MUST invoke `/task-ai:security verify-cmd "<command>"`. If verdict is `REJECT`, execution is halted immediately, signal `(mid-exec)`, state becomes `NEEDS_FIX`, and trigger lineage tracing to invalidate the source reference.
    - **Optional delegation — capability check**: Before implementing, follow `auto/references/plugin-delegation.md` to check if the current step matches a capability slot: `type` containing `frontend`/`web`/`ui` → `frontend-design` slot; `type` containing `bugfix` or NEEDS_FIX resumption → `debugging` slot; `type` containing `software` with `.test/` criteria → `tdd` slot; otherwise → `domain-*` semantic scan. If matched, invoke via Task subagent — guidance is incorporated into the implementation approach. No match or failure → use existing inline methods
 4. **HS confirmation** (VFP-applicable types with VH stubs): After implementing, run the same step-specific tests:
    - **All Green (passing)** → record successful VH→HS transition, proceed

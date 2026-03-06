@@ -16,9 +16,6 @@ triggers:
     User asks to EVALUATE plan feasibility (broader than security) → check.
     Normally invoked automatically as a pre-hook by check and exec — rarely called manually.
 arguments:
-  - name: notebook
-    description: "Notebook name (ignored for scan-skill; use _ as placeholder)"
-    required: false
   - name: action
     description: "Action to perform: audit-plan, verify-cmd, or scan-skill"
     required: true
@@ -34,10 +31,12 @@ Acts as the mandatory pre-hook for existing sub-commands (`check` and `exec`), e
 ## Usage
 
 ```bash
-/task-ai:security <notebook> audit-plan
-/task-ai:security <notebook> verify-cmd "<command>"
-/task-ai:security _ scan-skill "<path/to/SKILL.md>"
+/task-ai:security audit-plan                    # Notebook auto-detected
+/task-ai:security verify-cmd "<command>"         # Notebook auto-detected
+/task-ai:security scan-skill "<path/to/SKILL.md>"
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Execution Steps
 

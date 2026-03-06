@@ -16,9 +16,6 @@ triggers:
     User wants to PAUSE → not cancel (no pause skill; user just stops invoking commands).
     User wants to stop auto mode only → auto --action stop, not cancel.
 arguments:
-  - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
-    required: false
   - name: reason
     description: "Cancellation reason (recorded in .status.json cancel_reason field)"
     required: false
@@ -34,12 +31,12 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 ## Usage
 
 ```
-/task-ai:cancel <notebook_name> [--reason "..."] [--cleanup]
+/task-ai:cancel [--reason "..."] [--cleanup]
 ```
 
-## Arguments
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
-- **notebook** (optional, auto-detected from CWD or task branch): notebook name
+## Arguments
 - **--reason** (optional): cancellation reason, recorded in `.status.json` `cancel_reason` field
 - **--cleanup** (optional): also remove the git worktree and delete the task branch
 

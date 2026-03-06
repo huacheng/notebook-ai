@@ -15,9 +15,6 @@ triggers:
     User says "run tests" or "does it pass?" → verify.
     User says "is the plan OK?" or "can we merge?" → check (renders verdict).
 arguments:
-  - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
-    required: false
   - name: checkpoint
     description: "Verification scope: quick, full, or step-N (N >= 1)"
     required: false
@@ -38,9 +35,11 @@ Run domain-adapted tests and verification procedures for a task module, producin
 ## Usage
 
 ```
-/task-ai:verify <notebook_name> [--checkpoint quick|full|step-N]
-/task-ai:verify <notebook_name> --generate-skill-tests --target <skill.md>
+/task-ai:verify [--checkpoint quick|full|step-N]
+/task-ai:verify --generate-skill-tests --target <skill.md>
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ### Skill Test Generation Mode
 

@@ -15,9 +15,6 @@ triggers:
     User asks for a formal task report → report.
     User asks to distill EXPERIENCES/LESSONS → highlight. User asks to refresh summaries → summarize.
 arguments:
-  - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
-    required: false
   - name: format
     description: "Report format: full (default) or summary"
     required: false
@@ -31,8 +28,10 @@ Generate a structured completion report for a task module, documenting what was 
 ## Usage
 
 ```
-/task-ai:report <notebook_name> [--format full|summary]
+/task-ai:report [--format full|summary]
 ```
+
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Prerequisites
 
@@ -114,7 +113,7 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 14. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
 15. **Print** report to screen
 
-> *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. For manual workflows: run `/task-ai:highlight <notebook>` before `/task-ai:report <notebook>` if distillation is needed.*
+> *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. For manual workflows: run `/task-ai:highlight` before `/task-ai:report` if distillation is needed.*
 
 **Note**: Report is a terminal step — it reads ALL history files (not just latest) to produce a comprehensive record. `.summary.md` is used as an overview, not a replacement for full history in report context.
 

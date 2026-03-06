@@ -15,14 +15,11 @@ triggers:
     User asks "what tasks exist?" or "what's the status?" → list.
     User asks "is this plan OK?" → check (renders verdict). User asks "show target" → target read mode.
 arguments:
-  - name: notebook
-    description: "Notebook name (optional — omit to list all notebooks)"
-    required: false
   - name: deps
     description: "Output dependency relationship graph (Mermaid)"
     required: false
   - name: timeline
-    description: "Output status transition timeline from git history (requires notebook argument)"
+    description: "Output status transition timeline from git history (notebook auto-detected)"
     required: false
 ---
 
@@ -33,11 +30,12 @@ Query task status, details, and relationships. Pure read-only — no files writt
 ## Usage
 
 ```
-/task-ai:list                           # List all tasks
-/task-ai:list <notebook_name>             # Single notebook details
-/task-ai:list --deps                      # Dependency graph (all notebooks)
-/task-ai:list --timeline <notebook_name>  # Status transition timeline
+/task-ai:list                  # List all tasks
+/task-ai:list --deps           # Dependency graph (all notebooks)
+/task-ai:list --timeline       # Status transition timeline (notebook auto-detected)
 ```
+
+**Notebook auto-detection:** When in a notebook directory, details for that notebook are shown automatically. The notebook is resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`).
 
 ## Modes
 
@@ -55,9 +53,9 @@ Output a summary table of all notebooks:
 | Type | `.status.json` → `type` |
 | Updated | `.status.json` → `updated` |
 
-### 2. Single Notebook Details (`<notebook_name>`)
+### 2. Single Notebook Details (auto-detected from CWD or task branch)
 
-Output all fields from the notebook's `.working/.status.json` plus:
+When invoked inside a notebook directory (CWD contains `.working/.status.json`) or on a task branch (`task/<notebook>`), outputs all fields from the notebook's `.working/.status.json` plus:
 - `.summary.md` content (if exists) — condensed context
 - `.target.md` first 10 lines (preview, if exists) — requirements overview
 - File listing of `.working/` directory (system files and sub-directories)
@@ -75,7 +73,7 @@ graph LR
 
 Arrow direction: `A --> B` means "A depends on B" (drawn from the `depends_on` field of A). Nodes colored by status: green (complete/stage-done), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
 
-### 4. Status Timeline (`--timeline <notebook_name>`)
+### 4. Status Timeline (`--timeline`, notebook auto-detected)
 
 Extract status transition history from git log:
 
@@ -91,7 +89,7 @@ Parse commit messages to reconstruct the timeline of status changes.
 
 1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.working/.status.json`. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT`: project / notebook / `.working/`
 2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output)
-3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: validate that `notebook` argument is provided (REJECT if missing — timeline requires a specific notebook), then extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
+3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: auto-detect notebook from CWD or task branch (REJECT if not in a notebook context — timeline requires a specific notebook), then extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
 
 ## State Transitions
