@@ -280,10 +280,9 @@ generate_trust_report() {
 
 - **Trust Tier**: T1 (Unverified)
 - **Next Steps**:
-  1. Run \`check --checkpoint skill-review --target SKILL.md\` for six-dimension audit
-  2. If score >= 0.70 → T2 (move to .drafts/)
-  3. Human review → T3 (move to active skills/)
-  4. Production validation → T4 (fully verified)
+  1. Run \`check --checkpoint skill-review --target SKILL.md\` → L2 six-dimension audit, score >= 0.70 → T2 (move to .drafts/)
+  2. Run \`check --checkpoint skill-deep-review --target SKILL.md\` → L3 deep semantic review, score >= 0.85 → T3 (move to .active/)
+  3. Production validation (usage_count >= 3 post-activation, zero failures) → T4 (fully verified)
 
 ## Promotion Timestamp
 

@@ -108,7 +108,7 @@ $NB_WORKSPACES_ROOT/
     │   │   └── <slug>/
     │   │       ├── SKILL.md
     │   │       └── trust-report.md
-    │   └── .active/                          # T3/T4: human-reviewed / production-validated
+    │   └── .active/                          # T3: LLM deep-reviewed / T4: production-validated
     │       └── <name>/
     │           ├── SKILL.md
     │           └── trust-report.md

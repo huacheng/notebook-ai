@@ -577,8 +577,8 @@ EOF
         # D2: Sanitize slug for use in paths
         SKILL_SLUG=$(echo "$SKILL_SLUG" | tr -cd 'a-zA-Z0-9_-.')
 
-        # Check if skill is in .candidates/ (eligible for T3 promotion)
-        # L2 promotes to T3 max (L3 required for T4)
+        # Check if skill is in .candidates/ (eligible for T2 promotion)
+        # L2 skill-review promotes T1→T2 (.candidates/ → .drafts/)
         if [[ "$SKILL_PARENT_DIR" == *".candidates"* ]]; then
             if [[ "$TRUST_TIER" == "T3" ]]; then
                 DRAFTS_TARGET="$LIB_PATH/.skills/.drafts/$SKILL_SLUG"
@@ -591,11 +591,11 @@ EOF
                     else
                         # Update trust_tier in SKILL.md
                         if [[ -f "$DRAFTS_TARGET/SKILL.md" ]]; then
-                            sed -i "s/trust_tier: T[0-9]/trust_tier: T3/" "$DRAFTS_TARGET/SKILL.md"
+                            sed -i "s/trust_tier: T[0-9]/trust_tier: T2/" "$DRAFTS_TARGET/SKILL.md"
                         fi
 
                         echo ""
-                        echo "[PROMOTION] T2→T3: Moved to $DRAFTS_TARGET"
+                        echo "[PROMOTION] T1→T2: Moved to $DRAFTS_TARGET"
                         echo "[PROMOTION] Next: check --checkpoint skill-deep-review --target $DRAFTS_TARGET/SKILL.md"
                     fi
                 else
@@ -612,7 +612,7 @@ fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Handle skill-deep-review checkpoint (L3 LLM Semantic Review)
-# T3→T4 promotion: >= 0.85 composite → move to .skills/.active/<name>/
+# T2→T3 promotion: >= 0.85 composite → move to .skills/.active/<name>/
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$CHECKPOINT" == "skill-deep-review" ]]; then
     if ! command -v bc &>/dev/null; then
@@ -784,7 +784,7 @@ $(printf '%b' "${L3_D3_ISSUES:-None}")
 
 ## Next Steps
 $(if [[ "$L3_VERDICT" == "PROMOTE" ]]; then
-    echo "- ✅ Ready for T4 activation"
+    echo "- ✅ Ready for T3 activation"
     echo "- Skill will be moved to .skills/.active/$SKILL_SLUG/"
 else
     echo "- Fix issues above and re-run skill-deep-review"
@@ -792,7 +792,7 @@ fi)
 EOF
 
     # ─────────────────────────────────────────────────────────────────
-    # Auto-move T3→T4 if PROMOTE verdict
+    # Auto-move T2→T3 if PROMOTE verdict
     # ─────────────────────────────────────────────────────────────────
     if [[ "$L3_VERDICT" == "PROMOTE" ]]; then
         ACTIVE_TARGET="$LIB_PATH/.skills/.active/$SKILL_SLUG"
@@ -805,11 +805,11 @@ EOF
             else
                 # Update trust_tier in SKILL.md
                 if [[ -f "$ACTIVE_TARGET/SKILL.md" ]]; then
-                    sed -i "s/trust_tier: T[0-9]/trust_tier: T4/" "$ACTIVE_TARGET/SKILL.md"
+                    sed -i "s/trust_tier: T[0-9]/trust_tier: T3/" "$ACTIVE_TARGET/SKILL.md"
                 fi
 
                 echo ""
-                echo "[PROMOTION] T3→T4: Moved to $ACTIVE_TARGET"
+                echo "[PROMOTION] T2→T3: Moved to $ACTIVE_TARGET"
                 echo "[PROMOTION] Skill is now ACTIVE and available for hot-reload"
             fi
         else

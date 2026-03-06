@@ -89,8 +89,8 @@ Experience (.memory/.experiences/)
 Candidate (.candidates/<slug>/)
     ↓ check --skill (six-dimension audit)
 Draft (.drafts/<slug>/)
-    ↓ human review
-Workspace Skill (skills/<slug>/)
+    ↓ check --skill-deep-review (L3 deep semantic audit)
+Active (.active/<slug>/)
 ```
 EOF
         echo "[SKILL-HOTRELOAD] Initialized workspace skills with README"

@@ -739,10 +739,9 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 
 #### Next Steps After Promotion
 
-1. `check --checkpoint skill-review --target SKILL.md` → six-dimension audit
-2. Score >= 0.70 → move to `.skills/.drafts/` (T2)
-3. Human review → move to `.skills/.active/<name>/` (T3)
-4. Production validation → T4 (fully verified)
+1. `check --checkpoint skill-review --target SKILL.md` → L2 six-dimension audit, score ≥ 0.70 → move to `.skills/.drafts/` (T2)
+2. `check --checkpoint skill-deep-review --target SKILL.md` → L3 deep semantic review, score ≥ 0.85 → move to `.skills/.active/<name>/` (T3)
+3. Production validation (usage_count ≥ 3 post-activation, zero failures) → T4 (fully verified)
 
 ## Notes
 
