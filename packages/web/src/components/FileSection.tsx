@@ -40,7 +40,7 @@ interface ListResult {
 const EXT_TYPE: Record<string, string> = {
   py: 'py', js: 'js', jsx: 'js', ts: 'ts', tsx: 'ts',
   json: 'json', md: 'md', txt: 'txt', sh: 'sh',
-  csv: 'csv', html: 'html', css: 'css', yaml: 'yml', yml: 'yml',
+  csv: 'csv', html: 'html', css: 'css', yaml: 'yml', yml: 'yml', log: 'txt', changelog: 'txt',
   png: 'img', jpg: 'img', jpeg: 'img', gif: 'img', svg: 'img', webp: 'img',
   pdf: 'pdf', zip: 'zip', tar: 'zip', gz: 'zip',
   docx: 'doc', doc: 'doc', rtf: 'doc',

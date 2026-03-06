@@ -695,7 +695,7 @@ export function setupWebSocket(
             const ext = safePath.split('.').pop()?.toLowerCase() ?? '';
 
             const TEXT_EXTS = new Set(['md', 'txt', 'json', 'yaml', 'yml', 'sh', 'py', 'js', 'ts',
-              'tsx', 'jsx', 'css', 'htm', 'html', 'csv', 'xml', 'toml', 'ini', 'env', 'log']);
+              'tsx', 'jsx', 'css', 'htm', 'html', 'csv', 'xml', 'toml', 'ini', 'env', 'log', 'changelog']);
 
             const BINARY_FORMAT: Record<string, string> = {
               pdf: 'pdf-binary', docx: 'docx-binary', xlsx: 'xlsx-binary', pptx: 'pptx-binary',
