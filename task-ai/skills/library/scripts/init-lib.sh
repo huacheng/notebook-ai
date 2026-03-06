@@ -180,6 +180,7 @@ if [[ ! -f .gitignore ]]; then
 .plugin-registry.md
 .last-maintained
 .last-scheduled
+.scheduled.log
 **/.library-state.json
 **/.lock
 **/.lock.stale.*
