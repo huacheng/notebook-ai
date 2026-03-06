@@ -16,6 +16,58 @@ REBUILD_RELATIONS_PY="${REBUILD_RELATIONS_PY:-$SCRIPT_DIR/rebuild-relations.py}"
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 export NB_WORKSPACES_LIBRARY="$LIB_PATH"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared function: T3→T4 production validation for a single skill
+# Args: $1 = skill name, $2 = SKILL.md path
+# Returns: 0 if promoted, 1 if not eligible
+# ─────────────────────────────────────────────────────────────────────────────
+_validate_t3_to_t4() {
+    local skill_name="$1"
+    local skill_file="$2"
+    local changelog="$LIB_PATH/.changelog"
+
+    if [[ ! -f "$changelog" ]]; then
+        echo "[INFO] No changelog found, cannot validate usage"
+        return 1
+    fi
+
+    # Count post-activation referenced entries
+    local usage_count
+    usage_count=$(grep -c "| referenced | .*$skill_name" "$changelog" 2>/dev/null || echo 0)
+    echo "Usage count (referenced): $usage_count"
+
+    if [[ "$usage_count" -lt 3 ]]; then
+        echo "[INFO] Not enough usage (need >= 3, have $usage_count), remains T3"
+        return 1
+    fi
+
+    # Check for REPLAN failures
+    local failure_count=0
+    local ref_notebooks
+    ref_notebooks=$(grep "| referenced | .*$skill_name" "$changelog" | \
+        sed 's/.*notebook:\([a-zA-Z0-9_-]*\).*/\1/' | sort -u)
+
+    local nb
+    for nb in $ref_notebooks; do
+        if grep -q "replan:true.*notebook:$nb\|invalidated.*notebook:$nb" "$changelog" 2>/dev/null; then
+            failure_count=$((failure_count + 1))
+            echo "[WARN] Notebook '$nb' had REPLAN after referencing this skill"
+        fi
+    done
+
+    echo "Failure count: $failure_count"
+
+    if [[ "$failure_count" -gt 0 ]]; then
+        echo "[INFO] REPLAN failures detected ($failure_count), remains T3"
+        return 1
+    fi
+
+    # All checks passed — promote
+    sed -i 's/trust_tier: T3/trust_tier: T4/' "$skill_file"
+    echo "[PROMOTION] T3→T4: Promoted to production-validated"
+    return 0
+}
+
 while [[ $# -gt 0 ]]; do
   START_TIME=$(date +%s%3N)
   CMD="$1"
@@ -282,68 +334,20 @@ while [[ $# -gt 0 ]]; do
               echo ""
               echo "[SUCCESS] Promoted to T3 (.skills/.active/$SKILL_NAME/)"
               echo "Skill is now ACTIVE and available for hot-reload"
+              CURRENT_TIER="T3"
+              SKILL_FILE="$ACTIVE_DIR/$SKILL_NAME/SKILL.md"
           else
               echo "[INFO] Score < 0.85, skill remains in .drafts/"
           fi
       fi
 
-      # ─────────────────────────────────────────────────────────────────
       # T3→T4 Production Validation (changelog-driven)
-      # Requires: usage_count >= 3 post-activation, zero REPLAN failures
-      # ─────────────────────────────────────────────────────────────────
       if [[ "$CURRENT_TIER" == "T3" ]]; then
-          CHANGELOG="$LIB_PATH/.changelog"
-          SKILL_PATH=".skills/.active/$SKILL_NAME/SKILL.md"
-
           echo ""
           echo "--- Production Validation (T3→T4) ---"
-
-          if [[ ! -f "$CHANGELOG" ]]; then
-              echo "[INFO] No changelog found, cannot validate usage"
-              echo ""
-              echo "=== Promotion Complete ==="
-              exit 0
+          if _validate_t3_to_t4 "$SKILL_NAME" "$ACTIVE_DIR/$SKILL_NAME/SKILL.md"; then
+              echo "trust_tier updated to T4 in $ACTIVE_DIR/$SKILL_NAME/SKILL.md"
           fi
-
-          # Count post-activation referenced entries for this skill
-          USAGE_COUNT=$(grep -c "| referenced | .*$SKILL_NAME" "$CHANGELOG" 2>/dev/null || echo 0)
-          echo "Usage count (referenced): $USAGE_COUNT"
-
-          if [[ "$USAGE_COUNT" -lt 3 ]]; then
-              echo "[INFO] Not enough usage (need >= 3, have $USAGE_COUNT), remains T3"
-              echo ""
-              echo "=== Promotion Complete ==="
-              exit 0
-          fi
-
-          # Check for REPLAN failures: any referenced notebook that later had replan
-          FAILURE_COUNT=0
-          # Extract unique notebooks that referenced this skill
-          REF_NOTEBOOKS=$(grep "| referenced | .*$SKILL_NAME" "$CHANGELOG" | \
-              sed 's/.*notebook:\([a-zA-Z0-9_-]*\).*/\1/' | sort -u)
-
-          for nb in $REF_NOTEBOOKS; do
-              # Check if this notebook had a REPLAN/invalidation after referencing
-              if grep -q "replan:true.*notebook:$nb\|invalidated.*notebook:$nb" "$CHANGELOG" 2>/dev/null; then
-                  FAILURE_COUNT=$((FAILURE_COUNT + 1))
-                  echo "[WARN] Notebook '$nb' had REPLAN after referencing this skill"
-              fi
-          done
-
-          echo "Failure count: $FAILURE_COUNT"
-
-          if [[ "$FAILURE_COUNT" -gt 0 ]]; then
-              echo "[INFO] REPLAN failures detected ($FAILURE_COUNT), remains T3"
-              echo ""
-              echo "=== Promotion Complete ==="
-              exit 0
-          fi
-
-          # All checks passed — promote T3→T4
-          sed -i 's/trust_tier: T3/trust_tier: T4/' "$ACTIVE_DIR/$SKILL_NAME/SKILL.md"
-          echo ""
-          echo "[PROMOTION] T3→T4: Promoted to production-validated"
-          echo "trust_tier updated to T4 in $ACTIVE_DIR/$SKILL_NAME/SKILL.md"
       fi
 
       echo ""
@@ -457,37 +461,9 @@ while [[ $# -gt 0 ]]; do
               CURRENT_TRUST=$(grep 'trust_tier:' "$SKILL_FILE" 2>/dev/null | head -1 | sed 's/.*trust_tier:\s*//' | tr -d ' ')
               [[ "$CURRENT_TRUST" == "T3" ]] || continue
 
-              # Count referenced entries
-              CHANGELOG="$LIB_PATH/.changelog"
-              USAGE_COUNT=0
-              if [[ -f "$CHANGELOG" ]]; then
-                  USAGE_COUNT=$(grep -c "| referenced | .*$SKILL_NAME" "$CHANGELOG" 2>/dev/null || echo 0)
+              if _validate_t3_to_t4 "$SKILL_NAME" "$SKILL_FILE"; then
+                  T3_PROMOTED=$((T3_PROMOTED + 1))
               fi
-
-              if [[ "$USAGE_COUNT" -lt 3 ]]; then
-                  echo "  [T3] $SKILL_NAME — usage $USAGE_COUNT/3, not yet eligible"
-                  continue
-              fi
-
-              # Check for REPLAN failures
-              FAILURE_COUNT=0
-              REF_NOTEBOOKS=$(grep "| referenced | .*$SKILL_NAME" "$CHANGELOG" | \
-                  sed 's/.*notebook:\([a-zA-Z0-9_-]*\).*/\1/' | sort -u)
-              for nb in $REF_NOTEBOOKS; do
-                  if grep -q "replan:true.*notebook:$nb\|invalidated.*notebook:$nb" "$CHANGELOG" 2>/dev/null; then
-                      FAILURE_COUNT=$((FAILURE_COUNT + 1))
-                  fi
-              done
-
-              if [[ "$FAILURE_COUNT" -gt 0 ]]; then
-                  echo "  [T3] $SKILL_NAME — $FAILURE_COUNT REPLAN failure(s), remains T3"
-                  continue
-              fi
-
-              # Promote T3→T4
-              sed -i 's/trust_tier: T3/trust_tier: T4/' "$SKILL_FILE"
-              echo "  [PROMOTION] $SKILL_NAME: T3→T4 (production-validated)"
-              T3_PROMOTED=$((T3_PROMOTED + 1))
           done
       fi
       if [[ "$T3_PROMOTED" -eq 0 ]]; then

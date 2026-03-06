@@ -70,6 +70,7 @@ $NB_WORKSPACES_ROOT/
     ├── .type-registry.md                  # Known type registry (git tracked)
     ├── .ioc.md                            # Domain convergence IOC log (gitignore)
     ├── .inconsistency.log                 # Index–file mismatch log (gitignore)
+    ├── .last-scheduled                     # Epoch timestamp of last --scheduled run (gitignore)
     ├── .plugin-registry.md                # Plugin capability cache (lazily created, gitignore)
     ├── .memory/                           # System-managed knowledge base
     │   ├── .references/
