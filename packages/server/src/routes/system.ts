@@ -70,8 +70,8 @@ export function createSystemRouter(): IRouter {
 
       const workspacesRoot = process.env['NB_WORKSPACES_ROOT'] ?? path.join(os.homedir(), 'nb-workspaces');
       const { stdout, stderr } = await exec(
-        `NB_WORKSPACES_ROOT="${workspacesRoot}" bash "${maintainSh}" --install-cron`,
-        { timeout: 10_000 },
+        'bash "$MAINTAIN_SH" --install-cron',
+        { timeout: 10_000, env: { ...process.env, NB_WORKSPACES_ROOT: workspacesRoot, MAINTAIN_SH: maintainSh } },
       );
       res.json({ ok: true, output: (stdout + stderr).trim() });
     } catch (err) {
