@@ -32,9 +32,24 @@ describe('System preflight API — routes', () => {
     expect(ROUTES_SRC).toContain('task-ai:scheduled');
   });
 
-  it('should check for task-ai plugin installation', () => {
-    expect(ROUTES_SRC).toContain('task-ai');
+  it('should check for task-ai plugin installation and version', () => {
+    expect(ROUTES_SRC).toContain('task-ai@moonview');
     expect(ROUTES_SRC).toContain('installed_plugins');
+  });
+
+  it('should compare local vs remote version with compareSemver', () => {
+    expect(ROUTES_SRC).toContain('compareSemver');
+    expect(ROUTES_SRC).toContain('getRemoteLatestTag');
+  });
+
+  it('should use git ls-remote to fetch latest tag from moonview repo', () => {
+    expect(ROUTES_SRC).toContain('git ls-remote --tags');
+    expect(ROUTES_SRC).toContain('huacheng/moonview');
+  });
+
+  it('should return update-available alert when remote version is newer', () => {
+    expect(ROUTES_SRC).toContain('plugin-task-ai-update');
+    expect(ROUTES_SRC).toMatch(/update available/);
   });
 });
 
