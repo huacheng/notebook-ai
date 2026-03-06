@@ -2,6 +2,7 @@
 # Library Maintain Script
 # Usage: maintain.sh [--mode quick|audit] [--rebuild-index] [--rebuild-relations]
 #        [--compact] [--check-staleness] [--all] [--evolve] [--promote-skill <name>]
+#        [--scheduled [--force]]
 
 set -euo pipefail
 
@@ -383,6 +384,139 @@ while [[ $# -gt 0 ]]; do
       # D3: Use resolved script path for recursive invocation (CWD may change)
       bash "$SCRIPT_DIR/maintain.sh" --rebuild-index --rebuild-relations --compact --check-staleness
       shift ;;
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # --scheduled: periodic auto-maintenance (cron-friendly, timestamp-gated)
+    # Runs: staleness check, T3→T4 validation, changelog compact check
+    # Usage: maintain.sh --scheduled [--force]
+    # ─────────────────────────────────────────────────────────────────────────
+    --scheduled)
+      FORCE_RUN=0
+      shift
+      if [[ "${1:-}" == "--force" ]]; then
+          FORCE_RUN=1
+          shift
+      fi
+
+      SCHEDULED_TS_FILE="$LIB_PATH/.last-scheduled"
+      INTERVAL_SECONDS=86400  # 24 hours
+
+      # Check if maintenance is due
+      if [[ "$FORCE_RUN" -eq 0 ]] && [[ -f "$SCHEDULED_TS_FILE" ]]; then
+          LAST_RUN=$(cat "$SCHEDULED_TS_FILE" 2>/dev/null || echo "0")
+          # D2: validate numeric
+          if ! [[ "$LAST_RUN" =~ ^[0-9]+$ ]]; then
+              LAST_RUN=0
+          fi
+          NOW=$(date +%s)
+          ELAPSED_SINCE=$((NOW - LAST_RUN))
+          if [[ "$ELAPSED_SINCE" -lt "$INTERVAL_SECONDS" ]]; then
+              HOURS_AGO=$((ELAPSED_SINCE / 3600))
+              echo "[scheduled] Up to date — last run ${HOURS_AGO}h ago (interval: 24h). Skipping."
+              break
+          fi
+      fi
+
+      echo "=== Scheduled Maintenance ==="
+
+      # 1. Staleness check (references)
+      echo ""
+      echo "--- [1/3] Staleness Check ---"
+      REF_DIR="$LIB_PATH/.memory/.references"
+      STALE_COUNT=0
+      if [[ -d "$REF_DIR" ]]; then
+          STALENESS_DAYS=30
+          NOW_EPOCH=$(date +%s)
+          while IFS= read -r -d '' ref_file; do
+              FILE_EPOCH=$(stat -c %Y "$ref_file" 2>/dev/null || echo "$NOW_EPOCH")
+              AGE_DAYS=$(( (NOW_EPOCH - FILE_EPOCH) / 86400 ))
+              if [[ "$AGE_DAYS" -gt "$STALENESS_DAYS" ]]; then
+                  STALE_COUNT=$((STALE_COUNT + 1))
+                  echo "  [STALE] $(basename "$ref_file") — ${AGE_DAYS} days old"
+              fi
+          done < <(find "$REF_DIR" -maxdepth 1 -name "*.md" ! -name ".index.md" ! -name ".summary.md" -print0 2>/dev/null)
+      fi
+      if [[ "$STALE_COUNT" -eq 0 ]]; then
+          echo "  No stale references found"
+      else
+          echo "  $STALE_COUNT stale reference(s) — consider running: library research --scope gap"
+      fi
+
+      # 2. T3→T4 production validation for all active skills
+      echo ""
+      echo "--- [2/3] T3→T4 Production Validation ---"
+      ACTIVE_DIR="$LIB_PATH/.skills/.active"
+      T3_PROMOTED=0
+      if [[ -d "$ACTIVE_DIR" ]]; then
+          for skill_dir in "$ACTIVE_DIR"/*/; do
+              [[ -d "$skill_dir" ]] || continue
+              SKILL_NAME=$(basename "$skill_dir")
+              SKILL_FILE="$skill_dir/SKILL.md"
+              [[ -f "$SKILL_FILE" ]] || continue
+
+              CURRENT_TRUST=$(grep 'trust_tier:' "$SKILL_FILE" 2>/dev/null | head -1 | sed 's/.*trust_tier:\s*//' | tr -d ' ')
+              [[ "$CURRENT_TRUST" == "T3" ]] || continue
+
+              # Count referenced entries
+              CHANGELOG="$LIB_PATH/.changelog"
+              USAGE_COUNT=0
+              if [[ -f "$CHANGELOG" ]]; then
+                  USAGE_COUNT=$(grep -c "| referenced | .*$SKILL_NAME" "$CHANGELOG" 2>/dev/null || echo 0)
+              fi
+
+              if [[ "$USAGE_COUNT" -lt 3 ]]; then
+                  echo "  [T3] $SKILL_NAME — usage $USAGE_COUNT/3, not yet eligible"
+                  continue
+              fi
+
+              # Check for REPLAN failures
+              FAILURE_COUNT=0
+              REF_NOTEBOOKS=$(grep "| referenced | .*$SKILL_NAME" "$CHANGELOG" | \
+                  sed 's/.*notebook:\([a-zA-Z0-9_-]*\).*/\1/' | sort -u)
+              for nb in $REF_NOTEBOOKS; do
+                  if grep -q "replan:true.*notebook:$nb\|invalidated.*notebook:$nb" "$CHANGELOG" 2>/dev/null; then
+                      FAILURE_COUNT=$((FAILURE_COUNT + 1))
+                  fi
+              done
+
+              if [[ "$FAILURE_COUNT" -gt 0 ]]; then
+                  echo "  [T3] $SKILL_NAME — $FAILURE_COUNT REPLAN failure(s), remains T3"
+                  continue
+              fi
+
+              # Promote T3→T4
+              sed -i 's/trust_tier: T3/trust_tier: T4/' "$SKILL_FILE"
+              echo "  [PROMOTION] $SKILL_NAME: T3→T4 (production-validated)"
+              T3_PROMOTED=$((T3_PROMOTED + 1))
+          done
+      fi
+      if [[ "$T3_PROMOTED" -eq 0 ]]; then
+          echo "  No T3 skills eligible for T4 promotion"
+      fi
+
+      # 3. Changelog size check
+      echo ""
+      echo "--- [3/3] Changelog Size Check ---"
+      CHANGELOG="$LIB_PATH/.changelog"
+      if [[ -f "$CHANGELOG" ]]; then
+          LINE_COUNT=$(wc -l < "$CHANGELOG")
+          echo "  Changelog: $LINE_COUNT lines"
+          if [[ "$LINE_COUNT" -gt 2000 ]]; then
+              echo "  [WARN] Exceeds 2000-line threshold — run: library maintain --compact"
+          else
+              echo "  Within threshold"
+          fi
+      else
+          echo "  No changelog found"
+      fi
+
+      # Update timestamp
+      date +%s > "$SCHEDULED_TS_FILE"
+
+      echo ""
+      echo "=== Scheduled Maintenance Complete ==="
+      break
+      ;;
 
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac

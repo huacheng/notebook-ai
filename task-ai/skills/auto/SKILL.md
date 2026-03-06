@@ -481,7 +481,8 @@ The auto skill runs this loop within a single Claude session:
    2.6. Increment iteration counter
    2.7. If next == "(stop)" → break loop
    2.8. Set current step = next step → continue loop
-3. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
+3. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
+4. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
 
 ## Detailed Loop Logic
 

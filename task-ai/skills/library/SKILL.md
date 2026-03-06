@@ -55,7 +55,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 /task-ai:library search "<query>" [--type <type>] [--topic <topic>]
 /task-ai:library list [--type <type>]
 /task-ai:library status
-/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all]
+/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all] [--scheduled [--force]]
 ```
 
 ## Library Directory Structure
@@ -270,6 +270,28 @@ Report stale knowledge without auto-triggering `research`.
 #### `--all`
 
 Run `--rebuild-index` → `--compact` → `--check-staleness` in sequence. Also sweep for stale `.lock` files: for each `.lock` file in library, read its `pid`; if `kill -0 <pid>` fails → remove stale lock and log cleanup.
+
+#### `--scheduled [--force]`
+
+Lightweight periodic maintenance — timestamp-gated (24h interval), suitable for cron or auto loop post-report hook.
+
+**Runs three checks:**
+
+1. **Staleness check** — scan `.memory/.references/` for files older than 30 days, report stale count
+2. **T3→T4 production validation** — scan all `.skills/.active/` T3 skills, promote to T4 if `usage_count >= 3` and zero REPLAN failures (same logic as `--promote-skill`)
+3. **Changelog size check** — warn if `.changelog` exceeds 2000-line threshold
+
+**Timestamp gating:**
+- Reads `.last-scheduled` (epoch seconds); skips if last run < 24h ago
+- `--force` bypasses the timestamp check
+- On completion, writes current epoch to `.last-scheduled`
+
+**Cron example** (daily at 03:00):
+```
+0 3 * * * cd /path/to/project && bash task-ai/skills/library/scripts/maintain.sh --scheduled
+```
+
+**Auto loop integration**: auto calls `maintain.sh --scheduled` after report's `(stop)` signal — runs only if 24h have elapsed, zero overhead otherwise.
 
 ### `evolve`
 
