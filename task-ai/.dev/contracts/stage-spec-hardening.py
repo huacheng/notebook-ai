@@ -7,7 +7,7 @@ Checks:
   3. target Stage Advance .bugfix/ clear mentions non-fatal / skip (#18)
   4. task-ai.md Stage Field has validation rules (current >= 1, total >= 1) (#4, #13)
   5. task-ai.md mentions non-atomic / retry-safe design principle (#19)
-  6. merge Phase 4 has current > total degradation/warning (#6, #13)
+  6. merge Phase 3 has current > total degradation/warning (#6, #13)
   7. highlight §3.5 has context budget / upper-bound description (#7)
   8. auto SKILL.md stage-done entry has v2 annotation (#20)
 """
@@ -55,13 +55,13 @@ if 'retry-safe' in taskai_text.lower() or 'non-atomic' in taskai_text.lower():
 else:
     emit_fail('task-ai.md: missing retry-safe / non-atomic design principle')
 
-# --- Test 6: merge Phase 4 has current > total warning ---
+# --- Test 6: merge Phase 3 has current > total warning ---
 merge_text = (TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md').read_text()
 if 'current > total' in merge_text or 'current > stage.total' in merge_text or \
    'stage.current > stage.total' in merge_text or 'current exceeds total' in merge_text.lower():
-    emit_pass('merge: Phase 4 has current > total warning/degradation')
+    emit_pass('merge: Phase 3 has current > total warning/degradation')
 else:
-    emit_fail('merge: Phase 4 missing current > total warning/degradation')
+    emit_fail('merge: Phase 3 missing current > total warning/degradation')
 
 # --- Test 7: highlight §3.5 has context budget ---
 highlight_text = (TASK_AI_ROOT / 'skills' / 'highlight' / 'SKILL.md').read_text()

@@ -55,8 +55,8 @@ If merge conflict detected:
 1. **Analyze** conflict markers in affected files
 2. **Resolve** conflicts by applying the task branch's intent while preserving main's changes
 3. **Run verification**: build check, test suite, `lsp_diagnostics`
-4. **If verification passes**: commit merge resolution, proceed to Phase 4
-5. **If verification fails**: abort merge (`git merge --abort`), retry from Phase 2 with different resolution strategy
+4. **If verification passes**: commit merge resolution, proceed to Phase 3
+5. **If verification fails**: abort merge (`git merge --abort`), retry from Phase 1 with different resolution strategy
 6. **Max 3 resolution attempts** — after 3 failures → stay `executing`, report unresolvable conflicts (user can manually resolve then re-run merge)
 
 ### Phase 3: Post-Merge Finalization

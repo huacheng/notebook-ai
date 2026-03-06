@@ -22,11 +22,11 @@ from lib import emit_pass, emit_fail, summary, TASK_AI_ROOT
 # --- MERGE ---
 merge_text = (TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md').read_text()
 
-# Test 1: Phase 4 stage-done branching
+# Test 1: Phase 3 stage-done branching
 if 'stage-done' in merge_text and 'stage.current' in merge_text:
-    emit_pass('merge: Phase 4 mentions stage-done branching')
+    emit_pass('merge: Phase 3 mentions stage-done branching')
 else:
-    emit_fail('merge: Phase 4 missing stage-done branching')
+    emit_fail('merge: Phase 3 missing stage-done branching')
 
 # Test 2: State Transitions — executing -> stage-done
 # Look for stage-done in the State Transitions section

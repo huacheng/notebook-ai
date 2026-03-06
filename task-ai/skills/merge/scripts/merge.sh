@@ -131,7 +131,7 @@ if [[ -z "$MAIN_BRANCH" ]] || ! git rev-parse --verify "refs/heads/$MAIN_BRANCH"
     fi
 fi
 
-# Read multi-stage info (used after merge in Phase 4)
+# Read multi-stage info (used after merge in Phase 3)
 STAGE_CURRENT=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.current 2>/dev/null || echo "1")
 STAGE_TOTAL=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.total 2>/dev/null || echo "1")
 
@@ -143,14 +143,14 @@ if [[ ! "$STAGE_TOTAL" =~ ^[0-9]+$ ]] || [[ "$STAGE_TOTAL" -eq 0 ]]; then
     STAGE_TOTAL=1
 fi
 
-# D3: Handle stage.current > stage.total inconsistency (per SKILL.md Phase 4 step 2)
+# D3: Handle stage.current > stage.total inconsistency (per SKILL.md Phase 3 step 2)
 if [[ "$STAGE_CURRENT" -gt "$STAGE_TOTAL" ]]; then
     echo "[WARN] stage.current ($STAGE_CURRENT) > stage.total ($STAGE_TOTAL) — treating as final stage" >&2
 fi
 
 echo "[GIT] Merging $TASK_BRANCH into $MAIN_BRANCH..."
 
-# Phase 2: Execute actual git merge
+# Phase 1: Execute actual git merge
 if ! git checkout "$MAIN_BRANCH"; then
     echo "[ERROR] Failed to checkout $MAIN_BRANCH" >&2
     TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -187,7 +187,7 @@ fi
 # the merged codebase includes the final status. Checking out the task branch
 # would leave main without the status transition.
 
-# Phase 4: Post-merge finalization — branch on stage info
+# Phase 3: Post-merge finalization — branch on stage info
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 if [[ "$STAGE_CURRENT" -lt "$STAGE_TOTAL" ]]; then

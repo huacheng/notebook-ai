@@ -4,9 +4,9 @@
 Checks:
   #4:  state-matrix.md report column for non-listed states matches report/SKILL.md
   #5:  target/SKILL.md execution steps have explicit complete/cancelled rejection guard
-  #6:  merge/SKILL.md Phase 4 current>total warning specifies persistent log location
+  #6:  merge/SKILL.md Phase 3 current>total warning specifies persistent log location
   #7:  auto/SKILL.md stage-done v2 annotation clearly marked as future/not-implemented
-  #8:  merge/SKILL.md Phase 4 ordering: current>total check before current==total branch
+  #8:  merge/SKILL.md Phase 3 ordering: current>total check before current==total branch
   #12: state-matrix.md stage-done + report has (write) annotation
   #13: report/SKILL.md Prerequisites and State Transitions are consistent for draft
 """
@@ -38,7 +38,7 @@ if ('complete' in target_steps and 'cancelled' in target_steps and
 else:
     emit_fail('target: execution steps missing explicit complete/cancelled rejection guard')
 
-# --- #6: merge Phase 4 current>total warning persistent ---
+# --- #6: merge Phase 3 current>total warning persistent ---
 merge_text = (TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md').read_text()
 # Find the gt check area (may be stage.current > stage.total)
 gt_needle = 'stage.current > stage.total'
@@ -63,19 +63,19 @@ if has_future_marker:
 else:
     emit_fail('auto: stage-done v2 annotation not clearly marked as future/not-implemented')
 
-# --- #8: merge Phase 4 ordering ---
+# --- #8: merge Phase 3 ordering ---
 # current>total check should come BEFORE the current<total and current==total branches
-phase4 = extract_section(TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md', '### Phase 4: Post-Merge Finalization')
-gt_pos = phase4.find('stage.current > stage.total')
+phase3 = extract_section(TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md', '### Phase 3: Post-Merge Finalization')
+gt_pos = phase3.find('stage.current > stage.total')
 if gt_pos < 0:
-    gt_pos = phase4.find('current > total')
-lt_pos = phase4.find('stage.current < stage.total')
+    gt_pos = phase3.find('current > total')
+lt_pos = phase3.find('stage.current < stage.total')
 if lt_pos < 0:
-    lt_pos = phase4.find('current < total')
+    lt_pos = phase3.find('current < total')
 if gt_pos >= 0 and lt_pos >= 0 and gt_pos < lt_pos:
-    emit_pass('merge: Phase 4 current>total check precedes current<total branch')
+    emit_pass('merge: Phase 3 current>total check precedes current<total branch')
 else:
-    emit_fail(f'merge: Phase 4 ordering wrong (gt_pos={gt_pos}, lt_pos={lt_pos})')
+    emit_fail(f'merge: Phase 3 ordering wrong (gt_pos={gt_pos}, lt_pos={lt_pos})')
 
 # --- #13: report/SKILL.md draft handling ---
 report_text = (TASK_AI_ROOT / 'skills' / 'report' / 'SKILL.md').read_text()
