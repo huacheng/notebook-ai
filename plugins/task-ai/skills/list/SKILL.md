@@ -22,7 +22,7 @@ arguments:
     description: "Output dependency relationship graph (Mermaid)"
     required: false
   - name: timeline
-    description: "Output status transition timeline from git history"
+    description: "Output status transition timeline from git history (requires notebook argument)"
     required: false
 ---
 
@@ -48,19 +48,19 @@ Output a summary table of all notebooks:
 | Column | Source |
 |--------|--------|
 | Notebook | directory name |
-| Title | `.index.json` → `title` |
-| Status | `.index.json` → `status` |
-| Phase | `.index.json` → `phase` (if non-empty) |
-| Progress | `.index.json` → `completed_steps` |
-| Type | `.index.json` → `type` |
-| Updated | `.index.json` → `updated` |
+| Title | `.status.json` → `title` |
+| Status | `.status.json` → `status` |
+| Phase | `.status.json` → `phase` (if non-empty) |
+| Progress | `.status.json` → `completed_steps` (integer — steps completed so far) |
+| Type | `.status.json` → `type` |
+| Updated | `.status.json` → `updated` |
 
 ### 2. Single Notebook Details (`<notebook_name>`)
 
-Output all fields from `<notebook_name>/.working/.index.json` plus:
+Output all fields from the notebook's `.working/.status.json` plus:
 - `.summary.md` content (if exists) — condensed context
-- `.target.md` first 10 lines — requirements preview
-- File listing of task module directory
+- `.target.md` first 10 lines (preview, if exists) — requirements overview
+- File listing of `.working/` directory (system files and sub-directories)
 
 ### 3. Dependency Graph (`--deps`)
 
@@ -73,25 +73,25 @@ graph LR
   auth-refactor --> api-design
 ```
 
-Nodes colored by status: green (complete), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
+Arrow direction: `A --> B` means "A depends on B" (drawn from the `depends_on` field of A). Nodes colored by status: green (complete/stage-done), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
 
 ### 4. Status Timeline (`--timeline <notebook_name>`)
 
 Extract status transition history from git log:
 
 ```
-git log --oneline --fixed-strings --grep="task-ai(<notebook>)"
+git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100
 ```
 
-Use `--fixed-strings` to prevent `(` and `)` in the pattern from being interpreted as regex metacharacters.
+The format `%h %ai %s` includes abbreviated hash, author date (ISO format), and subject — providing the timestamps needed for timeline reconstruction. The `--fixed-strings` flag prevents `(` and `)` in the pattern from being interpreted as regex metacharacters. The `-n 100` limit bounds output size; most tasks have far fewer transitions.
 
-Parse commit messages to reconstruct the timeline of status changes with timestamps.
+Parse commit messages to reconstruct the timeline of status changes.
 
 ## Execution Steps
 
-1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories, then within each project list notebook directories that contain `.working/.index.json` to discover notebooks
-2. **Metadata extraction**: For each discovered notebook, read `.working/.index.json` to extract `title`, `status`, `type`, and `branch`.
-3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: extract history via `git log --oneline --grep="task-ai(<notebook>)"`
+1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.working/.status.json`. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT`: project / notebook / `.working/`
+2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output)
+3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: validate that `notebook` argument is provided (REJECT if missing — timeline requires a specific notebook), then extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
 
 ## State Transitions
@@ -102,7 +102,7 @@ Parse commit messages to reconstruct the timeline of status changes with timesta
 
 ## Git
 
-None — `list` does not create any commits (e.g., it will never create a `task-ai(<notebook>):feat ...` commit).
+None — `list` does not create any commits.
 
 ## .auto-signal
 
@@ -112,4 +112,6 @@ None — `list` does not write `.auto-signal`. It is a utility command that does
 
 - **Pure read-only**: `list` never writes files, never changes status, never creates commits. It is safe to run at any time without side effects
 - **No lock required**: Since `list` only reads files, it does not acquire `.working/.lock`
+- **Corrupt/missing .status.json**: If a notebook's `.status.json` is missing or fails to parse, skip that notebook with a warning line in the output (do not abort the entire listing)
 - **Dependency validation**: The `--deps` mode only visualizes relationships; it does not validate whether dependencies are met (that is `check`'s responsibility)
+- **Mutually exclusive modes**: `--deps` and `--timeline` cannot be combined. If both are provided, reject with usage hint

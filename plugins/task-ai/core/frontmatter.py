@@ -21,8 +21,29 @@ def parse_frontmatter(content: str) -> dict:
         if ':' in line and not stripped.startswith('-'):
             k, v = line.split(':', 1)
             current_key = k.strip()
-            val = v.strip().strip('"').strip("'")
-            fm[current_key] = val if val else []
+            if not current_key:
+                continue
+            raw_val = v.strip()
+            # D1: Track whether value was quoted (quoted booleans stay strings)
+            was_quoted = (raw_val.startswith('"') and raw_val.endswith('"')) or \
+                         (raw_val.startswith("'") and raw_val.endswith("'"))
+            val = raw_val.strip('"').strip("'")
+            if not val:
+                # D1: Empty value after colon — could be a list header or truly empty
+                fm[current_key] = []
+            elif not was_quoted and val.lower() == 'true':
+                fm[current_key] = True
+            elif not was_quoted and val.lower() == 'false':
+                fm[current_key] = False
+            else:
+                # D1: Try numeric conversion for integer fields (unquoted only)
+                if not was_quoted:
+                    try:
+                        fm[current_key] = int(val)
+                        continue
+                    except ValueError:
+                        pass
+                fm[current_key] = val
         elif stripped.startswith('-') and current_key:
             val = stripped[1:].strip().strip('"').strip("'")
             if isinstance(fm.get(current_key), list):

@@ -52,6 +52,11 @@ Generate a structured completion report for a task module, documenting what was 
 - **Created**: <timestamp>
 - **Completed**: <timestamp>
 - **Duration**: <calculated>
+- **Type**: <task type>
+
+## Overview
+<!-- From .summary.md if exists — condensed context overview -->
+<!-- If .summary.md does not exist, omit this section -->
 
 ## Execution Timeline
 <!-- From .auto-timeline.md if exists (auto mode execution history) -->
@@ -65,32 +70,35 @@ Generate a structured completion report for a task module, documenting what was 
 <!-- Summary of implementation approach from .plan.md -->
 
 ## Changes Made
-<!-- List of files modified/created/deleted with brief descriptions -->
+<!-- Git commit log from task-ai(<notebook>) commits -->
 
 ## Verification
 <!-- From .test/ criteria and results files, build status, evaluation outcomes -->
+
+## Analysis
+<!-- From .analysis/ evaluation history if exists -->
 
 ## Issues Encountered
 <!-- From .bugfix/ if exists, or "None" -->
 
 ## Dependencies
-<!-- Status of depends_on modules -->
+<!-- Status of depends_on modules from .status.json -->
 
 ## Lessons Learned
-<!-- Any notable patterns, workarounds, or discoveries -->
+<!-- From .notes/ if exists — notable patterns, workarounds, or discoveries -->
 ```
 
 ### Summary Format
 
-Compact single-section report with: status, objective (1 line), key changes (bullet list), verification result.
+Compact single-section report with: status, type, created/completed timestamps, objective (1 line), key changes (git log in code block), verification result.
 
 ## Output
 
-The report is written to `[deliverables-dir]/.report.md` (the notebook's deliverables directory, not `.working/`) and also printed to screen.
+The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the project's deliverables directory, not `.working/`) and also printed to screen. The deliverables directory is resolved as `<project-dir>/.deliverables/<notebook>/`.
 
 ## Execution Steps
 
-1. **Read** `.index.json` for task metadata (including `completed_steps`)
+1. **Read** `.status.json` for task metadata (status, title, created, completed, type, depends_on)
 2. **Read** `.target.md` for objectives
 3. **Read** `.plan.md` for implementation approach
 4. **Read** `.summary.md` if exists (condensed context overview)
@@ -99,13 +107,14 @@ The report is written to `[deliverables-dir]/.report.md` (the notebook's deliver
 7. **Read** `.analysis/` for evaluation history (all files, sorted by name, if exists)
 8. **Read** `.bugfix/` for issue history (all files, sorted by name, if exists)
 9. **Read** `.notes/` for research findings and experience log (all files, sorted by name, if exists)
-10. **Collect** git changes related to the task (if identifiable)
+10. **Collect** git changes related to the task (if identifiable via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"`)
 11. **Compose** report in requested format
-12. **Write** to `.report.md`
-13. *(Steps 13-15 moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. Report no longer performs library distillation writes. For manual workflows: run `/task-ai:highlight <notebook>` before `/task-ai:report <notebook>` if distillation is needed.)*
-14. **Git commit**: `task-ai(<notebook>):report generate completion report`
-15. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
-16. **Print** report to screen
+12. **Write** to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md`
+13. **Git commit**: `task-ai(<notebook>):report generate completion report`
+14. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
+15. **Print** report to screen
+
+> *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. For manual workflows: run `/task-ai:highlight <notebook>` before `/task-ai:report <notebook>` if distillation is needed.*
 
 **Note**: Report is a terminal step — it reads ALL history files (not just latest) to produce a comprehensive record. `.summary.md` is used as an overview, not a replacement for full history in report context.
 
@@ -139,5 +148,5 @@ Report is always a terminal step — `next` is always `(stop)`.
 - For `blocked` tasks, the report documents what was completed and what blocks remain
 - For `cancelled` tasks, the report documents the reason for cancellation
 - The report serves as a permanent record even after task files are archived
-- For `complete` tasks, report includes change history via `git log --oneline --all --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; works even after task branch deletion)
-- **Concurrency**: Report acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
+- For `complete` tasks, report includes change history via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; `--max-count=200` caps output for performance; works even after task branch deletion)
+- **Concurrency**: Report acquires `.working/.lock` before proceeding and releases on completion. Stale locks (holding PID is dead) are automatically recovered. (See Concurrency Protection in `commands/task-ai.md`)

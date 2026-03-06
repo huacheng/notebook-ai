@@ -4,13 +4,20 @@ All sub-commands that write to `$NB_WORKSPACES_LIBRARY/` MUST follow the six-ste
 
 ## Six-Step Protocol
 
-> See `commands/references/library-write-protocol.md` for the canonical six-step protocol, changelog format, and append/overwrite rules.
+All library writers MUST execute these steps in order:
+
+1. **mkdir -p** — ensure target directory exists (idempotent)
+2. **Acquire lock** — create `<dir>/.lock` with `O_CREAT|O_EXCL`; write `{ "pid", "session", "timestamp" }`
+3. **Write file** — write content via `.tmp` + atomic `rename` (overwrite) or `O_APPEND` (append)
+4. **Changelog append** — append one line to `.changelog` via `.changelog.lock` (see format below)
+5. **Update index** — append/update row in directory `.index.md` and `.master-index.md`
+6. **Release lock** — close fd and remove `<dir>/.lock`
 
 ## Per-Directory Lock Table
 
 | Directory | Lock file | Writers | Typical hold |
 |-----------|-----------|---------|-------------|
-| `.memory/.references/` | `.memory/.references/.lock` | `research`, `exec`, `check`, `maintain` | Medium (web fetch + write) |
+| `.memory/.references/` | `.memory/.references/.lock` | `read`, `research`, `exec`, `check`, `maintain` | Medium (web fetch + write) |
 | `.memory/.experiences/` | `.memory/.experiences/.lock` | `report`, `exec`, `verify`, `check` | Short (write + index append) |
 | `.memory/.type-profiles/` | `.memory/.type-profiles/.lock` | `research`, `report` | Short (profile write) |
 | `.memory/.thinking/patterns/` | `.memory/.thinking/patterns/.lock` | `report` | Long (read raw/ + distil + write) |
@@ -68,7 +75,7 @@ Used by `maintain` to count usage for `effectiveness_mark` candidate detection.
 | topic | versions | marked_version | source_domain | last_verified | stale | injection_risk |
 |-------|---------|----------------|---------------|---------------|-------|----------------|
 | jwt-auth | v1,v2,v3 | v2 | auth0.com | 2026-01-10 | no | none |
-| redis-session | v1 | — | redis.io | 2025-06-01 | yes⚠ | low |
+| redis-session | v1 | — | redis.io | 2025-06-01 | yes(!) | low |
 ```
 
 ### `.memory/.experiences/<type>/.index.md`
@@ -116,13 +123,13 @@ Flat index of all library files — used for cold-start full-match when `changel
 # Library Master Index
 <!-- Updated by: init (skeleton), all writers (append), maintain --rebuild-index (rebuild) -->
 
-| path | type | topic/type/problem | quality_status | effectiveness_mark | last_verified | source |
-|------|----|---------------------|----------------|--------------------|---------------|--------|
-| .memory/.references/jwt-auth-v3.md | reference | jwt-auth | active | ✓ | 2026-01-10 | system |
-| .memory/.experiences/software/auth-refactor-complete.md | experience | software | verified | ✓ | 2026-02-01 | system |
-| .memory/.type-profiles/software.md | type-profile | software | — | — | 2026-02-10 | system |
-| .memory/.thinking/patterns/replan-loop.md | pattern | replan-loop | validated | — | 2026-02-15 | system |
-| company-docs/api-spec.md | user-import | — | — | — | — | user-import |
+| Topic | Type | Keywords | File Path | Source |
+|-------|------|----------|-----------|--------|
+| jwt-auth | reference | jwt, auth, session | .memory/.references/jwt-auth-v3.md | system |
+| software | experience | auth, refactor | .memory/.experiences/software/auth-refactor-complete.md | system |
+| software | type-profile | methodology | .memory/.type-profiles/software.md | system |
+| replan-loop | pattern | replan, loop | .memory/.thinking/patterns/replan-loop.md | system |
+| api-spec | user-import | | company-docs/api-spec.md | user-import |
 ```
 
 Writers append one row after each write (step 5 extended for master index). `maintain --rebuild-index` rebuilds it from ground truth.
@@ -151,6 +158,6 @@ Writers append one row after each write (step 5 extended for master index). `mai
 | Overwrite file | `.tmp → rename` (POSIX `rename(2)` is atomic within same filesystem) |
 | Append to file | `O_APPEND` flag (POSIX: single write ≤ PIPE_BUF bytes is atomic) |
 | Lock acquisition | `O_CREAT \| O_EXCL` (POSIX: atomic create-if-not-exists) |
-| `.index.json` (task module) | `.tmp → rename` (same convention as library files) |
+| `.status.json` (task module) | `.tmp → rename` (same convention as library files) |
 
 Keep individual O_APPEND writes under 4096 bytes (PIPE_BUF on Linux) to guarantee atomicity.

@@ -16,6 +16,30 @@ fi
 # Library directory: $NB_WORKSPACES_ROOT/.library
 export NB_WORKSPACES_LIBRARY="${NB_WORKSPACES_LIBRARY:-$NB_WORKSPACES_ROOT/.library}"
 
+# --- Library Initialization ---
+
+# Ensures library directory structure exists (idempotent).
+# Calls init-lib.sh if library is missing or incomplete.
+ensure_library() {
+  local lib_path="${NB_WORKSPACES_LIBRARY:-$NB_WORKSPACES_ROOT/.library}"
+  local init_script="$TASK_AI_ROOT/skills/library/scripts/init-lib.sh"
+
+  # Quick check: if core structure exists, skip
+  if [[ -d "$lib_path/.memory/.experiences" && -f "$lib_path/.master-index.md" ]]; then
+    return 0
+  fi
+
+  # Run init-lib.sh (idempotent)
+  # D3: init-lib.sh call with error handling
+  if [[ -f "$init_script" ]]; then
+    if ! bash "$init_script" 2>&1; then
+      echo "[WARN] init-lib.sh failed, library may be incomplete" >&2
+    fi
+  else
+    echo "[WARN] init-lib.sh not found at $init_script" >&2
+  fi
+}
+
 # --- Context Discovery ---
 
 # Identifies the current notebook based on CWD or Git branch.
@@ -23,23 +47,27 @@ export NB_WORKSPACES_LIBRARY="${NB_WORKSPACES_LIBRARY:-$NB_WORKSPACES_ROOT/.libr
 find_nb_context() {
   local cur="$PWD"
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -d "$cur/.working" && -f "$cur/.working/.index.json" ]]; then
+    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
       export NB_WORKING="$cur/.working"
-      export NB_NOTEBOOK=$(basename "$cur")
+      export NB_NOTEBOOK="$(basename "$cur")"
       return 0
     fi
-    cur=$(dirname "$cur")
+    cur="$(dirname "$cur")"
   done
 
   local branch
-  branch=$(git branch --show-current 2>/dev/null)
-  if [[ "$branch" =~ ^task/ ]]; then
-    export NB_NOTEBOOK="${branch#task/}"
-    local nb_dir
-    nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null)
-    if [[ -n "$nb_dir" ]]; then
-      export NB_WORKING="$nb_dir/.working"
-      return 0
+  branch=$(git branch --show-current 2>/dev/null || true)
+  if [[ -n "$branch" && "$branch" =~ ^task/ ]]; then
+    local nb_name="${branch#task/}"
+    # D2: Validate notebook name from branch to prevent path traversal
+    if [[ "$nb_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      export NB_NOTEBOOK="$nb_name"
+      local nb_dir
+      nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
+      if [[ -n "$nb_dir" ]]; then
+        export NB_WORKING="$nb_dir/.working"
+        return 0
+      fi
     fi
   fi
 

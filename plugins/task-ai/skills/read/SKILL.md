@@ -36,18 +36,24 @@ Ingests user-provided documents, extracts novel information, applies strict 10-c
 
 ## Execution Steps
 
-1. **Ingestion**: Read the file. If binary (PDF/Docx), delegate to `doc-parse` plugin.
-2. **Entity Extraction**: Identify primary topic, type, and key concepts.
-3. **Deduplication**: Run `library search` using concepts. Isolate the "delta" (novel information).
-4. **Depth Processing**:
-   - `shallow`: Format the delta directly.
-   - `deep`: Delegate to `research --caller exec --scope gap` to cross-reference and supplement the delta with web research. Read delegates the research work; it does not perform web searches itself.
-5. **Sanitization (Detox)**: Apply 10-category injection rules (`library/references/injection-rules.md`). Compute risk and hashes.
-6. **Library Write Protocol**: Acquire `.references/.lock`, write to `.memory/.references/<topic>.md`, append to `.changelog`, update `.index.md`, release lock.
-7. **Rebuild**: Trigger `library maintain --rebuild-index`.
+1. **Ingestion**: Read the file. If binary (PDF/Docx), delegate to `doc-parse` plugin. Sanitize topic name from filename (strip control chars, special YAML chars, forward slashes, and path traversal sequences). Truncate to 120 characters.
+2. **Entity Extraction** (stub): Identify primary topic, type, and key concepts. Currently derives topic from filename only.
+3. **Deduplication** (stub): Run `library search` using concepts. Isolate the "delta" (novel information). Currently logs intent only.
+4. **Depth Processing** (stub):
+   - `shallow`: Format the content directly (delta isolation not yet implemented).
+   - `deep`: Delegate to `research --caller exec --scope gap` to cross-reference and supplement with web research. Currently logs intent only; actual delegation not yet implemented.
+5. **Sanitization (Detox)**: Apply 10-category injection rules (`skills/library/references/injection-rules.md`). Enforce 50KB size limit (Category 5). Compute content hashes (`content_hash_original`, `content_hash_sanitized`) and risk level.
+6. **Library Write Protocol** (six-step, per `skills/library/references/write-protocol.md`):
+   1. `mkdir -p` target directory (idempotent).
+   2. Acquire `.memory/.references/.lock` (`O_CREAT|O_EXCL`; stale-lock recovery via rename).
+   3. Write `.tmp` file → atomic `rename` to `<topic>.md`.
+   4. Acquire `.changelog.lock` → append changelog line → release `.changelog.lock`.
+   5. Update `.memory/.references/.index.md` (append new row or update existing).
+   6. Release `.memory/.references/.lock`.
+7. **Rebuild**: Invoke `library/scripts/maintain.sh --rebuild-index` directly.
 
 ## Output
-A new `.md` file in `.memory/.references/` with `injection_risk` explicitly marked.
+A new or updated `.md` file in `.memory/.references/` with `injection_risk` explicitly marked and version incremented on re-ingestion.
 
 ## State Transitions
 

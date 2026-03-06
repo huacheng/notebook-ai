@@ -79,7 +79,7 @@ Writers should keep `.summary.md` under ~200 lines. It is a context window optim
 
 > **See `commands/references/summary-formats.md`** for the detailed table formats (experiences index, per-type summaries, references index) and filename conventions.
 
-### .index.json Schema
+### .status.json Schema
 
 ```json
 {
@@ -119,7 +119,7 @@ The `stage` field tracks multi-stage target progression. Default: `{ "current": 
 
 **Validation Rules**: `stage.current >= 1`, `stage.total >= 1`, `stage.current <= stage.total + 1` (current may temporarily equal total + 1 during stage advance before total is incremented). If any rule is violated, treat as corrupted — log warning and fall back to `{ "current": 1, "total": 1, "completed": [] }`.
 
-**Default handling**: If `.index.json` lacks the `stage` field (pre-v1 notebooks), all commands MUST treat it as `{ "current": 1, "total": 1, "completed": [] }`. No migration needed — single-stage behavior is identical to pre-v1.
+**Default handling**: If `.status.json` lacks the `stage` field (pre-v1 notebooks), all commands MUST treat it as `{ "current": 1, "total": 1, "completed": [] }`. No migration needed — single-stage behavior is identical to pre-v1.
 
 **Retry-safe Design**: Stage advance operations (target step 2a) are designed to be retry-safe (non-atomic by intent). Archive/clear steps (4-5) execute before the status change (step 6). If archive/clear fails, status remains `stage-done` and re-running target retries safely. If status change succeeds but git commit fails, status is already `planning` — re-running target detects `planning` and routes to the normal update path. No manual rollback needed.
 
@@ -220,7 +220,7 @@ All sub-commands that accept `<project>` and/or `<notebook>` MUST validate the p
 | **Notebook name** | Must match `[a-zA-Z0-9_-]+` (ASCII letters/digits/hyphens/underscores only) | `notebook-1` ✓, `../../foo` ✗ |
 | **No symlinks** | Task module directory must not be a symlink (prevent symlink-based escape) | REJECT if `lstat` ≠ `stat` |
 | **Existence** | Directory must exist (except for `init` which creates it) | REJECT if missing |
-| **User text sanitization** | All user-provided text written to `.index.json` or `.md` files (e.g., `--title`, `--reason`, `--tags`) must be sanitized: strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (except `\n`). This prevents hidden content injection when values appear in `.summary.md` or other markdown files | Sanitize before write |
+| **User text sanitization** | All user-provided text written to `.status.json` or `.md` files (e.g., `--title`, `--reason`, `--tags`) must be sanitized: strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (except `\n`). This prevents hidden content injection when values appear in `.summary.md` or other markdown files | Sanitize before write |
 
 Validation is performed by resolving the absolute path and confirming it starts with the `$NB_WORKSPACES_ROOT/` prefix (resolved from the environment variable). This prevents path traversal attacks where a crafted project or notebook name could read/write files outside the workspace directory.
 
@@ -230,14 +230,14 @@ Sub-commands that modify task module files MUST acquire `.working/.lock` (O_CREA
 
 > **See `commands/references/concurrency.md`** for full lock protocol, stale-lock recovery, shared directory write protection table, `.changelog.lock`, and lock ordering convention.
 
-### .index.json Safety
+### .status.json Safety
 
-**Atomic write**: All sub-commands that modify `.index.json` MUST write atomically — write to `.index.json.tmp` first, then `rename` to `.index.json`. POSIX `rename` is atomic, preventing concurrent readers from seeing partially written JSON.
+**Atomic write**: All sub-commands that modify `.status.json` MUST write atomically — write to `.status.json.tmp` first, then `rename` to `.status.json`. POSIX `rename` is atomic, preventing concurrent readers from seeing partially written JSON.
 
-**Corruption recovery**: If `.index.json` fails to parse (malformed JSON):
+**Corruption recovery**: If `.status.json` fails to parse (malformed JSON):
 
-1. **Git recovery**: `git show HEAD:<project>/<notebook>/.working/.index.json` — restore from latest committed version
-2. **If git recovery fails**: Reconstruct minimal `.index.json` with `"status": "draft"`, `"phase": ""`, preserve only what's parseable
+1. **Git recovery**: `git show HEAD:<project>/<notebook>/.working/.status.json` — restore from latest committed version
+2. **If git recovery fails**: Reconstruct minimal `.status.json` with `"status": "draft"`, `"phase": ""`, preserve only what's parseable
 3. **Log**: Record corruption event and recovery action in `.analysis/<date>-index-recovery.md`
 
 ### Plugin Delegation (Extension Point)

@@ -31,9 +31,9 @@ task-ai-dev() {
 
     echo "╭─────────────────────────────────────────────────────╮"
     echo "│  task-ai dev mode (skill hot-reload enabled)        │"
+    echo "│  Edit SKILL.md → changes apply on next turn         │"
     echo "├─────────────────────────────────────────────────────┤"
     echo "│  Hot-reload: $skills_dir"
-    echo "│  Edit SKILL.md → changes apply on next turn         │"
     echo "╰─────────────────────────────────────────────────────╯"
     echo ""
 

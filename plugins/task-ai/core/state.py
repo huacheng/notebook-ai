@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import re
 import sys
 import argparse
 import os
@@ -7,8 +8,9 @@ from datetime import datetime, timezone
 
 VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "stage-done", "complete", "blocked", "cancelled"}
 
-def get_lock(index_path):
-    lock_path = index_path + ".lock"
+def get_lock(status_path):
+    """Acquire an exclusive lock for the status file. Uses O_CREAT|O_EXCL for atomicity."""
+    lock_path = status_path + ".lock"
     try:
         fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         os.write(fd, str(os.getpid()).encode())
@@ -34,44 +36,62 @@ def get_lock(index_path):
                 return fd, lock_path
             except FileExistsError:
                 pass  # Another process won the race
-        print(f"[ERROR] Could not acquire lock for {index_path}. Is another process running?", file=sys.stderr)
+        print(f"[ERROR] Could not acquire lock for {status_path}. Is another process running?", file=sys.stderr)
         sys.exit(1)
 
 def release_lock(fd, lock_path):
-    os.close(fd)
+    try:
+        os.close(fd)
+    except OSError:
+        pass
     try:
         os.remove(lock_path)
     except OSError:
         pass
 
-def read_state(index_path):
-    if not os.path.exists(index_path):
-        print(f"[ERROR] Index file missing: {index_path}", file=sys.stderr)
+def read_state(status_path):
+    if not os.path.exists(status_path):
+        print(f"[ERROR] Status file missing: {status_path}", file=sys.stderr)
         sys.exit(1)
-    with open(index_path, 'r', encoding='utf-8') as f:
+    with open(status_path, 'r', encoding='utf-8') as f:
         try:
             return json.load(f)
         except json.JSONDecodeError as e:
-            print(f"[ERROR] Malformed JSON in {index_path}: {e}", file=sys.stderr)
+            print(f"[ERROR] Malformed JSON in {status_path}: {e}", file=sys.stderr)
             sys.exit(1)
 
-def write_state(index_path, state):
+def write_state(status_path, state):
     state['updated'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    tmp_path = index_path + ".tmp"
+    tmp_path = status_path + ".tmp"
     with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(state, f, indent=2)
-    os.rename(tmp_path, index_path)
+        # D3: Ensure data is flushed to disk before atomic rename
+        f.flush()
+        os.fsync(f.fileno())
+    os.rename(tmp_path, status_path)
 
 def cmd_get(args):
     state = read_state(args.file)
-    val = state.get(args.key, '')
+    # Support dotted key paths (e.g., "stage.current")
+    keys = args.key.split('.')
+    val = state
+    for k in keys:
+        if isinstance(val, dict):
+            val = val.get(k, '')
+        else:
+            val = ''
+            break
     print(val if val is not None else '')
 
 def cmd_set(args):
+    # D2: Validate key name to prevent arbitrary state injection
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_.]*$', args.key):
+        print(f"[ERROR] Invalid key name: {args.key}", file=sys.stderr)
+        sys.exit(1)
     fd, lock_path = get_lock(args.file)
     try:
         state = read_state(args.file)
-        
+
         # Validations
         if args.key == 'status' and args.value not in VALID_STATUSES:
             print(f"[ERROR] Invalid status: {args.value}", file=sys.stderr)
@@ -93,8 +113,8 @@ def cmd_transition(args):
     fd, lock_path = get_lock(args.file)
     try:
         state = read_state(args.file)
-        
-        if args.status:
+
+        if args.status is not None:
             if args.status not in VALID_STATUSES:
                 print(f"[ERROR] Invalid status: {args.status}", file=sys.stderr)
                 sys.exit(1)
@@ -124,16 +144,16 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     p_get = subparsers.add_parser("get")
-    p_get.add_argument("file", help="Path to .index.json")
+    p_get.add_argument("file", help="Path to .status.json")
     p_get.add_argument("key", help="Key to read")
 
     p_set = subparsers.add_parser("set")
-    p_set.add_argument("file", help="Path to .index.json")
+    p_set.add_argument("file", help="Path to .status.json")
     p_set.add_argument("key", help="Key to write")
     p_set.add_argument("value", help="Value to write")
 
     p_trans = subparsers.add_parser("transition")
-    p_trans.add_argument("file", help="Path to .index.json")
+    p_trans.add_argument("file", help="Path to .status.json")
     p_trans.add_argument("--status", help="New status")
     p_trans.add_argument("--phase", help="New phase")
     p_trans.add_argument("--completed-steps", type=int, help="Steps completed")

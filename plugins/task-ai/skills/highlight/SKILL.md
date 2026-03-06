@@ -25,7 +25,7 @@ arguments:
 
 # /task-ai:highlight — Experience Distillation Engine
 
-Unified protocol for experience and thinking library writes. Defines 6 scopes covering all experience/thinking write operations across the task lifecycle. Also serves as an independent skill for comprehensive distillation (complete) and ad-hoc experience capture (adhoc).
+Unified protocol for experience and thinking library writes. Defines 7 scopes covering all experience/thinking write operations across the task lifecycle. Also serves as an independent skill for comprehensive distillation (complete), ad-hoc experience capture (adhoc), and experience-to-skill promotion (promote).
 
 ## Usage
 
@@ -38,7 +38,7 @@ Unified protocol for experience and thinking library writes. Defines 6 scopes co
 **Parameter routing:**
 - `highlight <notebook>` → scope=complete (independent execution, comprehensive distillation of a notebook)
 - `highlight "<description>"` → scope=adhoc (conversation experience capture)
-- No arguments → if in notebook context (CWD has `.working/.index.json`), equivalent to `highlight <current-notebook>`; otherwise error
+- No arguments → if in notebook context (CWD has `.working/.status.json`), equivalent to `highlight <current-notebook>`; otherwise error
 
 ## Architecture
 
@@ -57,6 +57,8 @@ Unified protocol for experience and thinking library writes. Defines 6 scopes co
 │  · .memory/.type-profiles│  · quarantine (security)           │
 │    (complete sync only)  │                                    │
 │  · quality_status        │                                    │
+│  · .skills/.candidates/  │                                    │
+│    (promote scope)       │                                    │
 └──────────────────────────┴───────────────────────────────────┘
 ```
 
@@ -67,7 +69,7 @@ Unified protocol for experience and thinking library writes. Defines 6 scopes co
 
 ## Scope Definitions
 
-highlight defines 6 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.6 are **independent executions** (run as standalone skill invocations).
+highlight defines 7 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.7 are **independent executions** (run as standalone skill invocations).
 
 ---
 
@@ -106,7 +108,7 @@ From exec's current context:
 quality_status: provisional
 completeness: partial
 source: highlight-exec
-type: <from .index.json>
+type: <from .status.json>
 notebook: <notebook-name>
 created_at: <ISO-8601>
 topic_keywords: [keyword1, keyword2]
@@ -186,7 +188,7 @@ From verify's current context (type-adaptive, not limited to software):
 quality_status: provisional
 completeness: partial
 source: highlight-verify
-type: <from .index.json>
+type: <from .status.json>
 notebook: <notebook-name>
 created_at: <ISO-8601>
 topic_keywords: [keyword1, keyword2]
@@ -266,7 +268,7 @@ quality:
 
 #### Content Structure
 
-Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
+Follow `$NB_WORKSPACES_LIBRARY/references/quality-rubric.md` H/M/L self-assessment standards.
 
 ```markdown
 ## CoT Capture — <caller> phase (<date>)
@@ -288,7 +290,7 @@ Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
 
 1. O_APPEND write to `<notebook>-<caller>-<YYYY-MM-DD>.md`
 2. O_APPEND append one row to `.memory/.thinking/raw/.index.md`
-3. No lock needed (filename contains notebook + caller + date, naturally unique)
+3. No lock needed (filename contains notebook + caller + date, naturally unique per day). Note: multiple calls within the same day append to the same file — O_APPEND ensures atomicity of individual writes
 
 #### Fault Isolation
 
@@ -316,7 +318,7 @@ Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
 | Write mode | Frontmatter field overwrite (atomic: read → modify → .tmp → rename) |
 | Lock | `.memory/.experiences/.lock` |
 
-#### Write Steps (promotion)
+#### Write Steps (status upgrade to verified)
 
 1. acquire `.memory/.experiences/.lock`
 2. read target file frontmatter
@@ -327,7 +329,7 @@ Follow `library/references/quality-rubric.md` H/M/L self-assessment standards.
 
 #### Write Steps (invalidation)
 
-Same as promotion, but `quality_status: provisional → invalidated`, changelog marks `invalidated-by:check`.
+Same as status upgrade steps above, but `quality_status: provisional → invalidated`, changelog marks `invalidated-by:check`.
 
 #### Related Operation — failure_count Update
 
@@ -346,7 +348,7 @@ check REPLAN may also need to update `.memory/.references/` `failure_count`. Thi
 **Caller**: None (not inline)
 **Independent execution**: **Yes** — auto loop step after merge; manual invocation
 
-This is highlight's core scope, carrying all logic previously in report steps 13-15.
+This is highlight's core scope for comprehensive experience distillation.
 
 #### Trigger & Dual Modes
 
@@ -368,7 +370,7 @@ input_files = [.target.md, .plan.md, .summary.md, *-impl.md, *-verify.md, ...]
 latest_input_mtime = max(mtime(f) for f in input_files if exists(f))
 
 # Stage-aware output filename
-Read .index.json stage field (default { current: 1, total: 1, completed: [] }):
+Read .status.json stage field (default { current: 1, total: 1, completed: [] }):
   IF stage.total > 1 AND status == "stage-done":
     filename = "<notebook>-stage-<stage.current>-complete.md"
   ELSE:
@@ -388,7 +390,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 | Input File | Purpose |
 |-----------|---------|
-| `.index.json` | Task metadata (type, status, completed_steps) |
+| `.status.json` | Task metadata (type, status, completed_steps) |
 | `.target.md` | Objective definition |
 | `.plan.md` | Implementation approach |
 | `.summary.md` | Task context summary |
@@ -402,7 +404,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 #### Output A — Experience Distillation
 
-**Stage-aware file naming** — read `.index.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing):
+**Stage-aware file naming** — read `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing):
 
 | Scenario | Target filename |
 |----------|----------------|
@@ -418,11 +420,11 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 | completeness | `complete` |
 | source | `highlight-complete` |
 
-For multi-type (e.g., `data-pipeline|ml`), write one file per pipe segment. Segments use directory-safe transform (`:` → `-`).
+For multi-type (e.g., `data-pipeline|ml`), split on `|` and write one file per segment. Each segment name uses directory-safe transform (`:` → `-`, e.g., `audio:dsp` → `audio-dsp`).
 
 **Final stage distillation** (last stage merge → `complete`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
 
-**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.index.json` > `.target.md` > `.summary.md` > `.plan.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
+**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.status.json` > `.target.md` > `.summary.md` > `.plan.md` > `.type-profile.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
 
 Frontmatter:
 
@@ -504,7 +506,7 @@ Steps:
 
 #### Complete Execution Steps
 
-1. **Read** `.index.json` — get type, status, notebook metadata
+1. **Read** `.status.json` — get type, status, notebook metadata
 2. **Read** all input files (see table above), respecting the context budget guard: read in priority order, stop or truncate when approaching the ~50k token budget
 3. **Absorb** existing provisional experience (`-impl.md`, `-verify.md`), integrate into final distillation
 4. **Output A** — Experience distillation, per type segment:
@@ -555,8 +557,8 @@ Identify from user's natural language:
 **Step 2 — Type Determination**
 
 ```
-if in notebook context (CWD has .working/.index.json):
-    type = .index.json type field
+if in notebook context (CWD has .working/.status.json):
+    type = .status.json type field
 elif user specified a domain in instruction:
     type = user-specified domain, match .type-registry.md existing types
 else:
@@ -651,7 +653,7 @@ adhoc mode does not participate in auto loop, does not write .auto-signal.
 
 ## State Transitions
 
-highlight **does not change notebook status**. Regardless of scope, `.index.json` status is unaffected.
+highlight **does not change notebook status**. Regardless of scope, `.status.json` status is unaffected.
 
 | scope | Status impact |
 |-------|-------------|
@@ -661,6 +663,7 @@ highlight **does not change notebook status**. Regardless of scope, `.index.json
 | quality-update | None (check manages status) |
 | complete | None (merge already set complete) |
 | adhoc | None (no notebook lifecycle) |
+| promote | None (batch operation, no notebook lifecycle) |
 
 ## Git
 
@@ -668,6 +671,7 @@ highlight **does not change notebook status**. Regardless of scope, `.index.json
 |--------|---------------|
 | complete distillation | `task-ai(<notebook>):highlight complete distillation` |
 | adhoc capture | `task-ai(<scope>):highlight adhoc experience captured` |
+| promote | No independent commit (changelog update only; candidates are committed by subsequent skill-review) |
 
 > Inline calls (impl/verify/thinking-raw/quality-update) do not produce independent commits. Their changelog updates are included in the caller's git commit (e.g., exec's commit includes impl experience write changelog changes).
 
@@ -693,7 +697,7 @@ highlight **does not change notebook status**. Regardless of scope, `.index.json
 
 All three must be met:
 1. `quality_status: verified` in experience frontmatter
-2. `usage_count >= 3` (counted from `.changelog` references)
+2. `usage_count >= 3` (counted from `.changelog` entries with `| referenced |` type only — excludes initial write entries)
 3. Contains structural patterns: `## Patterns` or `## Steps` headers
 
 #### Usage
@@ -723,11 +727,14 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 2. Filter: quality_status=verified
 3. Filter: usage_count >= 3 (from changelog)
 4. Filter: has structural patterns
-5. Generate SKILL.md (trust_tier: T1)
-6. Generate trust-report.md
-7. Write to .skills/.candidates/<slug>/
-8. Update .changelog
+5. D2 Security static analysis + D1/D3/D5 Semantic review (pre-promotion score >= 0.5)
+6. Generate SKILL.md (trust_tier: T1)
+7. Generate trust-report.md (includes pre-promotion scores)
+8. Write to .skills/.candidates/<slug>/
+9. Acquire .changelog.lock → append: `<ts> | skill-candidate | .skills/.candidates/<slug> | source:promote | from:<experience-file>` → release
 ```
+
+> **Note**: The `skill-candidate` changelog type is specific to promote operations and extends the standard types (`experience`, `reference`, `type-profile`, `pattern`, `referenced`) defined in `commands/references/library-write-protocol.md`.
 
 #### Next Steps After Promotion
 
@@ -739,7 +746,7 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 ## Notes
 
 - **Protocol, not runtime**: Inline scopes (§3.1–§3.4) define write format and steps. Calling skills execute these steps in their own context — highlight is not invoked as a separate skill for inline scopes
-- **Fault isolation is universal**: All 9 inline callers have the same guarantee — highlight protocol failure never blocks the caller's main flow
+- **Fault isolation is universal**: All inline caller commands (the 9 commands listed in §3.3, plus check's additional §3.4 quality-update role) have the same guarantee — highlight protocol failure never blocks the caller's main flow
 - **No state mutations**: highlight is transparent to the state machine. This is consistent with the former `light` behavior
 - **.type-profiles/ dual ownership**: research creates/updates profiles (knowledge acquisition); highlight syncs during complete (experience write-back). Both use Library Write Protocol locks for concurrency safety
-- **Concurrency**: Independent executions (complete, adhoc) acquire `.working/.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Independent executions (complete, adhoc) acquire `.working/.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`). promote does NOT acquire `.working/.lock` — it operates on library-level paths (`.skills/.candidates/`, `.changelog`) with its own `.changelog.lock`

@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [Core Principles](#core-principles)
-- [Type Format in .index.json](#type-format-in-indexjson)
+- [Type Format in .status.json](#type-format-in-statusjson)
 - [Type Determination Flow](#type-determination-flow)
 - [Auto-Expanding Type Registry](#auto-expanding-type-registry)
 - [Hybrid Type System](#hybrid-type-system)
@@ -23,7 +23,7 @@ Task type is NOT a one-shot decision. It is a **continuously refined classificat
 4. **Auto-expanding type registry** — when research discovers a domain not in the predefined table, it registers the new type in `$NB_WORKSPACES_LIBRARY/.type-registry.md` automatically. The predefined table is a seed, not a ceiling
 5. **Progressive refinement** — type confidence grows across phases: target analysis → research → plan → verify/check/exec feedback
 
-## Type Format in `.index.json`
+## Type Format in `.status.json`
 
 The `type` field uses a simple string with pipe separator for hybrids:
 
@@ -33,9 +33,9 @@ The `type` field uses a simple string with pipe separator for hybrids:
 | `<A>\|<B>` | `data-pipeline\|ml` | Hybrid — A is primary, B is secondary |
 | `<A>\|<B>\|<C>` | `software\|infrastructure\|dsp` | Multi-hybrid — first is primary, rest are secondary (rare) |
 
-**Validation regex**: Each segment must match `[a-zA-Z0-9_:-]+`. Full type field: `[a-zA-Z0-9_:|-]+` (pipe allowed as separator). Parsing: `type.split('|')` → `[0]` is primary, `[1:]` are secondary.
+**Validation regex**: Each segment must match `[a-zA-Z0-9_:-]+`. Full type field: `^[a-zA-Z0-9_:-]+(\|[a-zA-Z0-9_:-]+)*$` (no leading/trailing/consecutive pipes). Parsing: `type.split('|')` → `[0]` is primary, `[1:]` are secondary.
 
-**Experiences mapping**: For hybrid type `A|B`, `highlight` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. Plan reads `.summary.md` for all segments, drilling into individual entries when relevant.
+**Experiences mapping**: For hybrid type `A|B`, `highlight` writes to **both** `$NB_WORKSPACES_LIBRARY/.memory/.experiences/A/<notebook>.md` and `$NB_WORKSPACES_LIBRARY/.memory/.experiences/B/<notebook>.md`, updating per-type `.summary.md` in each directory. `plan` reads `.summary.md` for all segments, drilling into individual entries when relevant.
 
 ## Type Determination Flow
 
@@ -73,7 +73,7 @@ The `type` field uses a simple string with pipe separator for hybrids:
                                    │
                     ┌──────────────▼───────────────────────────┐
                     │     Write .type-profile.md                │
-                    │     Write type to .index.json             │
+                    │     Write type to .status.json             │
                     │     Update .type-registry.md (if new)     │
                     └──────────────────────────────────────────┘
                                    │
@@ -102,8 +102,8 @@ Auto-maintained by research. Predefined seed types + dynamically discovered type
 | software | Programming, API, database, UI development | (seed) | — |
 | dsp | Digital signal processing, audio, frequency analysis | (seed) | — |
 | data-pipeline | Data transformation, ETL, migration | (seed) | — |
-| quantum-computing | Quantum circuit design and simulation | 2024-03-15 | quantum-sim |
-| game-design | Game mechanics, level design, balancing | 2024-04-02 | rpg-prototype |
+| quantum-computing | Quantum circuit design and simulation | 2025-03-15 | quantum-sim |
+| game-design | Game mechanics, level design, balancing | 2025-04-02 | rpg-prototype |
 ```
 
 ### Lifecycle
@@ -111,7 +111,7 @@ Auto-maintained by research. Predefined seed types + dynamically discovered type
 1. **Seed**: `init` creates `.type-registry.md` (if missing) with the predefined types from `commands/task-ai.md` as seed rows
 2. **Grow**: When `research` classifies a type not in the registry, it appends a new row with discovery date and source task module name
 3. **Read**: `research` reads the registry during type classification to match against known types (both seed and discovered)
-4. **Shared**: The registry is a shared resource — types discovered by one task benefit future tasks. No lock needed (append-only, one writer at a time via task `.lock`)
+4. **Shared**: The registry is a shared resource — types discovered by one task benefit future tasks. Concurrent writes are rare (append-only, typically one task at a time) but if concurrent tasks run, `research` should coordinate via `$NB_WORKSPACES_LIBRARY/.type-registry.lock` before appending
 
 ### Why Auto-Expand?
 
@@ -125,13 +125,13 @@ Auto-expansion solves both: research identifies the domain from `.target.md` + w
 
 ### Single Type
 ```
-.index.json type: "software"
+.status.json type: "software"
 ```
 Task clearly belongs to one domain. All phases use that domain's methodology.
 
 ### Hybrid Type (pipe-separated)
 ```
-.index.json type: "data-pipeline|ml"
+.status.json type: "data-pipeline|ml"
 ```
 Task spans two domains. Primary (`data-pipeline`) drives architecture and workflow; secondary (`ml`) adds specialized verification and implementation concerns.
 
@@ -139,7 +139,7 @@ Example: "Build an ETL pipeline that feeds into ML model training" → `data-pip
 
 ### Custom / Novel Type
 ```
-.index.json type: "quantum-computing"
+.status.json type: "quantum-computing"
 ```
 Task is in a domain not covered by existing registry types. `research` registers it and builds `.type-profile.md` as the **sole** methodology reference. Profile must be especially thorough.
 
@@ -191,14 +191,14 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
 - **Tool chain**: <specific tools and their roles>
 
 ## Audit Adaptation
-<!-- Domain-specific checkpoints that augment the six-dimension base (see check/references/six-dimension-audit.md) -->
+<!-- Domain-specific checkpoints that augment the six-dimension base (see skills/check/references/six-dimension-audit.md) -->
 <!-- research populates from seed tables + web research; check/verify/exec refine from experience -->
-- **Security**: <+domain-specific security concerns>
-- **Architecture**: <+domain-specific structural concerns>
-- **Performance**: <+domain-specific efficiency concerns>
-- **Extensibility**: <+domain-specific extension concerns>
-- **Consistency**: <+domain-specific convention concerns>
-- **Correctness**: <+domain-specific verification concerns>
+- **D1 Correctness**: <+domain-specific correctness/verification concerns>
+- **D2 Security**: <+domain-specific security concerns>
+- **D3 Reliability**: <+domain-specific reliability/fault-tolerance concerns>
+- **D4 Performance**: <+domain-specific efficiency concerns>
+- **D5 Architecture**: <+domain-specific structural/extension concerns>
+- **D6 Maintainability**: <+domain-specific convention/readability concerns>
 
 ## Sources
 <!-- Where this profile information came from -->
@@ -237,7 +237,7 @@ When research needs domain intelligence for a type, it checks sources in this or
 
 ```
 1. $NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md     ← shared profile from prior tasks (most specific; apply directory-safe transform: `:` → `-`)
-2. Per-type seed files                   ← init/references/seed-types/<type>.md (factory defaults)
+2. Per-type seed files                   ← skills/init/references/seed-types/<type>.md (factory defaults)
 3. Web search from scratch              ← fallback for completely unknown types
 ```
 
@@ -258,7 +258,7 @@ For type `A|B`, shared profiles are stored by **primary** type: `$NB_WORKSPACES_
 | Phase | Reads | May Update | Trigger |
 |-------|-------|-----------|---------|
 | research | Entire profile (gap detection) | All sections (new domain info) | Always — research is the primary type intelligence source |
-| plan | All sections (methodology selection) | Domain Classification, Methodology | Initial creation; re-plan if nature changed |
+| plan | All sections (methodology selection) | Domain Classification, Domain Methodology | Initial creation; re-plan if nature changed |
 | verify | Verification Standards | Verification Standards | Testing approach proved inadequate for this domain |
 | check | Verification Standards, Quality metrics, Audit Adaptation | Verification Standards, Audit Adaptation | Evaluation criteria or audit checkpoints mismatched domain norms |
 | exec | Implementation Patterns, Key tools | Implementation Patterns | Discovered tools/patterns differ from profile |
@@ -273,18 +273,18 @@ research has **three type-related responsibilities**:
 - Analyze `.target.md` keywords against type registry (`$NB_WORKSPACES_LIBRARY/.type-registry.md`)
 - Web search to identify the actual domain field
 - Detect hybrid indicators (keywords from multiple domains)
-- Classify and write `type` to `.index.json` using `A|B` format for hybrids
+- Classify and write `type` to `.status.json` using `A|B` format for hybrids
 - Register new types in `.type-registry.md` if not already known
 
 ### 2. Type refinement (when called from any phase)
 - Each phase may discover that the current type classification is incomplete
 - research collects additional domain info and updates `.type-profile.md`
 - Type itself may change (e.g., `software` → `software|infrastructure` hybrid)
-- Updated type written back to `.index.json` with pipe format
+- Updated type written back to `.status.json` with pipe format
 
 ### 3. Custom type profiling (when no registry type fits)
 - Comprehensive web research to build the domain profile from scratch
-- Must cover all four profile sections with web-sourced best practices
+- Must cover all profile sections (Domain Classification, Phase Intelligence, Domain Methodology, Verification Standards, Implementation Patterns, Audit Adaptation, Sources) with web-sourced best practices
 - Identify the nearest known type(s) for partial methodology reuse
 - Register the new type in `.type-registry.md` for future tasks
 

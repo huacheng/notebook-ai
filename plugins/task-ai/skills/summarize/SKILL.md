@@ -1,6 +1,6 @@
 ---
 name: summarize
-description: Regenerate .summary.md files for context recovery or refresh
+description: "Regenerate .summary.md files for context recovery or refresh"
 model_tier: light
 auto_delegatable: true
 triggers:
@@ -16,7 +16,7 @@ triggers:
     User wants a formal task REPORT → report. User wants to capture EXPERIENCE → highlight.
 arguments:
   - name: notebook
-    description: "Notebook name (e.g., auth-refactor)"
+    description: "Notebook name (e.g., auth-refactor). Auto-detected from CWD or task branch if omitted"
     required: false
   - name: all
     description: "Also regenerate each sub-directory's .summary.md"
@@ -42,26 +42,28 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
 
 ## Execution Steps
 
-1. **Read** `.index.json` — get `status`, `type`, `phase`, `completed_steps`, `depends_on`, metadata
-2. **Read** `.target.md` — requirements and objectives
-3. **Read** `.plan.md` if exists — current implementation plan
-4. **Read** `.analysis/` all files (sorted by filename) — evaluation history
-5. **Read** `.bugfix/` all files (sorted by filename) — issue history
-6. **Read** `.test/` all files (sorted by filename) — criteria and results
-7. **Read** `.notes/` all files (sorted by filename) — research and decisions
-8. **If `--all`**: regenerate each directory's `.summary.md`:
+1. **Acquire** `.working/.lock` (see Concurrency Protection in `commands/task-ai.md`). If lock is held by another live session, REJECT
+2. **Read** `.status.json` — get `status`, `type`, `phase`, `completed_steps`, `depends_on`, metadata. If missing or corrupt, **release `.working/.lock`** and REJECT with error — valid status is required to generate an accurate summary
+3. **Read** `.target.md` if exists — requirements and objectives
+4. **Read** `.plan.md` if exists — current implementation plan
+5. **Read** `.analysis/` all files if directory exists (sorted by filename) — evaluation history
+6. **Read** `.bugfix/` all files if directory exists (sorted by filename) — issue history
+7. **Read** `.test/` all files if directory exists (sorted by filename) — criteria and results
+8. **Read** `.notes/` all files if directory exists (sorted by filename) — research and decisions
+9. **If `--all`**: regenerate each directory's `.summary.md` (skip directories that don't exist or that contain no `.md` files). Use atomic write (`.summary.md.tmp` + rename) for each sub-directory summary:
    - `.analysis/.summary.md` — condensed summary of all evaluation entries
    - `.bugfix/.summary.md` — condensed summary of all issues and fixes
    - `.test/.summary.md` — condensed summary of all criteria and results
    - `.notes/.summary.md` — condensed summary of all research and decisions
-9. **Generate + write** task-level `.summary.md` with condensed context:
-   - Status, phase, progress (`completed_steps`/total)
-   - Plan overview (3-5 sentence summary)
-   - Current state (what was last done, what's next)
-   - Key decisions (architectural/design decisions)
-   - Known issues (active issues, blockers, risks)
-   - Lessons learned (patterns, workarounds, discoveries)
-10. **Git commit**: `task-ai(<notebook>):summarize regenerate context summary`
+10. **Generate + write** task-level `.summary.md` (write to `.summary.md.tmp` then rename for crash safety) with condensed context:
+    - Status, phase, progress (`completed_steps` from `.status.json` / total steps from `.plan.md`)
+    - Plan overview (3-5 sentence summary)
+    - Current state (what was last done, what's next)
+    - Key decisions (architectural/design decisions)
+    - Known issues (active issues, blockers, risks)
+    - Lessons learned (patterns, workarounds, discoveries)
+11. **Git commit** (skip if no files changed): `task-ai(<notebook>):summarize regenerate context summary`. If the commit fails (e.g., git error), log a warning and continue — summary files are already written
+12. **Release** `.working/.lock`
 
 ## State Transitions
 
@@ -82,7 +84,8 @@ None — `summarize` does not write `.auto-signal`. It is a recovery/maintenance
 ## Notes
 
 - **Utility, not lifecycle**: `summarize` is a maintenance tool for context recovery. It does not participate in the auto loop and does not write `.auto-signal`
-- **Non-destructive**: Only writes `.summary.md` files — never modifies source files (`.target.md`, `.plan.md`, etc.) or state files (`.index.json`)
+- **Non-destructive**: Only writes `.summary.md` files — never modifies source files (`.target.md`, `.plan.md`, etc.) or `.status.json`
+- **Graceful degradation**: If any source file (steps 3–8) exists but cannot be read (I/O error, encoding issue), skip it with a warning note in the generated summary — do not abort. Generate the best summary possible from available data
 - **Format compliance**: Generated `.summary.md` follows the format specified in `commands/task-ai.md` (Status/Phase/Progress header, Plan Overview, Current State, Key Decisions, Known Issues, Lessons Learned sections). Keep under ~200 lines
 - **Concurrency**: Summarize acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
 - **`--all` scope**: Without `--all`, only the task-level `.summary.md` is regenerated. With `--all`, all sub-directory summaries are also regenerated, which requires reading every file in every sub-directory

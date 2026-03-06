@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified YAML parser for task-ai rule system.
+Unified YAML parser for task-ai rule system (stdlib only, Python >= 3.9).
 Used by: rule-loader.sh, check.sh (audit-validate), evolve-rules.sh
 
 Usage:
@@ -55,7 +55,8 @@ def parse_yaml_file(filepath: str) -> dict:
                 multiline_buffer = []
 
         # Parse key: value
-        match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*)$', stripped)
+        # D1: Allow hyphens in YAML keys (e.g., case-insensitive, source-url)
+        match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$', stripped)
         if match:
             key = match.group(1)
             value = match.group(2).strip()
@@ -67,16 +68,29 @@ def parse_yaml_file(filepath: str) -> dict:
                 multiline_buffer = []
                 continue
 
-            # Strip quotes
-            if (value.startswith('"') and value.endswith('"')) or \
-               (value.startswith("'") and value.endswith("'")):
+            # Strip quotes and process escape sequences
+            was_quoted = False
+            if value.startswith('"') and value.endswith('"'):
+                was_quoted = True
+                value = value[1:-1]
+                # Process YAML double-quote escape sequences
+                value = value.replace('\\\\', '\x00')  # Temp placeholder
+                value = value.replace('\\n', '\n')
+                value = value.replace('\\t', '\t')
+                value = value.replace('\\r', '\r')
+                value = value.replace('\\"', '"')
+                value = value.replace('\x00', '\\')  # Restore single backslash
+            elif value.startswith("'") and value.endswith("'"):
+                was_quoted = True
+                # Single quotes: no escape processing (literal)
                 value = value[1:-1]
 
-            # Convert boolean strings
-            if value.lower() == 'true':
-                value = True
-            elif value.lower() == 'false':
-                value = False
+            # D1: Only convert unquoted values to booleans (quoted "true" stays string)
+            if not was_quoted:
+                if value.lower() == 'true':
+                    value = True
+                elif value.lower() == 'false':
+                    value = False
 
             result[key] = value
 
@@ -139,10 +153,11 @@ def load_rules_from_directory(domain: str, rules_dir: str) -> list[dict]:
             if not pattern or pattern in ('|', '>'):
                 continue
 
-            # Sanitize pattern
-            is_safe, _ = sanitize_pattern(pattern, rule_id)
-            if not is_safe:
-                continue
+            # Note: sanitize_pattern is NOT called here for active rules.
+            # Security rules intentionally contain "dangerous" patterns because
+            # their purpose is to DETECT those patterns. Sanitization should only
+            # be applied to candidate rules during validation (check --checkpoint
+            # audit-validate), not to already-activated rules.
 
         rules.append({
             'id': rule_id,
@@ -158,51 +173,138 @@ def load_rules_from_directory(domain: str, rules_dir: str) -> list[dict]:
 
 
 def calculate_precision(rule_file: str, test_dir: str) -> float:
-    """Calculate precision by backtesting rule against test directory.
+    """Calculate precision using labeled positive/negative samples.
 
-    Precision heuristic:
-    - Match 10-30% of files = high precision (0.85)
-    - Match 30-50% = moderate precision (0.75)
-    - Match <10% = might be too narrow (0.70)
-    - Match >50% = too broad (0.60)
+    Directory structure expected:
+      test_dir/
+      ├── positive/   # Files that SHOULD match (true positives)
+      └── negative/   # Files that should NOT match (true negatives)
+
+    Precision = TP / (TP + FP)
+    Where:
+      TP = positive samples that matched
+      FP = negative samples that matched (false positives)
+
+    Falls back to heuristic if no labeled samples exist.
     """
     parsed = parse_yaml_file(rule_file)
     pattern = parsed.get('pattern', '')
+    # D1: Respect case_insensitive config from rule file
+    case_insensitive = parsed.get('case_insensitive', False)
+    re_flags = re.IGNORECASE if case_insensitive else 0
 
     if not pattern or pattern == '__audit_rule__':
         return 0.75  # Default for missing/audit patterns
+
+    # D3: Validate regex pattern before using it in re.search
+    try:
+        re.compile(pattern)
+    except re.error as e:
+        print(f"[ERROR] Invalid regex pattern in {rule_file}: {e}", file=sys.stderr)
+        return 0.0  # Invalid pattern gets worst score
 
     test_path = Path(test_dir)
     if not test_path.exists():
         return 0.75
 
-    # Find all text files
-    total_files = 0
-    match_count = 0
+    positive_dir = test_path / 'positive'
+    negative_dir = test_path / 'negative'
 
-    for ext in ['*.md', '*.yaml', '*.yml', '*.txt', '*.json']:
-        for f in test_path.rglob(ext):
+    # Check if labeled corpus exists
+    has_labeled_corpus = positive_dir.exists() or negative_dir.exists()
+
+    if has_labeled_corpus:
+        # True precision calculation with labeled samples
+        true_positive = 0
+        false_negative = 0
+        false_positive = 0
+        true_negative = 0
+
+        # D4: Collect all files once, avoid repeated rglob per extension
+        def collect_sample_files(sample_dir: Path) -> list:
+            """Collect all sample files from directory (single traversal)."""
+            files = []
+            if sample_dir.exists():
+                for f in sample_dir.rglob('*'):
+                    if f.is_file() and f.suffix in ('.md', '.yaml', '.yml', '.txt', '.json'):
+                        files.append(f)
+            return files
+
+        # Check positive samples (should match)
+        for f in collect_sample_files(positive_dir):
+            try:
+                content = f.read_text(encoding='utf-8', errors='ignore')
+                # D1: Use re_flags from rule config
+                if re.search(pattern, content, re_flags):
+                    true_positive += 1
+                else:
+                    false_negative += 1
+            except Exception:
+                pass
+
+        # Check negative samples (should NOT match)
+        for f in collect_sample_files(negative_dir):
+            try:
+                content = f.read_text(encoding='utf-8', errors='ignore')
+                # D1: Use re_flags from rule config
+                if re.search(pattern, content, re_flags):
+                    false_positive += 1
+                else:
+                    true_negative += 1
+            except Exception:
+                pass
+
+        # Calculate precision: TP / (TP + FP)
+        if true_positive + false_positive == 0:
+            # No matches at all - could be too narrow
+            if true_positive == 0 and false_negative > 0:
+                return 0.50  # Rule doesn't match any positive samples
+            return 0.75  # No data to judge
+
+        precision = true_positive / (true_positive + false_positive)
+
+        # Also factor in recall for a more balanced score
+        # Recall = TP / (TP + FN)
+        if true_positive + false_negative > 0:
+            recall = true_positive / (true_positive + false_negative)
+            # F1 score as final metric
+            if precision + recall > 0:
+                f1 = 2 * (precision * recall) / (precision + recall)
+                return round(f1, 2)
+
+        return round(precision, 2)
+
+    else:
+        # Fallback: heuristic based on match ratio (legacy behavior)
+        total_files = 0
+        match_count = 0
+
+        # D4: Single traversal instead of per-extension rglob
+        for f in test_path.rglob('*'):
+            if not f.is_file() or f.suffix not in ('.md', '.yaml', '.yml', '.txt', '.json'):
+                continue
             total_files += 1
             try:
                 content = f.read_text(encoding='utf-8', errors='ignore')
-                if re.search(pattern, content, re.IGNORECASE):
+                # D1: Use re_flags from rule config
+                if re.search(pattern, content, re_flags):
                     match_count += 1
             except Exception:
                 pass
 
-    if total_files == 0:
-        return 0.75
+        if total_files == 0:
+            return 0.75
 
-    match_ratio = match_count / total_files
+        match_ratio = match_count / total_files
 
-    if 0.10 <= match_ratio <= 0.30:
-        return 0.85
-    elif 0.30 < match_ratio <= 0.50:
-        return 0.75
-    elif match_ratio < 0.10:
-        return 0.70
-    else:  # > 0.50
-        return 0.60
+        if 0.10 <= match_ratio <= 0.30:
+            return 0.85
+        elif 0.30 < match_ratio <= 0.50:
+            return 0.75
+        elif match_ratio < 0.10:
+            return 0.70
+        else:  # > 0.50
+            return 0.60
 
 
 def main():

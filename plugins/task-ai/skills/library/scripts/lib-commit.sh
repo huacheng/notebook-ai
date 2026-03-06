@@ -18,12 +18,30 @@ if [[ "$1" == "--system" ]]; then
     COMMIT_PREFIX="task-ai(library)"
 else
     NOTEBOOK="$1"; shift
+    # D2: Validate notebook name to prevent commit message injection
+    if [[ ! "$NOTEBOOK" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[ERROR] Invalid notebook name: $NOTEBOOK" >&2
+        exit 1
+    fi
     COMMIT_PREFIX="task-ai($NOTEBOOK)"
 fi
 
 TYPE="$1"; shift
+# D2: Sanitize type and description for commit message safety
+if [[ ! "$TYPE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "[ERROR] Invalid commit type: $TYPE" >&2
+    exit 1
+fi
 DESC="$1"; shift
+# D2: Sanitize description — strip control chars and limit length to prevent commit message abuse
+DESC=$(printf '%s' "$DESC" | tr -d '\n\r' | cut -c1-200)
 FILES=("$@")
+
+# D3: Validate at least one file was specified
+if [[ ${#FILES[@]} -eq 0 ]]; then
+    echo "[ERROR] No files specified to commit" >&2
+    exit 1
+fi
 
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 

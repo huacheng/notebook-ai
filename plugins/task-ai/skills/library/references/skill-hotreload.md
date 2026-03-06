@@ -1,6 +1,6 @@
 # Skill Hot-Reload Reference
 
-workspace skills 的热重载机制，基于 Claude Code 原生的 `--add-dir` 支持。
+Hot-reload mechanism for workspace skills, based on Claude Code's native `--add-dir` support.
 
 ## Overview
 
@@ -119,7 +119,7 @@ Experience (highlight)                 Manual Authoring
 .candidates/<slug>/                   .drafts/<slug>/
     │                                       │
     ├───────── check --skill ──────────────┤
-    │          (六维审查)                    │
+    │          (six-dimension review)         │
     ▼                                       ▼
     │◀────── NEEDS_FIX ────────────────────┤
     │                                       │

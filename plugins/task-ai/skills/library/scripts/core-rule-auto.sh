@@ -49,8 +49,16 @@ audit_log() {
     local action="$1"
     local status="$2"
     local details="${3:-}"
-    local timestamp=$(date -Iseconds)
-    local entry=$(printf '{"ts":"%s","action":"%s","status":"%s","details":"%s"}\n' \
+    local timestamp
+    timestamp=$(date -Iseconds)
+    # D2: Escape JSON special characters in details to prevent injection
+    details="${details//\\/\\\\}"
+    details="${details//\"/\\\"}"
+    details="${details//$'\n'/\\n}"
+    details="${details//$'\t'/\\t}"
+    details="${details//$'\r'/\\r}"
+    local entry
+    entry=$(printf '{"ts":"%s","action":"%s","status":"%s","details":"%s"}\n' \
         "$timestamp" "$action" "$status" "$details")
     echo "$entry" >> "$AUDIT_LOG"
 }
@@ -226,9 +234,17 @@ integrate_proposal() {
     echo ""
 
     # Extract info from proposal
-    local core_id=$(grep -E '^# Core Rule Proposal:' "$proposal_file" | grep -oE 'CORE-[0-9]+')
-    local pattern=$(grep -E '^- \*\*Pattern\*\*:' "$proposal_file" | sed 's/.*`\(.*\)`.*/\1/')
-    local name=$(grep -E '^- \*\*Name\*\*:' "$proposal_file" | sed 's/.*: //')
+    local core_id pattern name
+    core_id=$(grep -E '^# Core Rule Proposal:' "$proposal_file" | grep -oE 'CORE-[0-9]+' || true)
+    pattern=$(grep -E '^- \*\*Pattern\*\*:' "$proposal_file" | sed 's/.*`\(.*\)`.*/\1/' || true)
+    name=$(grep -E '^- \*\*Name\*\*:' "$proposal_file" | sed 's/.*: //' || true)
+
+    # D3: Validate extracted fields before proceeding
+    if [[ -z "$core_id" || -z "$pattern" || -z "$name" ]]; then
+        echo "[ERROR] Could not extract core_id, pattern, or name from proposal file" >&2
+        audit_log "integrate" "failed" "missing_fields in $(basename "$proposal_file")"
+        exit 1
+    fi
 
     echo "Generating code for: $core_id - $name"
     echo ""
@@ -246,7 +262,7 @@ integrate_proposal() {
     echo ""
 
     if [[ "$REQUIRE_HUMAN_APPROVAL" == "true" ]]; then
-        echo -e "${RED}⚠️  HUMAN APPROVAL REQUIRED${NC}"
+        echo -e "${RED}[!] HUMAN APPROVAL REQUIRED${NC}"
         echo ""
         echo "To integrate this rule:"
         echo "  1. Review the code above"
@@ -275,7 +291,7 @@ EOYAML
 
         # Commit to library
         local lib_commit="$SCRIPT_DIR/lib-commit.sh"
-        if [[ -x "$lib_commit" ]]; then
+        if [[ -f "$lib_commit" ]]; then
             bash "$lib_commit" --system evolve "add $core_id $name" "$rule_yaml"
         fi
 
@@ -331,11 +347,11 @@ Pipeline Steps:
 └─────────────────────────────────────────────────────────────────┘
 
 Safety Controls:
-  ✓ Historical backtest required (precision >= 0.98)
-  ✓ Six-dimension review must pass (>= 0.80)
-  ✓ All decisions logged to .evolving-rules.log
-  ✓ Audit trail in .core-rule-proposals/
-  ✓ Git provides rollback safety net
+  [x] Historical backtest required (precision >= 0.98)
+  [x] Six-dimension review must pass (>= 0.80)
+  [x] All decisions logged to .core-rule-proposals/.audit.log
+  [x] Audit trail in .core-rule-proposals/
+  [x] Git provides rollback safety net
 
 One-click full automation:
   library core-rule-auto auto-pipeline
@@ -370,7 +386,14 @@ cron_job() {
         local core_due=true
 
         if [[ -f "$core_state" && -z "$force" ]]; then
-            local last=$(($(cat "$core_state")))
+            local last_raw
+            last_raw=$(cat "$core_state")
+            # Validate: must be numeric only (D2: prevent arithmetic injection)
+            if ! [[ "$last_raw" =~ ^[0-9]+$ ]]; then
+                echo "[WARN] Invalid .last-scan-core content, forcing rescan" >&2
+                last_raw=0
+            fi
+            local last=$((last_raw))
             local elapsed=$((now - last))
             if [[ $elapsed -lt $CORE_RULES_INTERVAL ]]; then
                 local remaining=$(( (CORE_RULES_INTERVAL - elapsed) / 3600 ))
@@ -394,7 +417,14 @@ cron_job() {
         local ext_due=true
 
         if [[ -f "$ext_state" && -z "$force" ]]; then
-            local last=$(($(cat "$ext_state")))
+            local last_raw
+            last_raw=$(cat "$ext_state")
+            # Validate: must be numeric only (D2: prevent arithmetic injection)
+            if ! [[ "$last_raw" =~ ^[0-9]+$ ]]; then
+                echo "[WARN] Invalid .last-scan-extended content, forcing rescan" >&2
+                last_raw=0
+            fi
+            local last=$((last_raw))
             local elapsed=$((now - last))
             if [[ $elapsed -lt $EXTENDED_RULES_INTERVAL ]]; then
                 local remaining=$(( (EXTENDED_RULES_INTERVAL - elapsed) / 3600 ))
@@ -410,6 +440,7 @@ cron_job() {
             local rules_dir="$LIB_DIR/.evolving-rules/security/active"
             if [[ -d "$rules_dir" ]]; then
                 local count=$(find "$rules_dir" -name "*.yaml" -o -name "*.yml" 2>/dev/null | wc -l)
+                count="${count// /}"
                 echo "[EXTENDED] Active rules: $count"
             else
                 echo "[EXTENDED] No active rules directory yet."
@@ -442,12 +473,12 @@ Log:    $log_path
 
 Quick Setup (copy & run):
 -------------------------
-cat > $script_path << 'EOSCRIPT'
+cat > "$script_path" <<EOSCRIPT
 #!/bin/bash
-cd $workspace || exit 1
-claude --print "/task-ai library evolve --full" 2>&1 >> $log_path
+cd "$workspace" || exit 1
+claude --print "/task-ai library evolve --full" 2>&1 >> "$log_path"
 EOSCRIPT
-chmod +x $script_path
+chmod +x "$script_path"
 (crontab -l 2>/dev/null; echo "0 3 * * 0  $script_path") | crontab -
 
 

@@ -36,7 +36,8 @@ Execute the implementation plan for a task module that has passed evaluation.
 ## Prerequisites
 
 - Task module must have status `review` (post-plan check passed) or `executing` (NEEDS_FIX continuation)
-- `.target.md` and at least one plan file must exist
+- `.target.md` should exist (warning if missing — provides requirements context)
+- At least one plan file (`.plan.md`) must exist
 - `.analysis/` should contain a PASS evaluation file (warning if empty/missing)
 - **Dependency gate**: All `depends_on` modules must meet their required status — simple string entries require `complete`, extended `{ module, min_status }` entries require at-or-past `min_status` (see depends_on Format in `commands/task-ai.md`). If any dependency is not met, exec REJECTS with error listing blocking dependencies and their current statuses
 
@@ -62,7 +63,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 
 ### Per-Step Execution
 
-Read the `type` field from `.index.json` to determine the task domain. Execution strategy MUST adapt to the task type — different domains use fundamentally different tools, verification methods, and workflows.
+Read the `type` field from `.status.json` to determine the task domain. Execution strategy MUST adapt to the task type — different domains use fundamentally different tools, verification methods, and workflows.
 
 For each implementation step:
 
@@ -75,13 +76,13 @@ For each implementation step:
    - **Optional delegation — capability check**: Before implementing, follow `auto/references/plugin-delegation.md` to check if the current step matches a capability slot: `type` containing `frontend`/`web`/`ui` → `frontend-design` slot; `type` containing `bugfix` or NEEDS_FIX resumption → `debugging` slot; `type` containing `software` with `.test/` criteria → `tdd` slot; otherwise → `domain-*` semantic scan. If matched, invoke via Task subagent — guidance is incorporated into the implementation approach. No match or failure → use existing inline methods
 4. **HS confirmation** (VFP-applicable types with VH stubs): After implementing, run the same step-specific tests:
    - **All Green (passing)** → record successful VH→HS transition, proceed
-   - **Still Red (failing)** → mark step as `NEEDS_FIX`, record failure details (which tests still fail and why). If minor, attempt a targeted fix and re-run. If unresolvable, signal `(mid-exec)` for check evaluation
+   - **Still Red (failing)** → mark step as `NEEDS_FIX`, record failure details (which tests still fail and why). If minor, attempt a targeted fix and re-run. If unresolvable, signal `(mid-exec)` for verify → check evaluation
 5. **Cumulative Green Gate (CGG)** (VFP-applicable types, after HS confirmation): Run all previously-passed VH stubs (step-1..N-1) to confirm no regressions. Append results to `.test/<date>-cumulative-green.jsonl`. For human VH types, store approval snapshots in `.test/hil-snapshots/`. On regression → fix (≤1 attempt) → re-run; still failing → signal `(mid-exec)`. Skip if step=1 or no VH stubs exist
 6. **Refactor window** (VFP-applicable types, after HS confirmation): With tests passing, check for obvious refactoring opportunities in the code just written (duplication, naming, dead code). If refactored, run the **full** test suite (not just step tests) to confirm no regressions. Skip if the step was straightforward with no refactoring opportunities
 7. **Verify** the step succeeded against `.test/` criteria using **domain-appropriate verification** (see per-type seed file or `.type-profile.md` for domain verification methods)
 8. **Record** what was done (files changed, commands run, tools invoked, approach taken)
-9. **Create** `.notes/<YYYY-MM-DD>-<summary>-exec.md` when implementation deviates from plan, an unexpected workaround is needed, or a non-obvious API behavior is discovered. Skip for straightforward steps that follow the plan exactly. For software types, include a **VFP Cycle Summary** section per step: `Red (N failing) → Green (N passing) → Refactor (yes/no)`
-10. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
+9. **Create** `.notes/<YYYY-MM-DD>-<summary>-exec.md` when implementation deviates from plan, an unexpected workaround is needed, or a non-obvious API behavior is discovered. Skip for straightforward steps that follow the plan exactly. For VFP-applicable types, include a **VFP Cycle Summary** section per step: `Red (N failing) → Green (N passing) → Refactor (yes/no)`
+10. **Update** `.summary.md` (task-level) — overwrite with condensed summary including ALL notes from `.notes/`
 
 ### Issue Handling
 
@@ -89,38 +90,43 @@ For each implementation step:
 |-----------|--------|
 | Step succeeds | Record in progress log, continue |
 | Minor deviation needed | Adjust and document, continue |
-| Significant issue | Stop execution, signal `(mid-exec)`. Interactive: suggest `check --checkpoint mid-exec`. Auto: daemon routes to mid-exec evaluation |
+| Significant issue | Stop execution, signal `(mid-exec)`. Interactive: suggest `verify --checkpoint mid-exec` (then `check`). Auto: daemon routes to verify → check mid-exec evaluation |
 | Blocking dependency | Set status to `blocked`, report which dependency |
 
 ## Execution Steps
 
-1. **Read** `.index.json` — validate status is `review` or `executing`
-2. **Validate dependencies**: read `depends_on` from `.index.json`, check each dependency module's `.index.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
-3. **Update** `.index.json` status to `executing`, clear `phase` to `""`, update timestamp
+1. **Read** `.status.json` — validate status is `review` or `executing`
+2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
+3. **Update** `.status.json` status to `executing`, clear `phase` to `""`, update timestamp
 4. **Discover** all implementation steps from `.plan.md`
-5. **Detect completed steps**: read `completed_steps` field from `.index.json` to determine progress; skip steps ≤ `completed_steps`
+5. **Detect completed steps**: read `completed_steps` field from `.status.json` to determine progress; skip steps ≤ `completed_steps`
 6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files, using the most recent file (by filename date) as the primary fix guidance. `.bugfix/` entries indicate mid-exec issues; `.analysis/` entries indicate post-exec issues. Address fix items before continuing remaining steps
-7. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
-8. **For each step** (follow Per-Step Execution flow above):
-   8.1. Read required files
-   8.2. **VH confirmation** — run step-specific VH stubs (software types only, see Per-Step step 2)
-   8.3. Implement the change
-   8.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (software types only, see Per-Step step 4)
-   8.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (software types only, see Per-Step step 5)
-   8.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (software types only, see Per-Step step 6)
-   8.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
-   8.8. Record result (include VFP cycle summary for software types)
-   8.9. Update `.index.json` `completed_steps` to current step number
-9. **After all steps** (or on failure):
-   - Update `.index.json` timestamp
-   - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
-   - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
-   - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
-   - If all steps complete: signal `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }`
-   - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-   - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-   - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
-10. **Report** execution summary with per-step results
+7. **Executor discovery** (before per-step loop): Follow `auto/references/plugin-delegation.md` executor slot discovery. Semantic match against three signal sources (`.status.json` type, `.target.md` content, `.plan.md` step structure) — not rigid type-string comparison. Check `plan-executor` seed slot first, then `domain-executor-*` registry/semantic scan. If a matching executor plugin is found with health score >= 0.70:
+   - Delegate entire remaining plan execution to the executor via Task subagent (see Executor Integration Contract in `plugin-delegation.md`)
+   - After executor completes: read `.status.json` `completed_steps`, `.auto-signal`, `.summary.md` to restore context
+   - If executor fails mid-execution: fall back to native per-step loop, resuming from `completed_steps + 1`
+   - If no executor matched or `--step N` is specified: proceed with native per-step loop below
+8. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
+9. **For each step** (follow Per-Step Execution flow above):
+   9.1. Read required files
+   9.2. **VH confirmation** — run step-specific VH stubs (VFP-applicable types only, see Per-Step step 2)
+   9.3. Implement the change
+   9.4. **HS confirmation** — run step-specific tests, confirm VH→HS transition (VFP-applicable types only, see Per-Step step 4)
+   9.5. **Cumulative Green Gate** — run all prior VH stubs, append to `cumulative-green.jsonl`, store `hil-snapshots/` if applicable (VFP-applicable types only, see Per-Step step 5)
+   9.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (VFP-applicable types only, see Per-Step step 6)
+   9.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
+   9.8. Record result (include VFP cycle summary for VFP-applicable types)
+   9.9. Update `.status.json` `completed_steps` to current step number
+10. **After all steps** (or on failure):
+    - Update `.status.json` timestamp
+    - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
+    - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
+    - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
+    - If all steps complete: signal `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }`
+    - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
+    - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
+    - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
+11. **Report** execution summary with per-step results
 
 ## State Transitions
 
@@ -132,12 +138,12 @@ For each implementation step:
 
 ## Progress Tracking
 
-Execution progress is tracked via `.index.json` fields:
+Execution progress is tracked via `.status.json` fields:
 - `completed_steps`: integer, incremented after each step completes successfully. Reset to `0` when plan changes (by `plan` sub-command on re-plan). **Validation**: must be integer >= 0. If value is invalid (negative, non-integer), reset to 0 with warning
 - `updated`: timestamp of last execution activity
 
 For long-running executions, intermediate progress can be observed by:
-- Reading `completed_steps` in `.index.json`
+- Reading `completed_steps` in `.status.json`
 - Reading `.summary.md` for condensed context
 - Checking git diff for code changes made so far
 
@@ -165,12 +171,12 @@ For long-running executions, intermediate progress can be observed by:
 - The executor should follow project coding conventions (check CLAUDE.md if present)
 - When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` and `.analysis/` latest files, using the most recent by filename date as fix guidance (`.bugfix/` = mid-exec source, `.analysis/` = post-exec source)
 - When `--step N` is used, the executor verifies prerequisites for that step are met, then signals `(step-N)` on completion for mid-exec checkpoint
-- After successful execution of all steps, the user should run `/task-ai:check --checkpoint post-exec`
-- Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec evaluation by `check`
+- After successful execution of all steps, the user should run `/task-ai:verify --checkpoint post-exec` followed by `/task-ai:check --checkpoint post-exec`
+- Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec `verify` + `check` evaluation
 - **VFP protocol reference**: The Verification-First Protocol (VH confirmation, HS confirmation, Cumulative Green Gate, Refactor window) is defined in `commands/references/verification-first-protocol.md`. Refer to that document for full VFP applicability rules, VH stub design patterns, and CGG thresholds
 - **Evidence-based decisions**: When uncertain about APIs, library usage, or compatibility, use shell commands to verify (curl official docs, check installed versions, read node_modules source, etc.) before implementing
 - **Experience invalidation**: If implementation reveals that a previously loaded experience file (`<notebook>-impl.md`, `-verify.md`, or `-eval.md`) provided guidance that contradicts actual runtime behavior (e.g., documented API signature doesn't match, performance claim is wrong), set `quality_status: invalidated` on that file — acquire `.memory/.experiences/.lock` → update frontmatter → write atomically (`.tmp → rename`) → append `experience` changelog line with tag `quality_status:invalidated` → release lock
 - **Concurrency**: Exec acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
 - **Reference collection**: Primary reference collection is handled by the `research` sub-command before planning. During execution, if you discover valuable implementation details via web searches, you may still save findings to `$NB_WORKSPACES_LIBRARY/.memory/.references/` — follow the full six-step Library Write Protocol (see `skills/library/SKILL.md`): acquire `.memory/.references/.lock` → sanitize content (ten categories, `references/injection-rules.md`) → apply source classification (`references/blocked-sources.md`) → write atomically → append `reference` changelog line → update `.memory/.references/.index.md` → release lock
-- **verify integration**: Per-step verification can optionally invoke `verify --checkpoint step-N` for domain-specific testing. For lightweight checks (build + lint), inline verification is sufficient
+- **`/task-ai:verify` integration**: Per-step verification can optionally invoke `verify --checkpoint step-N` for domain-specific testing. For lightweight checks (build + lint), inline verification is sufficient
 - **Auto-mode safety boundaries**: When exec runs within `auto` mode (unattended), the following operations are PROHIBITED unless the plan explicitly calls for them: modifying `.env` or credential files, running destructive commands (`rm -rf`, `git push --force`, `DROP TABLE`), installing system-level packages (`apt install`, `brew install`), sending external requests (email, webhook, API calls to production). Violation → stop execution and signal `(mid-exec)` for human review

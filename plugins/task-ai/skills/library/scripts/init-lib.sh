@@ -54,6 +54,14 @@ ensure_dir .memory/.thinking/patterns
 ensure_dir .memory/.type-profiles
 ensure_dir .memory/.references
 
+# Skills promotion pipeline (highlight promote scope)
+# - .candidates/: T1/T2 — promote.sh writes candidate skill files here
+# - .drafts/: T3 — L2 six-dimension review >= 0.70, pending human confirmation
+# - .active/: T4 — L3 LLM deep review passed, activated (--add-dir target)
+ensure_dir .skills/.candidates
+ensure_dir .skills/.drafts
+ensure_dir .skills/.active
+
 # Three-domain evolving rules structure (D5 Architecture)
 # - security: security.sh scan_skill() uses
 # - sanitization: research content detoxification uses
@@ -63,6 +71,14 @@ for domain in security sanitization audit; do
     ensure_dir ".evolving-rules/$domain/active"
     ensure_dir ".evolving-rules/$domain/review"
     ensure_dir ".evolving-rules/$domain/deprecated"
+done
+
+# Test corpus for precision calculation (labeled samples)
+# - positive/: samples that SHOULD match the rule (true positives)
+# - negative/: samples that should NOT match (true negatives)
+for domain in security sanitization audit; do
+    ensure_dir ".test-corpus/$domain/positive"
+    ensure_dir ".test-corpus/$domain/negative"
 done
 
 # .gitkeep for empty directories
@@ -76,6 +92,11 @@ ensure_file .memory/.thinking/patterns/.gitkeep
 ensure_file .memory/.type-profiles/.gitkeep
 ensure_file .memory/.references/.gitkeep
 
+# Skills subsystem .gitkeep
+ensure_file .skills/.candidates/.gitkeep
+ensure_file .skills/.drafts/.gitkeep
+ensure_file .skills/.active/.gitkeep
+
 for domain in security sanitization audit; do
     ensure_file ".evolving-rules/$domain/candidates/.gitkeep"
     ensure_file ".evolving-rules/$domain/active/.gitkeep"
@@ -83,13 +104,23 @@ for domain in security sanitization audit; do
     ensure_file ".evolving-rules/$domain/deprecated/.gitkeep"
 done
 
+# Test corpus .gitkeep
+for domain in security sanitization audit; do
+    ensure_file ".test-corpus/$domain/positive/.gitkeep"
+    ensure_file ".test-corpus/$domain/negative/.gitkeep"
+done
+
 # Copy intel sources template if not exists
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTEL_TEMPLATE="$SCRIPT_DIR/../templates/audit-intel-sources.yaml"
 if [[ -f "$INTEL_TEMPLATE" && ! -f ".audit-intel-sources.yaml" ]]; then
-    cp "$INTEL_TEMPLATE" ".audit-intel-sources.yaml"
-    echo "[+] Created: .audit-intel-sources.yaml (from template)"
-    CHANGES=1
+    # D3: cp with error handling
+    if ! cp "$INTEL_TEMPLATE" ".audit-intel-sources.yaml" 2>/dev/null; then
+        echo "[WARN] Failed to copy intel template" >&2
+    else
+        echo "[+] Created: .audit-intel-sources.yaml (from template)"
+        CHANGES=1
+    fi
 fi
 
 # --- Ensure skeleton files ---
@@ -111,13 +142,27 @@ EOF
 fi
 
 if [[ ! -f .type-registry.md ]]; then
+    # D1: seed all types from seed-types/.summary.md
+    SEED_DATE=$(date -u +"%Y-%m-%d")
     cat > .type-registry.md <<EOF
 # Task Type Registry
 
 | Type | Added | Source Task |
 |------|-------|-------------|
-| software | 2024-01-01 | seed |
-| documentation | 2024-01-01 | seed |
+| software | $SEED_DATE | seed |
+| science | $SEED_DATE | seed |
+| documentation | $SEED_DATE | seed |
+| data-pipeline | $SEED_DATE | seed |
+| infrastructure | $SEED_DATE | seed |
+| ml | $SEED_DATE | seed |
+| ai-skill | $SEED_DATE | seed |
+| image-processing | $SEED_DATE | seed |
+| video-production | $SEED_DATE | seed |
+| dsp | $SEED_DATE | seed |
+| literary | $SEED_DATE | seed |
+| screenwriting | $SEED_DATE | seed |
+| mechatronics | $SEED_DATE | seed |
+| chip-design | $SEED_DATE | seed |
 EOF
     echo "[+] Created: .type-registry.md"
     CHANGES=1
@@ -126,11 +171,14 @@ fi
 if [[ ! -f .gitignore ]]; then
     cat > .gitignore <<EOF
 .changelog
+.changelog.lock
 .changelog-archive/.lock
 .memory/.thinking/raw/
 .memory/.thinking/patterns/.lock
 .inconsistency.log
 .ioc.md
+.plugin-registry.md
+.last-maintained
 **/.library-state.json
 **/.lock
 **/.lock.stale.*
@@ -141,17 +189,24 @@ EOF
 fi
 
 # --- Git initialization ---
+# D3: git commands with error handling
 if [[ ! -d ".git" ]]; then
     echo "Initializing Git repository..."
-    git init
-    git add .
-    git commit -m "task-ai(library):init initialize library repository skeleton"
-    echo "Library initialized with Git."
+    if ! git init; then
+        echo "[WARN] git init failed" >&2
+    elif ! git add .; then
+        echo "[WARN] git add failed" >&2
+    elif ! git commit -m "task-ai(library):init initialize library repository skeleton"; then
+        echo "[WARN] git commit failed" >&2
+    else
+        echo "Library initialized with Git."
+    fi
 elif [[ $CHANGES -gt 0 ]]; then
     echo "Committing structure updates..."
-    git add .
-    if ! git diff --cached --quiet; then
-        git commit -m "task-ai(library):init补缺 add missing structure"
+    if ! git add .; then
+        echo "[WARN] git add failed during structure update" >&2
+    elif ! git diff --cached --quiet; then
+        git commit -m "task-ai(library):init add missing structure" || echo "[WARN] git commit failed" >&2
     fi
     echo "Library structure updated."
 else

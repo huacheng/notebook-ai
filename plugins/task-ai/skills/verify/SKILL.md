@@ -19,9 +19,16 @@ arguments:
     description: "Notebook name (e.g., auth-refactor)"
     required: false
   - name: checkpoint
-    description: "Verification scope: quick, full, or step-N"
+    description: "Verification scope: quick, full, or step-N (N >= 1)"
     required: false
     default: full
+  - name: generate-skill-tests
+    description: "Generate a structured test template for a skill file (requires --target)"
+    required: false
+    type: flag
+  - name: target
+    description: "Path to a SKILL.md file (used with --generate-skill-tests)"
+    required: false
 ---
 
 # /task-ai:verify — Test Execution & Verification
@@ -32,7 +39,12 @@ Run domain-adapted tests and verification procedures for a task module, producin
 
 ```
 /task-ai:verify <notebook_name> [--checkpoint quick|full|step-N]
+/task-ai:verify <notebook_name> --generate-skill-tests --target <skill.md>
 ```
+
+### Skill Test Generation Mode
+
+When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, verify generates a structured test template for the specified skill file under `.test/skill-<name>.test.md`. This mode exits immediately after generation and does not run normal verification flow.
 
 ## Checkpoints
 
@@ -40,11 +52,11 @@ Run domain-adapted tests and verification procedures for a task module, producin
 |------------|----------|-------|
 | `quick` | Lightweight check during execution | build + lint + type check |
 | `full` | Comprehensive post-execution verification | All `.test/` criteria + acceptance tests + regression tests |
-| `step-N` | Per-step verification during exec | Only criteria related to step N |
+| `step-N` | Per-step verification during exec (N >= 1) | Only criteria related to step N |
 
 ## Execution Steps
 
-1. **Read** `.index.json` — get `type`, `status`. Validate status is not terminal (`complete` or `cancelled`)
+1. **Read** `.status.json` — get `type`, `status`. Validate status is not terminal (`complete` or `cancelled`)
 2. **Read** `.type-profile.md` if exists — "Verification Standards" section is the **primary** source for testing approach, quality metrics, and acceptance criteria for this task (see `plan/references/type-profiling.md` for type system details)
 3. **Read** `.test/` latest criteria file — determine what to verify. For software types, also locate `vh-stubs.test.*` and `vh-baseline.md` for VFP verification
 4. **Read** `.target.md` — extract acceptance criteria
@@ -80,9 +92,9 @@ Run domain-adapted tests and verification procedures for a task module, producin
 
 | Result | Meaning |
 |--------|---------|
-| `pass` | All verification criteria met |
-| `fail` | One or more critical criteria failed |
-| `partial` | Some criteria passed, some failed (non-critical failures) |
+| `(pass)` | All verification criteria met |
+| `(fail)` | One or more critical criteria failed |
+| `(partial)` | Some criteria passed, some failed (non-critical failures) |
 
 ## State Transitions
 
@@ -113,7 +125,7 @@ The `checkpoint` field in verify's signal carries **the verification scope** (wh
 | full | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "full", "timestamp": "..." }` |
 | step-N | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "step-N", "timestamp": "..." }` |
 
-Result values: `(pass)`, `(fail)`, `(partial)` — see Result Values table above.
+Result values use the same `(pass)`, `(fail)`, `(partial)` notation defined in the Result Values table above.
 
 **Auto routing note**: In the auto loop, verify's checkpoint field is informational for the daemon. The auto loop determines the correct `check` checkpoint from the triggering context (e.g., after `plan` → `check --checkpoint post-plan`; after `exec (done)` → `check --checkpoint post-exec`; after `exec (mid-exec)` → `check --checkpoint mid-exec`).
 

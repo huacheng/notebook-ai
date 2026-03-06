@@ -94,7 +94,7 @@ Threshold 可被 seed-type 或 `.type-profile.md` 覆盖。
 | Phase (Skill) | 职责 | 产出 |
 |---------------|------|------|
 | **research** `--caller test` | 收集领域测试方法论和工具 | `.test/<date>-research-methodology.md` |
-| **plan** step 17-18 | 设计验证标准 + 生成 VH stubs (RED baseline) | `.test/<date>-plan-criteria.md`, `vh-stubs.test.*` |
+| **plan** step 17-18 | 设计验证标准 + 生成 Verification baseline (software: VH stubs; non-software: contract baseline with RED/GREEN specs) | `.test/<date>-plan-criteria.md`, `vh-stubs.test.*` or `contract-baseline.md` |
 | **verify** | 运行测试 + 产出结构化结果 | `.test/<date>-<checkpoint>-results.md` |
 | **check** (post-plan) | 评判测试标准质量 | `.analysis/` |
 | **exec** per-step | RED → Implement → GREEN → CGG → Refactor | `cumulative-green.jsonl` |

@@ -8,7 +8,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CORE_DIR="$SCRIPT_DIR/../../../core"
 
 LIB_PATH="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
 EVOLVING_RULES_DIR="$LIB_PATH/.evolving-rules"
@@ -20,8 +19,12 @@ MODE="auto"
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --domain) DOMAIN="$2"; shift 2 ;;
-        --mode)   MODE="$2"; shift 2 ;;
+        --domain)
+            if [[ $# -lt 2 ]]; then echo "[ERROR] --domain requires a value" >&2; exit 1; fi
+            DOMAIN="$2"; shift 2 ;;
+        --mode)
+            if [[ $# -lt 2 ]]; then echo "[ERROR] --mode requires a value" >&2; exit 1; fi
+            MODE="$2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -48,7 +51,7 @@ echo "[evolve-rules] Starting rule evolution for domains: ${DOMAINS[*]}, mode: $
 CHECK_SH="$SCRIPT_DIR/../../check/scripts/check.sh"
 if [[ -f "$CHECK_SH" ]]; then
     echo "[evolve-rules] Phase 1: Validating candidates..."
-    bash "$CHECK_SH" "_evolve" --checkpoint audit-validate 2>/dev/null || true
+    bash "$CHECK_SH" "_evolve" --checkpoint audit-validate || true
 fi
 
 # Report results
@@ -58,9 +61,13 @@ for domain in "${DOMAINS[@]}"; do
     ACTIVE_DIR="$EVOLVING_RULES_DIR/$domain/active"
     REVIEW_DIR="$EVOLVING_RULES_DIR/$domain/review"
 
-    CANDIDATE_COUNT=$(find "$CANDIDATES_DIR" -name "*.yaml" 2>/dev/null | wc -l || echo 0)
-    ACTIVE_COUNT=$(find "$ACTIVE_DIR" -name "*.yaml" 2>/dev/null | wc -l || echo 0)
-    REVIEW_COUNT=$(find "$REVIEW_DIR" -name "*.yaml" 2>/dev/null | wc -l || echo 0)
+    CANDIDATE_COUNT=$(find "$CANDIDATES_DIR" -name "*.yaml" 2>/dev/null | wc -l)
+    ACTIVE_COUNT=$(find "$ACTIVE_DIR" -name "*.yaml" 2>/dev/null | wc -l)
+    REVIEW_COUNT=$(find "$REVIEW_DIR" -name "*.yaml" 2>/dev/null | wc -l)
+    # D3: Trim whitespace from wc -l output (macOS wc pads with spaces)
+    CANDIDATE_COUNT="${CANDIDATE_COUNT// /}"
+    ACTIVE_COUNT="${ACTIVE_COUNT// /}"
+    REVIEW_COUNT="${REVIEW_COUNT// /}"
 
     echo "  $domain: candidates=$CANDIDATE_COUNT, active=$ACTIVE_COUNT, review=$REVIEW_COUNT"
 done

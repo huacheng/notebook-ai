@@ -9,7 +9,7 @@ Backend implementation details for the auto mode daemon. This file is for server
 | `POST` | `/api/sessions/:id/task-auto` | Start auto mode for a task module |
 | `DELETE` | `/api/sessions/:id/task-auto` | Stop auto mode (writes `.auto-stop`) |
 | `GET` | `/api/sessions/:id/task-auto` | Get auto mode status |
-| `GET` | `/api/task-auto/lookup?taskDir=<path>` | Look up which session is running auto for a given task directory. Returns `{ session_name, status }` or 404 if not found. Used by `cancel` to find the correct session to stop |
+| `GET` | `/api/task-auto/lookup?taskDir=<path>` | Look up which session is running auto for a given task directory. Returns `{ session_name, status }` or 404 if not found. Used by `cancel` to find the correct session to stop. **D2: Same `path.resolve()` + workspace root validation as POST** |
 
 Request body for POST:
 ```json
@@ -22,7 +22,7 @@ Request body for POST:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `taskDir` | string | (required) | Absolute path to notebook `.working/` directory in **main worktree** (e.g., `/nb-workspaces/auth-refactor/.working`). In worktree mode, this is still the main worktree path — NOT the task worktree path. Daemon's `fs.watch` monitors this path for `.auto-signal` |
+| `taskDir` | string | (required) | Absolute path to notebook `.working/` directory in **main worktree** (e.g., `/nb-workspaces/auth-refactor/.working`). In worktree mode, this is still the main worktree path — NOT the task worktree path. Daemon's `fs.watch` monitors this path for `.auto-signal`. **D2: Server MUST validate** that `taskDir`, after `path.resolve()` canonicalization, is under the configured `NB_WORKSPACES` root and ends with `/.working` — reject paths outside the workspace to prevent directory traversal (e.g., `/../` sequences) |
 | `maxIterations` | number | 20 | Max plan/check/exec cycles before forced stop |
 | `timeoutMinutes` | number | 30 | Total execution time limit (minutes). User sets based on task difficulty |
 
@@ -34,11 +34,11 @@ When `POST /api/sessions/:id/task-auto` is called:
 
 1. **Validate**: check no active auto loop for this session or task_dir
 2. **Insert** `task_auto` row into SQLite
-3. **Send** `/task-ai:auto <taskDir>` to the prompt input window of the active session
+3. **Send** `/task-ai:auto` to the session via `session.agentProcess.sendPrompt()`
 4. **Start** `fs.watch` on `taskDir` for `.auto-signal` changes
 5. **Start** heartbeat polling timer (60s interval)
 
-The daemon does NOT send any further commands after step 3. the agent's internal loop handles all subsequent orchestration.
+The daemon does NOT send any further commands after step 3. The agent's internal loop handles all subsequent orchestration.
 
 ## SQLite State
 
@@ -52,8 +52,8 @@ CREATE TABLE task_auto (
   iteration_count INTEGER DEFAULT 0,
   recovery_count_step INTEGER DEFAULT 0,
   recovery_count_total INTEGER DEFAULT 0,
-  last_capture_hash TEXT DEFAULT '',
   stall_count INTEGER DEFAULT 0,
+  restart_count INTEGER DEFAULT 0,
   quota_wait_since TEXT DEFAULT '',
   started_at TEXT,
   last_signal_at TEXT
@@ -81,7 +81,7 @@ The frontend is a **pure observer** for auto mode, except for start/stop control
 
 When auto mode stops (complete, blocked, cancelled, or manual stop), cleanup is split between the agent and the daemon:
 
-**the agent-side** (inside the session, at loop exit):
+**Agent-side** (inside the session, at loop exit):
 1. Delete `.auto-signal` file if exists
 2. Delete `.auto-stop` file if exists (consumed, no longer needed)
 
@@ -92,7 +92,7 @@ When auto mode stops (complete, blocked, cancelled, or manual stop), cleanup is 
 4. Remove `task_auto` row from SQLite (clears all stall detection state)
 5. Frontend status indicator clears on next poll
 
-The daemon detects loop exit by: (a) receiving a `DELETE` API call (user stop), (b) heartbeat detecting shell prompt (the agent exited), or (c) `.auto-signal` with `next: "(stop)"` (natural completion). In all cases, daemon performs its cleanup steps above.
+The daemon detects loop exit by: (a) receiving a `DELETE` API call (user stop), (b) `ClaudeProcess` emitting `close` event (agent exited), or (c) `.auto-signal` with `next: "(stop)"` (natural completion). In all cases, daemon performs its cleanup steps above.
 
 ## Server Recovery
 
@@ -100,13 +100,13 @@ On backend server restart, auto state is recovered from SQLite:
 
 1. **Read** all `task_auto` rows with `status = 'running'`
 2. **For each active row**:
-   2.1. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted the agent from immediately exiting due to leftover stop file from pre-crash state)
-   2.2. Check terminal state via `tmux capture-pane`:
-      - If the agent auto session still running → re-establish monitoring (fs.watch + heartbeat)
-      - If shell prompt visible (the agent exited) → restart with backoff: send `/task-ai:auto <task_dir>` to the prompt input window (the agent's internal loop reads `.index.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in a new SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
-   2.3. Reset `stall_count` to `0` and `last_capture_hash` to `""` (fresh monitoring baseline)
+   2.1. **Delete stale files**: remove `.auto-stop` and `.auto-signal.tmp` if they exist in `task_dir` (prevents restarted agent from immediately exiting due to leftover stop file from pre-crash state; `.tmp` file indicates interrupted atomic write)
+   2.2. Check session state via `ClaudeProcess`:
+      - If agent process still alive (`session.agentProcess.isAlive()`) → re-establish monitoring (fs.watch + heartbeat)
+      - If agent process exited → restart with backoff: send `/task-ai:auto` via `session.agentProcess.sendPrompt()` (agent's internal loop reads `.status.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
+   2.3. Reset `stall_count` to `0` (fresh monitoring baseline). Message hash tracking is in daemon memory and resets automatically on daemon recreation
    2.4. Start heartbeat polling timer
    2.5. Re-establish `fs.watch` on `task_dir` for `.auto-signal`
 3. **Resume** normal daemon operation (signal watching + heartbeat polling)
 
-On restart, the agent's auto loop re-reads `.index.json` and `.summary.md` to reconstruct context. The conversation context from the previous session is lost, but `.summary.md` provides the condensed recovery information.
+On restart, the agent's auto loop re-reads `.status.json` and `.summary.md` to reconstruct context. The conversation context from the previous session is lost, but `.summary.md` provides the condensed recovery information.

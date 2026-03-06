@@ -15,7 +15,8 @@ set -euo pipefail
 #   1. Enterprise skills (managed settings)
 #   2. Personal skills (~/.claude/skills/)
 #   3. Project skills (.claude/skills/)
-#   4. Workspace skills ($NB_WORKSPACES_LIBRARY/skills/) via --add-dir
+#   4. Plugin skills (where plugin enabled)
+#   5. Workspace skills ($NB_WORKSPACES_LIBRARY/skills/) via --add-dir
 
 # Resolve library path
 NB_WORKSPACES_LIBRARY="${NB_WORKSPACES_LIBRARY:-${NB_WORKSPACES_ROOT:-.}/.library}"
@@ -147,7 +148,7 @@ list_workspace_skills() {
     for skill_dir in "$skills_dir"/*/; do
         if [[ -f "$skill_dir/SKILL.md" ]]; then
             local name=$(basename "$skill_dir")
-            local desc=$(grep -E '^description:' "$skill_dir/SKILL.md" 2>/dev/null | head -1 | sed 's/^description:\s*//' || echo "(no description)")
+            local desc=$(grep -E '^description:' "$skill_dir/SKILL.md" 2>/dev/null | head -1 | sed 's/^description:[[:space:]]*//' || echo "(no description)")
             echo "  /$name — $desc"
             ((count++)) || true
         fi
@@ -171,6 +172,12 @@ create_workspace_skill() {
 
     if [[ -z "$name" ]]; then
         echo "Usage: create_workspace_skill <name> [description]" >&2
+        return 1
+    fi
+
+    # D2: Validate skill name to prevent path traversal and injection
+    if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[ERROR] Invalid skill name: '$name'. Use only letters, digits, hyphens, underscores." >&2
         return 1
     fi
 
@@ -228,6 +235,12 @@ promote_skill() {
 
     if [[ -z "$candidate_name" ]]; then
         echo "Usage: promote_skill <candidate-name>" >&2
+        return 1
+    fi
+
+    # D2: Validate candidate name to prevent path traversal
+    if [[ ! "$candidate_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[ERROR] Invalid candidate name: '$candidate_name'. Use only letters, digits, hyphens, underscores." >&2
         return 1
     fi
 

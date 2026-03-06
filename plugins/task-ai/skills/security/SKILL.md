@@ -17,40 +17,48 @@ triggers:
     Normally invoked automatically as a pre-hook by check and exec — rarely called manually.
 arguments:
   - name: notebook
-    description: "Notebook name"
+    description: "Notebook name (ignored for scan-skill; use _ as placeholder)"
     required: false
   - name: action
-    description: "Action to perform: audit-plan or verify-cmd"
-    required: false
+    description: "Action to perform: audit-plan, verify-cmd, or scan-skill"
+    required: true
   - name: payload
-    description: "Command string (required for verify-cmd)"
+    description: "Command string (required for verify-cmd) or file path (required for scan-skill). Must not be empty for these actions."
     required: false
 ---
 
 # /task-ai:security — Runtime Guardian
 
-Acts as the mandatory Pre-hook for existing sub-commands (`check` and `exec`), ensuring system integrity by blocking destructive or obfuscated instructions.
+Acts as the mandatory pre-hook for existing sub-commands (`check` and `exec`), ensuring system integrity by blocking destructive or obfuscated instructions.
 
 ## Usage
 
 ```bash
 /task-ai:security <notebook> audit-plan
 /task-ai:security <notebook> verify-cmd "<command>"
+/task-ai:security _ scan-skill "<path/to/SKILL.md>"
 ```
 
 ## Execution Steps
 
 ### verify-cmd (Used by `exec`)
-1. Receive command string.
-2. **Fatal Pattern Check**: Scan for destructive ops (`rm -rf /`), VFP injection (`--eval`, `--require`), two-stage payloads (`curl | bash`), and environment manipulation (`LD_PRELOAD`).
-3. **Scope Check**: Ensure paths do not traverse above workspace (`../../`).
-4. **Verdict**: If safe, return `[SECURITY] PASS`. If dangerous, return `[SECURITY] REJECT: <reason>`.
+1. Reject empty command strings immediately.
+2. **Dynamic Rules** (Tier 1): Check against evolving rules from `.evolving-rules/security/active/`. Stops on first match.
+3. **Core Pattern Check** (Tier 2, 13 rules): Scan for destructive ops (`rm -rf`), VFP injection (`--eval`, `--require`), two-stage payloads (`curl | bash`), download-then-execute, environment manipulation (`LD_PRELOAD`, `NODE_OPTIONS`, etc.), path traversal (`../`), sensitive path access (`~/.ssh`, `~/.config/claude`, `/etc/passwd`), secret exfiltration, command obfuscation (`base64 -d | bash`, `${IFS}`), config file tampering (`.claude/`, `.mcp.json`), DNS tunneling, SSRF to internal networks, and reverse shell patterns.
+4. **Verdict**: If safe, return `[SECURITY] PASS: Command looks safe`. If dangerous, return `[SECURITY] REJECT: <reason>`.
 
 ### audit-plan (Used by `check`)
-5. Read `.plan.md` and `.target.md`.
-6. **Semantic Deviation**: Evaluate if the proposed steps logically align with the target. Flag out-of-scope networking or obfuscated execution.
-7. **Verdict**: Return `[SECURITY] PASS` or `[SECURITY] BLOCKED`.
-8. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value). Capture threat model and risk assessment reasoning during security audit. Inline call failure MUST NOT block security's main flow.
+1. Read `.plan.md`. If absent or empty, PASS.
+2. **Dynamic Rules** (Tier 1): Check against evolving rules from `.evolving-rules/security/active/`.
+3. **Core Pattern Scan** (Tier 2): Check for destructive commands, VFP injection, two-stage payloads, download-then-execute, environment manipulation, path traversal, injection/obfuscation, config file tampering, sensitive path access, secret exfiltration, DNS tunneling, SSRF to internal networks, and reverse shell patterns.
+4. **Verdict**: Return `[SECURITY] PASS: Plan looks safe` or `[SECURITY] BLOCKED: High risk operations detected in plan` with findings list.
+5. (Optional) Execute highlight protocol scope=thinking-raw (see `highlight/SKILL.md` section 3.3). Not implemented in `security.sh`; intended for agent-level callers. Inline call failure MUST NOT block security's main flow.
+
+### scan-skill (L1 static analysis)
+1. Validate skill file exists and is non-empty.
+2. **Extended Rules**: Apply dynamic rules from `.evolving-rules/security/active/`.
+3. **Core Rules (CORE-001 to CORE-012)**: Hardcoded security floor covering destructive commands, VFP injection, two-stage loading, env manipulation, prompt injection, MCP/hooks config abuse, auth token theft, secret exfiltration, env var leaking, DNS tunneling, SSRF to internal networks, and reverse shell detection.
+4. **Verdict**: Return `[SECURITY] PASS: Skill static analysis passed` or `[SECURITY] REJECT: Skill contains high-risk patterns` with findings list.
 
 ## Incident Response
 If a command is `REJECT`ed during `exec`:
@@ -62,4 +70,4 @@ If a command is `REJECT`ed during `exec`:
 
 | Current Status | After Security | Condition |
 |----------------|----------------|-----------|
-| Any | (unchanged) | Pre-hook utility |
+| Any | (unchanged) | pre-hook utility |

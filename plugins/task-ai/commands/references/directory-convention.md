@@ -44,14 +44,14 @@ $NB_WORKSPACES_ROOT/                   # 环境变量: NB_WORKSPACES_ROOT
 │       └── ...                        # 任意结构，library search 也会索引
 │
 ├── project-a/                         # 项目目录
-│   ├── .index.json                    # 项目元数据（notebook 列表等）
+│   ├── .status.json                    # 项目元数据（notebook 列表等）
 │   ├── .deliverables/                 # 环境变量: NB_PROJECT_DELIVERABLES — project 级交付物目录
 │   │   └── <notebook>/               # 按 notebook 隔离
 │   │       └── .report.md            # 完成报告（由 report 子命令生成）
 │   │
 │   ├── notebook-1/
 │   │   └── .working/                  # 环境变量: NB_TASK_WORKING — notebook 级系统工作目录
-│   │       ├── .index.json            # 任务元数据（status/phase/type...）
+│   │       ├── .status.json            # 任务元数据（status/phase/type...）
 │   │       ├── .target.md             # 需求目标（人工编写）
 │   │       ├── .plan.md               # 实施计划（plan 生成，可通过 Plan 面板批注）
 │   │       ├── .plan-superseded.md    # 旧计划归档（re-plan 时重命名保留）
@@ -98,7 +98,7 @@ Project names and notebook names share the same validation rule: ASCII letters, 
 
 ## Path Resolution
 
-Sub-commands read `NB_WORKSPACES_ROOT` and `NB_WORKSPACES_LIBRARY` env vars at start. Notebooks are organized under project directories: `$NB_WORKSPACES_ROOT/<project>/`. Each project has a `.index.json` for project metadata.
+Sub-commands read `NB_WORKSPACES_ROOT` and `NB_WORKSPACES_LIBRARY` env vars at start. Notebooks are organized under project directories: `$NB_WORKSPACES_ROOT/<project>/`. Each project has a `.status.json` for project metadata.
 
 When a sub-command receives `<project>` and `<notebook>` arguments, the following derived paths are used:
 

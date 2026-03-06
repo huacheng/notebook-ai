@@ -4,7 +4,7 @@ When evaluating a plan or implementation, apply all six dimensions (D1-D6) syste
 
 This is the L3 (deep audit) application of the unified six-dimension framework. L1 (plan self-audit) and L2 (check post-plan) use the same dimensions at shallower depth. See `plan/references/self-audit-checklist.md` for L1.
 
-**Type adaptation**: Base checkpoints below are universal. Read `.type-profile.md` for domain-specific criteria that augment or override base checkpoints. See [Domain Adaptation](#domain-adaptation) for how dimensions shift across task types.
+**Type adaptation**: Base checkpoints below are universal. Read `.type-profile.md` for domain-specific criteria that augment (never replace) base checkpoints. See [Domain Adaptation](#domain-adaptation) for how dimensions shift across task types.
 
 ## Table of Contents
 
@@ -154,24 +154,30 @@ Seed tables below are ordered by scope (broadest → most specialized) and serve
 
 ## Audit Workflow
 
+Steps 1-6 identify issues. **Steps 7-9 are a HARD GATE** — fixes without regression tests are incomplete and MUST NOT be committed.
+
 1. **Read** `.type-profile.md` "Audit Adaptation" section — primary source for domain checkpoints. If absent, fall back to seed tables above
 2. **Read** all relevant task files for full context
 3. **Apply** each dimension's base checkpoints + domain-specific additions (from profile or seed table) systematically
 4. **Flag** issues with severity and specific file:line references
 5. **Cross-reference** findings across dimensions (a security issue may also be a reliability issue)
 6. **Propose** fixes grouped by file to minimize edit passes
-7. **Design regression tests** for each proposed fix per the [Regression Test Protocol](#regression-test-protocol) below — select test strategy by task type, write RED tests before applying fixes
-8. **Apply fixes** and confirm each RED test turns GREEN
-9. **Run full test suite** to verify no regressions across all dimensions
+
+**--- HARD GATE: Regression Test Protocol (steps 7-9) ---**
+
+7. **Design regression tests** for each proposed fix per the [Regression Test Protocol](#regression-test-protocol) below — classify by (fix category × task type), select test approach from `commands/references/test-strategy-by-type.md` Strategy Matrix, write RED tests before applying fixes. Exemptions: pure typo (≤3 chars), comment-only, historical doc annotation
+8. **Apply fixes** and confirm each RED test turns GREEN — if GREEN without fix applied, the test is wrong (not testing the right property)
+9. **Run full test suite** to verify no regressions across all dimensions — this step is mandatory even for exempt fixes
 
 ## Regression Test Protocol
 
-Every audit fix must have a regression test — see
-**`commands/references/test-strategy-by-type.md`** for the full protocol,
-including the Strategy Matrix, Test Classification Rules, exemptions,
-and integration with test infrastructure.
+**HARD REQUIREMENT**: Every audit fix MUST have a regression test. This is non-negotiable — an audit fix without a regression test is incomplete work.
 
-The audit workflow steps 7–9 apply this protocol:
-7. Design regression tests per the protocol
-8. Apply fixes, confirm RED → GREEN
-9. Run full suite, confirm zero regressions
+See **`commands/references/test-strategy-by-type.md`** for the full protocol, including the Strategy Matrix, Test Classification Rules, exemptions, and integration with test infrastructure.
+
+The audit workflow steps 7-9 apply this protocol:
+- **7.** Classify each fix → select test approach → write RED test → run → confirm FAIL
+- **8.** Apply fix → run RED test → confirm GREEN (if GREEN before fix, test is wrong)
+- **9.** Run full suite → confirm zero regressions (mandatory even for exempt fixes)
+
+**Violation consequence**: Fixes committed without regression tests can be silently reverted by subsequent audits. The test is the proof that the fix is correct.

@@ -35,9 +35,12 @@ else
 fi
 log "新版本: $NEW_VERSION"
 
-# 2. 更新开发目录版本
+# 2. 更新开发目录版本（plugin.json + marketplace.json 保持一致）
 log "更新 task-ai/plugin.json..."
 sed -i "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$TASK_AI_ROOT/plugin.json"
+
+log "更新 task-ai/marketplace.json..."
+sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" "$TASK_AI_ROOT/marketplace.json"
 
 # 3. 同步到 plugins/task-ai/
 log "同步到 plugins/task-ai/..."
