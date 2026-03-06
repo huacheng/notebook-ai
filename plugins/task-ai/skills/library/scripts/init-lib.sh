@@ -55,9 +55,9 @@ ensure_dir .memory/.type-profiles
 ensure_dir .memory/.references
 
 # Skills promotion pipeline (highlight promote scope)
-# - .candidates/: T1/T2 — promote.sh writes candidate skill files here
-# - .drafts/: T3 — L2 six-dimension review >= 0.70, pending human confirmation
-# - .active/: T4 — L3 LLM deep review passed, activated (--add-dir target)
+# - .candidates/: T1 — promote.sh writes candidate skill files here
+# - .drafts/: T2 — L2 skill-review >= 0.70, pending L3 deep review
+# - .active/: T3/T4 — L3 skill-deep-review >= 0.85 (T3), production-validated (T4)
 ensure_dir .skills/.candidates
 ensure_dir .skills/.drafts
 ensure_dir .skills/.active

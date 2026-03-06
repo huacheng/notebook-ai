@@ -70,8 +70,9 @@ skills/
 │   ├── SKILL.md          # Main skill file (required)
 │   ├── references/       # Supporting documentation
 │   └── scripts/          # Executable scripts
-├── .drafts/              # Work-in-progress (gitignored)
-└── .candidates/          # Promotion candidates (gitignored)
+├── .candidates/          # T1: Promotion candidates (gitignored)
+├── .drafts/              # T2: Passed L2 skill-review (gitignored)
+└── .active/              # T3/T4: Passed L3 skill-deep-review (gitignored)
 ```
 
 ## Hot-Reload Behavior
@@ -97,8 +98,9 @@ EOF
     fi
 
     # Ensure subdirectories exist
-    mkdir -p "$skills_dir/.drafts"
     mkdir -p "$skills_dir/.candidates"
+    mkdir -p "$skills_dir/.drafts"
+    mkdir -p "$skills_dir/.active"
 
     echo "$skills_dir"
 }
@@ -159,8 +161,9 @@ list_workspace_skills() {
     fi
 
     echo ""
-    echo "Drafts: $(ls -1 "$skills_dir/.drafts" 2>/dev/null | wc -l | tr -d ' ')"
-    echo "Candidates: $(ls -1 "$skills_dir/.candidates" 2>/dev/null | wc -l | tr -d ' ')"
+    echo "Candidates (T1): $(ls -1 "$skills_dir/.candidates" 2>/dev/null | wc -l | tr -d ' ')"
+    echo "Drafts (T2): $(ls -1 "$skills_dir/.drafts" 2>/dev/null | wc -l | tr -d ' ')"
+    echo "Active (T3/T4): $(ls -1 "$skills_dir/.active" 2>/dev/null | wc -l | tr -d ' ')"
 }
 
 #######################################

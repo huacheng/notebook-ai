@@ -113,18 +113,25 @@ install_reload_skill
 ## Skill Promotion Flow
 
 ```
-Experience (highlight)                 Manual Authoring
-    │                                       │
-    ▼                                       ▼
-.candidates/<slug>/                   .drafts/<slug>/
-    │                                       │
-    ├───────── check --skill ──────────────┤
-    │          (six-dimension review)         │
-    ▼                                       ▼
-    │◀────── NEEDS_FIX ────────────────────┤
-    │                                       │
-    ▼                                       │
-skills/<slug>/  ◀───── PASS ──────────────┘
+Experience (highlight promote)
+    │
+    ▼
+.candidates/<slug>/  (T1)
+    │
+    ├── check --checkpoint skill-review (L2, ≥0.70)
+    │
+    ▼
+.drafts/<slug>/  (T2)
+    │
+    ├── check --checkpoint skill-deep-review (L3, ≥0.85)
+    │
+    ▼
+.active/<slug>/  (T3)
+    │
+    ├── production validation (usage ≥3, zero failures)
+    │
+    ▼
+.active/<slug>/  (T4 — trust_tier upgraded)
     │
     ▼
 [Hot-Reload Active]

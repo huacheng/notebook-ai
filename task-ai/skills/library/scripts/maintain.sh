@@ -213,16 +213,16 @@ while [[ $# -gt 0 ]]; do
       CURRENT_TIER=""
       if [[ -f "$CANDIDATES_DIR/$SKILL_NAME/SKILL.md" ]]; then
           SKILL_FILE="$CANDIDATES_DIR/$SKILL_NAME/SKILL.md"
-          CURRENT_TIER="T1/T2"
-          echo "Found in .candidates/ (T1/T2)"
+          CURRENT_TIER="T1"
+          echo "Found in .candidates/ (T1)"
       elif [[ -f "$DRAFTS_DIR/$SKILL_NAME/SKILL.md" ]]; then
           SKILL_FILE="$DRAFTS_DIR/$SKILL_NAME/SKILL.md"
-          CURRENT_TIER="T3"
-          echo "Found in .drafts/ (T3)"
+          CURRENT_TIER="T2"
+          echo "Found in .drafts/ (T2)"
       elif [[ -f "$ACTIVE_DIR/$SKILL_NAME/SKILL.md" ]]; then
           SKILL_FILE="$ACTIVE_DIR/$SKILL_NAME/SKILL.md"
-          CURRENT_TIER="T4"
-          echo "Already at T4 (active)"
+          CURRENT_TIER="T3/T4"
+          echo "Already at T3+ (active)"
           exit 0
       else
           echo "[ERROR] Skill '$SKILL_NAME' not found in .skills/.candidates/, .skills/.drafts/, or .skills/.active/" >&2
@@ -231,7 +231,7 @@ while [[ $# -gt 0 ]]; do
 
       # Determine next promotion step
       case "$CURRENT_TIER" in
-          "T1/T2")
+          "T1")
               echo ""
               echo "--- Step 1: L2 Six-Dimension Review (skill-review) ---"
               if [[ -f "$CHECK_SCRIPT" ]]; then
@@ -244,9 +244,9 @@ while [[ $# -gt 0 ]]; do
               # Check if skill moved to drafts
               if [[ -f "$DRAFTS_DIR/$SKILL_NAME/SKILL.md" ]]; then
                   echo ""
-                  echo "[SUCCESS] Promoted to T3 (.drafts/)"
+                  echo "[SUCCESS] Promoted to T2 (.drafts/)"
                   SKILL_FILE="$DRAFTS_DIR/$SKILL_NAME/SKILL.md"
-                  CURRENT_TIER="T3"
+                  CURRENT_TIER="T2"
 
                   if [[ "$AUTO_MODE" -eq 1 ]]; then
                       echo "--- Continuing to L3 (--auto mode) ---"
@@ -261,8 +261,8 @@ while [[ $# -gt 0 ]]; do
               ;;
       esac
 
-      # If T3, run L3 deep review
-      if [[ "$CURRENT_TIER" == "T3" ]]; then
+      # If T2, run L3 deep review
+      if [[ "$CURRENT_TIER" == "T2" ]]; then
           echo ""
           echo "--- Step 2: L3 LLM Deep Semantic Review (skill-deep-review) ---"
           if [[ -f "$CHECK_SCRIPT" ]]; then
@@ -272,7 +272,7 @@ while [[ $# -gt 0 ]]; do
           # Check if skill moved to active
           if [[ -f "$ACTIVE_DIR/$SKILL_NAME/SKILL.md" ]]; then
               echo ""
-              echo "[SUCCESS] Promoted to T4 (.skills/.active/$SKILL_NAME/)"
+              echo "[SUCCESS] Promoted to T3 (.skills/.active/$SKILL_NAME/)"
               echo "Skill is now ACTIVE and available for hot-reload"
           else
               echo "[INFO] Score < 0.85, skill remains in .drafts/"

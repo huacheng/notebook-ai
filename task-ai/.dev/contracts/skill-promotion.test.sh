@@ -11,14 +11,14 @@ pass() { echo "✓ $1"; }
 fail() { echo "✗ $1" >&2; exit 1; }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test 1: check.sh has T2→T3 move logic (candidates → drafts)
+# Test 1: check.sh has T1→T2 move logic (candidates → drafts)
 # ─────────────────────────────────────────────────────────────────────────────
-test_check_has_t2_t3_move() {
-    if grep -qE 'mv.*candidates.*drafts|move_to_drafts|MOVE_TO_DRAFTS' \
+test_check_has_t1_t2_move() {
+    if grep -qE 'DRAFTS_TARGET|mv.*candidates.*drafts|move_to_drafts' \
         "$TASK_AI_ROOT/skills/check/scripts/check.sh"; then
-        pass "check.sh has T2→T3 move logic"
+        pass "check.sh has T1→T2 move logic"
     else
-        fail "check.sh missing T2→T3 move logic (candidates → drafts)"
+        fail "check.sh missing T1→T2 move logic (candidates → drafts)"
     fi
 }
 
@@ -35,14 +35,14 @@ test_check_has_skill_deep_review() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test 3: check.sh has T3→T4 move logic (drafts → skills/<name>)
+# Test 3: check.sh has T2→T3 move logic (drafts → .active/<name>)
 # ─────────────────────────────────────────────────────────────────────────────
-test_check_has_t3_t4_move() {
-    if grep -qE 'mv.*drafts.*skills/|move_to_active|MOVE_TO_ACTIVE' \
+test_check_has_t2_t3_move() {
+    if grep -qE 'ACTIVE_TARGET|mv.*drafts.*active|move_to_active' \
         "$TASK_AI_ROOT/skills/check/scripts/check.sh"; then
-        pass "check.sh has T3→T4 move logic"
+        pass "check.sh has T2→T3 move logic"
     else
-        fail "check.sh missing T3→T4 move logic (drafts → skills/<name>)"
+        fail "check.sh missing T2→T3 move logic (drafts → .active/<name>)"
     fi
 }
 
@@ -84,9 +84,9 @@ test_promote_has_semantic_review() {
 
 # Run tests
 echo "=== Skill Promotion Pipeline Tests ==="
-test_check_has_t2_t3_move
+test_check_has_t1_t2_move
 test_check_has_skill_deep_review
-test_check_has_t3_t4_move
+test_check_has_t2_t3_move
 test_library_has_promote_skill
 test_promote_has_d2_security
 test_promote_has_semantic_review
