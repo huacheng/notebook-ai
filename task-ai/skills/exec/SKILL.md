@@ -100,7 +100,7 @@ For each implementation step:
 3. **Update** `.status.json` status to `executing`, clear `phase` to `""`, update timestamp
 4. **Discover** all implementation steps from `.plan.md`
 5. **Detect completed steps**: read `completed_steps` field from `.status.json` to determine progress; skip steps ≤ `completed_steps`
-6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files, using the most recent file (by filename date) as the primary fix guidance. `.bugfix/` entries indicate mid-exec issues; `.analysis/` entries indicate post-exec issues. For each fix item, follow the **Regression Test Protocol** from `commands/references/test-strategy-by-type.md`:
+6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files. `.bugfix/` contains actionable fix items with regression test specs (from both mid-exec and post-exec NEEDS_FIX); `.analysis/` contains the full evaluation context. For each fix item in `.bugfix/`, follow the **Regression Test Protocol** from `commands/references/test-strategy-by-type.md`:
    6a. Read the regression test specification from `.bugfix/` (Category, Test approach, RED assertion, GREEN expectation)
    6b. Write/locate the regression test (RED) — must fail against current codebase
    6c. Run → confirm FAIL (RED)
@@ -177,7 +177,7 @@ For long-running executions, intermediate progress can be observed by:
 
 - Each step should be atomic — if a step fails, previous steps remain applied
 - The executor should follow project coding conventions (check CLAUDE.md if present)
-- **NEEDS_FIX regression test obligation**: When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` and `.analysis/` latest files, using the most recent by filename date as fix guidance (`.bugfix/` = mid-exec source, `.analysis/` = post-exec source). Each fix MUST follow the RED→GREEN protocol (step 6a-6f) using the regression test specification provided by check in `.bugfix/` — this is exec's binding to the Regression Test Protocol from `commands/references/test-strategy-by-type.md`
+- **NEEDS_FIX regression test obligation**: When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` (fix items with regression test specs, from mid-exec or post-exec) and `.analysis/` (evaluation context). Each fix MUST follow the RED→GREEN protocol (step 6a-6f) using the regression test specification provided by check in `.bugfix/` — this is exec's binding to the Regression Test Protocol from `commands/references/test-strategy-by-type.md`
 - When `--step N` is used, the executor verifies prerequisites for that step are met, then signals `(step-N)` on completion for mid-exec checkpoint
 - After successful execution of all steps, the user should run `/task-ai:verify --checkpoint post-exec` followed by `/task-ai:check --checkpoint post-exec`
 - Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec `verify` + `check` evaluation
