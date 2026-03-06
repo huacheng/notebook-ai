@@ -777,6 +777,20 @@ export function createProjectsRouter(
             if (!mergeResult.success) {
               return res.status(409).json({ error: mergeResult.message });
             }
+            // Remove .notebook.json that was merged into master (it's a runtime artifact)
+            try {
+              const mainEntries = await readdir(project.path);
+              const mergedNbFiles = mainEntries.filter((f) => f.endsWith('.notebook.json'));
+              if (mergedNbFiles.length > 0) {
+                const { simpleGit } = await import('simple-git');
+                const mainGit = simpleGit(project.path);
+                for (const f of mergedNbFiles) {
+                  await rm(path.join(project.path, f), { force: true });
+                  await mainGit.rm(f).catch(() => {});
+                }
+                await mainGit.commit('chore: remove merged .notebook.json artifacts').catch(() => {});
+              }
+            } catch { /* best-effort cleanup */ }
           }
 
           // Remove the worktree

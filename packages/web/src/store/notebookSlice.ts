@@ -1,5 +1,5 @@
-import { cacheSet, cacheGet, TTL } from '../utils/localCache';
-import { _loadCachedNotebook } from './cacheHelpers';
+import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
+import { _cacheKey, _loadCachedNotebook } from './cacheHelpers';
 import type { StateCreator } from 'zustand';
 import type {
   Cell,
@@ -402,7 +402,17 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   closeNotebookTabByPath: (wsPath: string) => {
     const normalized = wsPath.replace(/\/+$/, '');
     const match = Object.entries(get().openNotebooks).find(([, e]) => e.workspaceDir === normalized);
-    if (match) get().closeNotebookTab(match[0]);
+    if (match) {
+      const [notebookId, entry] = match;
+      // Clean up cached notebook data (same as deleteNotebook)
+      cacheRemove(_cacheKey(notebookId));
+      if (entry.notebook?.cells) {
+        for (const cell of entry.notebook.cells) {
+          cacheRemove(`nb-draft-${cell.id}`);
+        }
+      }
+      get().closeNotebookTab(notebookId);
+    }
   },
 
   closeProjectNotebookTabs: (projectId) => {
