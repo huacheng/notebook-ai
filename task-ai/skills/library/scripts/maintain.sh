@@ -426,7 +426,7 @@ while [[ $# -gt 0 ]]; do
 
       # 1. Staleness check (references)
       echo ""
-      echo "--- [1/3] Staleness Check ---"
+      echo "--- [1/4] Staleness Check ---"
       REF_DIR="$LIB_PATH/.memory/.references"
       STALE_COUNT=0
       if [[ -d "$REF_DIR" ]]; then
@@ -449,7 +449,7 @@ while [[ $# -gt 0 ]]; do
 
       # 2. T3→T4 production validation for all active skills
       echo ""
-      echo "--- [2/3] T3→T4 Production Validation ---"
+      echo "--- [2/4] T3→T4 Production Validation ---"
       ACTIVE_DIR="$LIB_PATH/.skills/.active"
       T3_PROMOTED=0
       if [[ -d "$ACTIVE_DIR" ]]; then
