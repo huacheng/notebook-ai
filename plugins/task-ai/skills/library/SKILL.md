@@ -55,7 +55,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 /task-ai:library search "<query>" [--type <type>] [--topic <topic>]
 /task-ai:library list [--type <type>]
 /task-ai:library status
-/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all] [--scheduled [--force]]
+/task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all] [--scheduled [--force]] [--install-cron] [--uninstall-cron]
 ```
 
 ## Library Directory Structure
@@ -71,6 +71,7 @@ $NB_WORKSPACES_ROOT/
     ├── .ioc.md                            # Domain convergence IOC log (gitignore)
     ├── .inconsistency.log                 # Index–file mismatch log (gitignore)
     ├── .last-scheduled                     # Epoch timestamp of last --scheduled run (gitignore)
+    ├── .scheduled.log                      # Cron output log for --scheduled (gitignore)
     ├── .plugin-registry.md                # Plugin capability cache (lazily created, gitignore)
     ├── .memory/                           # System-managed knowledge base
     │   ├── .references/
@@ -276,20 +277,22 @@ Run `--rebuild-index` → `--compact` → `--check-staleness` in sequence. Also 
 
 Lightweight periodic maintenance — timestamp-gated (24h interval), suitable for cron or auto loop post-report hook.
 
-**Runs three checks:**
+**Runs four checks:**
 
 1. **Staleness check** — scan `.memory/.references/` for files older than 30 days, report stale count
 2. **T3→T4 production validation** — scan all `.skills/.active/` T3 skills, promote to T4 if `usage_count >= 3` and zero REPLAN failures (same logic as `--promote-skill`)
-3. **Changelog size check** — warn if `.changelog` exceeds 2000-line threshold
+3. **Security rules evolution** — invoke `core-rule-auto.sh cron-job` (Core: 7d / Extended: 1d, own timestamp gating)
+4. **Changelog size check** — warn if `.changelog` exceeds 2000-line threshold
 
 **Timestamp gating:**
 - Reads `.last-scheduled` (epoch seconds); skips if last run < 24h ago
 - `--force` bypasses the timestamp check
 - On completion, writes current epoch to `.last-scheduled`
 
-**Cron example** (daily at 03:00):
-```
-0 3 * * * cd /path/to/project && bash task-ai/skills/library/scripts/maintain.sh --scheduled
+**Cron setup** (auto-configured, daily at 03:00):
+```bash
+maintain.sh --install-cron    # idempotent, version-independent path, output → .scheduled.log
+maintain.sh --uninstall-cron  # safe removal, preserves other crontab entries
 ```
 
 **Auto loop integration**: auto calls `maintain.sh --scheduled` after report's `(stop)` signal — runs only if 24h have elapsed, zero overhead otherwise.
@@ -402,6 +405,7 @@ All external content written to `.library/.memory/.references/` MUST be sanitise
 | `maintain --compact` | `task-ai(library):maintain archive YYYY-MM` |
 | `maintain --rebuild-index` | `task-ai(library):maintain rebuild index` |
 | `maintain --scheduled` | No commit (T3→T4 changes are uncommitted; caller should commit if needed) |
+| `maintain --install-cron` / `--uninstall-cron` | No commit (modifies system crontab only) |
 | `search`, `list`, `status`, `--check-staleness` | No commit |
 
 ## .auto-signal

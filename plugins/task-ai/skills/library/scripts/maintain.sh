@@ -392,7 +392,7 @@ while [[ $# -gt 0 ]]; do
 
     # ─────────────────────────────────────────────────────────────────────────
     # --scheduled: periodic auto-maintenance (cron-friendly, timestamp-gated)
-    # Runs: staleness check, T3→T4 validation, changelog compact check
+    # Runs: staleness check, T3→T4 validation, changelog compact check, security rules evolution
     # Usage: maintain.sh --scheduled [--force]
     # ─────────────────────────────────────────────────────────────────────────
     --scheduled)
@@ -426,7 +426,7 @@ while [[ $# -gt 0 ]]; do
 
       # 1. Staleness check (references)
       echo ""
-      echo "--- [1/3] Staleness Check ---"
+      echo "--- [1/4] Staleness Check ---"
       REF_DIR="$LIB_PATH/.memory/.references"
       STALE_COUNT=0
       if [[ -d "$REF_DIR" ]]; then
@@ -449,7 +449,7 @@ while [[ $# -gt 0 ]]; do
 
       # 2. T3→T4 production validation for all active skills
       echo ""
-      echo "--- [2/3] T3→T4 Production Validation ---"
+      echo "--- [2/4] T3→T4 Production Validation ---"
       ACTIVE_DIR="$LIB_PATH/.skills/.active"
       T3_PROMOTED=0
       if [[ -d "$ACTIVE_DIR" ]]; then
@@ -471,9 +471,21 @@ while [[ $# -gt 0 ]]; do
           echo "  No T3 skills eligible for T4 promotion"
       fi
 
-      # 3. Changelog size check
+      # 3. Security rules evolution check
       echo ""
-      echo "--- [3/3] Changelog Size Check ---"
+      echo "--- [3/4] Security Rules Evolution ---"
+      CORE_RULE_AUTO="$SCRIPT_DIR/core-rule-auto.sh"
+      if [[ -f "$CORE_RULE_AUTO" ]]; then
+          if ! bash "$CORE_RULE_AUTO" cron-job 2>&1; then
+              echo "  [WARN] core-rule-auto cron-job failed" >&2
+          fi
+      else
+          echo "  core-rule-auto.sh not found, skipping"
+      fi
+
+      # 4. Changelog size check
+      echo ""
+      echo "--- [4/4] Changelog Size Check ---"
       CHANGELOG="$LIB_PATH/.changelog"
       if [[ -f "$CHANGELOG" ]]; then
           LINE_COUNT=$(wc -l < "$CHANGELOG")
@@ -501,7 +513,8 @@ while [[ $# -gt 0 ]]; do
       CRON_TAG="# task-ai:scheduled"
       # Use version-independent path: dynamically resolve latest plugin version at cron runtime
       PLUGIN_BASE="${HOME}/.claude/plugins/cache/moonview/task-ai"
-      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash -c 'MDIR=\$(ls -d \"$PLUGIN_BASE\"/*/skills/library/scripts/maintain.sh 2>/dev/null | sort -V | tail -1) && [ -n \"\$MDIR\" ] && bash \"\$MDIR\" --scheduled' $CRON_TAG"
+      CRON_LOG="$LIB_PATH/.scheduled.log"
+      CRON_CMD="0 3 * * * NB_WORKSPACES_ROOT=\"$NB_WORKSPACES_ROOT\" NB_WORKSPACES_LIBRARY=\"$LIB_PATH\" bash -c 'MDIR=\$(ls -d \"$PLUGIN_BASE\"/*/skills/library/scripts/maintain.sh 2>/dev/null | sort -V | tail -1) && [ -n \"\$MDIR\" ] && bash \"\$MDIR\" --scheduled' >> \"$CRON_LOG\" 2>&1 $CRON_TAG"
 
       # Check if already installed (idempotent)
       EXISTING=$(crontab -l 2>/dev/null || true)
@@ -524,7 +537,12 @@ while [[ $# -gt 0 ]]; do
       CMD="--uninstall-cron"
       EXISTING=$(crontab -l 2>/dev/null || true)
       if echo "$EXISTING" | grep -q "task-ai:scheduled"; then
-          echo "$EXISTING" | grep -v "task-ai:scheduled" | crontab -
+          REMAINING=$(echo "$EXISTING" | grep -v "task-ai:scheduled" || true)
+          if [[ -n "$REMAINING" ]]; then
+              echo "$REMAINING" | crontab -
+          else
+              echo "" | crontab -
+          fi
           echo "[OK] Removed cron entry for maintain.sh --scheduled"
       else
           echo "[INFO] No task-ai:scheduled entry found, nothing to remove"

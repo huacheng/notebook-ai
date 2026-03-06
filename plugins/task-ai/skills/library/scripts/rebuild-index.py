@@ -73,6 +73,53 @@ def rebuild_index():
                 f.write('\n'.join(sorted(rows)) + '\n')
             sub_tmp.rename(sub_index)
 
+    # Scan .skills/ three-tier directories (.candidates/, .drafts/, .active/)
+    skills_path = lib_path / '.skills'
+    if skills_path.exists():
+        skill_tiers = {
+            '.candidates': 'T1',
+            '.drafts': 'T2',
+            '.active': 'T3/T4',
+        }
+        skills_rows = []
+        for tier_dir, tier_label in skill_tiers.items():
+            tier_path = skills_path / tier_dir
+            if not tier_path.exists():
+                continue
+            for skill_dir in sorted(tier_path.iterdir()):
+                if not skill_dir.is_dir():
+                    continue
+                skill_file = skill_dir / 'SKILL.md'
+                if not skill_file.exists():
+                    continue
+                try:
+                    content = skill_file.read_text(encoding='utf-8', errors='ignore')
+                    fm = parse_frontmatter(content)
+
+                    topic = fm.get('name') or fm.get('topic') or skill_dir.name
+                    trust = fm.get('trust_tier', tier_label)
+                    type_field = fm.get('type', 'skill')
+                    keywords = fm.get('keywords', '')
+                    if isinstance(keywords, list):
+                        keywords = ', '.join(keywords)
+
+                    rel_path = skill_file.relative_to(lib_path)
+                    master_rows.append(f"| {topic} | {type_field} | {keywords} | {rel_path} | system |")
+
+                    updated = fm.get('activated_at') or fm.get('last_verified_at') or datetime.fromtimestamp(skill_file.stat().st_mtime).strftime('%Y-%m-%d')
+                    skills_rows.append(f"| {topic} | {trust} | {type_field} | {updated} | {rel_path} |")
+                except (OSError, UnicodeDecodeError, ValueError) as e:
+                    print(f"[ERROR] Failed to read {skill_file}: {e}")
+
+        if skills_rows:
+            skills_index = skills_path / '.index.md'
+            tmp_skills = skills_path / '.index.md.tmp'
+            with open(tmp_skills, 'w', encoding='utf-8') as f:
+                f.write("# Skills Index\n\n| Name | Tier | Type | Updated | Path |\n|------|------|------|---------|------|\n")
+                f.write('\n'.join(sorted(skills_rows)) + '\n')
+            tmp_skills.rename(skills_index)
+        print(f"[rebuild-index] Skills: {len(skills_rows)} entries")
+
     # D1: Always write master index (even if empty) to ensure consistent state
     tmp_master = master_index_path.parent / '.master-index.md.tmp'
     with open(tmp_master, 'w', encoding='utf-8') as f:
