@@ -5000,8 +5000,12 @@ button:focus-visible {
   background: transparent;
 }
 
+.fv-render__html-iframe {
+  flex: 1;
+  min-height: 600px;
+}
+
 .fv-render__markdown,
-.fv-render__html,
 .output-text-md {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);

@@ -524,6 +524,7 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
     tool_use_id: z.string(),
     content: z.string().max(1_000_000),
   }),
+  z.object({ type: z.literal('notebook_sync_request'), session_id: z.string() }),
 ]);
 
 // Server → Client: all session-scoped messages carry session_id
@@ -1013,6 +1014,17 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   StuckExhaustedSchema,
   ToolLongRunningSchema,
   AutoStatusMessageSchema,
+  z.object({
+    type: z.literal('notebook_digest'),
+    session_id: z.string(),
+    cell_count: z.number(),
+    last_cell_id: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal('notebook_sync'),
+    session_id: z.string(),
+    notebook: NotebookSchema,
+  }),
 ]);
 
 // ─── Notebook List / Workspace Types ───

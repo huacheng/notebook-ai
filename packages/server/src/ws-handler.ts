@@ -200,15 +200,17 @@ export function setupWebSocket(
       if (stat.size > MAX_WS_FILE_SIZE) return; // Skip large files
 
       const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+      const HTML_EXTS = new Set(['html', 'htm']);
       const TEXT_EXTS = new Set(['md', 'txt', 'json', 'yaml', 'yml', 'sh', 'py', 'js', 'ts',
-        'tsx', 'jsx', 'css', 'htm', 'html', 'csv', 'xml', 'toml', 'ini', 'env', 'log']);
+        'tsx', 'jsx', 'css', 'csv', 'xml', 'toml', 'ini', 'env', 'log']);
       const BINARY_FORMAT: Record<string, string> = {
         pdf: 'pdf-binary', docx: 'docx-binary', xlsx: 'xlsx-binary', pptx: 'pptx-binary',
       };
       const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
 
       let format: string;
-      if (TEXT_EXTS.has(ext)) format = 'text';
+      if (HTML_EXTS.has(ext)) format = 'html';
+      else if (TEXT_EXTS.has(ext)) format = 'text';
       else if (BINARY_FORMAT[ext]) format = BINARY_FORMAT[ext];
       else if (IMAGE_EXTS.has(ext)) format = 'image';
       else {
@@ -486,6 +488,15 @@ export function setupWebSocket(
               }
             }
 
+            // Send notebook digest so frontend can detect stale state
+            const cells = session.notebook.cells;
+            sendToClient(ws, {
+              type: 'notebook_digest',
+              session_id,
+              cell_count: cells.length,
+              last_cell_id: cells.length > 0 ? cells[cells.length - 1].id : null,
+            });
+
             // Send current queue state on subscribe/reconnect
             const queueState = sessionManager.getQueueState(session_id);
             if (queueState) {
@@ -706,8 +717,9 @@ export function setupWebSocket(
 
             const ext = safePath.split('.').pop()?.toLowerCase() ?? '';
 
+            const HTML_EXTS = new Set(['html', 'htm']);
             const TEXT_EXTS = new Set(['md', 'txt', 'json', 'yaml', 'yml', 'sh', 'py', 'js', 'ts',
-              'tsx', 'jsx', 'css', 'htm', 'html', 'csv', 'xml', 'toml', 'ini', 'env', 'log', 'changelog']);
+              'tsx', 'jsx', 'css', 'csv', 'xml', 'toml', 'ini', 'env', 'log', 'changelog']);
 
             const BINARY_FORMAT: Record<string, string> = {
               pdf: 'pdf-binary', docx: 'docx-binary', xlsx: 'xlsx-binary', pptx: 'pptx-binary',
@@ -717,7 +729,9 @@ export function setupWebSocket(
 
             let format: string;
 
-            if (TEXT_EXTS.has(ext)) {
+            if (HTML_EXTS.has(ext)) {
+              format = 'html';
+            } else if (TEXT_EXTS.has(ext)) {
               format = 'text';
             } else if (BINARY_FORMAT[ext]) {
               format = BINARY_FORMAT[ext];
@@ -884,6 +898,20 @@ export function setupWebSocket(
           if (!checkSessionPermission(session_id)) break;
           db.upsertFileAnnotations(session_id, filePath, content, updated_at);
           sendToClient(ws, { type: 'annotation-sync-ok', session_id, path: filePath, updated_at });
+          break;
+        }
+
+        case 'notebook_sync_request': {
+          const { session_id } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          const syncSession = sessionManager.getSession(session_id);
+          if (syncSession) {
+            sendToClient(ws, {
+              type: 'notebook_sync',
+              session_id,
+              notebook: syncSession.notebook,
+            });
+          }
           break;
         }
 

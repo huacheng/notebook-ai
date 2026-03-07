@@ -68,7 +68,9 @@ export async function openNotebookByPath(
         notebook, activeSessionRow.jsonl_path, notebookId,
         undefined, activeSessionRow.claude_session_id ?? undefined,
       );
-      return { notebookId, notebook, sessionId: result.session.id, workspaceDir: cwd };
+      // Use in-memory notebook for existing sessions (may have cells not yet saved to disk)
+      const effectiveNotebook = result.reconnected ? result.session.notebook : notebook;
+      return { notebookId, notebook: effectiveNotebook, sessionId: result.session.id, workspaceDir: cwd };
     }
   } else {
     // Create a DB record for this notebook

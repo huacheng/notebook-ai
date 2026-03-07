@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { WSServerMessage, QueuedPrompt, Cell } from '@notebook-ai/shared';
+import type { WSServerMessage, QueuedPrompt, Cell, Notebook } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 import type { Command } from '../mention/types';
 import DOMPurify from 'dompurify';
@@ -541,13 +541,33 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         }
         case 'queue_state': {
-          const queueMsg = parsed as { items: QueuedPrompt[]; version: number };
-          set({ promptQueue: queueMsg.items, queueVersion: queueMsg.version });
+          const queueMsg = parsed as { items: QueuedPrompt[]; version: number; session_id?: string };
+          const qSid = queueMsg.session_id ?? msgSessionId;
+          if (qSid) {
+            set((state) => {
+              const updates: Record<string, unknown> = {
+                promptQueues: { ...state.promptQueues, [qSid]: { items: queueMsg.items, version: queueMsg.version } },
+              };
+              // Only update flat state if this is the active session
+              if (qSid === state.sessionId) {
+                updates.promptQueue = queueMsg.items;
+                updates.queueVersion = queueMsg.version;
+              }
+              return updates;
+            });
+          } else {
+            set({ promptQueue: queueMsg.items, queueVersion: queueMsg.version });
+          }
           break;
         }
         case 'queue_error': {
-          const queueErr = parsed as { error?: string };
-          set({ sessionNotice: `⚠️ Queue error: ${queueErr.error ?? 'Unknown error'}` });
+          const queueErr = parsed as { error?: string; code?: string; session_id?: string };
+          if (queueErr.code === 'VERSION_MISMATCH' && queueErr.session_id) {
+            // Auto-recover: re-subscribe to get fresh queue_state
+            ws.send(JSON.stringify({ type: 'subscribe', session_id: queueErr.session_id }));
+          } else {
+            set({ sessionNotice: `⚠️ Queue error: ${queueErr.error ?? 'Unknown error'}` });
+          }
           break;
         }
         // ── Heartbeat events ──────────────────────────────────────────────────
@@ -571,9 +591,64 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         }
         case 'auto_status': {
-          set((state) => ({
-            autoStatus: applyAutoStatus(state.autoStatus, parsed),
-          }));
+          const asSid = (parsed as any).session_id ?? msgSessionId;
+          set((state) => {
+            const newStatus = applyAutoStatus(state.autoStatus, parsed);
+            const updates: Record<string, unknown> = {
+              autoStatuses: asSid
+                ? { ...state.autoStatuses, [asSid]: newStatus }
+                : state.autoStatuses,
+            };
+            // Only update flat state if this is the active session
+            if (!asSid || asSid === state.sessionId) {
+              updates.autoStatus = newStatus;
+            }
+            return updates;
+          });
+          break;
+        }
+        case 'notebook_digest': {
+          // Cross-device sync: compare server cell state with local
+          const digestMsg = parsed as unknown as { session_id: string; cell_count: number; last_cell_id: string | null };
+          if (digestMsg.session_id) {
+            const localNb = Object.values(get().openNotebooks).find(
+              (e) => e.sessionId === digestMsg.session_id,
+            )?.notebook ?? (get().sessionId === digestMsg.session_id ? get().notebook : null);
+            const localCount = localNb?.cells.length ?? 0;
+            const localLastId = localNb && localNb.cells.length > 0
+              ? localNb.cells[localNb.cells.length - 1].id
+              : null;
+            if (localCount !== digestMsg.cell_count || localLastId !== digestMsg.last_cell_id) {
+              // Stale: request full notebook sync
+              ws.send(JSON.stringify({
+                type: 'notebook_sync_request',
+                session_id: digestMsg.session_id,
+              }));
+            }
+          }
+          break;
+        }
+        case 'notebook_sync': {
+          // Full notebook sync from server (cross-device catch-up)
+          const syncMsg = parsed as unknown as { session_id: string; notebook: Notebook };
+          if (syncMsg.session_id && syncMsg.notebook) {
+            set((state) => {
+              const updates: Partial<typeof state> = {};
+              // Update openNotebooks entry matching this session
+              const updatedOpen = { ...state.openNotebooks };
+              for (const [nbId, entry] of Object.entries(updatedOpen)) {
+                if (entry.sessionId === syncMsg.session_id) {
+                  updatedOpen[nbId] = { ...entry, notebook: syncMsg.notebook };
+                }
+              }
+              updates.openNotebooks = updatedOpen;
+              // Update active notebook if it matches
+              if (state.sessionId === syncMsg.session_id) {
+                updates.notebook = syncMsg.notebook;
+              }
+              return updates;
+            });
+          }
           break;
         }
         case 'error':
@@ -796,6 +871,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   // ── Prompt Queue ───────────────────────────────────────────────────────
   promptQueue: [] as QueuedPrompt[],
   queueVersion: 0,
+  promptQueues: {} as Record<string, { items: QueuedPrompt[]; version: number }>,
 
   queuePrompt(source: string, images?) {
     const { ws, sessionId, queueVersion, promptQueue } = get();
@@ -808,8 +884,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       createdAt: new Date().toISOString(),
     };
 
-    // D1-1: Optimistic update - add to local state before server confirms
-    set({ promptQueue: [...promptQueue, prompt], queueVersion: queueVersion + 1 });
+    const newItems = [...promptQueue, prompt];
+    const newVersion = queueVersion + 1;
+    set((state) => ({
+      promptQueue: newItems,
+      queueVersion: newVersion,
+      promptQueues: { ...state.promptQueues, [sessionId]: { items: newItems, version: newVersion } },
+    }));
 
     ws.send(JSON.stringify({
       type: 'queue_prompt',
@@ -823,11 +904,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, sessionId, queueVersion, promptQueue } = get();
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
 
-    // D1-1: Optimistic update - remove from local state before server confirms
-    set({
-      promptQueue: promptQueue.filter((p) => p.id !== id),
-      queueVersion: queueVersion + 1,
-    });
+    const newItems = promptQueue.filter((p) => p.id !== id);
+    const newVersion = queueVersion + 1;
+    set((state) => ({
+      promptQueue: newItems,
+      queueVersion: newVersion,
+      promptQueues: { ...state.promptQueues, [sessionId]: { items: newItems, version: newVersion } },
+    }));
 
     ws.send(JSON.stringify({
       type: 'queue_remove',
@@ -841,10 +924,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, sessionId, queueVersion, promptQueue } = get();
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
 
-    // D1-1: Optimistic update - reorder local state before server confirms
     const idToPrompt = new Map(promptQueue.map((p) => [p.id, p]));
     const reordered = newOrder.map((id) => idToPrompt.get(id)).filter(Boolean) as QueuedPrompt[];
-    set({ promptQueue: reordered, queueVersion: queueVersion + 1 });
+    const newVersion = queueVersion + 1;
+    set((state) => ({
+      promptQueue: reordered,
+      queueVersion: newVersion,
+      promptQueues: { ...state.promptQueues, [sessionId!]: { items: reordered, version: newVersion } },
+    }));
 
     ws.send(JSON.stringify({
       type: 'queue_reorder',

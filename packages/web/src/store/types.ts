@@ -99,6 +99,7 @@ export interface NotebookStore {
 
   // ── Auto status state ─────────────────────────────────────────────────
   autoStatus: AutoStatusState;
+  autoStatuses: Record<string, AutoStatusState>;
   setAutoStatus: (msg: AutoStatusMessage) => void;
 
   // ── WebSocket state ────────────────────────────────────────────────────
@@ -244,9 +245,10 @@ export interface NotebookStore {
   setPendingSuggestions(s: { cellId: string; suggestions: string[] }): void;
   clearPendingSuggestions(): void;
 
-  // ── Prompt Queue ───────────────────────────────────────────────────────
+  // ── Prompt Queue (per-session isolated) ────────────────────────────────
   promptQueue: QueuedPrompt[];
   queueVersion: number;
+  promptQueues: Record<string, { items: QueuedPrompt[]; version: number }>;
   queuePrompt(source: string, images?: PromptImage[]): void;
   removeQueueItem(id: string): void;
   reorderQueue(newOrder: string[]): void;

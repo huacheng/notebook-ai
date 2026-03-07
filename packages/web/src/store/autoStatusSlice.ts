@@ -44,9 +44,10 @@ export function applyAutoStatus(
 }
 
 export const createAutoStatusSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'autoStatus' | 'setAutoStatus'
+  | 'autoStatus' | 'autoStatuses' | 'setAutoStatus'
 >> = (set) => ({
   autoStatus: { ...initialAutoStatus },
+  autoStatuses: {} as Record<string, AutoStatusState>,
   setAutoStatus: (msg: AutoStatusMessage) => {
     set((state) => ({
       autoStatus: applyAutoStatus(state.autoStatus, msg),

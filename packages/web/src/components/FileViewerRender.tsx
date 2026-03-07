@@ -774,9 +774,12 @@ export function FileViewerRender({
         </div>
       )}
       {format === 'html' && (
-        <div
-          className="fv-render__html"
-          dangerouslySetInnerHTML={{ __html: String(DOMPurify.sanitize(content)) }}
+        <iframe
+          className="fv-render__html-iframe"
+          sandbox="allow-scripts"
+          srcDoc={content}
+          title={filename}
+          style={{ width: '100%', height: '100%', border: 'none' }}
         />
       )}
       {format === 'unsupported' && (
