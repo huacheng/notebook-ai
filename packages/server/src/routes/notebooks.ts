@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { rm, readFile, mkdir, readdir } from 'fs/promises';
+import * as lz4 from 'lz4js';
 import {
   NotebookSchema,
   type Notebook,
@@ -207,7 +208,14 @@ export function createNotebooksRouter(
 
     try {
       const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);
-      res.json(result);
+      const notebookJson = JSON.stringify(result.notebook);
+      const compressed = Buffer.from(lz4.compress(Buffer.from(notebookJson, 'utf-8')));
+      res.json({
+        ...result,
+        notebook: undefined,
+        notebook_compressed: compressed.toString('base64'),
+        compression: 'lz4',
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('ENOENT') || msg.includes('not found')) {

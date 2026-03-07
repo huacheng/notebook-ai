@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import * as lz4 from 'lz4js';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 
@@ -90,7 +91,13 @@ export function WelcomeScreen() {
         });
         if (res.ok) {
           const data = await res.json();
-          openNotebookTab(data.notebookId, data.notebook, data.sessionId, data.workspaceDir);
+          let notebook = data.notebook;
+          if (data.notebook_compressed && data.compression === 'lz4') {
+            const compressed = Uint8Array.from(atob(data.notebook_compressed), c => c.charCodeAt(0));
+            const decompressed = lz4.decompress(compressed);
+            notebook = JSON.parse(new TextDecoder().decode(decompressed));
+          }
+          openNotebookTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
           subscribeToSession(data.sessionId);
         }
       } catch { /* notebook created but couldn't auto-open */ }

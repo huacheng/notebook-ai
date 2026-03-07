@@ -906,10 +906,13 @@ export function setupWebSocket(
           if (!checkSessionPermission(session_id)) break;
           const syncSession = sessionManager.getSession(session_id);
           if (syncSession) {
+            const syncJson = JSON.stringify(syncSession.notebook);
+            const syncCompressed = Buffer.from(lz4.compress(Buffer.from(syncJson, 'utf-8')));
             sendToClient(ws, {
               type: 'notebook_sync',
               session_id,
-              notebook: syncSession.notebook,
+              notebook_compressed: syncCompressed.toString('base64'),
+              compression: 'lz4',
             });
           }
           break;

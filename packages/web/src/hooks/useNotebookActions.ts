@@ -7,6 +7,7 @@
  */
 
 import { useCallback } from 'react';
+import * as lz4 from 'lz4js';
 import { useStore } from '../store';
 
 export interface NotebookOpenResult {
@@ -397,9 +398,16 @@ async function openNotebookViaRest(
   }
 
   const data = await res.json();
+  // Decompress lz4-compressed notebook
+  let notebook = data.notebook;
+  if (data.notebook_compressed && data.compression === 'lz4') {
+    const compressed = Uint8Array.from(atob(data.notebook_compressed), c => c.charCodeAt(0));
+    const decompressed = lz4.decompress(compressed);
+    notebook = JSON.parse(new TextDecoder().decode(decompressed));
+  }
   return {
     notebookId: data.notebookId,
-    notebook: data.notebook,
+    notebook,
     sessionId: data.sessionId,
     workspaceDir: data.workspaceDir,
     totalCells: data.totalCells,

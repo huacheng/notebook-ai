@@ -1023,7 +1023,9 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('notebook_sync'),
     session_id: z.string(),
-    notebook: NotebookSchema,
+    notebook: NotebookSchema.optional(),
+    notebook_compressed: z.string().optional(),
+    compression: z.string().optional(),
   }),
 ]);
 

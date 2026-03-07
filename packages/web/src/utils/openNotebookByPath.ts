@@ -1,4 +1,5 @@
 import { useStore } from '../store';
+import * as lz4 from 'lz4js';
 
 export interface OpenNotebookResult {
   switched?: boolean;
@@ -81,7 +82,13 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      openTab(data.notebook_id, data.notebook, data.session_id, data.workspace_dir);
+      let notebook = data.notebook;
+      if (data.notebook_compressed && data.compression === 'lz4') {
+        const compressed = Uint8Array.from(atob(data.notebook_compressed), c => c.charCodeAt(0));
+        const decompressed = lz4.decompress(compressed);
+        notebook = JSON.parse(new TextDecoder().decode(decompressed));
+      }
+      openTab(data.notebook_id, notebook, data.session_id, data.workspace_dir);
       setActiveNotebookTab(data.notebook_id);
       sub(data.session_id);
       useStore.setState({ notebookLoading: false });

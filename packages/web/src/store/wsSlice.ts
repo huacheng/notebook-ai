@@ -630,21 +630,33 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         }
         case 'notebook_sync': {
           // Full notebook sync from server (cross-device catch-up)
-          const syncMsg = parsed as unknown as { session_id: string; notebook: Notebook };
+          const syncMsg = parsed as unknown as { session_id: string; notebook?: Notebook; notebook_compressed?: string; compression?: string };
+          // Decompress lz4 if needed
+          if (syncMsg.notebook_compressed && syncMsg.compression === 'lz4') {
+            try {
+              const compressed = Uint8Array.from(atob(syncMsg.notebook_compressed), c => c.charCodeAt(0));
+              const decompressed = lz4.decompress(compressed);
+              syncMsg.notebook = JSON.parse(new TextDecoder().decode(decompressed));
+            } catch (e) {
+              console.error('[ws] Failed to decompress notebook_sync:', e);
+              break;
+            }
+          }
           if (syncMsg.session_id && syncMsg.notebook) {
+            const syncedNotebook = syncMsg.notebook;
             set((state) => {
               const updates: Partial<typeof state> = {};
               // Update openNotebooks entry matching this session
               const updatedOpen = { ...state.openNotebooks };
               for (const [nbId, entry] of Object.entries(updatedOpen)) {
                 if (entry.sessionId === syncMsg.session_id) {
-                  updatedOpen[nbId] = { ...entry, notebook: syncMsg.notebook };
+                  updatedOpen[nbId] = { ...entry, notebook: syncedNotebook };
                 }
               }
               updates.openNotebooks = updatedOpen;
               // Update active notebook if it matches
               if (state.sessionId === syncMsg.session_id) {
-                updates.notebook = syncMsg.notebook;
+                updates.notebook = syncedNotebook;
               }
               return updates;
             });

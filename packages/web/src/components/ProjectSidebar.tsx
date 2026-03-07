@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import * as lz4 from 'lz4js';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { FileSection } from './FileSection';
@@ -642,7 +643,13 @@ function FileBrowser() {
           });
           if (res.ok) {
             const data = await res.json();
-            openTab(data.notebookId, data.notebook, data.sessionId, data.workspaceDir);
+            let notebook = data.notebook;
+            if (data.notebook_compressed && data.compression === 'lz4') {
+              const compressed = Uint8Array.from(atob(data.notebook_compressed), c => c.charCodeAt(0));
+              const decompressed = lz4.decompress(compressed);
+              notebook = JSON.parse(new TextDecoder().decode(decompressed));
+            }
+            openTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
             sub(data.sessionId);
           }
         }
