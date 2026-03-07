@@ -76,14 +76,23 @@ Deliverables + .target.md + .plan.md → check(D1-D6 scoring) → overall ≥ th
 | `satisfied` | `finalization` | User satisfied, final report |
 | `cancelled` | — (terminal) | Loop stops immediately, no phase |
 
-### Threshold & Retry Limits
+### Threshold & Retry Limits — Adaptive
 
-| Checkpoint | Threshold | Retry Limit | On Limit Exceeded |
-|------------|-----------|-------------|-------------------|
+Thresholds and retry limits are **adaptive**: read from `.type-profile.md` `## Auto Adaptation` section if present, with hardcoded defaults as fallback when `.type-profile.md` is absent or lacks the section.
+
+**Resolution order**: `.type-profile.md` Auto Adaptation → fallback defaults (table below).
+
+| Checkpoint | Fallback Threshold | Fallback Retry Limit | On Limit Exceeded |
+|------------|-------------------|---------------------|-------------------|
 | post-plan (Phase 2) | 0.70 | 3 replans | Stop, notify user: "Plan repeatedly failed review, manual intervention needed" |
 | mid-exec (Phase 3 mid) | 0.60 | 2 fixes | Stop current step, notify user |
 | post-exec (Phase 3 done) | 0.75 | 3 fix/replan | Stop, notify user |
 | pre-merge (Phase 4) | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0, resume from failing dimensions) |
+
+**Adaptive threshold examples** (from `.type-profile.md` Auto Adaptation):
+- Simple bugfix task → lower thresholds (post-plan 0.60, post-exec 0.65), fewer retries (post-plan 2)
+- Complex architecture redesign → higher thresholds (post-plan 0.75, post-exec 0.80), more retries (post-exec 4)
+- Data pipeline task → verify-heavy profile (mid-exec threshold 0.70, more mid-exec retries)
 
 `retry_count` persists in `.auto-signal`. Resets to 0 on phase transition. `delegation_failures` clears on phase transition (new phase = new context).
 
@@ -471,9 +480,10 @@ Terminal: merge conflict → (stop, status stays executing — retryable)
 The auto skill runs this loop within a single Claude session:
 
 1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
+1a. **Load adaptive parameters**: Read `.type-profile.md` `## Auto Adaptation` section. Extract `thresholds`, `retry_limits`, and `compaction_threshold`. If `.type-profile.md` is absent or lacks the section → use fallback defaults from the Threshold table
 2. LOOP:
    2.1. Check for .auto-stop file → if exists, break loop
-   2.2. Context check: if context window usage ≥ 82% AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
+   2.2. Context check: if context window usage ≥ `compaction_threshold` (adaptive from `.type-profile.md`, fallback 82%) AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
    2.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - Evaluate four delegation factors (phase, context dependency, complexity, execution history)
       - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.status.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
@@ -484,8 +494,9 @@ The auto skill runs this loop within a single Claude session:
    2.6. Increment iteration counter
    2.7. If next == "(stop)" → break loop
    2.8. Set current step = next step → continue loop
-3. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
-4. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
+3. **Post-loop learning**: Write execution metrics back to `.type-profile.md` `## Auto Adaptation` section — actual retries used per checkpoint, total iterations, compaction count, phase durations. This enables future tasks of the same type to use refined thresholds. If `.type-profile.md` lacks `## Auto Adaptation`, create the section with observed metrics. Sync updated profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` (same write protocol as research — acquire `.type-profiles/.lock`)
+4. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
+5. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
 
 ## Detailed Loop Logic
 
@@ -558,13 +569,18 @@ Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **t
 
 Proactive **structured compaction** prevents overflow. Strategy: **single active compaction + file-based recovery**:
 
-1. **First compaction at ≥ 82%**: Send the Structured Compaction Prompt (template below)
+Compaction threshold is adaptive based on task complexity from `.type-profile.md` Auto Adaptation:
+- Simple tasks (few steps, low retry history) → higher threshold (85-90%) — more context budget available
+- Complex tasks (many steps, high retry history) → lower threshold (75-80%) — reserve headroom for fix cycles
+- Fallback default: 82%
+
+1. **First compaction at ≥ compaction_threshold**: Send the Structured Compaction Prompt (template below)
 2. **No subsequent active compaction**: After first, rely on `.summary.md` + `.auto-signal` + `.status.json` for recovery
 3. **Daemon detection**: If Claude's system compaction is detected, daemon sends recovery signal
 
 #### Structured Compaction Prompt Template
 
-When context ≥ 82% AND `compaction_count == 0`, fill and send:
+When context ≥ `compaction_threshold` (adaptive, fallback 82%) AND `compaction_count == 0`, fill and send:
 
 ```
 Summarize and compress our conversation context for continuation. Task identity and loop position will be recovered from files — preserve ONLY the following conversation-exclusive context:
@@ -617,7 +633,7 @@ When `type` contains `software`, the auto loop tracks VH→HS cycle progress dur
 - **Max iterations**: user-configurable (default 20), daemon writes `.auto-stop` when reached
 - **Timeout**: user-configurable (default 30 min), daemon writes `.auto-stop` when elapsed
 - **Stall detection**: heartbeat polling (60s) + pattern matching recovery, with per-step (3) and total (10) recovery limits
-- **Context management**: proactive structured compaction at ≥ 82% context window usage
+- **Context management**: proactive structured compaction at adaptive threshold (fallback ≥ 82% context window usage)
 - **Quota exhaustion**: detected and handled as wait (not stall), timeout clock paused during quota-wait
 - **Pause on blocked**: Auto stops immediately on `blocked` status
 - **Manual override**: User can `/task-ai:auto --stop` or daemon writes `.auto-stop` via `DELETE` API

@@ -200,6 +200,25 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
 - **D5 Architecture**: <+domain-specific structural/extension concerns>
 - **D6 Maintainability**: <+domain-specific convention/readability concerns>
 
+## Auto Adaptation
+<!-- Adaptive parameters for auto sub-command — initially empty, populated by auto's post-loop learning -->
+<!-- auto reads this section to override fallback defaults; writes execution metrics back after each run -->
+- **Thresholds**:
+  - post-plan: <0.0-1.0, or "default">
+  - mid-exec: <0.0-1.0, or "default">
+  - post-exec: <0.0-1.0, or "default">
+  - pre-merge: <0.0-1.0, or "default">
+- **Retry limits**:
+  - post-plan: <int, or "default">
+  - mid-exec: <int, or "default">
+  - post-exec: <int, or "default">
+- **Compaction threshold**: <0.0-1.0, or "default" (82%)>
+- **Observed metrics** (auto-populated by post-loop learning):
+  - avg_iterations: <float>
+  - avg_retries_per_checkpoint: { post-plan: <float>, mid-exec: <float>, post-exec: <float> }
+  - avg_compaction_count: <float>
+  - sample_count: <int, number of completed runs contributing to averages>
+
 ## Sources
 <!-- Where this profile information came from -->
 - <URL or reference for each claim above>
