@@ -35,7 +35,7 @@ Generate a structured completion report for a task module, documenting what was 
 
 ## Prerequisites
 
-- Task module should have status `complete` or `stage-done` (post-exec assessment passed)
+- Task module should have status `satisfied` or `evolving` (post-exec assessment passed)
 - Can also be run on `blocked` or `cancelled` tasks for documentation purposes
 - **Minimum content**: If status is `draft` and `.plan.md` does not exist, report outputs a brief notice ("No meaningful content to report — task is still in draft with no plan") instead of generating an empty report structure
 
@@ -47,7 +47,7 @@ Generate a structured completion report for a task module, documenting what was 
 # Task Report: <title>
 
 ## Summary
-- **Status**: complete | blocked | cancelled
+- **Status**: satisfied | evolving | blocked | cancelled
 - **Created**: <timestamp>
 - **Completed**: <timestamp>
 - **Duration**: <calculated>
@@ -126,10 +126,10 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 | `review` | `review` | Progress snapshot |
 | `executing` | `executing` | Progress snapshot |
 | `re-planning` | `re-planning` | Progress snapshot |
-| `complete` | `complete` | Full completion report |
+| `satisfied` | `satisfied` | Full completion report |
 | `blocked` | `blocked` | Document blocked state |
 | `cancelled` | `cancelled` | Document cancellation |
-| `stage-done` | `stage-done` | Interim report for completed stage |
+| `evolving` | `evolving` | Interim report for completed stage |
 
 ## Git
 
@@ -141,11 +141,34 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 
 Report is always a terminal step — `next` is always `(stop)`.
 
+## Stage Review (evolving status)
+
+When status is `evolving`, the report includes a Stage Review section:
+
+### Stage Review Format
+```markdown
+## Stage Review
+
+### Current Stage Results
+- <deliverables summary>
+
+### Relation to Overall Objective
+- Overall objective: <from .target.md>
+- This stage covered: <aspects addressed>
+- Not yet covered: <remaining aspects>
+- Possible next directions: <1-2 suggestions>
+
+### Decision Point
+> Current stage merged and complete.
+> - Continue evolving: describe next direction
+> - Pause: say "satisfied" or run /task-ai:target --satisfy
+```
+
 ## Notes
 
 - Reports are overwritten on regeneration (only latest report kept)
 - For `blocked` tasks, the report documents what was completed and what blocks remain
 - For `cancelled` tasks, the report documents the reason for cancellation
 - The report serves as a permanent record even after task files are archived
-- For `complete` tasks, report includes change history via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; `--max-count=200` caps output for performance; works even after task branch deletion)
+- For `satisfied` tasks, report includes change history via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; `--max-count=200` caps output for performance; works even after task branch deletion)
 - **Concurrency**: Report acquires `.working/.lock` before proceeding and releases on completion. Stale locks (holding PID is dead) are automatically recovered. (See Concurrency Protection in `commands/task-ai.md`)

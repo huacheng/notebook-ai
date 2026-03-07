@@ -72,7 +72,8 @@ Deliverables + .target.md + .plan.md → check(D1-D6 scoring) → overall ≥ th
 | `planning` / `re-planning` | `planning` | Generating/revising plan |
 | `review` / `executing` | `execution` | Executing plan steps |
 | `blocked` | `execution` (stalled) | Blocked, awaiting user intervention |
-| `complete` / `stage-done` | `finalization` | Merge, distill, report |
+| `evolving` | `finalization` | Merge done, distill + report |
+| `satisfied` | `finalization` | User satisfied, final report |
 | `cancelled` | — (terminal) | Loop stops immediately, no phase |
 
 ### Threshold & Retry Limits
@@ -129,9 +130,9 @@ Phase 3: Execution (status=executing) — Full auto + user can intervene
   - Exceeds retry limit → stop, notify user
   - User can intervene: "what does this error mean?" → explain + fix, continue
 
-Phase 4: Finalization (status=complete/stage-done) — Full auto
-  - check(pre-merge, threshold 0.80) → below threshold → fall back to Phase 3
-  - Passes: merge → highlight → report → done
+Phase 4: Finalization (status=evolving/satisfied) — Full auto
+  - evolving: highlight → report → (stop, wait for user to define next stage or --satisfy)
+  - satisfied: report → (stop)
 ```
 
 ## Dialog Behavior
@@ -314,6 +315,10 @@ User returns and says "continue":
    - If `.summary.md` absent → read `.target.md` + `.plan.md` to rebuild minimal context
 4. Resume from interruption point
 
+### Cross-Stage Continuation
+
+When status is `evolving`, auto stops and waits for user input. If the user provides next-stage direction in the same session (e.g., "now build the OAuth layer"), auto can route from `evolving` back to `target` to define the next stage, then continue the loop through planning → execution → merge for the new stage.
+
 ### "Silent Continue" Mechanism
 
 Claude Code is request-response. Phases 2-4 "auto-advance without intervention" means:
@@ -361,7 +366,7 @@ Fields:
 - `iteration`: current iteration count. **Auto-mode only** — absent in manual execution
 - `compaction_count`: context compaction invocations within current auto session. **Auto-mode only**. Reset to `0` on normal iteration advance. On compaction recovery, incremented by 1 (NOT reset). If `>= 3` → stop with warning (see Compaction frequency limit)
 - `vfp_cycles_completed`: VH→HS cycles completed during Phase 3 execution. **Auto-mode only**, software types only
-- `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (complete/stage-done)
+- `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (evolving/satisfied)
 - `phase_progress`: float 0-1, progress within current phase
 - `stage`: `{ current, total }` multi-stage position, synced from `.status.json`
 - `check_score`: last check D1-D6 scores + overall, or null if no check has run. Written by check, not auto
@@ -392,13 +397,13 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
 | `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `stage-done`, `conflict`, `rejected` |
+| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `evolving`, `conflict`, `rejected` |
 | `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize`, `(stop)`, `(none)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `post-annotate`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
 | `compaction_count` | Integer | ≥ 0 |
 | `vfp_cycles_completed` | Integer (optional) | ≥ 0 (present only for software types in auto mode) |
-| `phase` | Whitelist | `target`, `planning`, `execution`, `finalization` |
+| `phase` | Whitelist | `target`, `planning`, `execution`, `finalization`, `satisfied` |
 | `phase_progress` | Float | 0.0 - 1.0 |
 | `stage` | Object | `{ "current": int, "total": int }` where current ≥ 1, current ≤ total |
 | `check_score` | Object or null | `{ "overall": float, "d1_correctness": float, ..., "d6_maintainability": float }` all 0.0-1.0 |
@@ -451,11 +456,9 @@ Phase 4: Finalization (auto)
             │
             FAIL ──→ [Phase 3] (retry_count reset, resume from failing dimensions)
 
-  merge ─── success (current==total) ──→ highlight(complete) ──→ report → (stop)
-    │          │
-    │      stage-done (current<total) ──→ highlight(complete) ──→ report → (stop)
-    │                                     Output: "Stage <N> completed.
-    │                                     Define next stage target, then run /task-ai:auto"
+  merge ─── evolving (always) ──→ highlight ──→ report → (stop)
+    │                              Output: "Stage <N> completed.
+    │                              Define next stage target or /task-ai:target --satisfy"
     │
     └── conflict unresolvable (after 3 retries) → (stop)
 
@@ -495,8 +498,8 @@ The auto skill runs this loop within a single Claude session:
 | `review` | Execute exec |
 | `executing` | Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX |
 | `re-planning` | Read `phase` field: if `needs-plan` → execute plan; if `needs-check` → execute verify → check (post-plan); if empty → default to plan |
-| `stage-done` | Execute highlight(complete) → report → stop. Output stage completion message with next-stage instructions |
-| `complete` | Execute report, then stop |
+| `evolving` | highlight → report → (stop, wait for user) |
+| `satisfied` | report → (stop) |
 | `blocked` | Stop loop, report blocking reason |
 | `cancelled` | Stop loop |
 
@@ -517,8 +520,7 @@ The auto skill runs this loop within a single Claude session:
 | exec | (mid-exec) | verify | mid-exec | Significant issue, verify before checkpoint |
 | exec | (step-N) | verify | mid-exec | Single step completed (manual `--step N` only) |
 | exec | (blocked) | (stop) | — | Cannot continue |
-| merge | success | highlight | — | Merge complete, distill experience |
-| merge | stage-done | highlight | — | Stage complete, distill stage experience |
+| merge | evolving | highlight | — | Merge complete, distill experience |
 | merge | conflict | (stop) | — | Merge conflict unresolvable |
 | merge | rejected | (stop) | dependency-blocked / no-accept | Prerequisite not met |
 | highlight | (distilled) | report | — | Distillation complete |

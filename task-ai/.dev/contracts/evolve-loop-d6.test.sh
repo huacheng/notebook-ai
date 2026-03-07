@@ -928,10 +928,10 @@ test_MG1_state_py_existence_check() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MG2: merge.sh python3 transition stage-done should have error handling (D3)
+# MG2: merge.sh python3 transition evolving should have error handling (D3)
 # ─────────────────────────────────────────────────────────────────────────────
 test_MG2_stage_transition_error_handling() {
-    if grep -qE 'if.*python3.*stage-done|if ! python3.*stage-done|stage-done.*\|\|' \
+    if grep -qE 'if.*python3.*evolving|if ! python3.*evolving|evolving.*\|\|' \
         "$TASK_AI_ROOT/skills/merge/scripts/merge.sh"; then
         pass "MG2: merge.sh stage transition has error handling"
     else
@@ -940,22 +940,22 @@ test_MG2_stage_transition_error_handling() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MG3: merge.sh python3 transition complete should have error handling (D3)
+# MG3: merge.sh unified evolving path — no --status complete in merge.sh (D3)
 # ─────────────────────────────────────────────────────────────────────────────
-test_MG3_complete_transition_error_handling() {
-    if grep -qE 'if.*python3.*complete|if ! python3.*complete|complete.*2>&1' \
+test_MG3_unified_evolving_path() {
+    if ! grep -qE '\-\-status complete' \
         "$TASK_AI_ROOT/skills/merge/scripts/merge.sh"; then
-        pass "MG3: merge.sh complete transition has error handling"
+        pass "MG3: merge.sh has no --status complete (unified evolving path)"
     else
-        fail "MG3: merge.sh complete transition lacks error handling"
+        fail "MG3: merge.sh still contains --status complete"
     fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MG4: merge.sh STAGE_CURRENT/STAGE_TOTAL should be validated as numbers (D2)
+# MG4: merge.sh STAGE_CURRENT should be validated as number (D2)
 # ─────────────────────────────────────────────────────────────────────────────
 test_MG4_stage_numbers_validated() {
-    if grep -qE 'STAGE_CURRENT.*=~|STAGE_TOTAL.*=~|\[\[.*STAGE.*\^[0-9]' \
+    if grep -qE 'STAGE_CURRENT.*=~|\[\[.*STAGE.*\^[0-9]' \
         "$TASK_AI_ROOT/skills/merge/scripts/merge.sh"; then
         pass "MG4: merge.sh validates STAGE numbers"
     else
@@ -1013,15 +1013,15 @@ test_MG8_merge_abort_error_handling() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MG9: merge.sh stage-done path should write .auto-signal (D1)
+# MG9: merge.sh evolving path should write .auto-signal (D1)
 # ─────────────────────────────────────────────────────────────────────────────
-test_MG9_stage_done_auto_signal() {
-    # Check that stage-done branch also writes .auto-signal
-    if grep -A10 'status stage-done' "$TASK_AI_ROOT/skills/merge/scripts/merge.sh" | \
-       grep -qE 'auto-signal|stage-done.*signal'; then
-        pass "MG9: merge.sh stage-done writes .auto-signal"
+test_MG9_evolving_auto_signal() {
+    # Check that evolving branch also writes .auto-signal
+    if grep -A10 'status evolving' "$TASK_AI_ROOT/skills/merge/scripts/merge.sh" | \
+       grep -qE 'auto-signal|evolving.*signal'; then
+        pass "MG9: merge.sh evolving writes .auto-signal"
     else
-        fail "MG9: merge.sh stage-done missing .auto-signal"
+        fail "MG9: merge.sh evolving missing .auto-signal"
     fi
 }
 
@@ -1517,13 +1517,13 @@ test_SEC2_scan_skill_cat_error_handling
 test_SEC3_no_unused_code_blocks
 test_MG1_state_py_existence_check
 test_MG2_stage_transition_error_handling
-test_MG3_complete_transition_error_handling
+test_MG3_unified_evolving_path
 test_MG4_stage_numbers_validated
 test_MG5_writes_auto_signal
 test_MG6_checkout_task_branch_error_handling
 test_MG7_auto_signal_write_error_handling
 test_MG8_merge_abort_error_handling
-test_MG9_stage_done_auto_signal
+test_MG9_evolving_auto_signal
 test_MG10_git_commit
 test_RP1_state_py_existence_check
 test_RP2_python_error_handling

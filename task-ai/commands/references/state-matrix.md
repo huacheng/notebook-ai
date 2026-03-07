@@ -8,10 +8,10 @@ Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays s
 | `draft` | →`planning` | →`planning` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
 | `planning` | =`planning` | =`planning` | =`planning` | PASS→`review` / NEEDS_REVISION=`planning` / BLOCKED→`blocked` | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
 | `review` | →`re-planning` | →`re-planning` | →`re-planning` | ⊘ | ⊘ | ⊘ | →`executing` | ⊘ | — | →`cancelled` | — |
-| `executing` | =`executing` | →`re-planning` | →`re-planning` | ⊘ | CONT=`executing` / NEEDS_FIX=`executing` / REPLAN→`re-planning` / BLOCKED→`blocked` | ACCEPT=`executing` (signal→merge) / NEEDS_FIX=`executing` / REPLAN→`re-planning` | =`executing` (NEEDS_FIX fix) / →`blocked` (dependency) | →`complete` / →`stage-done` / =`executing` (conflict) | — | →`cancelled` | — |
-| `stage-done` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | →`cancelled` | — |
+| `executing` | =`executing` | →`re-planning` | →`re-planning` | ⊘ | CONT=`executing` / NEEDS_FIX=`executing` / REPLAN→`re-planning` / BLOCKED→`blocked` | ACCEPT=`executing` (signal→merge) / NEEDS_FIX=`executing` / REPLAN→`re-planning` | =`executing` (NEEDS_FIX fix) / →`blocked` (dependency) | →`evolving` / =`executing` (conflict) | — | →`cancelled` | — |
+| `evolving` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | →`cancelled` | — |
 | `re-planning` | =`re-planning` | =`re-planning` | =`re-planning` | PASS→`review` / NEEDS_REVISION=`re-planning` / BLOCKED→`blocked` | ⊘ | ⊘ | ⊘ | ⊘ | — | →`cancelled` | — |
-| `complete` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | ⊘ | — |
+| `satisfied` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | →`cancelled` | — |
 | `blocked` | →`planning` | →`planning` | →`planning` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | →`cancelled` | — |
 | `cancelled` | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | ⊘ | — (write) | ⊘ | — |
 
@@ -19,8 +19,8 @@ Every (state, sub-command) combination. `→X` = transitions to X. `=` = stays s
 
 **Verification properties:**
 - Every non-terminal state has ≥1 exit path (no deadlock)
-- Terminal states: only `complete` and `cancelled` (`stage-done` is non-terminal — exits via `target` → `planning` or `cancel` → `cancelled`)
-- `cancel` is available on all non-terminal states (rejected on `complete` and `cancelled`)
+- Terminal states: only `cancelled` (`satisfied` is non-terminal — re-enters via `target` → `planning`)
+- `cancel` is available on all non-terminal states (rejected on `cancelled` only)
 - `exec` requires `review` gate (cannot skip `check`)
 - `merge` requires ACCEPT verdict gate (cannot skip `check post-exec`)
 - `re-planning` must pass through `check` to reach `review`

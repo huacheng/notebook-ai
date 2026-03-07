@@ -2,15 +2,15 @@
 """L1: Verify target and highlight SKILL.md support progressive target v1.
 
 target tests:
-  1. Write Mode has three-branch routing (stage-done / multi-stage update / normal+analysis)
-  2. Stage Advance mode documented (status == stage-done)
+  1. Write Mode has three-branch routing (evolving / multi-stage update / normal+analysis)
+  2. Stage Advance mode documented (status == evolving)
   3. Multi-stage analysis mentions status ∈ {draft, planning} guard
-  4. State Transitions includes stage-done → planning
+  4. State Transitions includes evolving → planning
   5. Git table includes stage advance commit type
 
 highlight tests:
   6. §3.5 Output A has stage-aware file naming
-  7. §3.5 mentions stage-done and stage-<N> prefix
+  7. §3.5 mentions evolving and stage-<N> prefix
   8. Final distillation reads prior stage experience files
 """
 import sys
@@ -21,10 +21,10 @@ from lib import emit_pass, emit_fail, extract_section, summary, TASK_AI_ROOT
 target_text = (TASK_AI_ROOT / 'skills' / 'target' / 'SKILL.md').read_text()
 
 # Test 1: Three-branch routing in Write Mode
-has_stage_done_branch = 'stage-done' in target_text
-has_multi_stage = 'stage.total' in target_text or 'multi-stage' in target_text.lower()
+has_evolving_branch = 'evolving' in target_text
+has_multi_stage = 'stage.history' in target_text or 'multi-stage' in target_text.lower() or 'stage.current' in target_text
 has_analysis = 'draft' in target_text and 'planning' in target_text
-if has_stage_done_branch and has_multi_stage:
+if has_evolving_branch and has_multi_stage:
     emit_pass('target: Write Mode has three-branch routing')
 else:
     emit_fail('target: Write Mode missing three-branch routing')
@@ -42,14 +42,14 @@ if ('draft' in target_text and 'planning' in target_text) and \
 else:
     emit_fail('target: Multi-stage analysis missing status guard')
 
-# Test 4: State Transitions includes stage-done → planning
+# Test 4: State Transitions includes evolving → planning
 target_transitions = extract_section(
     TASK_AI_ROOT / 'skills' / 'target' / 'SKILL.md', '## State Transitions'
 )
-if 'stage-done' in target_transitions and 'planning' in target_transitions:
-    emit_pass('target: State Transitions includes stage-done → planning')
+if 'evolving' in target_transitions and 'planning' in target_transitions:
+    emit_pass('target: State Transitions includes evolving → planning')
 else:
-    emit_fail('target: State Transitions missing stage-done → planning')
+    emit_fail('target: State Transitions missing evolving → planning')
 
 # Test 5: Git table includes stage advance commit
 target_git = extract_section(
@@ -76,11 +76,11 @@ if 'stage' in highlight_35 and ('-stage-' in highlight_35 or 'stage-<' in highli
 else:
     emit_fail('highlight: §3.5 Output A missing stage-aware file naming')
 
-# Test 7: mentions stage-done
-if 'stage-done' in highlight_35:
-    emit_pass('highlight: §3.5 mentions stage-done status')
+# Test 7: mentions evolving
+if 'evolving' in highlight_35:
+    emit_pass('highlight: §3.5 mentions evolving status')
 else:
-    emit_fail('highlight: §3.5 missing stage-done reference')
+    emit_fail('highlight: §3.5 missing evolving reference')
 
 # Test 8: Final distillation reads prior stage files
 if 'stage-*-complete' in highlight_35 or 'stage experience' in highlight_35.lower() or \

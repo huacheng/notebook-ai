@@ -13,7 +13,6 @@ source "$SCRIPT_DIR/../../../core/lib.sh"
 # Parse arguments
 NOTEBOOK=""
 REFINE_MODE=0
-FINALIZE_MODE=0
 REFINE_CONTENT=""
 
 while [[ $# -gt 0 ]]; do
@@ -29,10 +28,6 @@ while [[ $# -gt 0 ]]; do
                 shift
             fi
             ;;
-        --finalize)
-            FINALIZE_MODE=1
-            shift
-            ;;
         --generate)
             shift
             ;;
@@ -47,7 +42,6 @@ resolve_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 STATUS_JSON="$WORK_DIR/.status.json"
-SESSION_CONTEXT="$WORK_DIR/.session-context"
 PLAN_FILE="$WORK_DIR/.plan.md"
 
 if [[ ! -d "$WORK_DIR" ]]; then
@@ -64,27 +58,13 @@ if [[ ! -f "$STATE_PY" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mode 1: Finalize (exit plan-refinement phase)
-# ─────────────────────────────────────────────────────────────────────────────
-if [[ "$FINALIZE_MODE" -eq 1 ]]; then
-    if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: plan-refinement" "$SESSION_CONTEXT"; then
-        rm -f "$SESSION_CONTEXT"
-        echo "[plan] Plan finalized. Exited plan-refinement phase."
-        echo "[plan] Run /exec to start execution."
-    else
-        echo "[plan] Not in plan-refinement phase."
-    fi
-    exit 0
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Mode 2: Refine (modify existing plan)
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$REFINE_MODE" -eq 1 ]]; then
-    # D1: Reject refinement on terminal statuses
+    # D1: Reject refinement on terminal/non-plannable statuses
     REFINE_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null) || REFINE_STATUS=""
     case "$REFINE_STATUS" in
-        complete|cancelled|stage-done)
+        satisfied|cancelled|evolving)
             echo "[ERROR] Cannot refine — task status is $REFINE_STATUS." >&2
             exit 1
             ;;
@@ -99,11 +79,6 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     if [[ ! -f "$PLAN_FILE" ]]; then
         echo "[ERROR] Cannot refine - no plan exists. Use /plan first." >&2
         exit 1
-    fi
-
-    # D3: Warn if not in plan-refinement phase (non-blocking)
-    if [[ ! -f "$SESSION_CONTEXT" ]] || ! grep -q "phase: plan-refinement" "$SESSION_CONTEXT"; then
-        echo "[WARN] Not in plan-refinement phase. Proceeding anyway."
     fi
 
     DATE=$(date "+%Y-%m-%d %H:%M")
@@ -138,16 +113,16 @@ fi
 # 0. Guard: reject terminal statuses (SKILL.md State Transitions)
 CURRENT_STATUS_GUARD=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null) || CURRENT_STATUS_GUARD=""
 case "$CURRENT_STATUS_GUARD" in
-    complete)
-        echo "[ERROR] Completed tasks cannot be re-planned." >&2
+    satisfied)
+        echo "[ERROR] Satisfied tasks cannot be re-planned. Use /task-ai:target to re-enter evolution first." >&2
         exit 1
         ;;
     cancelled)
         echo "[ERROR] Cancelled tasks cannot be re-planned." >&2
         exit 1
         ;;
-    stage-done)
-        echo "[ERROR] Stage completed — use /target to advance to next stage first." >&2
+    evolving)
+        echo "[ERROR] Evolving tasks cannot be re-planned. Use /task-ai:target to define next stage first." >&2
         exit 1
         ;;
 esac
@@ -259,23 +234,9 @@ if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status "$NEW_STATUS" --phas
     echo "[WARN] Failed to transition status to $NEW_STATUS" >&2
 fi
 
-# 5. Transition phases: target-refinement → plan-refinement
-if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: target-refinement" "$SESSION_CONTEXT"; then
-    echo "[plan] Exited target-refinement phase."
-fi
-
-# Enter plan-refinement phase
-# D3: Error handling for session context write
-if ! printf 'phase: plan-refinement\nentered_at: %s\nentered_by: /task-ai:plan\n' "$(date -Iseconds)" > "$SESSION_CONTEXT" 2>/dev/null; then
-    echo "[WARN] Failed to write session context" >&2
-fi
-
-# D1: Commit generated plan + test artifacts + session context
+# D1: Commit generated plan + test artifacts
 # D3: git with error handling; only add files that exist
 GIT_ADD_FILES=("$PLAN_FILE" "$STATUS_JSON")
-if [[ -f "$SESSION_CONTEXT" ]]; then
-    GIT_ADD_FILES+=("$SESSION_CONTEXT")
-fi
 if ! git add "${GIT_ADD_FILES[@]}" 2>/dev/null; then
     echo "[WARN] git add failed" >&2
 fi

@@ -17,7 +17,7 @@ derive_phase() {
         planning|re-planning) echo "planning" ;;
         review|executing) echo "execution" ;;
         blocked) echo "execution" ;;
-        complete|stage-done) echo "finalization" ;;
+        evolving|satisfied) echo "finalization" ;;
         cancelled) echo "terminal" ;;  # Not in signal validation whitelist; auto exits before writing signal
         *) echo "unknown" ;;
     esac
@@ -164,14 +164,14 @@ case "$STATUS" in
     RESULT="(pass)"
     NEXT_STEP="check"
     ;;
-  complete)
+  satisfied)
     # Phase 4: Generate report, then stop
     STEP="report"
     RESULT="(generated)"
     NEXT_STEP="(stop)"
     ;;
-  stage-done)
-    # Phase 4: Distill experience, then report
+  evolving)
+    # Phase 4: Distill experience, highlight, then report, then stop
     STEP="highlight"
     RESULT="(distilled)"
     NEXT_STEP="report"

@@ -73,7 +73,6 @@ if [[ ! -d "$WORK_DIR" ]]; then
 fi
 
 STATUS_JSON="$WORK_DIR/.status.json"
-SESSION_CONTEXT="$WORK_DIR/.session-context"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
@@ -169,12 +168,6 @@ if [[ "$CURRENT_STATUS" == "executing" ]]; then
     if [[ -n "$LATEST_ANALYSIS" ]]; then
         echo "[exec] Analysis available: $(basename "$LATEST_ANALYSIS")"
     fi
-fi
-
-# Exit plan-refinement phase (if active)
-if [[ -f "$SESSION_CONTEXT" ]] && grep -qF "phase: plan-refinement" "$SESSION_CONTEXT"; then
-    rm -f "$SESSION_CONTEXT"
-    echo "[exec] Exited plan-refinement phase."
 fi
 
 # D1: Prerequisite checks — .target.md and .analysis/ should exist

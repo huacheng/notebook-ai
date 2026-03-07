@@ -54,7 +54,7 @@ assert_contains "$F" '## Next Step Prompt' \
 assert_contains "$F" 'Target defined.*Next.*research.*plan' \
     "target (draft→planning) prompts research or plan"
 assert_contains "$F" 'Stage.*target defined.*Next.*plan' \
-    "target (stage-done→planning) prompts plan"
+    "target (evolving→planning) prompts plan"
 assert_contains "$F" 'Target updated.*Next.*plan.*regenerate' \
     "target (refinement) prompts plan regeneration"
 assert_contains "$F" 'Target updated mid-execution' \
@@ -107,10 +107,8 @@ assert_contains "$F" 'Verification complete.*Next.*check.*checkpoint' \
 # --- merge ---
 echo "[merge]"
 F="$SKILLS_DIR/merge/SKILL.md"
-assert_contains "$F" 'merged and completed.*Next.*highlight.*report' \
-    "merge complete prompts highlight then report"
-assert_contains "$F" 'Stage.*merged.*Next.*highlight.*target' \
-    "merge stage-done prompts highlight then target"
+assert_contains "$F" 'Stage.*merged.*Next.*highlight.*report' \
+    "merge evolving prompts highlight then report"
 assert_contains "$F" 'Merge conflict.*resolve manually' \
     "merge conflict prompts manual resolution"
 

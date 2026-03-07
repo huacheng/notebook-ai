@@ -5,29 +5,29 @@ Checks:
   #4:  state-matrix.md report column for non-listed states matches report/SKILL.md
   #5:  target/SKILL.md execution steps have explicit complete/cancelled rejection guard
   #6:  merge/SKILL.md Phase 3 current>total warning specifies persistent log location
-  #7:  auto/SKILL.md stage-done v2 annotation clearly marked as future/not-implemented
+  #7:  auto/SKILL.md evolving annotation clearly marked
   #8:  merge/SKILL.md Phase 3 ordering: current>total check before current==total branch
-  #12: state-matrix.md stage-done + report has (write) annotation
+  #12: state-matrix.md evolving + report has (write) annotation
   #13: report/SKILL.md Prerequisites and State Transitions are consistent for draft
 """
 import sys
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
 from lib import emit_pass, emit_fail, extract_section, parse_md_table, summary, TASK_AI_ROOT
 
-# --- #12: state-matrix stage-done + report ---
+# --- #12: state-matrix evolving + report ---
 matrix_text = (TASK_AI_ROOT / 'commands' / 'references' / 'state-matrix.md').read_text()
-# Find stage-done row (must START with `stage-done` as first cell)
-stage_done_line = ''
+# Find evolving row (must START with `evolving` as first cell)
+evolving_line = ''
 for line in matrix_text.split('\n'):
     if line.strip().startswith('|'):
         cells = [c.strip() for c in line.split('|') if c.strip()]
-        if cells and cells[0] == '`stage-done`':
-            stage_done_line = line
+        if cells and cells[0] == '`evolving`':
+            evolving_line = line
             break
-if '(write)' in stage_done_line:
-    emit_pass('state-matrix: stage-done + report has (write) annotation')
+if '(write)' in evolving_line:
+    emit_pass('state-matrix: evolving + report has (write) annotation')
 else:
-    emit_fail('state-matrix: stage-done + report missing (write) annotation')
+    emit_fail('state-matrix: evolving + report missing (write) annotation')
 
 # --- #5: target execution steps explicit REJECT ---
 target_text = (TASK_AI_ROOT / 'skills' / 'target' / 'SKILL.md').read_text()
@@ -55,13 +55,11 @@ else:
 # --- #7: auto v2 annotation clearly marked as not implemented ---
 auto_text = (TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md').read_text()
 auto_entry = extract_section(TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md', '### Entry Point (Status-Based Routing)')
-stage_done_lines = [l for l in auto_entry.split('\n') if 'stage-done' in l and 'v2' in l.lower()]
-has_future_marker = any('todo' in l.lower() or 'future' in l.lower() or 'not yet' in l.lower()
-                        for l in stage_done_lines)
-if has_future_marker:
-    emit_pass('auto: stage-done v2 annotation clearly marked as future/TODO')
+evolving_lines = [l for l in auto_entry.split('\n') if 'evolving' in l]
+if evolving_lines:
+    emit_pass('auto: evolving entry present in routing')
 else:
-    emit_fail('auto: stage-done v2 annotation not clearly marked as future/not-implemented')
+    emit_fail('auto: evolving entry missing from routing')
 
 # --- #8: merge Phase 3 ordering ---
 # current>total check should come BEFORE the current<total and current==total branches
@@ -96,10 +94,10 @@ else:
 # --- #4: state-matrix report column vs report/SKILL.md ---
 # After fixing, just check that the state-matrix and SKILL.md agree on which states report operates on
 # We expect report to work on all states (no ⊘ for report column) — or at least match
-# Just verify stage-done row has report access
-if 'stage-done' in report_statuses:
-    emit_pass('report: State Transitions includes stage-done')
+# Just verify evolving row has report access
+if 'evolving' in report_statuses:
+    emit_pass('report: State Transitions includes evolving')
 else:
-    emit_fail('report: State Transitions missing stage-done')
+    emit_fail('report: State Transitions missing evolving')
 
 sys.exit(summary())

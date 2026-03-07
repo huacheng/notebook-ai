@@ -133,19 +133,10 @@ fi
 
 # Read multi-stage info (used after merge in Phase 3)
 STAGE_CURRENT=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.current 2>/dev/null || echo "1")
-STAGE_TOTAL=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.total 2>/dev/null || echo "1")
 
-# D2: Validate STAGE numbers contain only digits; D3: guard against zero/invalid values
+# D2: Validate STAGE number contains only digits; D3: guard against zero/invalid values
 if [[ ! "$STAGE_CURRENT" =~ ^[0-9]+$ ]] || [[ "$STAGE_CURRENT" -eq 0 ]]; then
     STAGE_CURRENT=1
-fi
-if [[ ! "$STAGE_TOTAL" =~ ^[0-9]+$ ]] || [[ "$STAGE_TOTAL" -eq 0 ]]; then
-    STAGE_TOTAL=1
-fi
-
-# D3: Handle stage.current > stage.total inconsistency (per SKILL.md Phase 3 step 2)
-if [[ "$STAGE_CURRENT" -gt "$STAGE_TOTAL" ]]; then
-    echo "[WARN] stage.current ($STAGE_CURRENT) > stage.total ($STAGE_TOTAL) — treating as final stage" >&2
 fi
 
 echo "[GIT] Merging $TASK_BRANCH into $MAIN_BRANCH..."
@@ -187,61 +178,26 @@ fi
 # the merged codebase includes the final status. Checking out the task branch
 # would leave main without the status transition.
 
-# Phase 3: Post-merge finalization — branch on stage info
+# Phase 3: Post-merge finalization — unified evolving path (progressive evolution)
+# D1: Always transition to evolving (no stage.total comparison — progressive evolution model)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-if [[ "$STAGE_CURRENT" -lt "$STAGE_TOTAL" ]]; then
-    # --- Intermediate stage complete ---
-    echo "[STAGE] Stage $STAGE_CURRENT/$STAGE_TOTAL complete. Advancing to next stage."
-
-    # D1: Status transition (SKILL.md requires .summary.md/.target.md writes before this — handled by AI agent caller)
-    # D3: Transition failure is fatal — .auto-signal must not claim stage-done if status is still executing
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status stage-done; then
-        echo "[ERROR] Failed to update status to stage-done. Merge succeeded but state update failed." >&2
-        # D3: Write .auto-signal so daemon can route even on state transition failure (atomic)
-        cat > "${SIGNAL_FILE}.tmp" <<EOFAIL
-{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"state-transition-failed","timestamp":"$TIMESTAMP"}
-EOFAIL
-        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
-        exit 1
-    fi
-
-    # Write .auto-signal for stage-done (atomic)
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"stage-done","next":"highlight","checkpoint":"","timestamp":"$TIMESTAMP"}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
-
-    # Git commit stage state
-    cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }
-    git add .status.json .auto-signal 2>/dev/null || echo "[WARN] git add failed for stage state" >&2
-    git commit -m "task-ai($NOTEBOOK):merge stage $STAGE_CURRENT completed" 2>/dev/null || echo "[WARN] git commit failed for stage state" >&2
-
-    echo "Task $NOTEBOOK stage $STAGE_CURRENT complete. Use init --continue to start next stage."
-else
-    # --- Final stage or single-stage task ---
-    # D1: Update status to complete (retain branch/worktree per SKILL.md)
-    # D3: Transition failure is fatal — .auto-signal must not claim success if status is still executing
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status complete; then
-        echo "[ERROR] Failed to update status to complete. Merge succeeded but state update failed." >&2
-        # D3: Write .auto-signal so daemon can route even on state transition failure (atomic)
-        cat > "${SIGNAL_FILE}.tmp" <<EOFAIL
-{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"state-transition-failed","timestamp":"$TIMESTAMP"}
-EOFAIL
-        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
-        exit 1
-    fi
-
-    # Write .auto-signal for success (atomic)
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"success","next":"highlight","checkpoint":"","timestamp":"$TIMESTAMP"}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
-
-    # Git commit task state
-    cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }
-    git add .status.json .auto-signal 2>/dev/null || echo "[WARN] git add failed for task state" >&2
-    git commit -m "task-ai($NOTEBOOK):merge task completed" 2>/dev/null || echo "[WARN] git commit failed for task state" >&2
-
-    echo "Task $NOTEBOOK successfully merged into $MAIN_BRANCH. Branch '$TASK_BRANCH' retained."
+echo "[STAGE] Stage $STAGE_CURRENT completed. Status → evolving."
+if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status evolving \
+    --stage-history "{\"stage\":$STAGE_CURRENT,\"name\":\"stage-$STAGE_CURRENT\",\"completed_at\":\"$TIMESTAMP\"}"; then
+    echo "[ERROR] Failed to update task state to evolving" >&2
+    exit 1
 fi
+
+# Write .auto-signal for evolving (atomic)
+cat > "${SIGNAL_FILE}.tmp" <<EOF
+{"step":"merge","result":"evolving","next":"highlight","checkpoint":"","timestamp":"$TIMESTAMP"}
+EOF
+mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
+
+# Git commit stage state
+cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }
+git add .status.json .auto-signal 2>/dev/null || echo "[WARN] git add failed for stage state" >&2
+git commit -m "task-ai($NOTEBOOK):merge stage $STAGE_CURRENT completed" 2>/dev/null || echo "[WARN] git commit failed for stage state" >&2
+
+echo "Task $NOTEBOOK stage $STAGE_CURRENT complete. Use /task-ai:target to define next stage or --satisfy to mark satisfied."

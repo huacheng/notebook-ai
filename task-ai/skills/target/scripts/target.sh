@@ -2,14 +2,14 @@
 # /task-ai:target implementation
 # Usage: target.sh [objective_content]
 #        target.sh --refine "refinement content"
-#        target.sh --finalize
+#        target.sh --satisfy
 
 set -euo pipefail
 trap 'rm -f "${TMP_FILE:-}" "${TMP_STATUS:-}"' EXIT ERR INT TERM HUP
 
 # Parse arguments
 REFINE_MODE=0
-FINALIZE_MODE=0
+SATISFY_MODE=0
 OBJECTIVE=""
 
 while [[ $# -gt 0 ]]; do
@@ -24,8 +24,8 @@ while [[ $# -gt 0 ]]; do
             OBJECTIVE="${2:-}"
             shift 2 || shift
             ;;
-        --finalize)
-            FINALIZE_MODE=1
+        --satisfy)
+            SATISFY_MODE=1
             shift
             ;;
         *)
@@ -45,8 +45,8 @@ if ! find_nb_context; then
 fi
 
 TARGET_FILE="$NB_WORKING/.target.md"
-SESSION_CONTEXT="$NB_WORKING/.session-context"
 STATUS_FILE="$NB_WORKING/.status.json"
+STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # D1: Read .status.json and reject complete/cancelled tasks (SKILL.md step 1)
@@ -63,30 +63,30 @@ if [[ -f "$STATUS_FILE" ]]; then
 fi
 CURRENT_STATUS="${CURRENT_STATUS:-draft}"
 
-# D1: Reject completed/cancelled tasks (SKILL.md State Transitions table)
-if [[ "$CURRENT_STATUS" == "complete" || "$CURRENT_STATUS" == "cancelled" ]]; then
-    echo "[ERROR] Completed/cancelled tasks cannot be re-targeted." >&2
+# D1: Reject cancelled tasks (SKILL.md State Transitions table)
+if [[ "$CURRENT_STATUS" == "cancelled" ]]; then
+    echo "[ERROR] Cancelled tasks cannot be re-targeted." >&2
     exit 1
 fi
 
-# D1: stage-done requires archive operations (SKILL.md step 2a) which are
-# handled by the agent, not this script. Refuse direct script invocation.
-if [[ "$CURRENT_STATUS" == "stage-done" ]] && [[ -n "${OBJECTIVE:-}" || "$REFINE_MODE" -eq 1 ]]; then
-    echo "[ERROR] Status is 'stage-done'. Stage advance requires archive operations — use the agent workflow, not direct script invocation." >&2
+# D1: evolving with objective write should be rejected (require agent workflow for Stage Advance)
+if [[ "$CURRENT_STATUS" == "evolving" ]] && [[ -n "${OBJECTIVE:-}" || "$REFINE_MODE" -eq 1 ]]; then
+    echo "[ERROR] Status is 'evolving'. Stage advance requires agent workflow — use the agent workflow, not direct script invocation." >&2
     exit 1
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mode 1: Finalize (exit target-refinement phase)
+# Mode 1: Satisfy (mark task as satisfied from evolving status)
 # ─────────────────────────────────────────────────────────────────────────────
-if [[ "$FINALIZE_MODE" -eq 1 ]]; then
-    if [[ -f "$SESSION_CONTEXT" ]] && grep -q "phase: target-refinement" "$SESSION_CONTEXT"; then
-        rm -f "$SESSION_CONTEXT"
-        echo "[target] Target finalized. Exited target-refinement phase."
-        echo "[target] Run /task-ai:plan to generate implementation plan."
-    else
-        echo "[target] Not in target-refinement phase."
+if [[ "$SATISFY_MODE" == "1" ]]; then
+    CURRENT_STATUS=$(python3 "$STATE_PY" get "$STATUS_FILE" status 2>/dev/null || echo "")
+    if [[ "$CURRENT_STATUS" != "evolving" ]]; then
+        echo "[ERROR] --satisfy requires status 'evolving', current is '$CURRENT_STATUS'" >&2
+        exit 1
     fi
+    python3 "$STATE_PY" set "$STATUS_FILE" status satisfied
+    git add "$STATUS_FILE" && git commit -m "task-ai($NB_NOTEBOOK):target marked satisfied" 2>/dev/null || true
+    echo "Task marked as satisfied. Use /task-ai:target to re-enter evolution if needed."
     exit 0
 fi
 
@@ -116,11 +116,6 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
     if [[ ! -f "$TARGET_FILE" ]]; then
         echo "[ERROR] Cannot refine — no target file exists. Use /task-ai:target first." >&2
         exit 1
-    fi
-
-    # D3: Warn if not in target-refinement phase (non-blocking)
-    if [[ ! -f "$SESSION_CONTEXT" ]] || ! grep -q "phase: target-refinement" "$SESSION_CONTEXT"; then
-        echo "[WARN] Not in target-refinement phase. Proceeding anyway."
     fi
 
     DATE=$(date "+%Y-%m-%d %H:%M")
@@ -219,17 +214,14 @@ else
 fi
 
 # D1: Update .status.json status transition (SKILL.md State Transitions table)
-# draft → planning; blocked → planning; review → re-planning
-# NOTE: stage-done is NOT transitioned here — SKILL.md step 2a requires archive
-# (steps 4-5) BEFORE status change. The agent handles stage-done → planning
-# after performing archive operations. See SKILL.md "Atomicity" note.
+# draft → planning; blocked → planning; review → re-planning; satisfied → planning (re-enter evolution)
 if [[ -f "$STATUS_FILE" ]] && ! command -v jq &>/dev/null; then
     echo "[WARN] jq not found — cannot update .status.json status transition" >&2
 elif [[ -f "$STATUS_FILE" ]]; then
     NEW_STATUS=""
     case "$CURRENT_STATUS" in
-        draft|blocked)  NEW_STATUS="planning" ;;
-        review)         NEW_STATUS="re-planning" ;;
+        draft|blocked|satisfied)  NEW_STATUS="planning" ;;
+        review)                   NEW_STATUS="re-planning" ;;
     esac
     if [[ -n "$NEW_STATUS" ]]; then
         TMP_STATUS=$(mktemp) || { echo "[ERROR] Failed to create temp file for status" >&2; exit 1; }
@@ -256,13 +248,4 @@ if ! git commit -m "task-ai($NB_NOTEBOOK):target update objective" 2>/dev/null; 
 fi
 
 echo "Objective successfully updated and committed."
-
-# Enter target-refinement phase
-# D2: Variables are safe here (controlled values), but use explicit format
-# D3: Error handling for session context write
-if ! printf 'phase: target-refinement\nentered_at: %s\nentered_by: /task-ai:target\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$SESSION_CONTEXT" 2>/dev/null; then
-    echo "[WARN] Failed to write session context" >&2
-fi
-
-echo "[target] Entered target-refinement phase."
 echo "[target] Continue discussing to refine. Use /task-ai:plan when ready."

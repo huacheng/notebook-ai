@@ -96,32 +96,30 @@ Writers should keep `.summary.md` under ~200 lines. It is a context window optim
   "worktree": ".worktrees/task-notebook-name",
   "stage": {
     "current": 1,
-    "total": 1,
-    "completed": []
+    "history": []
   }
 }
 ```
 
 Notes: `worktree` is empty string `""` if not using worktree. `depends_on` entries can be simple strings (require `complete`) or objects `{ "module": "...", "min_status": "..." }`.
 
-#### Stage Field (Progressive Target)
+#### Stage Field (Progressive Evolution)
 
-The `stage` field tracks multi-stage target progression. Default: `{ "current": 1, "total": 1, "completed": [] }`.
+The `stage` field tracks progressive task evolution. Default: `{ "current": 1, "history": [] }`. There is no `total` — stages are emergent, not predefined.
 
 | Sub-field | Type | Description |
 |-----------|------|-------------|
-| `stage.current` | integer | Current stage number (1-based) |
-| `stage.total` | integer | `1` = single stage, `>1` = multi-stage |
-| `stage.completed` | array | Records of completed stages |
-| `stage.completed[].stage` | integer | Stage number |
-| `stage.completed[].name` | string | Stage name |
-| `stage.completed[].completed_at` | string | ISO 8601 completion timestamp |
+| `stage.current` | integer | Current stage number (1-based, only increases) |
+| `stage.history` | array | Records of completed stages |
+| `stage.history[].stage` | integer | Stage number |
+| `stage.history[].name` | string | Stage name/description |
+| `stage.history[].completed_at` | string | ISO 8601 completion timestamp |
 
-**Validation Rules**: `stage.current >= 1`, `stage.total >= 1`, `stage.current <= stage.total + 1` (current may temporarily equal total + 1 during stage advance before total is incremented). If any rule is violated, treat as corrupted — log warning and fall back to `{ "current": 1, "total": 1, "completed": [] }`.
+**Validation Rules**: `stage.current >= 1`. If violated, treat as corrupted — log warning and fall back to `{ "current": 1, "history": [] }`.
 
-**Default handling**: If `.status.json` lacks the `stage` field (pre-v1 notebooks), all commands MUST treat it as `{ "current": 1, "total": 1, "completed": [] }`. No migration needed — single-stage behavior is identical to pre-v1.
+**Default handling**: If `.status.json` lacks the `stage` field, all commands MUST treat it as `{ "current": 1, "history": [] }`.
 
-**Retry-safe Design**: Stage advance operations (target step 2a) are designed to be retry-safe (non-atomic by intent). Archive/clear steps (4-5) execute before the status change (step 6). If archive/clear fails, status remains `stage-done` and re-running target retries safely. If status change succeeds but git commit fails, status is already `planning` — re-running target detects `planning` and routes to the normal update path. No manual rollback needed.
+**Hard upgrade (v2)**: Old `stage.total` and `stage.completed` fields are not recognized. Old `.status.json` files must be manually migrated (`completed` → `history`, remove `total`) or re-initialized.
 
 #### Type Field
 
@@ -148,14 +146,28 @@ Writers: `check` sets `phase: needs-plan` on REPLAN and on NEEDS_REVISION when s
 | `draft` | Task target being defined | `planning`, `cancelled` |
 | `planning` | Plan being researched | `review`, `blocked`, `cancelled` |
 | `review` | Plan passed assessment | `executing`, `re-planning`, `cancelled` |
-| `executing` | Implementation in progress | `complete`, `stage-done`, `re-planning`, `blocked`, `cancelled` |
+| `executing` | Implementation in progress | `evolving`, `re-planning`, `blocked`, `cancelled` |
 | `re-planning` | Plan being revised | `review`, `blocked`, `cancelled` |
-| `stage-done` | Current stage complete, awaiting next stage | `planning`, `cancelled` |
-| `complete` | Finished and verified | — (terminal) |
+| `evolving` | Current stage complete, ready for next evolution | `planning`, `satisfied`, `cancelled` |
+| `satisfied` | User temporarily satisfied (non-terminal, can re-enter) | `planning`, `cancelled` |
 | `blocked` | Blocked by dependency/issue | `planning`, `cancelled` |
 | `cancelled` | Abandoned (via `cancel`) | — (terminal) |
 
 > **See `commands/references/state-matrix.md`** for the complete state × command matrix with all (state, sub-command) combinations and verification properties.
+
+Terminal states: only `cancelled`.
+
+### Phase Awareness Protocol
+
+`.status.json` is the single source of truth for task phase information. The agent maintains phase awareness through two mechanisms:
+
+1. **Change sensing**: Each skill modifies `.status.json` on completion. The agent re-reads `.status.json` after each `/task-ai:` command to load current `status`, `stage`, and `phase` values.
+
+2. **Compression recovery**: After Claude Code triggers context compression, the agent MUST re-read `.status.json` to restore phase information lost during compression.
+
+**Non-notebook context**: If `.status.json` does not exist (CWD is not inside `.working/` and not on a `task/` branch), the agent does not attempt phase-aware behavior — no research/refine calls, no status checks. Falls back to normal conversation mode.
+
+No `.session-context` file is used. Phase awareness is derived entirely from `.status.json`.
 
 ### Annotation Format (for `annotate` sub-command)
 
@@ -163,7 +175,7 @@ Writers: `check` sets `phase: needs-plan` on REPLAN and on NEEDS_REVISION when s
 
 ### depends_on Format
 
-Simple string `"module"` → requires `complete`. Extended object `{ "module", "min_status" }` → requires at-or-past that status. `exec`/`merge` MUST validate before proceeding; `check` flags unmet as BLOCKED.
+Simple string `"module"` → requires `satisfied`. Extended object `{ "module", "min_status" }` → requires at-or-past that status. `exec`/`merge` MUST validate before proceeding; `check` flags unmet as BLOCKED.
 
 > **See `commands/references/depends-on-format.md`** for full format specification, status progression order, and enforcement rules.
 

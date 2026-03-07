@@ -22,8 +22,8 @@ arguments:
   - name: --refine
     description: "Append a refinement to existing target (used by agent during target-refinement phase). Requires a value argument: --refine \"content\""
     required: false
-  - name: --finalize
-    description: "Exit target-refinement phase, signal target is ready for planning"
+  - name: --satisfy
+    description: "Mark task as satisfied (only valid in evolving status). Non-terminal — can re-enter evolution later via /task-ai:target"
     required: false
 ---
 
@@ -34,7 +34,7 @@ Define or review the core mission for a notebook. This command acts as the cogni
 ## Usage
 
 ```bash
-# Write mode: define/update objective, enter target-refinement phase
+# Write mode: define/update objective
 /task-ai:target "Build a JWT authentication system"
 
 # Read mode: display current target
@@ -43,31 +43,15 @@ Define or review the core mission for a notebook. This command acts as the cogni
 # Refine mode: append refinement (agent calls this during conversation)
 /task-ai:target --refine "Use refresh tokens for session extension"
 
-# Finalize mode: exit target-refinement phase
-/task-ai:target --finalize
+# Satisfy mode: mark task as satisfied (non-terminal)
+/task-ai:target --satisfy
 ```
 
-## Target-Refinement Phase
+## Refinement
 
-When `/task-ai:target "..."` is called with content, the system enters **target-refinement phase**:
+The agent maintains phase awareness via `.status.json` (see Phase Awareness Protocol in `commands/task-ai.md`). No `.session-context` file is used.
 
-1. **Entry**: `/task-ai:target "objective"` writes to `.target.md` and creates `.session-context`
-2. **During phase**: Agent monitors conversation for objective refinements
-   - Agent detects user refining the goal → automatically calls `/task-ai:target --refine "content"`
-   - Refinements are appended to `## Refinements` section in `.target.md`
-3. **Exit**: `/task-ai:plan` or `/task-ai:target --finalize` clears `.session-context`
-
-### Agent Behavior (Context Augmentation)
-
-When `.session-context` exists with `phase: target-refinement`, the agent receives:
-```
-You are in target-refinement phase.
-Current target: <content of .target.md>
-
-When user's conversation refines, clarifies, or adjusts the objective,
-automatically call: /task-ai:target --refine "<extracted refinement>"
-No explicit command needed from user.
-```
+When the user expresses intent to modify the target during `planning` status, the agent calls `/task-ai:target --refine "..."` naturally. No additional phase file is needed — `.status.json` `status: planning` is sufficient context.
 
 ### .target.md Structure
 
@@ -98,28 +82,35 @@ Build a JWT authentication system
    - Locate the current notebook via path-based discovery (`.working/` directory) or branch-based discovery (`task/<name>`).
    - If context cannot be identified, abort with error: "No active task context detected. Enter a notebook directory or switch to a task branch."
    - **Read** `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing) and `status`.
-   - **If status is `complete` or `cancelled`**: REJECT with error "Completed/cancelled tasks cannot be re-targeted." Abort execution.
+   - **If status is `cancelled`**: REJECT with error "Cancelled tasks cannot be re-targeted." Abort execution.
 
-2. **If `objective` is provided (Write Mode)** — three-branch routing:
+2. **If `--satisfy` is provided**:
+   - If status != `evolving` → REJECT with error "Can only satisfy tasks in evolving status."
+   - Else: update `.status.json` status → `satisfied`, git commit `task-ai(<notebook>):target mark satisfied`, output message "Task marked as satisfied."
 
-   2a. **IF status == `stage-done`** → **Stage Advance Mode**:
-      1. Read `.target.md`, locate next `[PENDING]` Stage
-      2. Write user's objective to that Stage's Objective/Requirements/Constraints
-      3. Mark switch: current Stage `[PENDING]` → `[ACTIVE]`
-      4. Archive (if exists — skip missing files, non-fatal): `.plan.md` → `.plan-stage-<N>.md` (where N = just-completed stage); `.plan-superseded.md` → `.plan-superseded-stage-<N>.md` (if exists); `.analysis/` → `.analysis-stage-<N>/` (if exists); `.test/` → `.test-stage-<N>/` (if exists)
-      5. Clear (non-fatal — skip if directory missing or empty): `.bugfix/` directory contents
-      6. Update `.status.json`: `stage.current++`, `status` → `planning`, `completed_steps` → `0`
-      7. Git commit: `task-ai(<notebook>):target stage <N+1> defined`
-      8. Execute highlight protocol scope=thinking-raw (optional, high-value)
+3. **If `objective` is provided (Write Mode)** — three-branch routing:
 
-      **Atomicity**: status change (step 6) occurs AFTER archive/clear (steps 4-5). If steps 4-5 fail, status stays `stage-done` — user can retry. If step 6 succeeds but step 7 fails, status is already `planning` — re-running target detects `planning` and routes to normal update path.
+   3a. **IF status == `evolving`** → **Stage Advance Mode**:
+      1. Read `.target.md`, archive old plan: `.plan.md` → `.plan-stage-<N>.md` (where N = current stage); `.plan-superseded.md` → `.plan-superseded-stage-<N>.md` (if exists); `.analysis/` → `.analysis-stage-<N>/` (if exists); `.test/` → `.test-stage-<N>/` (if exists). Skip missing files (non-fatal).
+      2. Clear (non-fatal — skip if directory missing or empty): `.bugfix/` directory contents
+      3. Increment `stage.current`, append new Stage section to `.target.md` with user's objective
+      4. Update `.status.json`: `stage.current` incremented, `status` → `planning`, `completed_steps` → `0`
+      5. Git commit: `task-ai(<notebook>):target stage <N+1> defined`
+      6. Execute highlight protocol scope=thinking-raw (optional, high-value)
 
-   2b. **ELIF `stage.total > 1`** → **Multi-stage Update Mode**:
+      **Atomicity**: status change (step 4) occurs AFTER archive/clear (steps 1-2). If steps 1-2 fail, status stays `evolving` — user can retry. If step 4 succeeds but step 5 fails, status is already `planning` — re-running target detects `planning` and routes to normal update path.
+
+   3b. **ELIF `stage.total > 1`** → **Multi-stage Update Mode**:
       - Update current `[ACTIVE]` Stage's content in `.target.md`
       - Atomic write + Git commit: `task-ai(<notebook>):target update objective`
       - Execute highlight protocol scope=thinking-raw (optional, high-value)
 
-   2c. **ELSE** (normal mode, including first definition) → **Normal/Multi-stage Analysis Mode**:
+   3c. **ELIF status == `satisfied`** → **Re-enter Evolution**:
+      - Update `.status.json` status → `planning`
+      - Write user's objective to `.target.md`
+      - Git commit: `task-ai(<notebook>):target re-enter evolution`
+
+   3d. **ELSE** (normal mode, including first definition) → **Normal/Multi-stage Analysis Mode**:
       - **IF status ∈ {`draft`, `planning`}**: evaluate objective complexity:
         - Is it beyond a single plan→exec→merge cycle?
         - Are there natural stage boundaries?
@@ -129,23 +120,25 @@ Build a JWT authentication system
       - Atomic write to `.working/.target.md` + update `.status.json` + Git commit: `task-ai(<notebook>):target update objective`
       - Execute highlight protocol scope=thinking-raw (optional, high-value). Inline call failure MUST NOT block target's main flow.
 
-3. **If `objective` is omitted (Read Mode)**:
+4. **If `objective` is omitted (Read Mode)**:
    - **Read**: Read the content of `.working/.target.md`.
    - **Display**: Output the structured objective to the conversation window.
-4. **Validation**: Confirm the target reflects the user's intent.
-5. **Next Step Prompt** (MUST output after write mode completes — see table below).
+5. **Validation**: Confirm the target reflects the user's intent.
+6. **Next Step Prompt** (MUST output after write mode completes — see table below).
 
 ## Next Step Prompt
 
-After write mode (step 2) completes, output the exact next step based on the resulting status:
+After write mode completes, output the exact next step based on the resulting status:
 
 | Resulting Status | Prompt (output verbatim) |
 |-----------------|--------------------------|
 | `planning` (from `draft`) | "Target defined. Next: `/task-ai:research --caller target` to deepen the objective, or `/task-ai:plan` to generate the implementation plan." |
-| `planning` (from `stage-done`) | "Stage <N+1> target defined. Next: `/task-ai:plan` to generate the implementation plan for this stage." |
+| `planning` (from `evolving`) | "Stage <N+1> target defined. Next: `/task-ai:plan` to generate the implementation plan for this stage." |
+| `planning` (from `satisfied`) | "Re-entering evolution. Next: `/task-ai:plan` to generate the implementation plan." |
 | `planning` (from `blocked`) | "Target revised. Next: `/task-ai:plan` to re-plan with the updated objective." |
 | `planning` / `re-planning` (refinement) | "Target updated. Next: `/task-ai:plan` to regenerate the plan with the revised objective." |
 | `executing` (mid-exec update) | "Target updated mid-execution. Impact analysis needed — review current plan against revised objective." |
+| `satisfied` (from `--satisfy`) | "Task marked as satisfied. Use `/task-ai:target` to re-enter evolution if needed." |
 
 > **Why mandatory**: Without this prompt, the user has no clear signal of what to do next after defining the target. The target→plan transition is the most common point where users get stuck.
 
@@ -153,15 +146,15 @@ After write mode (step 2) completes, output the exact next step based on the res
 
 | Current Status | Result | Next Status | Checkpoint | Rationale |
 | :--- | :--- | :--- | :--- | :--- |
-| `draft` | (updated) | `planning` | `post-target` | Target defined, ready for research or planning. |
-| `planning` | (updated) | `planning` | `re-plan` | Objective refined during planning; requires plan regeneration. |
-| `executing` | (updated) | `executing` | `mid-exec` | Goal adjustment mid-execution; requires impact analysis. |
-| `stage-done` | (updated) | `planning` | `stage-advance` | Next stage target defined, enter planning for new stage. |
-| `review` | (updated) | `re-planning` | `mid-review` | Objective refined during review; requires re-planning. |
-| `re-planning` | (updated) | `re-planning` | `re-plan` | Objective refined during re-planning; plan regeneration needed. |
-| `blocked` | (updated) | `planning` | `unblock` | Target revised to unblock; re-enter planning. |
-| `complete` | REJECT | — | — | Completed tasks cannot be re-targeted. |
-| `cancelled` | REJECT | — | — | Cancelled tasks cannot be re-targeted. |
+| `draft` | (updated) | `planning` | `post-target` | Target defined |
+| `planning` | (updated) | `planning` | `re-plan` | Objective refined |
+| `executing` | (updated) | `executing` | `mid-exec` | Goal adjustment mid-execution |
+| `re-planning` | (updated) | `re-planning` | `re-plan` | Objective refined during re-planning |
+| `blocked` | (updated) | `planning` | `post-target` | Target revised to unblock |
+| `evolving` | (updated) | `planning` | `post-target` | Next stage defined |
+| `evolving` | --satisfy | `satisfied` | — | User temporarily satisfied |
+| `satisfied` | (updated) | `planning` | `post-target` | Re-enter evolution |
+| `cancelled` | REJECT | — | — | Terminal state |
 
 ## Git
 
@@ -170,9 +163,10 @@ After write mode (step 2) completes, output the exact next step based on the res
 | `target` | `task-ai(<notebook>):target update objective` |
 | `target --refine` | `task-ai(<notebook>):target refine objective` |
 | `target` (stage advance) | `task-ai(<notebook>):target stage <N+1> defined` |
+| `target --satisfy` | `task-ai(<notebook>):target mark satisfied` |
+| `target` (re-enter from satisfied) | `task-ai(<notebook>):target re-enter evolution` |
 
 ## Notes
 
 - **Read-only in frontend**: `.target.md` is displayed as read-only in the frontend. Users submit change requests via annotations, which are processed by the `target` sub-command to regenerate the document. This prevents format corruption in multi-stage targets.
 - **Context Loading**: If the agent's context is compressed, `/task-ai:target` without arguments is the standard way to reload the task's mission into memory.
-- **Accepted risk — `stage-done` trust**: In Stage Advance Mode (step 2a), target trusts that the prior stage was genuinely completed (merge set `stage-done` after ACCEPT verdict). There is no re-verification of the prior stage. This is an accepted risk: if `.status.json` is manually corrupted to `stage-done`, target will advance without checking. Mitigation: `.status.json` is only written atomically by lifecycle commands, and manual edits are explicitly unsupported.

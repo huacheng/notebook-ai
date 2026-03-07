@@ -51,8 +51,8 @@ else:
 
 # --- Test 3: Key self-loop transitions ---
 missing_loops = []
-# report self-loops on terminal + stage-done
-for state in ['complete', 'blocked', 'cancelled']:
+# report self-loops on terminal + evolving
+for state in ['satisfied', 'blocked', 'cancelled']:
     if not has_t(state, state, 'report'):
         missing_loops.append(f'{state}→{state} via report')
 # target/annotate self-loops on planning

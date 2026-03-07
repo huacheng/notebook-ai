@@ -6,9 +6,9 @@ Checks:
   2. Every transition in state-matrix for plan matches plan/SKILL.md
   3. Every transition in state-matrix for cancel matches cancel/SKILL.md
   4. Every transition in state-matrix for annotate matches annotate/SKILL.md
-  5. state-matrix target column includes stage-done → planning
-  6. state-matrix cancel column includes stage-done → cancelled
-  7. state-matrix report column is available for stage-done
+  5. state-matrix target column includes evolving → planning
+  6. state-matrix cancel column includes evolving → cancelled
+  7. state-matrix report column is available for evolving
 """
 import re
 import sys
@@ -129,34 +129,34 @@ if not mismatches:
 else:
     emit_fail(f'state-matrix annotate inconsistencies: {"; ".join(mismatches)}')
 
-# --- Test 5: state-matrix target shows stage-done → planning ---
-if 'stage-done' in matrix and 'target' in matrix['stage-done']:
-    cell = matrix['stage-done']['target']
+# --- Test 5: state-matrix target shows evolving → planning ---
+if 'evolving' in matrix and 'target' in matrix['evolving']:
+    cell = matrix['evolving']['target']
     if 'planning' in cell:
-        emit_pass('state-matrix: stage-done + target → planning')
+        emit_pass('state-matrix: evolving + target → planning')
     else:
-        emit_fail(f'state-matrix: stage-done + target cell = "{cell}", expected planning')
+        emit_fail(f'state-matrix: evolving + target cell = "{cell}", expected planning')
 else:
-    emit_fail('state-matrix: stage-done row or target column not found')
+    emit_fail('state-matrix: evolving row or target column not found')
 
-# --- Test 6: state-matrix cancel shows stage-done → cancelled ---
-if 'stage-done' in matrix and 'cancel' in matrix['stage-done']:
-    cell = matrix['stage-done']['cancel']
+# --- Test 6: state-matrix cancel shows evolving → cancelled ---
+if 'evolving' in matrix and 'cancel' in matrix['evolving']:
+    cell = matrix['evolving']['cancel']
     if 'cancelled' in cell:
-        emit_pass('state-matrix: stage-done + cancel → cancelled')
+        emit_pass('state-matrix: evolving + cancel → cancelled')
     else:
-        emit_fail(f'state-matrix: stage-done + cancel cell = "{cell}", expected cancelled')
+        emit_fail(f'state-matrix: evolving + cancel cell = "{cell}", expected cancelled')
 else:
-    emit_fail('state-matrix: stage-done row or cancel column not found')
+    emit_fail('state-matrix: evolving row or cancel column not found')
 
-# --- Test 7: state-matrix report available for stage-done ---
-if 'stage-done' in matrix and 'report' in matrix['stage-done']:
-    cell = matrix['stage-done']['report']
+# --- Test 7: state-matrix report available for evolving ---
+if 'evolving' in matrix and 'report' in matrix['evolving']:
+    cell = matrix['evolving']['report']
     if '⊘' not in cell:
-        emit_pass('state-matrix: stage-done + report is available (not rejected)')
+        emit_pass('state-matrix: evolving + report is available (not rejected)')
     else:
-        emit_fail('state-matrix: stage-done + report is rejected (should be available)')
+        emit_fail('state-matrix: evolving + report is rejected (should be available)')
 else:
-    emit_fail('state-matrix: stage-done row or report column not found')
+    emit_fail('state-matrix: evolving row or report column not found')
 
 sys.exit(summary())

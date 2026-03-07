@@ -38,7 +38,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 - `.target.md` should exist (warning if missing — provides requirements context)
 - At least one plan file (`.plan.md`) must exist
 - `.analysis/` should contain a PASS evaluation file (warning if empty/missing)
-- **Dependency gate**: All `depends_on` modules must meet their required status — simple string entries require `complete`, extended `{ module, min_status }` entries require at-or-past `min_status` (see depends_on Format in `commands/task-ai.md`). If any dependency is not met, exec REJECTS with error listing blocking dependencies and their current statuses
+- **Dependency gate**: All `depends_on` modules must meet their required status — simple string entries require `satisfied`, extended `{ module, min_status }` entries require at-or-past `min_status` (see depends_on Format in `commands/task-ai.md`). If any dependency is not met, exec REJECTS with error listing blocking dependencies and their current statuses
 
 ## Execution Strategy
 
@@ -54,7 +54,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 8. **Read** `.notes/` latest file only if exists for most recent research findings
 9. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
 10. **Scan** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — find relevant external reference files by keyword matching. Read matched `.memory/.references/<topic>.md` files for domain-specific implementation guidance
-11. **Gap check**: if `.type-profile.md` lacks implementation guidance OR `.references/` lacks knowledge for the current step's technologies/APIs, trigger `research --scope gap --caller exec` to collect missing references before proceeding
+11. **Gap check** (intelligence support): if `.type-profile.md` lacks implementation guidance OR `.references/` lacks knowledge for the current step's technologies/APIs, trigger `research --scope gap --caller exec` to collect missing references before proceeding. When encountering technical obstacles during execution, the agent may also invoke `research --scope gap --caller exec` for targeted research
 12. **Extract** implementation steps from `.plan.md` (ordered by heading structure)
 13. **Build** execution order respecting any noted dependencies
 
@@ -95,7 +95,7 @@ For each implementation step:
 ## Execution Steps
 
 1. **Read** `.status.json` — validate status is `review` or `executing`
-2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `complete`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
+2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `satisfied`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
 3. **Update** `.status.json` status to `executing`, clear `phase` to `""`, update timestamp
 4. **Discover** all implementation steps from `.plan.md`
 5. **Detect completed steps**: read `completed_steps` field from `.status.json` to determine progress; skip steps ≤ `completed_steps`

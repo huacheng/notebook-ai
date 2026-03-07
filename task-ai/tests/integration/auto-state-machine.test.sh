@@ -162,21 +162,21 @@ assert_signal "executing→verify" "$_SIGNAL" "phase" "execution"
 cleanup
 
 # ─────────────────────────────────────────────────────────────
-# Test 9: status=complete → report
+# Test 9: status=satisfied → report
 # ─────────────────────────────────────────────────────────────
-run_auto_with_status "complete"
-assert_signal "complete→report" "$_SIGNAL" "step" "report"
-assert_signal "complete→report" "$_SIGNAL" "next" "(stop)"
-assert_signal "complete→report" "$_SIGNAL" "phase" "finalization"
+run_auto_with_status "satisfied"
+assert_signal "satisfied→report" "$_SIGNAL" "step" "report"
+assert_signal "satisfied→report" "$_SIGNAL" "next" "(stop)"
+assert_signal "satisfied→report" "$_SIGNAL" "phase" "finalization"
 cleanup
 
 # ─────────────────────────────────────────────────────────────
-# Test 10: status=stage-done → highlight
+# Test 10: status=evolving → highlight
 # ─────────────────────────────────────────────────────────────
-run_auto_with_status "stage-done"
-assert_signal "stage-done→highlight" "$_SIGNAL" "step" "highlight"
-assert_signal "stage-done→highlight" "$_SIGNAL" "next" "report"
-assert_signal "stage-done→highlight" "$_SIGNAL" "phase" "finalization"
+run_auto_with_status "evolving"
+assert_signal "evolving→highlight" "$_SIGNAL" "step" "highlight"
+assert_signal "evolving→highlight" "$_SIGNAL" "next" "report"
+assert_signal "evolving→highlight" "$_SIGNAL" "phase" "finalization"
 cleanup
 
 # ─────────────────────────────────────────────────────────────

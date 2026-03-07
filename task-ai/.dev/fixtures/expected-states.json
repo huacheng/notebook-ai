@@ -1,7 +1,7 @@
 {
-  "_meta": { "version": "1.5", "last_verified": "2026-02-27", "note": "41 transitions — complete coverage: self-loops + annotate/plan/exec state-changing transitions" },
-  "states": ["draft","planning","review","executing","re-planning","stage-done","complete","blocked","cancelled"],
-  "terminal": ["complete", "cancelled"],
+  "_meta": { "version": "2.0", "last_verified": "2026-03-07", "note": "Progressive evolution model — evolving/satisfied replace stage-done/complete — 43 transitions" },
+  "states": ["draft","planning","review","executing","re-planning","evolving","satisfied","blocked","cancelled"],
+  "terminal": ["cancelled"],
   "transitions": [
     { "from": "draft",        "to": "planning",     "via": "plan" },
     { "from": "draft",        "to": "planning",     "via": "annotate" },
@@ -25,11 +25,12 @@
     { "from": "executing",    "to": "re-planning",  "via": "check REPLAN" },
     { "from": "executing",    "to": "blocked",      "via": "exec", "note": "blocking dependency encountered" },
     { "from": "executing",    "to": "blocked",      "via": "check BLOCKED" },
-    { "from": "executing",    "to": "complete",     "via": "merge" },
-    { "from": "executing",    "to": "stage-done",   "via": "merge", "note": "stage.current < stage.total" },
+    { "from": "executing",    "to": "evolving",     "via": "merge" },
     { "from": "executing",    "to": "cancelled",    "via": "cancel" },
-    { "from": "stage-done",   "to": "planning",     "via": "target", "note": "next stage defined" },
-    { "from": "stage-done",   "to": "cancelled",    "via": "cancel" },
+    { "from": "evolving",     "to": "planning",     "via": "target", "note": "next stage defined" },
+    { "from": "evolving",     "to": "satisfied",    "via": "target --satisfy", "note": "user satisfied" },
+    { "from": "evolving",     "to": "cancelled",    "via": "cancel" },
+    { "from": "evolving",     "to": "evolving",     "via": "report", "note": "interim report for completed stage" },
     { "from": "re-planning",  "to": "re-planning",  "via": "plan", "note": "self-loop: further revision" },
     { "from": "re-planning",  "to": "re-planning",  "via": "target", "note": "self-loop: objective refined during re-planning" },
     { "from": "re-planning",  "to": "re-planning",  "via": "annotate", "note": "self-loop: further annotations" },
@@ -41,8 +42,9 @@
     { "from": "blocked",      "to": "planning",     "via": "target", "note": "target revised to unblock" },
     { "from": "blocked",      "to": "cancelled",    "via": "cancel" },
     { "from": "blocked",      "to": "blocked",      "via": "report", "note": "self-loop: document blocked state" },
-    { "from": "complete",     "to": "complete",     "via": "report", "note": "self-loop: generate completion report" },
-    { "from": "cancelled",    "to": "cancelled",    "via": "report", "note": "self-loop: document cancellation" },
-    { "from": "stage-done",   "to": "stage-done",   "via": "report", "note": "interim report for completed stage" }
+    { "from": "satisfied",    "to": "planning",     "via": "target", "note": "re-enter evolution" },
+    { "from": "satisfied",    "to": "cancelled",    "via": "cancel" },
+    { "from": "satisfied",    "to": "satisfied",    "via": "report", "note": "self-loop: generate report" },
+    { "from": "cancelled",    "to": "cancelled",    "via": "report", "note": "self-loop: document cancellation" }
   ]
 }

@@ -141,7 +141,7 @@ Callable independently for preparatory research before any phase, or to suppleme
 
 ## Execution Steps
 
-1. **Read** `.status.json` — get task `type`, `status`, validate not `complete`/`cancelled`
+1. **Read** `.status.json` — get task `type`, `status`, validate not `satisfied`/`cancelled`
 2. **Read** `.target.md` — extract requirements, key technologies, domain keywords
 3. **Read** `.type-profile.md` if exists — current domain classification, methodology, confidence level
 4. **Read** `.plan.md` if exists — understand current approach (for re-plan context)
@@ -460,7 +460,7 @@ Research writes to shared directories (`$NB_WORKSPACES_LIBRARY/.memory/.referenc
 | `executing` | `executing` | Always |
 | `re-planning` | `re-planning` | Always |
 | `blocked` | `blocked` | Always |
-| `complete` | REJECT | Completed tasks don't need research |
+| `satisfied` | REJECT | Satisfied tasks don't need research |
 | `cancelled` | REJECT | Cancelled tasks don't need research |
 
 ## Git
@@ -538,6 +538,18 @@ Each `<topic>.md` should follow:
 - Before creating a new file, check if an existing reference already covers the topic (scan `.summary.md` keywords)
 - If a topic partially overlaps, **append** a new dated section to the existing file rather than creating a new one
 - Topic granularity: one file per distinct technology/concept, not one file per search query
+
+## Upstream Caller Integration
+
+Research is called by upstream commands (target, plan, check, exec) as an intelligence support step. When called with `--caller <command>`:
+
+1. **Context sensing**: Read `.status.json` to understand current phase and caller needs
+2. **Library check**: Search `$NB_WORKSPACES_LIBRARY` for existing relevant materials
+3. **Gap analysis**: Compare library results against caller's information needs
+4. **Supplement**: If gaps exist, perform targeted web search and write results to library
+5. **Return**: Provide research results to the calling command
+
+Research remains independently callable via `/task-ai:research` for manual use.
 
 ## Notes
 

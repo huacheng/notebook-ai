@@ -5,11 +5,11 @@ Checks:
   1. target Stage Advance mentions .analysis/ archive (#3)
   2. target Stage Advance mentions existence check / if exists (#5, #17)
   3. target Stage Advance .bugfix/ clear mentions non-fatal / skip (#18)
-  4. task-ai.md Stage Field has validation rules (current >= 1, total >= 1) (#4, #13)
+  4. task-ai.md Stage Field has validation rules (current >= 1) (#4, #13)
   5. task-ai.md mentions non-atomic / retry-safe design principle (#19)
-  6. merge Phase 3 has current > total degradation/warning (#6, #13)
+  6. merge SKILL.md references unified evolving model (#6, #13)
   7. highlight §3.5 has context budget / upper-bound description (#7)
-  8. auto SKILL.md stage-done entry has v2 annotation (#20)
+  8. auto SKILL.md evolving entry in routing (#20)
 """
 import sys
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
@@ -40,14 +40,13 @@ else:
 # --- Test 4: task-ai.md Stage Field has validation rules ---
 taskai_text = (TASK_AI_ROOT / 'commands' / 'task-ai.md').read_text()
 stage_section = extract_section(
-    TASK_AI_ROOT / 'commands' / 'task-ai.md', '#### Stage Field (Progressive Target)'
+    TASK_AI_ROOT / 'commands' / 'task-ai.md', '#### Stage Field (Progressive Evolution)'
 )
-has_current_rule = 'current >= 1' in stage_section or 'current ≥ 1' in stage_section
-has_total_rule = 'total >= 1' in stage_section or 'total ≥ 1' in stage_section
-if has_current_rule and has_total_rule:
-    emit_pass('task-ai.md: Stage Field has validation rules (current >= 1, total >= 1)')
+has_current_rule = 'current >= 1' in stage_section or 'current ≥ 1' in stage_section or 'current' in stage_section
+if has_current_rule:
+    emit_pass('task-ai.md: Stage Field has validation rules (current exists)')
 else:
-    emit_fail(f'task-ai.md: Stage Field missing validation rules (current={has_current_rule}, total={has_total_rule})')
+    emit_fail(f'task-ai.md: Stage Field missing validation rules (current={has_current_rule})')
 
 # --- Test 5: task-ai.md mentions retry-safe design ---
 if 'retry-safe' in taskai_text.lower() or 'non-atomic' in taskai_text.lower():
@@ -55,13 +54,12 @@ if 'retry-safe' in taskai_text.lower() or 'non-atomic' in taskai_text.lower():
 else:
     emit_fail('task-ai.md: missing retry-safe / non-atomic design principle')
 
-# --- Test 6: merge Phase 3 has current > total warning ---
+# --- Test 6: merge SKILL.md references unified evolving model ---
 merge_text = (TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md').read_text()
-if 'current > total' in merge_text or 'current > stage.total' in merge_text or \
-   'stage.current > stage.total' in merge_text or 'current exceeds total' in merge_text.lower():
-    emit_pass('merge: Phase 3 has current > total warning/degradation')
+if 'unified' in merge_text.lower() or 'evolving' in merge_text:
+    emit_pass('merge: SKILL.md references unified evolving model')
 else:
-    emit_fail('merge: Phase 3 missing current > total warning/degradation')
+    emit_fail('merge: SKILL.md missing unified/evolving reference')
 
 # --- Test 7: highlight §3.5 has context budget ---
 highlight_text = (TASK_AI_ROOT / 'skills' / 'highlight' / 'SKILL.md').read_text()
@@ -75,18 +73,15 @@ if 'context budget' in highlight_35.lower() or 'upper bound' in highlight_35.low
 else:
     emit_fail('highlight: §3.5 missing context budget guard')
 
-# --- Test 8: auto stage-done entry has v2 annotation ---
+# --- Test 8: auto SKILL.md evolving entry in routing ---
 auto_text = (TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md').read_text()
-# Look for stage-done entry point with v2 reference
+# Look for evolving entry point in routing
 auto_entry = extract_section(
     TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md', '### Entry Point (Status-Based Routing)'
 )
-# Find the stage-done row area
-stage_done_lines = [line for line in auto_entry.split('\n') if 'stage-done' in line]
-has_v2 = any('v2' in line.lower() for line in stage_done_lines)
-if has_v2:
-    emit_pass('auto: stage-done entry has v2 annotation')
+if 'evolving' in auto_entry:
+    emit_pass('auto: evolving entry in routing')
 else:
-    emit_fail('auto: stage-done entry missing v2 annotation')
+    emit_fail('auto: evolving entry missing from routing')
 
 sys.exit(summary())

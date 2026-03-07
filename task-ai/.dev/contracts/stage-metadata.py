@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""L1: Verify state-matrix.md and git-details.md support progressive target v1.
+"""L1: Verify state-matrix.md and git-details.md support progressive evolution.
 
 state-matrix tests:
-  1. stage-done row exists in the matrix
-  2. stage-done + target → planning
-  3. stage-done + cancel → cancelled
-  4. stage-done + merge/plan/exec/check = ⊘ (rejected)
-  5. executing + merge shows stage-done outcome
-  6. Verification properties mention stage-done is non-terminal
+  1. evolving row exists in the matrix
+  2. evolving + target → planning
+  3. evolving + cancel → cancelled
+  4. evolving rejects plan/exec/merge (⊘)
+  5. executing + merge shows evolving outcome
+  6. satisfied + target → planning (non-terminal)
 
 git-details tests:
   7. Commit type table includes 'target' type with stage subject
@@ -22,42 +22,45 @@ from lib import emit_pass, emit_fail, extract_section, split_table_row, summary,
 matrix_path = TASK_AI_ROOT / 'commands' / 'references' / 'state-matrix.md'
 matrix_text = matrix_path.read_text()
 
-# Parse the matrix table to find stage-done row
+# Parse the matrix table to find evolving row
 matrix_lines = matrix_text.strip().split('\n')
-stage_done_row = None
+evolving_row = None
 executing_row = None
+satisfied_row = None
 for line in matrix_lines:
-    if '`stage-done`' in line and line.strip().startswith('|'):
-        stage_done_row = line
+    if '`evolving`' in line and line.strip().startswith('|'):
+        evolving_row = line
     if '`executing`' in line and line.strip().startswith('|'):
         executing_row = line
+    if '`satisfied`' in line and line.strip().startswith('|'):
+        satisfied_row = line
 
-# Test 1: stage-done row exists
-if stage_done_row:
-    emit_pass('state-matrix: stage-done row exists')
+# Test 1: evolving row exists
+if evolving_row:
+    emit_pass('state-matrix: evolving row exists')
 else:
-    emit_fail('state-matrix: stage-done row missing')
+    emit_fail('state-matrix: evolving row missing')
 
-# Test 2: stage-done + target → planning
-if stage_done_row and 'planning' in stage_done_row:
-    cells = split_table_row(stage_done_row)
+# Test 2: evolving + target → planning
+if evolving_row and 'planning' in evolving_row:
+    cells = split_table_row(evolving_row)
     # target is column index 1 (after state column)
     if len(cells) > 1 and 'planning' in cells[1]:
-        emit_pass('state-matrix: stage-done + target → planning')
+        emit_pass('state-matrix: evolving + target → planning')
     else:
-        emit_fail('state-matrix: stage-done + target column incorrect')
+        emit_fail('state-matrix: evolving + target column incorrect')
 else:
-    emit_fail('state-matrix: stage-done + target → planning missing')
+    emit_fail('state-matrix: evolving + target → planning missing')
 
-# Test 3: stage-done + cancel → cancelled
-if stage_done_row and 'cancelled' in stage_done_row:
-    emit_pass('state-matrix: stage-done + cancel → cancelled')
+# Test 3: evolving + cancel → cancelled
+if evolving_row and 'cancelled' in evolving_row:
+    emit_pass('state-matrix: evolving + cancel → cancelled')
 else:
-    emit_fail('state-matrix: stage-done + cancel → cancelled missing')
+    emit_fail('state-matrix: evolving + cancel → cancelled missing')
 
-# Test 4: stage-done rejects plan/exec/check/merge
-if stage_done_row:
-    cells = split_table_row(stage_done_row)
+# Test 4: evolving rejects plan/exec/merge
+if evolving_row:
+    cells = split_table_row(evolving_row)
     # Columns: state, target, plan, annotate, check-post-plan, check-mid-exec, check-post-exec, exec, merge, report, cancel, highlight
     # plan is index 2, exec is index 7, merge is index 8
     rejected_cols = [2, 7, 8]  # plan, exec, merge
@@ -66,29 +69,27 @@ if stage_done_row:
         if col_idx < len(cells) and '⊘' not in cells[col_idx]:
             all_rejected = False
     if all_rejected:
-        emit_pass('state-matrix: stage-done rejects plan/exec/merge')
+        emit_pass('state-matrix: evolving rejects plan/exec/merge')
     else:
-        emit_fail('state-matrix: stage-done should reject plan/exec/merge')
+        emit_fail('state-matrix: evolving should reject plan/exec/merge')
 else:
-    emit_fail('state-matrix: stage-done row not found for rejection check')
+    emit_fail('state-matrix: evolving row not found for rejection check')
 
-# Test 5: executing + merge shows stage-done
-if executing_row and 'stage-done' in executing_row:
-    emit_pass('state-matrix: executing + merge shows stage-done outcome')
+# Test 5: executing + merge shows evolving
+if executing_row and 'evolving' in executing_row:
+    emit_pass('state-matrix: executing + merge shows evolving outcome')
 else:
-    emit_fail('state-matrix: executing + merge missing stage-done outcome')
+    emit_fail('state-matrix: executing + merge missing evolving outcome')
 
-# Test 6: Verification properties mention stage-done non-terminal
-verification = extract_section(matrix_path, '**Verification properties:**')
-# Fallback: check full text for "stage-done" in verification context
-if not verification:
-    # The section might not have a heading — check the whole text
-    verification = matrix_text
-if 'stage-done' in verification and ('non-terminal' in verification.lower() or
-   'terminal' in verification.lower()):
-    emit_pass('state-matrix: verification mentions stage-done terminal status')
+# Test 6: satisfied + target → planning (non-terminal)
+if satisfied_row and 'planning' in satisfied_row:
+    cells = split_table_row(satisfied_row)
+    if len(cells) > 1 and 'planning' in cells[1]:
+        emit_pass('state-matrix: satisfied + target → planning (non-terminal)')
+    else:
+        emit_fail('state-matrix: satisfied + target column incorrect')
 else:
-    emit_fail('state-matrix: verification missing stage-done terminal reference')
+    emit_fail('state-matrix: satisfied + target → planning missing')
 
 # --- GIT-DETAILS ---
 git_path = TASK_AI_ROOT / 'commands' / 'references' / 'git-details.md'

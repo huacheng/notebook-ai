@@ -60,23 +60,10 @@ If merge conflict detected:
 
 ### Phase 3: Post-Merge Finalization
 
-On successful merge:
+7. **Phase 3**: Post-merge finalization — unified path (always):
+   - Write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `evolving` with history push → git commit `stage <N> completed`
 
-1. **Read** `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing)
-2. **IF `stage.current > stage.total`** (data inconsistency):
-   - Log warning to `.summary.md`: `⚠ stage.current (N) > stage.total (M) — treating as final stage`
-   - Proceed as final stage (step 4 below)
-3. **ELIF `stage.current < stage.total`** (intermediate stage complete):
-   a. **Write** `.summary.md` with stage completion summary: completed steps, key changes, verification outcome, lessons learned
-   b. **Update** `.target.md`: mark current Stage `[ACTIVE]` → `[COMPLETE]`, fill `### Results` section (extract from `.summary.md`)
-   c. **Update** `.status.json`: status → `stage-done`, push to `stage.completed` array `{ "stage": <current>, "name": "<stage name>", "completed_at": "<ISO timestamp>" }` — **retain** `branch` and `worktree` values
-   d. **Git commit** state: `task-ai(<notebook>):merge stage <N> completed`
-4. **ELSE** (`stage.current == stage.total`, or data inconsistency from step 2):
-   a. **Write** `.summary.md` with final task summary
-   b. **Update** `.status.json` status → `complete`, update timestamp — **retain** `branch` and `worktree` values
-   c. **Git commit** state: `task-ai(<notebook>):merge task completed`
-
-**Atomicity**: In the stage-done code path, status change (step 3c) occurs AFTER `.summary.md` and `.target.md` writes (steps 3a-3b). If steps 3a-3b fail, status remains `executing` — user can retry merge. If step 3c succeeds but 3d fails, status is `stage-done` — auto re-enters from stage-done entry point (highlight → report), no repeated merge. (Phase numbers here refer to Merge Strategy section, not Execution Steps.)
+**Atomicity**: status change occurs AFTER `.summary.md` and `.target.md` writes. If those fail, status remains `executing` — user can retry merge. If status update succeeds but git commit fails, status is `evolving` — auto re-enters from evolving entry point (highlight → report), no repeated merge.
 
 > **Note**: Merge does NOT delete branches or worktrees. The user can clean them up manually or via a separate cleanup command when ready.
 
@@ -93,23 +80,19 @@ On successful merge:
    6.3. Each resolution: fix conflicts → verify (build + test) → if pass commit, if fail abort and retry
    6.4. If all 3 attempts fail → stay `executing`, abort merge, report unresolvable conflicts
    6.5. If conflicts were resolved: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value, only when conflicts occurred). Capture conflict resolution strategy reasoning. Inline call failure MUST NOT block merge's main flow
-7. **Phase 3**: Post-merge finalization — read `stage` field from `.status.json` (default `{ current: 1, total: 1, completed: [] }` if missing):
-   - **If `stage.current > stage.total`**: log warning to `.summary.md`, then treat as final stage
-   - **Elif `stage.current < stage.total`**: write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `stage-done` with stage.completed push → git commit `stage <N> completed`
-   - **Else** (`current == total` or data inconsistency): write `.summary.md` → status → `complete` with branch/worktree retained → git commit `task completed`
+7. **Phase 3**: Post-merge finalization — unified path (always):
+   - Write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `evolving` with history push → git commit `stage <N> completed`
 8. **Write** `.auto-signal` — MUST be written AFTER Phase 3 status update, so the daemon reads correct status when routing
 9. **Report** merge result. Then output next step prompt based on outcome:
-    - `complete` → "Task merged and completed. Next: `/task-ai:highlight` to distill experience, then `/task-ai:report` for the completion report."
-    - `stage-done` → "Stage <N> merged. Next: `/task-ai:highlight` to distill stage experience, then `/task-ai:target` to define Stage <N+1> objective."
+    - `evolving` → "Stage <N> merged. Next: `/task-ai:highlight` to distill stage experience, then `/task-ai:report` for the stage report."
     - Conflict unresolvable → "Merge conflict could not be resolved automatically. Please resolve manually, then retry `/task-ai:merge`."
 
 ## State Transitions
 
 | Current Status | After Merge | Condition |
 |----------------|-------------|-----------|
-| `executing` | `complete` | Merge successful, `stage.current == stage.total` (final stage or single-stage) |
-| `executing` | `stage-done` | Merge successful, `stage.current < stage.total` (intermediate stage) |
-| `executing` | `executing` | Merge conflict unresolvable after 3 attempts (stays `executing` so merge can be retried after manual conflict resolution) |
+| `executing` | `evolving` | Merge successful (always, via merge) |
+| `executing` | `executing` | Merge conflict unresolvable after 3 attempts |
 | `executing` | `executing` | Checkout failed, no ACCEPT verdict, or state transition failed (status unchanged, `.auto-signal` written for routing) |
 
 ## Git
@@ -118,15 +101,13 @@ On successful merge:
 |--------|---------------|
 | Merge commit | `task-ai(<notebook>):merge merge completed task` |
 | Conflict resolution | `task-ai(<notebook>):merge resolve merge conflict` |
-| State update (final) | `task-ai(<notebook>):merge task completed` |
-| State update (stage) | `task-ai(<notebook>):merge stage <N> completed` |
+| State update | `task-ai(<notebook>):merge stage <N> completed` |
 
 ## .auto-signal
 
 | Result | Signal |
 |--------|--------|
-| Success (final/single stage) | `{ "step": "merge", "result": "success", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
-| Success (intermediate stage) | `{ "step": "merge", "result": "stage-done", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
+| Merged | `{ "step": "merge", "result": "evolving", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
 | Conflict | `{ "step": "merge", "result": "conflict", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
 | Dependency not met | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 | No ACCEPT verdict | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "no-accept", "timestamp": "..." }` |
@@ -139,7 +120,7 @@ On successful merge:
 - The 3-attempt limit prevents infinite resolution loops
 - Each resolution attempt includes full verification (build + test) to ensure resolved code is correct
 - On merge failure, status stays `executing` (not `blocked`) so merge can be retried. The user should manually resolve conflicts and then run `/task-ai:merge` again
-- After manual resolution, if the user has already merged manually, they can update `.status.json` status to `complete` directly
+- After manual resolution, if the user has already merged manually, they can update `.status.json` status to `evolving` directly
 - Refactoring is exec's per-step responsibility (exec Per-Step step 6 Refactor window) — merge does not refactor. This ensures all code changes are verified within exec's RED→GREEN cycle
 - Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
 - **Concurrency**: Lock acquisition/release is handled by the caller (auto mode or CLI dispatcher). `merge.sh` assumes `.working/.lock` is already held (see Concurrency Protection in `commands/task-ai.md`)

@@ -6,7 +6,7 @@ import argparse
 import os
 from datetime import datetime, timezone
 
-VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "stage-done", "complete", "blocked", "cancelled"}
+VALID_STATUSES = {"draft", "planning", "review", "executing", "re-planning", "evolving", "satisfied", "blocked", "cancelled"}
 
 def get_lock(status_path):
     """Acquire an exclusive lock for the status file. Uses O_CREAT|O_EXCL for atomicity."""
@@ -55,10 +55,18 @@ def read_state(status_path):
         sys.exit(1)
     with open(status_path, 'r', encoding='utf-8') as f:
         try:
-            return json.load(f)
+            state = json.load(f)
         except json.JSONDecodeError as e:
             print(f"[ERROR] Malformed JSON in {status_path}: {e}", file=sys.stderr)
             sys.exit(1)
+    # D3: Migration guard — detect old-format stage fields and warn
+    stage = state.get('stage')
+    if isinstance(stage, dict):
+        if 'completed' in stage and 'history' not in stage:
+            print(f"[WARN] Old stage format detected in {status_path}: 'completed' should be 'history'. Run init to re-create or manually migrate.", file=sys.stderr)
+        if 'total' in stage:
+            print(f"[WARN] Old stage format detected in {status_path}: 'total' field is no longer used (progressive evolution). Remove it manually.", file=sys.stderr)
+    return state
 
 def write_state(status_path, state):
     state['updated'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -130,10 +138,14 @@ def cmd_transition(args):
         if args.stage_current is not None:
             stage = state.setdefault('stage', {})
             stage['current'] = args.stage_current
-        if args.stage_completed is not None:
+        if args.stage_history is not None:
             stage = state.setdefault('stage', {})
-            completed = stage.setdefault('completed', [])
-            completed.append(args.stage_completed)
+            history = stage.setdefault('history', [])
+            try:
+                entry = json.loads(args.stage_history)
+            except (json.JSONDecodeError, TypeError):
+                entry = args.stage_history
+            history.append(entry)
 
         write_state(args.file, state)
     finally:
@@ -160,7 +172,7 @@ if __name__ == "__main__":
     p_trans.add_argument("--branch", help="Git branch")
     p_trans.add_argument("--worktree", help="Worktree path")
     p_trans.add_argument("--stage-current", type=int, help="Current stage number")
-    p_trans.add_argument("--stage-completed", help="Stage name to append to stage.completed[]")
+    p_trans.add_argument("--stage-history", help="JSON object to append to stage.history[]")
 
     args = parser.parse_args()
     if args.command == "get": cmd_get(args)

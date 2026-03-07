@@ -5,7 +5,7 @@ Checks:
   1. SKILL.md files with inline stage defaults reference task-ai.md (#8)
   2. commands/references/progressive-target.md exists and mentions lifecycle (#9)
   3. git-details.md init commit matches init/SKILL.md (#12)
-  4. target Notes or task-ai.md mentions stage-done trust / accepted risk (#14, #16)
+  4. target Notes or task-ai.md mentions evolving trust / accepted risk (#14, #16)
   5. init.sh has control character filtering (#15)
 """
 import sys
@@ -61,9 +61,9 @@ target_notes = extract_section(TASK_AI_ROOT / 'skills' / 'target' / 'SKILL.md', 
 has_risk = 'accepted risk' in target_notes.lower() or 'trust' in target_notes.lower() or \
            'accepted risk' in taskai_text.lower()
 if has_risk:
-    emit_pass('target Notes / task-ai.md mentions stage-done accepted risk')
+    emit_pass('target Notes / task-ai.md mentions evolving accepted risk')
 else:
-    emit_fail('target Notes / task-ai.md missing stage-done accepted risk mention')
+    emit_fail('target Notes / task-ai.md missing evolving accepted risk mention')
 
 # --- Test 5: init.sh has control character filtering ---
 init_sh = (TASK_AI_ROOT / 'skills' / 'init' / 'scripts' / 'init.sh').read_text()
