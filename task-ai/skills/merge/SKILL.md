@@ -81,7 +81,7 @@ If merge conflict detected:
    6.4. If all 3 attempts fail → stay `executing`, abort merge, report unresolvable conflicts
    6.5. If conflicts were resolved: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional (medium-value, only when conflicts occurred). Capture conflict resolution strategy reasoning. Inline call failure MUST NOT block merge's main flow
 7. **Phase 3**: Post-merge finalization — unified path (always):
-   - Write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → status → `evolving` with history push → git commit `stage <N> completed`
+   - Write `.summary.md` → update `.target.md` (mark `[COMPLETE]`, fill Results) → update `.status.json`: status → `evolving`, increment `stage.current`, push entry to `stage.history` → git commit `stage <N> completed`
 8. **Write** `.auto-signal` — MUST be written AFTER Phase 3 status update, so the daemon reads correct status when routing
 9. **Report** merge result. Then output next step prompt based on outcome:
     - `evolving` → "Stage <N> merged. Next: `/task-ai:highlight` to distill stage experience, then `/task-ai:report` for the stage report."

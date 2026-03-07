@@ -148,6 +148,7 @@ After write mode completes, output the exact next step based on the resulting st
 | :--- | :--- | :--- | :--- | :--- |
 | `draft` | (updated) | `planning` | `post-target` | Target defined |
 | `planning` | (updated) | `planning` | `re-plan` | Objective refined |
+| `review` | (updated) | `re-planning` | `re-plan` | Requirements changed after plan review |
 | `executing` | (updated) | `executing` | `mid-exec` | Goal adjustment mid-execution |
 | `re-planning` | (updated) | `re-planning` | `re-plan` | Objective refined during re-planning |
 | `blocked` | (updated) | `planning` | `post-target` | Target revised to unblock |
@@ -170,3 +171,4 @@ After write mode completes, output the exact next step based on the resulting st
 
 - **Read-only in frontend**: `.target.md` is displayed as read-only in the frontend. Users submit change requests via annotations, which are processed by the `target` sub-command to regenerate the document. This prevents format corruption in multi-stage targets.
 - **Context Loading**: If the agent's context is compressed, `/task-ai:target` without arguments is the standard way to reload the task's mission into memory.
+- **Accepted risk (evolving trust)**: In the progressive evolution model, `--satisfy` relies on user judgment — the system accepts the risk that "satisfied" may be premature. This is by design: `satisfied` is non-terminal, so users can re-enter evolution at any time.

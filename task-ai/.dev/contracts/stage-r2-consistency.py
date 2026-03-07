@@ -4,9 +4,9 @@
 Checks:
   #4:  state-matrix.md report column for non-listed states matches report/SKILL.md
   #5:  target/SKILL.md execution steps have explicit complete/cancelled rejection guard
-  #6:  merge/SKILL.md Phase 3 current>total warning specifies persistent log location
+  #6:  merge/SKILL.md Phase 3 unified evolving path (progressive evolution — no stage.total branching)
   #7:  auto/SKILL.md evolving annotation clearly marked
-  #8:  merge/SKILL.md Phase 3 ordering: current>total check before current==total branch
+  #8:  merge/SKILL.md Phase 3 mentions history push (progressive evolution)
   #12: state-matrix.md evolving + report has (write) annotation
   #13: report/SKILL.md Prerequisites and State Transitions are consistent for draft
 """
@@ -38,19 +38,15 @@ if ('complete' in target_steps and 'cancelled' in target_steps and
 else:
     emit_fail('target: execution steps missing explicit complete/cancelled rejection guard')
 
-# --- #6: merge Phase 3 current>total warning persistent ---
+# --- #6: merge Phase 3 unified evolving path (progressive evolution) ---
 merge_text = (TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md').read_text()
-# Find the gt check area (may be stage.current > stage.total)
-gt_needle = 'stage.current > stage.total'
-gt_pos = merge_text.find(gt_needle)
-if gt_pos < 0:
-    gt_needle = 'current > total'
-    gt_pos = merge_text.find(gt_needle)
-phase4_area = merge_text[gt_pos:gt_pos+500] if gt_pos >= 0 else ''
-if '.summary.md' in phase4_area or '.analysis/' in phase4_area:
-    emit_pass('merge: current>total warning specifies persistent log location')
+# In progressive evolution, Phase 3 is a unified path — always transitions to evolving.
+# No stage.total branching exists. Check that Phase 3 mentions evolving and .summary.md.
+phase3 = extract_section(TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md', '### Phase 3: Post-Merge Finalization')
+if 'evolving' in phase3 and '.summary.md' in phase3:
+    emit_pass('merge: Phase 3 unified evolving path with .summary.md')
 else:
-    emit_fail('merge: current>total warning has no persistent log location specified')
+    emit_fail('merge: Phase 3 missing evolving or .summary.md')
 
 # --- #7: auto v2 annotation clearly marked as not implemented ---
 auto_text = (TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md').read_text()
@@ -61,19 +57,13 @@ if evolving_lines:
 else:
     emit_fail('auto: evolving entry missing from routing')
 
-# --- #8: merge Phase 3 ordering ---
-# current>total check should come BEFORE the current<total and current==total branches
+# --- #8: merge Phase 3 mentions history push (progressive evolution) ---
+# In progressive evolution, Phase 3 pushes to stage.history instead of comparing stage.total.
 phase3 = extract_section(TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md', '### Phase 3: Post-Merge Finalization')
-gt_pos = phase3.find('stage.current > stage.total')
-if gt_pos < 0:
-    gt_pos = phase3.find('current > total')
-lt_pos = phase3.find('stage.current < stage.total')
-if lt_pos < 0:
-    lt_pos = phase3.find('current < total')
-if gt_pos >= 0 and lt_pos >= 0 and gt_pos < lt_pos:
-    emit_pass('merge: Phase 3 current>total check precedes current<total branch')
+if 'history' in phase3 or 'stage.current' in phase3:
+    emit_pass('merge: Phase 3 mentions stage.current/history (progressive evolution)')
 else:
-    emit_fail(f'merge: Phase 3 ordering wrong (gt_pos={gt_pos}, lt_pos={lt_pos})')
+    emit_fail('merge: Phase 3 missing stage.current/history mention')
 
 # --- #13: report/SKILL.md draft handling ---
 report_text = (TASK_AI_ROOT / 'skills' / 'report' / 'SKILL.md').read_text()

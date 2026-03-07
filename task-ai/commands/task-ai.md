@@ -169,6 +169,10 @@ Terminal states: only `cancelled`.
 
 No `.session-context` file is used. Phase awareness is derived entirely from `.status.json`.
 
+### Retry-Safe Design
+
+All skill scripts are designed to be **retry-safe** (non-atomic): if a script fails midway, re-running it produces the correct result without corruption. Status transitions occur after file writes, so partial failures leave the task in the pre-transition state. Idempotent file writes (overwrite, not append) ensure repeated runs converge.
+
 ### Annotation Format (for `annotate` sub-command)
 
 > **See `commands/references/annotation-format.md`** for the JSONL prompt format — four annotation types (Insert/Delete/Replace/Comment) with rendered-text context positioning.

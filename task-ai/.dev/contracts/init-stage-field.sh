@@ -5,8 +5,8 @@
 # Tests:
 #   1. .status.json has "stage" key after init
 #   2. stage.current == 1
-#   3. stage.total == 1
-#   4. stage.completed == []
+#   3. stage has no 'total' field (progressive evolution)
+#   4. stage.history == []
 #   5. stage has no highlight_file in completed entries
 
 source "$(dirname "$0")/lib.sh"
@@ -55,26 +55,26 @@ else
     emit_fail "init: stage.current != 1"
 fi
 
-# --- Test 3: stage.total == 1 ---
+# --- Test 3: stage has no 'total' field (progressive evolution) ---
 if python3 -c "
 import json, sys
 data = json.load(open('$STATUS_FILE'))
-sys.exit(0 if data.get('stage', {}).get('total') == 1 else 1)
+sys.exit(0 if 'total' not in data.get('stage', {}) else 1)
 "; then
-    emit_pass "init: stage.total == 1"
+    emit_pass "init: stage has no total field"
 else
-    emit_fail "init: stage.total != 1"
+    emit_fail "init: stage unexpectedly has total field"
 fi
 
-# --- Test 4: stage.completed == [] ---
+# --- Test 4: stage.history == [] ---
 if python3 -c "
 import json, sys
 data = json.load(open('$STATUS_FILE'))
-sys.exit(0 if data.get('stage', {}).get('completed') == [] else 1)
+sys.exit(0 if data.get('stage', {}).get('history') == [] else 1)
 "; then
-    emit_pass "init: stage.completed == []"
+    emit_pass "init: stage.history == []"
 else
-    emit_fail "init: stage.completed != []"
+    emit_fail "init: stage.history != []"
 fi
 
 # --- Test 5: no highlight_file anywhere in stage ---

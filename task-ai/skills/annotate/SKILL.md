@@ -104,8 +104,8 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | → `re-planning` | = `executing` | Heaviest case: mid-execution requirement change |
 | `re-planning` | = `re-planning` | = `re-planning` | Continue revision |
 | `blocked` | → `planning` | = `blocked` | Unblocking |
-| `evolving` | = `evolving` | = `evolving` | Non-terminal; annotations preserved for next stage |
-| `satisfied` | = `satisfied` | = `satisfied` | Non-terminal; annotations accepted |
+| `evolving` | REJECT | = `evolving` | Use `/task-ai:target` to define next stage; direct annotation modification rejected |
+| `satisfied` | REJECT | = `satisfied` | Use `/task-ai:target` to re-enter evolution; direct annotation modification rejected |
 | `cancelled` | REJECT | REJECT | Terminal state |
 
 > **`planning` does not jump to `re-planning`**: `re-planning` presumes a reviewed plan exists. In `planning`, the plan may be a draft or absent. plan skill in `re-planning` runs gap analysis (assumes reviewed plan), while in `planning` it runs full planning. Jumping would cause plan skill to incorrectly downgrade. plan skill reads `.target.md` fresh each run — requirement changes are absorbed naturally.
@@ -120,8 +120,8 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | → `re-planning` | = `executing` | Mid-execution plan change |
 | `re-planning` | = `re-planning` | = `re-planning` | Continue revision |
 | `blocked` | → `planning` | = `blocked` | Unblocking |
-| `evolving` | = `evolving` | = `evolving` | Non-terminal; annotations preserved for next stage |
-| `satisfied` | = `satisfied` | = `satisfied` | Non-terminal; annotations accepted |
+| `evolving` | REJECT | = `evolving` | No active plan in evolving; use `/task-ai:target` to start next stage |
+| `satisfied` | REJECT | = `satisfied` | No active plan; use `/task-ai:target` to re-enter evolution |
 | `cancelled` | REJECT | REJECT | Terminal state |
 
 ### Evaluation Layer — `.analysis/*.md`, `.test/*.md`

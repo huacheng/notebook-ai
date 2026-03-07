@@ -9,6 +9,7 @@ The progressive evolution model replaces predefined multi-stage planning with em
 - No terminal "complete" state — `satisfied` is non-terminal, can re-enter evolution
 - Each stage follows the full lifecycle: target → plan → check → exec → merge → evolving
 - User decides when to continue (`target` next stage) or pause (`target --satisfy`)
+- The lifecycle diagram above is simplified; the full loop includes check, verify, and highlight steps — see `auto/SKILL.md` for the complete state machine
 
 ## Stage Lifecycle
 
