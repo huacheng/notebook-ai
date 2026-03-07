@@ -232,7 +232,7 @@ Per-task `.type-profile.md` is task-specific and non-shared. When task A builds 
 
 ### Solution: `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/`
 
-A shared directory of type profiles, auto-maintained by `research` and `highlight` for **all** types (seed and discovered):
+A shared directory of type profiles, auto-maintained by `research`, `highlight`, and `auto` for **all** types (seed and discovered):
 
 ```
 $NB_WORKSPACES_LIBRARY/.memory/.type-profiles/
@@ -247,6 +247,7 @@ $NB_WORKSPACES_LIBRARY/.memory/.type-profiles/
 |-------|---------|--------|
 | **research** | Builds or updates `.type-profile.md` for **any** type (seed or discovered) | Copy profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (create or overwrite if confidence is higher). Apply directory-safe transform: replace `:` with `-` in type for filename |
 | **highlight** | Task completes with a refined `.type-profile.md` | Merge refinements back to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (append refinement log, update sections that changed). Apply directory-safe transform for `:` in type |
+| **auto** | Post-loop learning after auto session completes | Write execution metrics (retries, iterations, compaction count) to `.type-profile.md` `## Auto Adaptation` section, then sync to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (acquire `.type-profiles/.lock`). Apply directory-safe transform for `:` in type |
 
 **Note**: ALL types sync to shared profiles — including seed types. Over time, shared profiles become richer than static reference tables because they incorporate real task execution experience (tool discoveries, verified patterns, phase-specific intelligence). Static tables remain as initial fallback only.
 
@@ -281,6 +282,7 @@ For type `A|B`, shared profiles are stored by **primary** type: `$NB_WORKSPACES_
 | verify | Verification Standards | Verification Standards | Testing approach proved inadequate for this domain |
 | check | Verification Standards, Quality metrics, Audit Adaptation | Verification Standards, Audit Adaptation | Evaluation criteria or audit checkpoints mismatched domain norms |
 | exec | Implementation Patterns, Key tools | Implementation Patterns | Discovered tools/patterns differ from profile |
+| auto | Auto Adaptation (thresholds, retries, compaction) | Auto Adaptation (observed metrics) | Post-loop learning — writes actual execution metrics after each run |
 
 **Refinement log**: Every update appends to the "Refinement log" in Domain Classification, creating an audit trail of how the type understanding evolved.
 
