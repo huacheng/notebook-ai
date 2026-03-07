@@ -2,7 +2,7 @@
  * NotebookDeleteModal — Delete modal for notebooks with worktree branches.
  *
  * Provides two options:
- * 1. Merge & Delete — merge branch to main first, then delete
+ * 1. Save Deliverables & Delete — copy .deliverables/ to master, then delete
  * 2. Delete Only — delete without merging (branch work will be lost)
  */
 
@@ -113,9 +113,9 @@ export function NotebookDeleteModal({
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && setSelected('merge')}
           >
-            <div className="nb-delete-option-title">Merge & Delete</div>
+            <div className="nb-delete-option-title">Save Deliverables & Delete</div>
             <div className="nb-delete-option-desc">
-              Merge branch to master, then delete the notebook and branch.
+              Copy <code>.deliverables/</code> to master, then delete the notebook and branch.
             </div>
           </div>
 
