@@ -180,7 +180,8 @@ Callable independently for preparatory research before any phase, or to suppleme
     - **Batch limit**: research at most **10 topics** per invocation. If more than 10 uncovered topics are identified, prioritize by relevance to the calling phase's immediate needs, collect the top 10, and note remaining topics in `.auto-signal` result (e.g., `"(collected, 3 deferred)"`). Subsequent `--scope gap` invocations will pick up deferred topics
 14. **Acquire** `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` (see Concurrency Protection in `commands/task-ai.md`)
 15. **Active research** — for each uncovered topic:
-    - Use shell commands to gather domain knowledge: `curl` official docs/APIs, `npm info` / `pip show` for package details, web search for best practices, GitHub issues for known pitfalls, `man` pages for CLI tools, read project `node_modules` or local source for API details
+    - Use shell commands to gather domain knowledge: `curl --max-time 30` official docs/APIs, `npm info` / `pip show` for package details, web search for best practices, GitHub issues for known pitfalls, `man` pages for CLI tools, read project `node_modules` or local source for API details. Always set request timeout (`--max-time 30` for curl, equivalent for other tools) to prevent hangs on slow/malicious servers
+    - **Failure degradation**: If 3 consecutive topics fail to fetch (timeout, connection refused, empty response), skip remaining topics and proceed with collected results. Log skipped topics in `.auto-signal` result (e.g., `"(collected, 2 skipped-unreachable)"`)
     - **Phase-directed focus**: collection content must align with the calling phase's needs from step 12 (e.g., verify-phase calls should collect testing tools/frameworks/thresholds, not architecture patterns)
     - For hybrid types: collect from **both** primary and secondary domain sources
     - Write findings to `$NB_WORKSPACES_LIBRARY/.memory/.references/<topic>.md` (kebab-case filename, e.g., `express-middleware.md`, `ffmpeg-filters.md`)
@@ -373,7 +374,7 @@ Use shell script to extract status:
 python3 "$TASK_AI_ROOT/core/state.py" get ".working/.status.json" status
 ```
 
-**Test-S2a. If status = `planning` or `draft` → Methodology collection**
+**Test-S2a. If status = `planning`, `draft`, or `re-planning` → Methodology collection**
 
 Collect domain testing methodology for plan phase:
 - Recommended test layering strategy for task type (unit/integration/e2e ratios)
@@ -554,7 +555,7 @@ Research remains independently callable via `/task-ai:research` for manual use.
 ## Notes
 
 - **Evidence over assumptions**: Always verify claims via shell commands — `curl` official docs, check actual installed versions, read source code. Do not rely solely on internal knowledge
-- **Concurrency**: Research acquires two locks at different stages: (1) `.working/.lock` during type discovery (step 9) when writing `.status.json` or `.type-profile.md`, released after step 11; (2) `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` during reference collection (steps 14–18). **Lock ordering**: `.working/.lock` is always acquired and released before `.memory/.references/.lock`, preventing deadlocks. If a lock is held, wait and retry (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Research acquires three locks at different stages: (1) `.working/.lock` during type discovery (step 9) when writing `.status.json` or `.type-profile.md`, released after step 11; (2) `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/.lock` during shared profile sync (step 10.6/10.7), acquired and released within step 10; (3) `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` during reference collection (steps 14–18). **Lock ordering**: `.working/.lock` → `.type-profiles/.lock` → `.references/.lock` — each is fully released before the next is acquired, preventing deadlocks. If a lock is held, wait and retry (see Concurrency Protection in `commands/task-ai.md`)
 - **Idempotent**: Running research multiple times with `--scope gap` is safe — it only adds missing topics, never removes or overwrites existing reference content (append-only for existing files)
 - **Shared resources**: `.memory/.references/`, `.type-registry.md`, and `.memory/.type-profiles/` are shared across all task modules. References and type profiles collected for one task benefit future tasks in the same domain. This is by design — domain knowledge compounds
 - **Shared profile priority**: When building `.type-profile.md`, check `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` first. If it exists, use as starting point instead of researching from scratch. Only web search for topics not covered by the shared profile
