@@ -516,15 +516,24 @@ Steps:
    - 4f. overwrite `<segment>/.summary.md` (distilled patterns + entry index table)
    - 4g. overwrite top-level `.memory/.experiences/.summary.md`
    - 4h. release `.memory/.experiences/.lock`
-5. **Output B** — Thinking Patterns distillation
-6. **Output C** — Type-profiles sync
-7. **library maintain --compact** (only check if `.changelog` exceeds 2000-line threshold)
-8. **Git commit**: `task-ai(<notebook>):highlight complete distillation`
-9. **Write .auto-signal** (only when running within auto loop):
+5. **Output D** — Adoption tracking:
+   - 5a. Read `.plan.md` `## Adopted Experiences` section (if exists)
+   - 5b. For each `← .experiences/<type>/<source-file>.md` reference found:
+     - acquire `.memory/.experiences/.lock` (reuse if still held from step 4)
+     - read the source experience file
+     - increment `adoption_count` in frontmatter (default 0 → 1); append `adopted_by: <notebook>` and `adopted_at: <date>` to the frontmatter list
+     - write atomically (.tmp → rename)
+     - release lock
+   - 5c. This creates a feedback loop: experiences that prove useful across tasks accumulate higher `adoption_count`, enabling plan to prioritize high-adoption lessons
+6. **Output B** — Thinking Patterns distillation
+7. **Output C** — Type-profiles sync
+9. **library maintain --compact** (only check if `.changelog` exceeds 2000-line threshold)
+10. **Git commit**: `task-ai(<notebook>):highlight complete distillation`
+11. **Write .auto-signal** (only when running within auto loop):
    ```json
    { "step": "highlight", "result": "(distilled)", "next": "report", "checkpoint": "", "timestamp": "..." }
    ```
-10. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
+12. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
 
 ---
 

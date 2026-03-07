@@ -85,6 +85,10 @@ Generate a structured completion report for a task module, documenting what was 
 
 ## Lessons Learned
 <!-- From .notes/ if exists — notable patterns, workarounds, or discoveries -->
+
+### Adoption Summary
+<!-- From .plan.md "## Adopted Experiences" section — which lessons from prior tasks were adopted -->
+<!-- From $NB_WORKSPACES_LIBRARY/.memory/.experiences/ — which lessons from THIS task have been adopted by other tasks (check adoption_count in frontmatter) -->
 ```
 
 ### Summary Format
@@ -106,12 +110,13 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 7. **Read** `.analysis/` for evaluation history (all files, sorted by name, if exists)
 8. **Read** `.bugfix/` for issue history (all files, sorted by name, if exists)
 9. **Read** `.notes/` for research findings and experience log (all files, sorted by name, if exists)
-10. **Collect** git changes related to the task (if identifiable via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"`)
-11. **Compose** report in requested format
-12. **Write** to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md`
-13. **Git commit**: `task-ai(<notebook>):report generate completion report`
-14. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
-15. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/<notebook>/.report.md`."
+10. **Read adoption data**: Read `.plan.md` `## Adopted Experiences` section (lessons adopted from prior tasks). Read `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/` for this notebook's experience files — check `adoption_count` in frontmatter (lessons from this task adopted by others). Compose the Adoption Summary sub-section of Lessons Learned
+11. **Collect** git changes related to the task (if identifiable via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"`)
+12. **Compose** report in requested format
+13. **Write** to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md`
+14. **Git commit**: `task-ai(<notebook>):report generate completion report`
+15. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
+16. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/<notebook>/.report.md`."
 
 > *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. For manual workflows: run `/task-ai:highlight` before `/task-ai:report` if distillation is needed.*
 

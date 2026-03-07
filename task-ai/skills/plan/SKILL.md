@@ -73,6 +73,7 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
 8. Read `.test/` latest criteria and results files if exists (incorporate lessons learned)
 9. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
 10. Read `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/.summary.md` if exists — condensed cross-task experience from completed tasks of the same domain type (apply directory-safe transform: `:` → `-` in type for directory name, e.g., `science:astro` → `science-astro`). For hybrid types (`A|B`), read summary files for **all** pipe-separated segments. If summary references specific entries relevant to current task, read those `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<module>.md` files for detail
+    - **Adoption tracking**: When incorporating a lesson or pattern from an experience entry into the plan, record the source in `.plan.md` under `## Adopted Experiences` (append if section exists). Format: `- <lesson summary> ← .experiences/<type>/<source-file>.md`. This enables downstream adoption tracking by highlight and report
 11. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — find relevant external reference files by keyword matching against task requirements. Read matched `.memory/.references/<topic>.md` files for domain knowledge
 12. Read project codebase for context (relevant files, CLAUDE.md conventions)
 13. Read `.notes/` latest file only if exists (prior research findings and experience)
