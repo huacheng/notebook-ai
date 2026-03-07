@@ -28,7 +28,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'submitToolResult' | 'updateToolResultLocal'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
   | 'commands' | 'commandsLoaded' | 'setCommands'
-  | 'promptQueue' | 'queueVersion' | 'queuePrompt' | 'removeQueueItem' | 'reorderQueue'
+  | 'promptQueue' | 'queueVersion' | 'promptQueues' | 'queuePrompt' | 'removeQueueItem' | 'reorderQueue'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
