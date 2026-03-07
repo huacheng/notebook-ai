@@ -132,7 +132,7 @@ Phase 2: Planning (status=planning) — Full auto + user can intervene
 
 Phase 3: Execution (status=executing) — Full auto + user can intervene
   - Execute exec step by step
-  - Key checkpoints trigger verify → check(mid-exec): significant issues, or every 3 steps
+  - Key checkpoints trigger verify → check(mid-exec): significant issues, or every N steps (N from `.type-profile.md` Auto Adaptation `mid-exec check interval`, fallback 3)
   - All steps done → verify → check(post-exec)
   - check score ≥ threshold → continue/advance to Phase 4
   - score < threshold → auto-fix based on failing dimensions → re-verify + re-check
@@ -480,7 +480,7 @@ Terminal: merge conflict → (stop, status stays executing — retryable)
 The auto skill runs this loop within a single Claude session:
 
 1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
-1a. **Load adaptive parameters**: Read `.type-profile.md` `## Auto Adaptation` section. Extract `thresholds`, `retry_limits`, and `compaction_threshold`. If `.type-profile.md` is absent or lacks the section → use fallback defaults from the Threshold table
+1a. **Load adaptive parameters**: Read `.type-profile.md` `## Auto Adaptation` section. Extract `thresholds`, `retry_limits`, `mid_exec_check_interval`, and `compaction_threshold`. If `.type-profile.md` is absent or lacks the section → use fallback defaults (thresholds from table above, check interval = 3, compaction = 82%)
 2. LOOP:
    2.1. Check for .auto-stop file → if exists, break loop
    2.2. Context check: if context window usage ≥ `compaction_threshold` (adaptive from `.type-profile.md`, fallback 82%) AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
@@ -494,7 +494,7 @@ The auto skill runs this loop within a single Claude session:
    2.6. Increment iteration counter
    2.7. If next == "(stop)" → break loop
    2.8. Set current step = next step → continue loop
-3. **Post-loop learning**: Write execution metrics back to `.type-profile.md` `## Auto Adaptation` section — actual retries used per checkpoint, total iterations, compaction count, phase durations. This enables future tasks of the same type to use refined thresholds. If `.type-profile.md` lacks `## Auto Adaptation`, create the section with observed metrics. Sync updated profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` (same write protocol as research — acquire `.type-profiles/.lock`)
+3. **Post-loop learning**: Write execution metrics back to `.type-profile.md` `## Auto Adaptation` section — actual retries used per checkpoint, total iterations, mid-exec checks triggered, compaction count, phase durations. This enables future tasks of the same type to use refined thresholds. If `.type-profile.md` lacks `## Auto Adaptation`, create the section with observed metrics. Sync updated profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` (same write protocol as research — acquire `.type-profiles/.lock`)
 4. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
 5. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
 

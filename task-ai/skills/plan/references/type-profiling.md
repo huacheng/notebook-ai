@@ -212,6 +212,7 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
   - post-plan: <int, or "default">
   - mid-exec: <int, or "default">
   - post-exec: <int, or "default">
+- **Mid-exec check interval**: <int, or "default" (3 steps)>
 - **Compaction threshold**: <0.0-1.0, or "default" (82%)>
 - **Observed metrics** (auto-populated by post-loop learning):
   - avg_iterations: <float>
