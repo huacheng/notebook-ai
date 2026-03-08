@@ -38,7 +38,7 @@
 | `verify` | Run domain-adapted tests, produce result files |
 | `check` | Plan feasibility check at post-plan, mid-exec, post-exec checkpoints |
 | `exec` | Execute implementation plan step by step |
-| `merge` | Merge task branch to main with conflict resolution |
+| `merge` | Copy deliverables from task branch to main (selective, no full merge) |
 | `report` | Generate completion report |
 | `auto` | Autonomous execution loop (single-session orchestration) |
 | `cancel` | Cancel task module, stop auto, optional cleanup |

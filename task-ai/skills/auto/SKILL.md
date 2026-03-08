@@ -131,6 +131,7 @@ Phase 2: Planning (status=planning) — Full auto + user can intervene
   - User can intervene: "step 3 unnecessary" → modify .plan.md, re-check
 
 Phase 3: Execution (status=executing) — Full auto + user can intervene
+  - All non-system output (code, configs, assets) MUST be written to `<notebook>/.deliverables/`
   - Execute exec step by step
   - Key checkpoints trigger verify → check(mid-exec): significant issues, or every N steps (N from `.type-profile.md` Auto Adaptation `mid-exec check interval`, fallback 3)
   - All steps done → verify → check(post-exec)
@@ -351,7 +352,7 @@ After each sub-command step completes, Claude writes a progress signal. This is 
   "vfp_cycles_completed": 2,
   "phase": "planning",
   "phase_progress": 0.75,
-  "stage": { "current": 1, "total": 2 },
+  "stage": { "current": 1 },
   "check_score": {
     "overall": 0.85,
     "d1_correctness": 0.90,
@@ -377,7 +378,7 @@ Fields:
 - `vfp_cycles_completed`: VH→HS cycles completed during Phase 3 execution. **Auto-mode only**, software types only
 - `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (evolving/satisfied)
 - `phase_progress`: float 0-1, progress within current phase
-- `stage`: `{ current, total }` multi-stage position, synced from `.status.json`
+- `stage`: `{ current }` current stage number, synced from `.status.json` (no total — stages emerge progressively)
 - `check_score`: last check D1-D6 scores + overall, or null if no check has run. Written by check, not auto
 - `retry_count`: retries at current checkpoint, reset to 0 on phase transition
 - `delegation_failures`: subagent failure records (`"cmd@iterN"`), cleared on phase transition
@@ -406,15 +407,15 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
 | `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `evolving`, `conflict`, `rejected` |
+| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `evolving`, `satisfied`, `conflict`, `rejected` |
 | `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize`, `(stop)`, `(none)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `post-annotate`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
 | `compaction_count` | Integer | ≥ 0 |
 | `vfp_cycles_completed` | Integer (optional) | ≥ 0 (present only for software types in auto mode) |
-| `phase` | Whitelist | `target`, `planning`, `execution`, `finalization`, `satisfied` |
+| `phase` | Whitelist | `target`, `planning`, `execution`, `finalization` |
 | `phase_progress` | Float | 0.0 - 1.0 |
-| `stage` | Object | `{ "current": int, "total": int }` where current ≥ 1, current ≤ total |
+| `stage` | Object | `{ "current": int }` where current ≥ 1 |
 | `check_score` | Object or null | `{ "overall": float, "d1_correctness": float, ..., "d6_maintainability": float }` all 0.0-1.0 |
 | `retry_count` | Integer | ≥ 0 |
 | `delegation_failures` | Array | String array, each matching pattern `cmd@iterN` |

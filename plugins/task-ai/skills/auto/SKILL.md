@@ -72,17 +72,27 @@ Deliverables + .target.md + .plan.md → check(D1-D6 scoring) → overall ≥ th
 | `planning` / `re-planning` | `planning` | Generating/revising plan |
 | `review` / `executing` | `execution` | Executing plan steps |
 | `blocked` | `execution` (stalled) | Blocked, awaiting user intervention |
-| `complete` / `stage-done` | `finalization` | Merge, distill, report |
+| `evolving` | `finalization` | Merge done, distill + report |
+| `satisfied` | `finalization` | User satisfied, final report |
 | `cancelled` | — (terminal) | Loop stops immediately, no phase |
 
-### Threshold & Retry Limits
+### Threshold & Retry Limits — Adaptive
 
-| Checkpoint | Threshold | Retry Limit | On Limit Exceeded |
-|------------|-----------|-------------|-------------------|
+Thresholds and retry limits are **adaptive**: read from `.type-profile.md` `## Auto Adaptation` section if present, with hardcoded defaults as fallback when `.type-profile.md` is absent or lacks the section.
+
+**Resolution order**: `.type-profile.md` Auto Adaptation → fallback defaults (table below).
+
+| Checkpoint | Fallback Threshold | Fallback Retry Limit | On Limit Exceeded |
+|------------|-------------------|---------------------|-------------------|
 | post-plan (Phase 2) | 0.70 | 3 replans | Stop, notify user: "Plan repeatedly failed review, manual intervention needed" |
 | mid-exec (Phase 3 mid) | 0.60 | 2 fixes | Stop current step, notify user |
 | post-exec (Phase 3 done) | 0.75 | 3 fix/replan | Stop, notify user |
 | pre-merge (Phase 4) | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0, resume from failing dimensions) |
+
+**Adaptive threshold examples** (from `.type-profile.md` Auto Adaptation):
+- Simple bugfix task → lower thresholds (post-plan 0.60, post-exec 0.65), fewer retries (post-plan 2)
+- Complex architecture redesign → higher thresholds (post-plan 0.75, post-exec 0.80), more retries (post-exec 4)
+- Data pipeline task → verify-heavy profile (mid-exec threshold 0.70, more mid-exec retries)
 
 `retry_count` persists in `.auto-signal`. Resets to 0 on phase transition. `delegation_failures` clears on phase transition (new phase = new context).
 
@@ -121,17 +131,18 @@ Phase 2: Planning (status=planning) — Full auto + user can intervene
   - User can intervene: "step 3 unnecessary" → modify .plan.md, re-check
 
 Phase 3: Execution (status=executing) — Full auto + user can intervene
+  - All non-system output (code, configs, assets) MUST be written to `<notebook>/.deliverables/`
   - Execute exec step by step
-  - Key checkpoints trigger verify → check(mid-exec): significant issues, or every 3 steps
+  - Key checkpoints trigger verify → check(mid-exec): significant issues, or every N steps (N from `.type-profile.md` Auto Adaptation `mid-exec check interval`, fallback 3)
   - All steps done → verify → check(post-exec)
   - check score ≥ threshold → continue/advance to Phase 4
   - score < threshold → auto-fix based on failing dimensions → re-verify + re-check
   - Exceeds retry limit → stop, notify user
   - User can intervene: "what does this error mean?" → explain + fix, continue
 
-Phase 4: Finalization (status=complete/stage-done) — Full auto
-  - check(pre-merge, threshold 0.80) → below threshold → fall back to Phase 3
-  - Passes: merge → highlight → report → done
+Phase 4: Finalization (status=evolving/satisfied) — Full auto
+  - evolving: highlight → report → (stop, wait for user to define next stage or --satisfy)
+  - satisfied: report → (stop)
 ```
 
 ## Dialog Behavior
@@ -314,6 +325,10 @@ User returns and says "continue":
    - If `.summary.md` absent → read `.target.md` + `.plan.md` to rebuild minimal context
 4. Resume from interruption point
 
+### Cross-Stage Continuation
+
+When status is `evolving`, auto stops and waits for user input. If the user provides next-stage direction in the same session (e.g., "now build the OAuth layer"), auto can route from `evolving` back to `target` to define the next stage, then continue the loop through planning → execution → merge for the new stage.
+
 ### "Silent Continue" Mechanism
 
 Claude Code is request-response. Phases 2-4 "auto-advance without intervention" means:
@@ -337,7 +352,7 @@ After each sub-command step completes, Claude writes a progress signal. This is 
   "vfp_cycles_completed": 2,
   "phase": "planning",
   "phase_progress": 0.75,
-  "stage": { "current": 1, "total": 2 },
+  "stage": { "current": 1 },
   "check_score": {
     "overall": 0.85,
     "d1_correctness": 0.90,
@@ -361,9 +376,9 @@ Fields:
 - `iteration`: current iteration count. **Auto-mode only** — absent in manual execution
 - `compaction_count`: context compaction invocations within current auto session. **Auto-mode only**. Reset to `0` on normal iteration advance. On compaction recovery, incremented by 1 (NOT reset). If `>= 3` → stop with warning (see Compaction frequency limit)
 - `vfp_cycles_completed`: VH→HS cycles completed during Phase 3 execution. **Auto-mode only**, software types only
-- `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (complete/stage-done)
+- `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (evolving/satisfied)
 - `phase_progress`: float 0-1, progress within current phase
-- `stage`: `{ current, total }` multi-stage position, synced from `.status.json`
+- `stage`: `{ current }` current stage number, synced from `.status.json` (no total — stages emerge progressively)
 - `check_score`: last check D1-D6 scores + overall, or null if no check has run. Written by check, not auto
 - `retry_count`: retries at current checkpoint, reset to 0 on phase transition
 - `delegation_failures`: subagent failure records (`"cmd@iterN"`), cleared on phase transition
@@ -392,7 +407,7 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 | Field | Validation | Allowed Values |
 |-------|-----------|----------------|
 | `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `success`, `stage-done`, `conflict`, `rejected` |
+| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `evolving`, `satisfied`, `conflict`, `rejected` |
 | `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize`, `(stop)`, `(none)` |
 | `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `post-annotate`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
 | `iteration` | Integer | ≥ 0 |
@@ -400,7 +415,7 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 | `vfp_cycles_completed` | Integer (optional) | ≥ 0 (present only for software types in auto mode) |
 | `phase` | Whitelist | `target`, `planning`, `execution`, `finalization` |
 | `phase_progress` | Float | 0.0 - 1.0 |
-| `stage` | Object | `{ "current": int, "total": int }` where current ≥ 1, current ≤ total |
+| `stage` | Object | `{ "current": int }` where current ≥ 1 |
 | `check_score` | Object or null | `{ "overall": float, "d1_correctness": float, ..., "d6_maintainability": float }` all 0.0-1.0 |
 | `retry_count` | Integer | ≥ 0 |
 | `delegation_failures` | Array | String array, each matching pattern `cmd@iterN` |
@@ -451,11 +466,9 @@ Phase 4: Finalization (auto)
             │
             FAIL ──→ [Phase 3] (retry_count reset, resume from failing dimensions)
 
-  merge ─── success (current==total) ──→ highlight(complete) ──→ report → (stop)
-    │          │
-    │      stage-done (current<total) ──→ highlight(complete) ──→ report → (stop)
-    │                                     Output: "Stage <N> completed.
-    │                                     Define next stage target, then run /task-ai:auto"
+  merge ─── evolving (always) ──→ highlight ──→ report → (stop)
+    │                              Output: "Stage <N> completed.
+    │                              Define next stage target or /task-ai:target --satisfy"
     │
     └── conflict unresolvable (after 3 retries) → (stop)
 
@@ -468,9 +481,10 @@ Terminal: merge conflict → (stop, status stays executing — retryable)
 The auto skill runs this loop within a single Claude session:
 
 1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to detect `## Research Insights` presence and `[PROPOSED]` residuals before routing
+1a. **Load adaptive parameters**: Read `.type-profile.md` `## Auto Adaptation` section. Extract `thresholds`, `retry_limits`, `mid_exec_check_interval`, and `compaction_threshold`. If `.type-profile.md` is absent or lacks the section → use fallback defaults (thresholds from table above, check interval = 3, compaction = 82%)
 2. LOOP:
    2.1. Check for .auto-stop file → if exists, break loop
-   2.2. Context check: if context window usage ≥ 82% AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
+   2.2. Context check: if context window usage ≥ `compaction_threshold` (adaptive from `.type-profile.md`, fallback 82%) AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
    2.3. Execute current step — read target SKILL.md metadata (`model_tier`, `auto_delegatable`):
       - Evaluate four delegation factors (phase, context dependency, complexity, execution history)
       - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.status.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
@@ -481,8 +495,9 @@ The auto skill runs this loop within a single Claude session:
    2.6. Increment iteration counter
    2.7. If next == "(stop)" → break loop
    2.8. Set current step = next step → continue loop
-3. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
-4. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
+3. **Post-loop learning**: Write execution metrics back to `.type-profile.md` `## Auto Adaptation` section — actual retries used per checkpoint, total iterations, mid-exec checks triggered, compaction count, phase durations. This enables future tasks of the same type to use refined thresholds. If `.type-profile.md` lacks `## Auto Adaptation`, create the section with observed metrics. Sync updated profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` (same write protocol as research — acquire `.type-profiles/.lock`)
+4. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
+5. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
 
 ## Detailed Loop Logic
 
@@ -495,8 +510,8 @@ The auto skill runs this loop within a single Claude session:
 | `review` | Execute exec |
 | `executing` | Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX |
 | `re-planning` | Read `phase` field: if `needs-plan` → execute plan; if `needs-check` → execute verify → check (post-plan); if empty → default to plan |
-| `stage-done` | Execute highlight(complete) → report → stop. Output stage completion message with next-stage instructions |
-| `complete` | Execute report, then stop |
+| `evolving` | highlight → report → (stop, wait for user) |
+| `satisfied` | report → (stop) |
 | `blocked` | Stop loop, report blocking reason |
 | `cancelled` | Stop loop |
 
@@ -517,8 +532,7 @@ The auto skill runs this loop within a single Claude session:
 | exec | (mid-exec) | verify | mid-exec | Significant issue, verify before checkpoint |
 | exec | (step-N) | verify | mid-exec | Single step completed (manual `--step N` only) |
 | exec | (blocked) | (stop) | — | Cannot continue |
-| merge | success | highlight | — | Merge complete, distill experience |
-| merge | stage-done | highlight | — | Stage complete, distill stage experience |
+| merge | evolving | highlight | — | Merge complete, distill experience |
 | merge | conflict | (stop) | — | Merge conflict unresolvable |
 | merge | rejected | (stop) | dependency-blocked / no-accept | Prerequisite not met |
 | highlight | (distilled) | report | — | Distillation complete |
@@ -556,13 +570,18 @@ Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **t
 
 Proactive **structured compaction** prevents overflow. Strategy: **single active compaction + file-based recovery**:
 
-1. **First compaction at ≥ 82%**: Send the Structured Compaction Prompt (template below)
+Compaction threshold is adaptive based on task complexity from `.type-profile.md` Auto Adaptation:
+- Simple tasks (few steps, low retry history) → higher threshold (85-90%) — more context budget available
+- Complex tasks (many steps, high retry history) → lower threshold (75-80%) — reserve headroom for fix cycles
+- Fallback default: 82%
+
+1. **First compaction at ≥ compaction_threshold**: Send the Structured Compaction Prompt (template below)
 2. **No subsequent active compaction**: After first, rely on `.summary.md` + `.auto-signal` + `.status.json` for recovery
 3. **Daemon detection**: If Claude's system compaction is detected, daemon sends recovery signal
 
 #### Structured Compaction Prompt Template
 
-When context ≥ 82% AND `compaction_count == 0`, fill and send:
+When context ≥ `compaction_threshold` (adaptive, fallback 82%) AND `compaction_count == 0`, fill and send:
 
 ```
 Summarize and compress our conversation context for continuation. Task identity and loop position will be recovered from files — preserve ONLY the following conversation-exclusive context:
@@ -615,7 +634,7 @@ When `type` contains `software`, the auto loop tracks VH→HS cycle progress dur
 - **Max iterations**: user-configurable (default 20), daemon writes `.auto-stop` when reached
 - **Timeout**: user-configurable (default 30 min), daemon writes `.auto-stop` when elapsed
 - **Stall detection**: heartbeat polling (60s) + pattern matching recovery, with per-step (3) and total (10) recovery limits
-- **Context management**: proactive structured compaction at ≥ 82% context window usage
+- **Context management**: proactive structured compaction at adaptive threshold (fallback ≥ 82% context window usage)
 - **Quota exhaustion**: detected and handled as wait (not stall), timeout clock paused during quota-wait
 - **Pause on blocked**: Auto stops immediately on `blocked` status
 - **Manual override**: User can `/task-ai:auto --stop` or daemon writes `.auto-stop` via `DELETE` API

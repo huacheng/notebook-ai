@@ -101,7 +101,7 @@ Writers should keep `.summary.md` under ~200 lines. It is a context window optim
 }
 ```
 
-Notes: `worktree` is empty string `""` if not using worktree. `depends_on` entries can be simple strings (require `complete`) or objects `{ "module": "...", "min_status": "..." }`.
+Notes: `worktree` is empty string `""` if not using worktree. `depends_on` entries can be simple strings (require `satisfied`) or objects `{ "module": "...", "min_status": "..." }`.
 
 #### Stage Field (Progressive Evolution)
 

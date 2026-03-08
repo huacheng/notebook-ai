@@ -81,7 +81,7 @@ Build a JWT authentication system
 1. **Context discovery**:
    - Locate the current notebook via path-based discovery (`.working/` directory) or branch-based discovery (`task/<name>`).
    - If context cannot be identified, abort with error: "No active task context detected. Enter a notebook directory or switch to a task branch."
-   - **Read** `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing) and `status`.
+   - **Read** `.status.json` `stage` field (default `{ current: 1, history: [] }` if missing) and `status`.
    - **If status is `cancelled`**: REJECT with error "Cancelled tasks cannot be re-targeted." Abort execution.
 
 2. **If `--satisfy` is provided**:
@@ -100,7 +100,7 @@ Build a JWT authentication system
 
       **Atomicity**: status change (step 4) occurs AFTER archive/clear (steps 1-2). If steps 1-2 fail, status stays `evolving` — user can retry. If step 4 succeeds but step 5 fails, status is already `planning` — re-running target detects `planning` and routes to normal update path.
 
-   3b. **ELIF `stage.total > 1`** → **Multi-stage Update Mode**:
+   3b. **ELIF `stage.current > 1`** → **Multi-stage Update Mode**:
       - Update current `[ACTIVE]` Stage's content in `.target.md`
       - Atomic write + Git commit: `task-ai(<notebook>):target update objective`
       - Execute highlight protocol scope=thinking-raw (optional, high-value)
@@ -114,7 +114,7 @@ Build a JWT authentication system
       - **IF status ∈ {`draft`, `planning`}**: evaluate objective complexity:
         - Is it beyond a single plan→exec→merge cycle?
         - Are there natural stage boundaries?
-        - **IF suggests splitting**: propose stages to user (e.g., "Suggest 3 stages: 1.Basic auth 2.OAuth 3.RBAC"), await confirmation/modification, then generate multi-stage `.target.md` format + update `.status.json` `stage.total`
+        - **IF suggests splitting**: propose stages to user as guidance (e.g., "Suggest starting with: 1.Basic auth, then evolving to OAuth, then RBAC"), but generate only the first stage in `.target.md` — subsequent stages emerge through the evolving → target cycle
         - **ELSE**: generate single-stage `.target.md` (simplified format)
       - **ELSE** (status ∉ {`draft`, `planning`}): update current stage target content (no multi-stage analysis — plan is already based on current stage target)
       - Atomic write to `.working/.target.md` + update `.status.json` + Git commit: `task-ai(<notebook>):target update objective`

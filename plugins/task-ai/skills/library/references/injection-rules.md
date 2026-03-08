@@ -1,6 +1,8 @@
-# Injection Protection Rules — External Content
+# Injection Protection Rules — External Content (Seed Baseline)
 
-Detailed per-category detection patterns and sanitisation steps for all external content written to `.library/.memory/.references/`. Applied by `research` and `exec` before any write. Cross-referenced from `skills/library/SKILL.md` Injection Protection section.
+These 10 categories are the **seed baseline** for injection detection. They are not static — evolved rules in `$NB_WORKSPACES_LIBRARY/.evolving-rules/sanitization/active/` can override any category or add new categories (11+). When both seed and evolved rules exist for the same category number, the evolved version takes precedence. See `read/SKILL.md` step 5 for the merge protocol.
+
+Detailed per-category detection patterns and sanitisation steps for all external content written to `.library/.memory/.references/`. Applied by `research`, `read`, and `exec` before any write. Cross-referenced from `skills/library/SKILL.md` Injection Protection section.
 
 ## Frontmatter Schema for Sanitised Files
 

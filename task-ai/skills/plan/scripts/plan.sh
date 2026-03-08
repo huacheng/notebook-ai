@@ -2,7 +2,7 @@
 # /task-ai:plan implementation
 # Usage: plan.sh [notebook] [--generate]
 #        plan.sh --refine "refinement description text"
-#        plan.sh --finalize
+#        plan.sh --refine "refinement text"
 
 set -euo pipefail
 

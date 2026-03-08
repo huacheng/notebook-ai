@@ -233,7 +233,7 @@ Same as scope=impl (steps 1-5), with different filename and source field.
 | **High-value** | exec | After step execution | Implementation decisions and problem-solving reasoning |
 | **High-value** | check | step 16 | Quality judgment and ACCEPT/REPLAN decision reasoning |
 | **High-value** | verify | After verification completes | Verification strategy selection and result analysis reasoning |
-| **Medium-value** | merge | During conflict resolution | Conflict resolution strategy reasoning (only when conflicts occur) |
+| **Low-value** | merge | After deliverables copy | Deliverables selection reasoning (only when non-trivial) |
 | **Medium-value** | security | During security audit | Threat model and risk assessment reasoning |
 | **Medium-value** | annotate | During annotation processing | Cross-impact assessment reasoning |
 
@@ -368,8 +368,8 @@ input_files = [.target.md, .plan.md, .summary.md, *-impl.md, *-verify.md, ...]
 latest_input_mtime = max(mtime(f) for f in input_files if exists(f))
 
 # Stage-aware output filename
-Read .status.json stage field (default { current: 1, total: 1, completed: [] }):
-  IF stage.total > 1 AND status == "stage-done":
+Read .status.json stage field (default { current: 1, history: [] }):
+  IF status == "evolving" AND stage.current > 1:
     filename = "<notebook>-stage-<stage.current>-complete.md"
   ELSE:
     filename = "<notebook>-complete.md"
@@ -402,12 +402,12 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 #### Output A — Experience Distillation
 
-**Stage-aware file naming** — read `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing):
+**Stage-aware file naming** — read `.status.json` `stage` field (default `{ current: 1, history: [] }` if missing):
 
 | Scenario | Target filename |
 |----------|----------------|
-| Intermediate stage (`stage.total > 1` AND `status == "stage-done"`) | `<notebook>-stage-<stage.current>-complete.md` |
-| Final stage (`stage.current == stage.total`, including `total: 1`) | `<notebook>-complete.md` |
+| Intermediate stage (`status == "evolving"` AND `stage.current > 1`) | `<notebook>-stage-<stage.current>-complete.md` |
+| Final stage (`status == "satisfied"`, including `total: 1`) | `<notebook>-complete.md` |
 
 | Field | Value |
 |-------|-------|
@@ -420,7 +420,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 For multi-type (e.g., `data-pipeline|ml`), split on `|` and write one file per segment. Each segment name uses directory-safe transform (`:` → `-`, e.g., `audio:dsp` → `audio-dsp`).
 
-**Final stage distillation** (last stage merge → `complete`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
+**Final stage distillation** (last stage merge → `satisfied`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
 
 **Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.status.json` > `.target.md` > `.summary.md` > `.plan.md` > `.type-profile.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
 
@@ -516,15 +516,24 @@ Steps:
    - 4f. overwrite `<segment>/.summary.md` (distilled patterns + entry index table)
    - 4g. overwrite top-level `.memory/.experiences/.summary.md`
    - 4h. release `.memory/.experiences/.lock`
-5. **Output B** — Thinking Patterns distillation
-6. **Output C** — Type-profiles sync
-7. **library maintain --compact** (only check if `.changelog` exceeds 2000-line threshold)
-8. **Git commit**: `task-ai(<notebook>):highlight complete distillation`
-9. **Write .auto-signal** (only when running within auto loop):
+5. **Output D** — Adoption tracking:
+   - 5a. Read `.plan.md` `## Adopted Experiences` section (if exists)
+   - 5b. For each `← .experiences/<type>/<source-file>.md` reference found:
+     - acquire `.memory/.experiences/.lock` (reuse if still held from step 4)
+     - read the source experience file
+     - increment `adoption_count` in frontmatter (default 0 → 1); append `adopted_by: <notebook>` and `adopted_at: <date>` to the frontmatter list
+     - write atomically (.tmp → rename)
+     - release lock
+   - 5c. This creates a feedback loop: experiences that prove useful across tasks accumulate higher `adoption_count`, enabling plan to prioritize high-adoption lessons
+6. **Output B** — Thinking Patterns distillation
+7. **Output C** — Type-profiles sync
+9. **library maintain --compact** (only check if `.changelog` exceeds 2000-line threshold)
+10. **Git commit**: `task-ai(<notebook>):highlight complete distillation`
+11. **Write .auto-signal** (only when running within auto loop):
    ```json
    { "step": "highlight", "result": "(distilled)", "next": "report", "checkpoint": "", "timestamp": "..." }
    ```
-10. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
+12. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
 
 ---
 
@@ -660,7 +669,7 @@ highlight **does not change notebook status**. Regardless of scope, `.status.jso
 | verify | None (verify manages status) |
 | thinking-raw | None (callers manage their own status) |
 | quality-update | None (check manages status) |
-| complete | None (merge already set complete) |
+| satisfied | None (merge already set satisfied) |
 | adhoc | None (no notebook lifecycle) |
 | promote | None (batch operation, no notebook lifecycle) |
 

@@ -71,7 +71,7 @@ graph LR
   auth-refactor --> api-design
 ```
 
-Arrow direction: `A --> B` means "A depends on B" (drawn from the `depends_on` field of A). Nodes colored by status: green (complete/stage-done), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
+Arrow direction: `A --> B` means "A depends on B" (drawn from the `depends_on` field of A). Nodes colored by status: green (satisfied), cyan (evolving), blue (executing/review), yellow (planning/re-planning), red (blocked), gray (draft/cancelled).
 
 ### 4. Status Timeline (`--timeline`, notebook auto-detected)
 

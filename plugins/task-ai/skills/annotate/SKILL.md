@@ -71,7 +71,7 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 2. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once. If any JSONL line fails to parse or is missing required fields, **release `.working/.lock`** and REJECT with error identifying the malformed line
 3. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. If any path escapes, **release `.working/.lock`** and REJECT (prevents path traversal)
 4. **Determine file layer** for each annotation (Requirement / Planning / Evaluation / Methodology / Information). Files that don't match any known layer default to Information (lowest impact)
-5. **Read `.status.json`** — validate status is not terminal (`complete` / `cancelled`). If terminal, **release `.working/.lock`** and REJECT. Note: `stage-done` is non-terminal and accepts annotations
+5. **Read `.status.json`** — validate status is not terminal (`cancelled`). If terminal, **release `.working/.lock`** and REJECT. Note: `evolving` and `satisfied` are non-terminal and accept annotations
 6. **Read context files**: `.target.md` + `.plan.md` + `.test/` (latest criteria)
 7. **Read** the annotated source file(s)
 8. **Content sanitization**: strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (U+0000–U+001F except `\n` and `\t`, and U+007F) from annotation content before writing. Preserve markdown formatting and visible text
@@ -80,7 +80,7 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 11. **Execute changes**: write to source file. Comment annotations append `> 💬`/`> 📝` blockquotes — never modify existing content. Apply modify-type annotations in reverse cursor order (see `references/annotation-processing.md` §Batch ordering)
 12. **Update `.status.json`** (atomic write via `.status.json.tmp` + rename) per State Transitions (three-dimensional: `status × file_layer × annotation_type`):
     - If new status is `re-planning`, set `phase: needs-check`
-    - If status is unchanged (including `stage-done`), preserve existing `phase`
+    - If status is unchanged (including `evolving`), preserve existing `phase`
     - If status changed to something other than `re-planning`, clear `phase` to `""`
     - Update `updated` timestamp
 13. **Write `.summary.md`** (atomic write via `.summary.md.tmp` + rename) with condensed context reflecting annotation changes
@@ -104,8 +104,9 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | → `re-planning` | = `executing` | Heaviest case: mid-execution requirement change |
 | `re-planning` | = `re-planning` | = `re-planning` | Continue revision |
 | `blocked` | → `planning` | = `blocked` | Unblocking |
-| `stage-done` | = `stage-done` | = `stage-done` | Non-terminal; annotations preserved for next stage |
-| `complete`/`cancelled` | REJECT | REJECT | Terminal states |
+| `evolving` | REJECT | = `evolving` | Use `/task-ai:target` to define next stage; direct annotation modification rejected |
+| `satisfied` | REJECT | = `satisfied` | Use `/task-ai:target` to re-enter evolution; direct annotation modification rejected |
+| `cancelled` | REJECT | REJECT | Terminal state |
 
 > **`planning` does not jump to `re-planning`**: `re-planning` presumes a reviewed plan exists. In `planning`, the plan may be a draft or absent. plan skill in `re-planning` runs gap analysis (assumes reviewed plan), while in `planning` it runs full planning. Jumping would cause plan skill to incorrectly downgrade. plan skill reads `.target.md` fresh each run — requirement changes are absorbed naturally.
 
@@ -119,8 +120,9 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | → `re-planning` | = `executing` | Mid-execution plan change |
 | `re-planning` | = `re-planning` | = `re-planning` | Continue revision |
 | `blocked` | → `planning` | = `blocked` | Unblocking |
-| `stage-done` | = `stage-done` | = `stage-done` | Non-terminal; annotations preserved for next stage |
-| `complete`/`cancelled` | REJECT | REJECT | Terminal states |
+| `evolving` | REJECT | = `evolving` | No active plan in evolving; use `/task-ai:target` to start next stage |
+| `satisfied` | REJECT | = `satisfied` | No active plan; use `/task-ai:target` to re-enter evolution |
+| `cancelled` | REJECT | REJECT | Terminal state |
 
 ### Evaluation Layer — `.analysis/*.md`, `.test/*.md`
 
@@ -130,7 +132,7 @@ State transitions depend on **(current status, file layer, annotation type)**. C
 | `executing` | `.test/*.md` | = `executing` (mark re-verify) | = `executing` |
 | `review` | `.analysis/*.md` | → `re-planning` | = `review` |
 | other (non-terminal) | any evaluation file | = (keep current) | = (keep current) |
-| `complete`/`cancelled` | any | REJECT | REJECT |
+| `cancelled` | any | REJECT | REJECT |
 
 > Terminal states are rejected at step 5 before reaching this table. Evaluation layer annotations typically don't trigger `re-planning` directly — they flag for re-check/re-verify at the next verify/check run. Exception: `review` + `.analysis/*.md` modification = conclusion overturned → `re-planning`. Note: `review` + `.test/*.md` modification does **not** trigger `re-planning` — test changes flag for re-verify only, as they don't overturn the plan-level conclusion.
 
@@ -194,7 +196,7 @@ The `next` field routes by **(file layer, pre-transition status)**. The routing 
 { "step": "annotate", "result": "(processed)", "next": "<by-layer>", "checkpoint": "post-annotate", "timestamp": "..." }
 ```
 
-Terminal states (`complete`/`cancelled`) are rejected at step 5 and never reach this table.
+Terminal states (`cancelled`) are rejected at step 5 and never reach this table.
 
 | Annotation target layer | Current status | `next` | Reason |
 |------------------------|----------------|--------|--------|
@@ -203,19 +205,19 @@ Terminal states (`complete`/`cancelled`) are rejected at step 5 and never reach 
 | Requirement `.target.md` | `review`/`executing` | `check` | Reviewed plan needs re-checking against changed requirements |
 | Requirement `.target.md` | `re-planning` | `check` | Requirements changed during re-planning, re-check needed |
 | Requirement `.target.md` | `blocked` | `plan` | Unblocking via requirement change, needs planning |
-| Requirement `.target.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
+| Requirement `.target.md` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
 | Planning `.plan.md` | `draft` | `plan` | Plan annotation triggers planning phase |
 | Planning `.plan.md` | `planning` | `check` | Plan modified, needs review |
 | Planning `.plan.md` | `review`/`executing` | `check` | Plan modified after review/during execution, needs re-check |
 | Planning `.plan.md` | `re-planning` | `check` | Plan revised during re-planning, re-check needed |
 | Planning `.plan.md` | `blocked` | `plan` | Unblocking via plan change, needs planning |
-| Planning `.plan.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
-| Evaluation `.analysis/*` | any non-terminal (except `stage-done`) | `check` | Evaluation conclusion challenged |
-| Evaluation `.analysis/*` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
-| Evaluation `.test/*` | any non-terminal (except `stage-done`) | `verify` | Test criteria/results changed |
-| Evaluation `.test/*` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
-| Methodology `.type-profile.md` | any non-terminal (except `stage-done`) | `verify` | Methodology change affects verification |
-| Methodology `.type-profile.md` | `stage-done` | `(none)` | Stage complete; annotations stored for next stage |
+| Planning `.plan.md` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
+| Evaluation `.analysis/*` | any non-terminal (except `evolving`) | `check` | Evaluation conclusion challenged |
+| Evaluation `.analysis/*` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
+| Evaluation `.test/*` | any non-terminal (except `evolving`) | `verify` | Test criteria/results changed |
+| Evaluation `.test/*` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
+| Methodology `.type-profile.md` | any non-terminal (except `evolving`) | `verify` | Methodology change affects verification |
+| Methodology `.type-profile.md` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
 | Information (`.summary.md` etc.) | any | `(none)` | Pure context improvement |
 | Comment-only (any file) | any | `(none)` | Comments don't trigger downstream |
 

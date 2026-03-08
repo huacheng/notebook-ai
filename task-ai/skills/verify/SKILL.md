@@ -55,7 +55,7 @@ When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, veri
 
 ## Execution Steps
 
-1. **Read** `.status.json` — get `type`, `status`. Validate status is not terminal (`complete` or `cancelled`)
+1. **Read** `.status.json` — get `type`, `status`. Validate status is not terminal (`cancelled` is the only terminal state)
 2. **Read** `.type-profile.md` if exists — "Verification Standards" section is the **primary** source for testing approach, quality metrics, and acceptance criteria for this task (see `plan/references/type-profiling.md` for type system details)
 3. **Read** `.test/` latest criteria file — determine what to verify. For software types, also locate `vh-stubs.test.*` and `vh-baseline.md` for VFP verification
 4. **Read** `.target.md` — extract acceptance criteria

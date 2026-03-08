@@ -233,7 +233,7 @@ Same as scope=impl (steps 1-5), with different filename and source field.
 | **High-value** | exec | After step execution | Implementation decisions and problem-solving reasoning |
 | **High-value** | check | step 16 | Quality judgment and ACCEPT/REPLAN decision reasoning |
 | **High-value** | verify | After verification completes | Verification strategy selection and result analysis reasoning |
-| **Medium-value** | merge | During conflict resolution | Conflict resolution strategy reasoning (only when conflicts occur) |
+| **Low-value** | merge | After deliverables copy | Deliverables selection reasoning (only when non-trivial) |
 | **Medium-value** | security | During security audit | Threat model and risk assessment reasoning |
 | **Medium-value** | annotate | During annotation processing | Cross-impact assessment reasoning |
 

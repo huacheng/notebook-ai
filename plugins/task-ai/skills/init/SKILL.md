@@ -57,6 +57,8 @@ $NB_WORKSPACES_ROOT/
 └── <project_name>/
     ├── .status.json                    # Project metadata
     └── <notebook_name>/
+        ├── .deliverables/              # Non-system output directory (code, configs, assets)
+        │                               # Created during exec; merged to <project>/.deliverables/<notebook>/ on main
         └── .working/
             ├── .status.json            # Task metadata (JSON) — machine-readable
             └── .target.md              # Task target / requirements — human-authored
@@ -81,8 +83,7 @@ The `.status.json` file uses JSON as the single source of truth for task state:
   "worktree": ".worktrees/task-notebook-name",
   "stage": {
     "current": 1,
-    "total": 1,
-    "completed": []
+    "history": []
   }
 }
 ```
@@ -96,14 +97,14 @@ The `.status.json` file uses JSON as the single source of truth for task state:
 | `review` | Plan complete, awaiting feasibility evaluation |
 | `executing` | Implementation in progress |
 | `re-planning` | Plan being revised due to issues or objective changes |
-| `stage-done` | Current stage complete, awaiting next stage definition (multi-stage only) |
-| `complete` | Task finished and verified |
+| `evolving` | Current stage complete, awaiting next stage definition (multi-stage only) |
+| `satisfied` | Task finished and verified |
 | `blocked` | Blocked by dependency or unresolved issue |
 | `cancelled` | Task abandoned |
 
 ### depends_on Format
 
-Dependencies reference other task modules. Two formats — simple string (requires `complete`) and extended object (custom minimum status):
+Dependencies reference other task modules. Two formats — simple string (requires `satisfied`) and extended object (custom minimum status):
 
 ```json
 "depends_on": [
@@ -152,7 +153,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
    - `tags`: parsed from `--tags` argument or `[]`
    - `branch`: `task/<notebook_name>`
    - `worktree`: `.worktrees/task-<notebook_name>` (or empty if no worktree)
-   - `stage`: `{ "current": 1, "total": 1, "completed": [] }` (progressive target default)
+   - `stage`: `{ "current": 1, "history": [] }` (progressive target default)
 12. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.working/.target.md` with default template (task type in `.status.json` is auto-discovered by `research` during planning):
     ```markdown
     # Task Target: <title>

@@ -99,6 +99,14 @@ except Exception:
     # D3: Validate recovered values are integers, fall back to defaults
     [[ "$ITERATION" =~ ^[0-9]+$ ]] || ITERATION=1
     [[ "$COMPACTION" =~ ^[0-9]+$ ]] || COMPACTION=0
+    # D3: Increment compaction count on recovery (per SKILL.md: "On compaction recovery, incremented by 1")
+    COMPACTION=$((COMPACTION + 1))
+    # D3: Enforce compaction frequency limit (>= 3 within same auto session → stop)
+    if [[ "$COMPACTION" -ge 3 ]]; then
+        echo "[ERROR] Compaction frequency limit reached ($COMPACTION compactions). Context may be too large for this task." >&2
+        echo '{"stop_reason":"compaction_frequency_limit","compaction_count":'"$COMPACTION"'}' > "$WORK_DIR/.auto-stop"
+        exit 1
+    fi
 fi
 
 case "$STATUS" in
@@ -197,6 +205,15 @@ esac
 # D3: Get stage field. Python heredoc has try/except for malformed JSON (e.g. Python repr vs JSON)
 STAGE_JSON=$(python3 "$STATE_PY" get "$STATUS_JSON" stage 2>/dev/null || echo "")
 CHECKPOINT=""
+# D3: Increment iteration counter and enforce hard safety limit
+ITERATION=$((ITERATION + 1))
+MAX_ITERATIONS=200
+if [[ "$ITERATION" -ge "$MAX_ITERATIONS" ]]; then
+    echo "[ERROR] Hard iteration limit reached ($MAX_ITERATIONS). Stopping auto loop to prevent runaway." >&2
+    echo '{"stop_reason":"hard_iteration_limit","iteration":'"$ITERATION"'}' > "$WORK_DIR/.auto-stop"
+    exit 1
+fi
+
 # Derive checkpoint from step + status context
 case "$STEP" in
     verify)

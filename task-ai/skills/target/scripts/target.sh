@@ -79,13 +79,19 @@ fi
 # Mode 1: Satisfy (mark task as satisfied from evolving status)
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$SATISFY_MODE" == "1" ]]; then
+    if [[ ! -f "$STATUS_FILE" ]]; then
+        echo "[ERROR] Task not initialized — .status.json does not exist at $STATUS_FILE" >&2
+        exit 1
+    fi
     CURRENT_STATUS=$(python3 "$STATE_PY" get "$STATUS_FILE" status 2>/dev/null || echo "")
     if [[ "$CURRENT_STATUS" != "evolving" ]]; then
         echo "[ERROR] --satisfy requires status 'evolving', current is '$CURRENT_STATUS'" >&2
         exit 1
     fi
     python3 "$STATE_PY" set "$STATUS_FILE" status satisfied
-    git add "$STATUS_FILE" && git commit -m "task-ai($NB_NOTEBOOK):target marked satisfied" 2>/dev/null || true
+    if ! git add "$STATUS_FILE" || ! git commit -m "task-ai($NB_NOTEBOOK):target marked satisfied" 2>/dev/null; then
+        echo "[WARN] git commit failed (status updated locally but not committed)" >&2
+    fi
     echo "Task marked as satisfied. Use /task-ai:target to re-enter evolution if needed."
     exit 0
 fi

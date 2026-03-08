@@ -50,6 +50,7 @@ $NB_WORKSPACES_ROOT/                   # 环境变量: NB_WORKSPACES_ROOT
 │   │       └── .report.md            # 完成报告（由 report 子命令生成）
 │   │
 │   ├── notebook-1/
+│   │   ├── .deliverables/             # 任务交付物（exec 阶段产出，merge 时复制到 project 级）
 │   │   └── .working/                  # 环境变量: NB_TASK_WORKING — notebook 级系统工作目录
 │   │       ├── .status.json            # 任务元数据（status/phase/type...）
 │   │       ├── .target.md             # 需求目标（人工编写）
@@ -110,3 +111,14 @@ When a sub-command receives `<project>` and `<notebook>` arguments, the followin
 | `NB_PROJECT_DELIVERABLES` | `$NB_WORKSPACES_ROOT/<project>/.deliverables/` | Project-level deliverables directory |
 
 Deliverables are written to `$NB_PROJECT_DELIVERABLES/<notebook>/` (project-level, not notebook-level).
+
+### Merge Path Mapping
+
+During `merge`, `<notebook>/.deliverables/` on the task branch is copied to `<project>/.deliverables/<notebook>/` on main. No full git merge — only deliverables are transferred.
+
+```
+Source (task branch):  <project>/<notebook>/.deliverables/*
+Target (main branch):  <project>/.deliverables/<notebook>/*
+```
+
+Non-system file output (code, configs, assets) during exec MUST be written to `<notebook>/.deliverables/`, not elsewhere in the project tree. System files (`.status.json`, `.plan.md`, etc.) remain in `.working/`.

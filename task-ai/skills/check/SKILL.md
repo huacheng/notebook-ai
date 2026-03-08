@@ -503,7 +503,7 @@ Every check outcome writes `.auto-signal` on completion:
 | pre-merge | PASS | `{ "step": "check", "result": "PASS", "next": "merge", "checkpoint": "pre-merge", "timestamp": "..." }` |
 | pre-merge | NEEDS_FIX | `{ "step": "check", "result": "NEEDS_FIX", "next": "exec", "checkpoint": "pre-merge", "timestamp": "..." }` |
 
-When ACCEPT (post-exec) or PASS (pre-merge), the `merge` sub-command handles refactoring, merge, conflict resolution, and cleanup. See `skills/merge/SKILL.md`.
+When ACCEPT (post-exec) or PASS (pre-merge), the `merge` sub-command copies `<notebook>/.deliverables/` to main and transitions status to `evolving`. See `skills/merge/SKILL.md`.
 
 ## Task-Type-Aware Verification
 

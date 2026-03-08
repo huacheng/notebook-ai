@@ -43,7 +43,7 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 ## Execution Steps
 
 1. **Read** `.status.json` — get current status
-2. **Validate status**: If current status is `complete` or `cancelled`, REJECT — terminal states cannot be cancelled
+2. **Validate status**: If current status is `cancelled`, REJECT — already terminal
 3. **Stop auto** if running:
    - Call `GET /api/task-auto/lookup?taskDir=<notebook_working_dir>` to find the session running this task's auto loop
    - If found (200): call `DELETE /api/sessions/<session_name>/task-auto`
@@ -78,8 +78,8 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 | `executing` | `cancelled` | Always |
 | `re-planning` | `cancelled` | Always |
 | `blocked` | `cancelled` | Always |
-| `stage-done` | `cancelled` | Always |
-| `complete` | REJECT | Terminal state |
+| `evolving` | `cancelled` | Always |
+| `satisfied` | `cancelled` | Always |
 | `cancelled` | REJECT | Terminal state |
 
 ## Git
@@ -96,7 +96,7 @@ None — `cancel` does not write `.auto-signal`. It is a lifecycle-terminating c
 ## Notes
 
 - **Input sanitization**: The `--reason` text must be sanitized before writing to `.status.json` or `.summary.md` — strip HTML comments, ANSI escape sequences, and control characters (except `\n` and `\t`) per the Input Validation rules in `commands/task-ai.md`
-- Cancel is rejected on terminal statuses: `complete` (use a separate workflow to reopen) and `cancelled` (already terminal)
+- Cancel is rejected only on `cancelled` (already terminal). `satisfied` is non-terminal and can be cancelled
 - If the task has uncommitted code changes in a worktree, `--cleanup` will warn before deleting
 - Without `--cleanup`, the branch and worktree are preserved for reference
 - A cancelled task can be referenced by the `report` sub-command for documentation purposes

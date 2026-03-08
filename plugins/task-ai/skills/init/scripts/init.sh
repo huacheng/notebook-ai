@@ -215,8 +215,7 @@ cat > "$WORKING_DIR/.status.json" <<EOF
   "worktree": "$WORKTREE_REL",
   "stage": {
     "current": 1,
-    "total": 1,
-    "completed": []
+    "history": []
   }
 }
 EOF

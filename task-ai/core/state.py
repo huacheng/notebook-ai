@@ -143,8 +143,9 @@ def cmd_transition(args):
             history = stage.setdefault('history', [])
             try:
                 entry = json.loads(args.stage_history)
-            except (json.JSONDecodeError, TypeError):
-                entry = args.stage_history
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f"[ERROR] Invalid JSON in --stage-history: {e}", file=sys.stderr)
+                sys.exit(1)
             history.append(entry)
 
         write_state(args.file, state)

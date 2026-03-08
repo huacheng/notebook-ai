@@ -7,7 +7,7 @@ Sub-commands have different cognitive demands. The `model_tier` and `auto_delega
 | Tier | Model Mapping | Cognitive Profile |
 |------|--------------|-------------------|
 | `heavy` | opus | Architecture reasoning, code generation, deep evaluation, judgment |
-| `medium` | sonnet | Structured procedures, search + collection, conflict resolution |
+| `medium` | sonnet | Structured procedures, search + collection, deliverables management |
 | `light` | haiku | Mechanical operations, read-only queries, simple status changes |
 
 ## Routing Table
@@ -20,7 +20,7 @@ Sub-commands have different cognitive demands. The `model_tier` and `auto_delega
 | **auto** | heavy | — (orchestration) | Loop management + decision routing; IS the main session |
 | **security** | heavy | false | Six-perspective security audit + judgment; needs plan/exec context |
 | **read** | medium | true | Local document ingestion; delegates to research for supplementation |
-| **merge** | medium | false | Conflict resolution needs exec context; git state is session-bound |
+| **merge** | medium | false | Deliverables copy + state transition; git state is session-bound |
 | **annotate** | medium | false | Cross-impact assessment needs module-wide file context |
 | **verify** | medium | true | Test execution + result collection; output to `.test/` is self-contained |
 | **report** | medium | true | Read all files + compose report; output to `.report.md` is self-contained |

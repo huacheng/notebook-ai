@@ -42,7 +42,11 @@ Ingests user-provided documents, extracts novel information, applies strict 10-c
 4. **Depth Processing** (stub):
    - `shallow`: Format the content directly (delta isolation not yet implemented).
    - `deep`: Delegate to `research --caller exec --scope gap` to cross-reference and supplement with web research. Currently logs intent only; actual delegation not yet implemented.
-5. **Sanitization (Detox)**: Apply 10-category injection rules (`skills/library/references/injection-rules.md`). Enforce 50KB size limit (Category 5). Compute content hashes (`content_hash_original`, `content_hash_sanitized`) and risk level.
+5. **Sanitization (Detox)**: Load injection rules from two sources and merge:
+   - **Seed rules** (baseline): 10-category rules from `skills/library/references/injection-rules.md`
+   - **Evolved rules** (overrides): `$NB_WORKSPACES_LIBRARY/.evolving-rules/sanitization/active/*.md` — dynamically promoted rules that extend or override seed categories
+   - **Merge precedence**: evolved active rules take precedence over seed rules for the same category number. New categories (11+) from evolved rules are appended after seed categories. Seed categories without an evolved override apply as-is
+   - Apply merged ruleset. Enforce 50KB size limit (Category 5). Compute content hashes (`content_hash_original`, `content_hash_sanitized`) and risk level.
 6. **Library Write Protocol** (six-step, per `skills/library/references/write-protocol.md`):
    1. `mkdir -p` target directory (idempotent).
    2. Acquire `.memory/.references/.lock` (`O_CREAT|O_EXCL`; stale-lock recovery via rename).

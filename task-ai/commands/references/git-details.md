@@ -29,7 +29,7 @@ task-ai(<module>):<type> <description>
 | `feat` | New feature code during exec | Project files |
 | `fix` | Bugfix code during exec | Project files |
 | `refactor` | Code cleanup before merge | Project files |
-| `merge` | Merge to main + conflict resolution; stage completion | — (merge commit) / $NB_WORKSPACES_ROOT/ directory files |
+| `merge` | Copy <notebook>/.deliverables/ to main; stage completion | $NB_WORKSPACES_ROOT/ directory files |
 | `report` | Report generation | $NB_WORKSPACES_ROOT/ directory files |
 | `cancel` | Task cancellation | $NB_WORKSPACES_ROOT/ directory files |
 | `highlight` | Experience distillation and ad-hoc capture | $NB_WORKSPACES_LIBRARY/ files |
@@ -48,9 +48,7 @@ task-ai(auth-refactor):feat add user auth middleware
 task-ai(auth-refactor):fix fix token expiration check
 task-ai(auth-refactor):exec step 2/5 done
 task-ai(auth-refactor):check post-exec ACCEPT
-task-ai(auth-refactor):merge merge completed task
-task-ai(auth-refactor):merge resolve merge conflict
-task-ai(auth-refactor):merge task completed
+task-ai(auth-refactor):merge copy deliverables from task/auth-refactor
 task-ai(auth-refactor):report generate completion report
 task-ai(auth-refactor):verify full verification
 task-ai(auth-refactor):annotate annotations processed
@@ -62,17 +60,19 @@ task-ai(auth-refactor):merge stage 1 completed
 task-ai(auth-refactor):target stage 2 defined
 ```
 
-## Refactoring & Merge
+## Deliverables Copy & Merge
 
-After task completion confirmed (`check --checkpoint post-exec` ACCEPT), the `merge` sub-command handles the full merge lifecycle:
+After task completion confirmed (`check --checkpoint post-exec` ACCEPT), the `merge` sub-command copies deliverables to main:
 
-1. **Task-level refactoring** (on task branch, before merge)
-2. **Merge to main** (with conflict resolution — up to 3 attempts with verification)
-3. **Cleanup** (worktree removal, branch deletion)
+1. **Save** `<notebook>/.deliverables/` content from task branch to temp dir
+2. **Checkout main**, copy to `<project>/.deliverables/<notebook>/`, commit
+3. **Checkout back** to task branch for state transition (→ `evolving`)
 
-See `skills/merge/SKILL.md` for detailed merge strategy and conflict resolution flow.
+No full git merge — only deliverables are copied. Branches and worktrees are NOT deleted.
 
-**Recommended:** After all related tasks merge to main, do a project-level refactoring pass on main (cross-task cleanup, shared utilities, API consistency). This is a manual activity, not part of auto mode.
+See `skills/merge/SKILL.md` for detailed merge strategy.
+
+**Recommended:** After all related tasks complete, do a project-level refactoring pass on main (cross-task cleanup, shared utilities, API consistency). This is a manual activity, not part of auto mode.
 
 ## Worktree Parallel Execution
 
@@ -86,7 +86,7 @@ git worktree add .worktrees/task-<module> -b task/<notebook>
 - Each task runs in an isolated directory with full project copy
 - Multiple tasks can `exec` simultaneously without conflict
 - `auto` daemon operates in the task's worktree directory
-- On completion, merge back: `git merge task/<notebook>` from main branch
+- On completion, copy deliverables: `merge` copies `<notebook>/.deliverables/` to `<project>/.deliverables/<notebook>/` on main
 
 ## Rollback
 

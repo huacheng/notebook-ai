@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /task-ai:merge implementation
-# Merge only — does NOT delete branches or worktrees.
+# Copy <notebook>/.deliverables/ to main — does NOT do full git merge, delete branches or worktrees.
 # Usage: merge.sh <notebook>
 
 set -euo pipefail
@@ -29,8 +29,10 @@ STATE_PY="$TASK_AI_ROOT/core/state.py"
 SIGNAL_FILE="$WORK_DIR/.auto-signal"
 
 # D3: Cleanup handler — remove temp files on exit
+MERGE_TMPDIR=""
 cleanup_merge() {
     rm -f "${SIGNAL_FILE}.tmp" 2>/dev/null || true
+    [[ -n "$MERGE_TMPDIR" ]] && rm -rf "$MERGE_TMPDIR" 2>/dev/null || true
 }
 trap cleanup_merge EXIT INT TERM
 
@@ -139,13 +141,37 @@ if [[ ! "$STAGE_CURRENT" =~ ^[0-9]+$ ]] || [[ "$STAGE_CURRENT" -eq 0 ]]; then
     STAGE_CURRENT=1
 fi
 
-echo "[GIT] Merging $TASK_BRANCH into $MAIN_BRANCH..."
+echo "[GIT] Copying .deliverables/ from $TASK_BRANCH to $MAIN_BRANCH..."
 
-# Phase 1: Execute actual git merge
+# Resolve paths before branch switch (paths vanish after checkout master)
+NB_DIR="$(dirname "$WORK_DIR")"
+PROJECT_DIR="$(dirname "$NB_DIR")"
+SRC_DELIVERABLES="$NB_DIR/.deliverables"
+DELIVERABLES_TARGET="$PROJECT_DIR/.deliverables/$NOTEBOOK"
+
+# D3: Save deliverables to temp dir before switching branches (cleaned up by cleanup_merge trap)
+MERGE_TMPDIR=$(mktemp -d)
+HAS_DELIVERABLES=0
+if [[ -d "$SRC_DELIVERABLES" ]] && [[ -n "$(ls -A "$SRC_DELIVERABLES" 2>/dev/null)" ]]; then
+    # D3: Explicit error handling — set -e exits on failure but won't write signal
+    if ! cp -a "$SRC_DELIVERABLES/." "$MERGE_TMPDIR/"; then
+        echo "[ERROR] Failed to copy deliverables to temp dir" >&2
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        cat > "${SIGNAL_FILE}.tmp" <<EOSIG
+{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"copy-failed","timestamp":"$TIMESTAMP"}
+EOSIG
+        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
+        exit 1
+    fi
+    HAS_DELIVERABLES=1
+else
+    echo "[INFO] No .deliverables/ found on $TASK_BRANCH — nothing to copy."
+fi
+
+# Phase 1: Checkout master
 if ! git checkout "$MAIN_BRANCH"; then
     echo "[ERROR] Failed to checkout $MAIN_BRANCH" >&2
     TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    # D3: Atomic write via .tmp + mv
     cat > "${SIGNAL_FILE}.tmp" <<EOF
 {"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
 EOF
@@ -153,19 +179,35 @@ EOF
     exit 1
 fi
 
-# D6: Variable name reflects semantics — 0 = no failure, 1 = failure
+# Phase 1b: Copy deliverables from temp to project-level .deliverables/<notebook>/
 MERGE_FAILED=0
-git merge --no-ff -m "task-ai($NOTEBOOK):merge merge completed task" -- "$TASK_BRANCH" || MERGE_FAILED=1
+if [[ "$HAS_DELIVERABLES" -eq 1 ]]; then
+    # D3: Explicit error handling for mkdir/cp on master branch
+    if ! mkdir -p "$DELIVERABLES_TARGET" || ! cp -a "$MERGE_TMPDIR/." "$DELIVERABLES_TARGET/"; then
+        echo "[ERROR] Failed to write deliverables on $MAIN_BRANCH" >&2
+        git checkout "$TASK_BRANCH" 2>/dev/null || true
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        cat > "${SIGNAL_FILE}.tmp" <<EOSIG
+{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"copy-failed","timestamp":"$TIMESTAMP"}
+EOSIG
+        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
+        exit 1
+    fi
+    git add "$DELIVERABLES_TARGET/"
+    if git diff --cached --quiet 2>/dev/null; then
+        echo "[INFO] No deliverables changes to commit."
+    else
+        git commit -m "task-ai($NOTEBOOK):merge copy deliverables from $TASK_BRANCH" || MERGE_FAILED=1
+    fi
+fi
+rm -rf "$MERGE_TMPDIR"
+MERGE_TMPDIR=""
 
 if [[ "$MERGE_FAILED" -ne 0 ]]; then
-    echo "[ERROR] Merge failed (likely conflict). Please resolve manually." >&2
-    # D3: Abort merge and write conflict signal
-    git merge --abort 2>/dev/null || echo "[WARN] merge --abort failed" >&2
+    echo "[ERROR] Failed to commit deliverables." >&2
+    # D1: Checkout back to task branch before writing signal (signal file is on task branch)
     git checkout "$TASK_BRANCH" 2>/dev/null || true
-
-    # D1: Write conflict .auto-signal (per SKILL.md)
     TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    # D3: Atomic write via .tmp + mv
     cat > "${SIGNAL_FILE}.tmp" <<EOF
 {"step":"merge","result":"conflict","next":"(stop)","checkpoint":"","timestamp":"$TIMESTAMP"}
 EOF
@@ -173,10 +215,20 @@ EOF
     exit 1
 fi
 
-# Merge succeeded — stay on main branch for state update commits
-# D1: State updates (.status.json, .auto-signal) must be committed on main so
-# the merged codebase includes the final status. Checking out the task branch
-# would leave main without the status transition.
+# Deliverables copied — checkout back to task branch for state update
+# D1: .status.json and .auto-signal live on task branch, not master
+if ! git checkout "$TASK_BRANCH"; then
+    echo "[ERROR] Failed to checkout back to $TASK_BRANCH for state update" >&2
+    # D3: Write signal so auto daemon can detect the failure
+    # Note: SIGNAL_FILE path may not exist on master, but attempt anyway
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    mkdir -p "$(dirname "$SIGNAL_FILE")" 2>/dev/null || true
+    cat > "${SIGNAL_FILE}.tmp" <<EOF
+{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
+EOF
+    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE" 2>/dev/null || true
+    exit 1
+fi
 
 # Phase 3: Post-merge finalization — unified evolving path (progressive evolution)
 # D1: Always transition to evolving (no stage.total comparison — progressive evolution model)

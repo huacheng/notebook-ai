@@ -21,9 +21,7 @@ arguments:
   - name: --refine
     description: "Append a refinement to existing plan (used by agent during plan-refinement phase). Requires a quoted string value, e.g., --refine \"description\""
     required: false
-  - name: --finalize
-    description: "Exit plan-refinement phase, signal plan is ready for execution"
-    required: false
+
 ---
 
 # /task-ai:plan — Plan Generation
@@ -33,68 +31,34 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 ## Usage
 
 ```bash
-# Generate mode: create/regenerate plan, enter plan-refinement phase
+# Generate mode: create/regenerate plan
 /task-ai:plan [--generate]
 
 # Refine mode: append refinement (agent calls this during conversation)
 /task-ai:plan --refine "Add caching layer between API and database"
-
-# Finalize mode: exit plan-refinement phase
-/task-ai:plan --finalize
 ```
 
 **Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 `--generate` is the default behavior — the flag exists for explicitness when invoked from auto mode or scripts. Omitting it has the same effect.
 
-## Plan-Refinement Phase
+## Plan Refinement
 
-When `/plan` generates a plan, the system enters **plan-refinement phase**:
+After plan generation, the agent monitors conversation for plan refinements:
 
-1. **Entry**: `/plan` writes `.plan.md` and creates `.session-context` with `phase: plan-refinement`
-2. **During phase**: Agent monitors conversation for plan refinements
-   - Agent detects user refining the plan → automatically calls `plan --refine "content"`
-   - Refinements are appended to `## Refinements` section in `.plan.md`
-3. **Exit**: `/exec` or `/plan --finalize` clears `.session-context`
+1. **After generation**: The agent reads `.status.json` to confirm `status: planning`
+2. **During conversation**: If user refines the plan, agent calls `/task-ai:plan --refine "content"`
+3. **When ready**: User proceeds to `/task-ai:exec`
 
-### Agent Behavior (Prompt Injection)
-
-When `.session-context` exists with `phase: plan-refinement`, the agent receives:
-```
-You are in plan-refinement phase.
-Current plan: <content of .plan.md>
-
-When user's conversation refines, adjusts, or adds steps to the plan,
-automatically call: /task-ai:plan --refine "<extracted refinement>"
-No explicit command needed from user.
-```
-
-### .plan.md Structure with Refinements
-
-```markdown
-# Implementation Plan: notebook-name
-
-## Step 1: Initialize Project
-- Setup basic structure
-[VH: test-init]
-
-## Step 2: Implement Core Logic
-- Write main functions
-[VH: test-core]
-
-## Refinements
-
-- [2026-03-04 10:15] Add caching layer between API and database
-- [2026-03-04 10:20] Use Redis for session storage instead of memory
-```
+The agent maintains phase awareness via `.status.json` (see Phase Awareness Protocol in `commands/task-ai.md`). No `.session-context` file is used.
 
 ## Execution Steps
 
-1. Read `.target.md` for requirements. **Stage awareness**: read `.status.json` `stage` field (default `{ current: 1, total: 1, completed: [] }` if missing). If `stage.total > 1` (multi-stage mode):
+1. Read `.target.md` for requirements. **Stage awareness**: read `.status.json` `stage` field (default `{ current: 1, history: [] }` if missing). If `stage.current > 1` (multi-stage mode):
    - Only read the current `[ACTIVE]` stage's Objective/Requirements/Constraints from `.target.md` — plan scope is limited to the current stage
    - Also read prior `[COMPLETE]` stages' `### Results` sections as context (already-implemented capabilities)
    - Library context loading (steps 9-11) naturally includes prior-stage experience files distilled by highlight
-   - If `stage.total == 1`: read entire `.target.md` as before (backward compatible)
+   - If `stage.current == 1`: read entire `.target.md` as before (backward compatible)
 2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/task-ai:research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
    - **First plan** (status `draft`/`planning`, no existing `.plan.md`):
      - Check if `.target.md` contains `## Research Insights` section (indicates `research --caller target` was already run)
@@ -109,6 +73,7 @@ No explicit command needed from user.
 8. Read `.test/` latest criteria and results files if exists (incorporate lessons learned)
 9. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
 10. Read `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/.summary.md` if exists — condensed cross-task experience from completed tasks of the same domain type (apply directory-safe transform: `:` → `-` in type for directory name, e.g., `science:astro` → `science-astro`). For hybrid types (`A|B`), read summary files for **all** pipe-separated segments. If summary references specific entries relevant to current task, read those `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<module>.md` files for detail
+    - **Adoption tracking**: When incorporating a lesson or pattern from an experience entry into the plan, record the source in `.plan.md` under `## Adopted Experiences` (append if section exists). Format: `- <lesson summary> ← .experiences/<type>/<source-file>.md`. This enables downstream adoption tracking by highlight and report
 11. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — find relevant external reference files by keyword matching against task requirements. Read matched `.memory/.references/<topic>.md` files for domain knowledge
 12. Read project codebase for context (relevant files, CLAUDE.md conventions)
 13. Read `.notes/` latest file only if exists (prior research findings and experience)
@@ -169,9 +134,9 @@ No explicit command needed from user.
 | `executing` | `re-planning` | Mid-execution re-plan |
 | `re-planning` | `re-planning` | Further revisions |
 | `blocked` | `planning` | Unblocking changes |
-| `complete` | REJECT | Completed tasks cannot be re-planned |
+| `satisfied` | REJECT | Use /target to re-enter first |
+| `evolving` | REJECT | Use /target to define next stage first |
 | `cancelled` | REJECT | Cancelled tasks cannot be re-planned |
-| `stage-done` | REJECT | Stage completed — use `/target` to advance to next stage first |
 
 ## Git
 

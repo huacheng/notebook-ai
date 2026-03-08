@@ -118,7 +118,7 @@ if [[ -f "$STATUS_FILE" ]]; then
         echo "[WARN] .status.json exists but has no 'status' field" >&2
     else
         case "$TASK_STATUS" in
-          complete|cancelled)
+          cancelled)
             echo "[ERROR] Task status is '$TASK_STATUS' (terminal). Verify cannot run on terminal tasks." >&2
             exit 1
             ;;
