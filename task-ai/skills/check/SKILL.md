@@ -515,7 +515,7 @@ Before step 1, determine scope from invocation:
     - NEEDS_REVISION (post-plan) → "Plan needs revision. Next: `/task-ai:plan` to revise based on the feedback above."
     - ACCEPT (post-exec) → "Implementation accepted. Next: `/task-ai:merge` to merge the task branch."
     - NEEDS_FIX (mid/post-exec) → "Issues found. Next: `/task-ai:exec` to apply fixes based on the findings above."
-    - ROLLBACK (post-exec) → "Convergence regressed — deliverables rolled back to previous stage endpoint. Next: `/task-ai:exec` to retry with a different approach. See `.analysis/<date>-convergence-rollback.md` for failure analysis."
+    - ROLLBACK (post-exec) → "Convergence regressed — deliverables rolled back to previous stage endpoint. Next: `/task-ai:exec` to retry with a different approach. Refer to `.analysis/<date>-convergence-rollback.md` for failure analysis."
     - REPLAN → "Fundamental issues found. Next: `/task-ai:plan` to re-plan based on the feedback above."
     - CONTINUE (mid-exec) → "Progress OK. Next: `/task-ai:exec` to continue implementation."
     - BLOCKED → "Task blocked. Manual intervention required."

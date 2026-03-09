@@ -54,7 +54,7 @@ Ingests user-provided documents, extracts novel information, applies strict 10-c
    4. Acquire `.changelog.lock` → append changelog line → release `.changelog.lock`.
    5. Update `.memory/.references/.index.md` (append new row or update existing).
    6. Release `.memory/.references/.lock`.
-7. **Rebuild**: Invoke `library/scripts/maintain.sh --rebuild-index` directly.
+7. **Rebuild**: Invoke `/task-ai:library maintain --rebuild-index` directly.
 
 ## Output
 A new or updated `.md` file in `.memory/.references/` with `injection_risk` explicitly marked and version incremented on re-ingestion.

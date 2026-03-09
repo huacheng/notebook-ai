@@ -47,17 +47,17 @@ Acts as the mandatory pre-hook for existing sub-commands (`check` and `exec`), e
 4. **Verdict**: If safe, return `[SECURITY] PASS: Command looks safe`. If dangerous, return `[SECURITY] REJECT: <reason>`.
 
 ### audit-plan (Used by `check`)
-1. Read `.plan.md`. If absent or empty, PASS.
-2. **Dynamic Rules** (Tier 1): Check against evolving rules from `.evolving-rules/security/active/`.
-3. **Core Pattern Scan** (Tier 2): Check for destructive commands, VFP injection, two-stage payloads, download-then-execute, environment manipulation, path traversal, injection/obfuscation, config file tampering, sensitive path access, secret exfiltration, DNS tunneling, SSRF to internal networks, and reverse shell patterns.
-4. **Verdict**: Return `[SECURITY] PASS: Plan looks safe` or `[SECURITY] BLOCKED: High risk operations detected in plan` with findings list.
-5. (Optional) Execute highlight protocol scope=thinking-raw (see `highlight/SKILL.md` section 3.3). Not implemented in `security.sh`; intended for agent-level callers. Inline call failure should not block security's main flow — highlight is enhancement, not gating.
+5. Read `.plan.md`. If absent or empty, PASS.
+6. **Dynamic Rules** (Tier 1): Check against evolving rules from `.evolving-rules/security/active/`.
+7. **Core Pattern Scan** (Tier 2): Check for destructive commands, VFP injection, two-stage payloads, download-then-execute, environment manipulation, path traversal, injection/obfuscation, config file tampering, sensitive path access, secret exfiltration, DNS tunneling, SSRF to internal networks, and reverse shell patterns.
+8. **Verdict**: Return `[SECURITY] PASS: Plan looks safe` or `[SECURITY] BLOCKED: High risk operations detected in plan` with findings list.
+9. (Optional) Execute highlight protocol scope=thinking-raw (see `highlight/SKILL.md` section 3.3). Not implemented in `security.sh`; intended for agent-level callers. Inline call failure should not block security's main flow — highlight is enhancement, not gating.
 
 ### scan-skill (L1 static analysis)
-1. Validate skill file exists and is non-empty.
-2. **Extended Rules**: Apply dynamic rules from `.evolving-rules/security/active/`.
-3. **Core Rules (CORE-001 to CORE-012)**: Hardcoded security floor covering destructive commands, VFP injection, two-stage loading, env manipulation, prompt injection, MCP/hooks config abuse, auth token theft, secret exfiltration, env var leaking, DNS tunneling, SSRF to internal networks, and reverse shell detection.
-4. **Verdict**: Return `[SECURITY] PASS: Skill static analysis passed` or `[SECURITY] REJECT: Skill contains high-risk patterns` with findings list.
+10. Validate skill file exists and is non-empty.
+11. **Extended Rules**: Apply dynamic rules from `.evolving-rules/security/active/`.
+12. **Core Rules (CORE-001 to CORE-012)**: Hardcoded security floor covering destructive commands, VFP injection, two-stage loading, env manipulation, prompt injection, MCP/hooks config abuse, auth token theft, secret exfiltration, env var leaking, DNS tunneling, SSRF to internal networks, and reverse shell detection.
+13. **Verdict**: Return `[SECURITY] PASS: Skill static analysis passed` or `[SECURITY] REJECT: Skill contains high-risk patterns` with findings list.
 
 ## Incident Response
 If a command is `REJECT`ed during `exec`:

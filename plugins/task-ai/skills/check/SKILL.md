@@ -132,7 +132,7 @@ Dimension weights and focus areas are **not hardcoded** — they adapt based on 
 
 4. **Auto-update mechanism**:
    - When check completes, if new type-specific insights discovered
-   - Write to `.memory/.experiences/<type>/<notebook>-eval.md`
+   - Write to `.memory/.experiences/<type>/<semantic>-eval.md`
    - highlight scope=complete syncs to `.type-profiles/`
    - Next check for same type uses updated adaptation
 
@@ -503,7 +503,7 @@ Before step 1, determine scope from invocation:
 11. **Write** output files per outcome: evaluation to `.analysis/` or `.bugfix/` (per Outcomes tables above), and test results to `.test/<date>-<checkpoint>-results.md` when tests are evaluated (mid-exec and post-exec checkpoints)
     - **REPLAN with traceable reference**: if verdict is REPLAN AND evaluation identifies a specific `.memory/.references/<file>` as misleading (e.g., bad API docs caused wrong approach), increment `failure_count` in that reference file's frontmatter (acquire `.memory/.references/.lock` → read frontmatter → `failure_count++` → write atomically → append `reference` changelog update line → release lock)
 12. **Experience and quality updates** (skip for CONTINUE verdict — insufficient evaluation evidence):
-    - Write evaluation experience: execute highlight protocol scope=impl pattern — see `highlight/SKILL.md` §3.1 for format. Write to `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<notebook>-eval.md` with evaluation findings, verdict rationale, and domain quality criteria learned — `quality_status: provisional`. Follow the same write steps (acquire lock → O_APPEND → changelog → index → release). Inline call failure should not block check's main flow — highlight is an enhancement step, not a gating requirement
+    - Write evaluation experience: execute highlight protocol scope=impl pattern — see `highlight/SKILL.md` §3.1 for format. Write to `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<semantic>-eval.md` with evaluation findings, verdict rationale, and domain quality criteria learned — `quality_status: provisional`. Follow the same write steps (acquire lock → O_APPEND → changelog → index → release). Inline call failure should not block check's main flow — highlight is an enhancement step, not a gating requirement
     - **`quality_status` updates**: execute highlight protocol scope=quality-update — see `highlight/SKILL.md` §3.4. ACCEPT (post-exec): provisional → verified. REPLAN: provisional → invalidated (if experience was misleading source). Inline call failure should not block check's main flow (same fault isolation)
 13. **Update** each written directory's `.summary.md` — overwrite with condensed summary of ALL entries in that directory (`.analysis/.summary.md`, `.bugfix/.summary.md`, `.test/.summary.md` as applicable per checkpoint)
 14. **Write** task-level `.summary.md` with condensed context: task state, plan summary, evaluation outcome, progress (`completed_steps`), known issues, key decisions (integrate from directory summaries)
@@ -515,7 +515,7 @@ Before step 1, determine scope from invocation:
     - NEEDS_REVISION (post-plan) → "Plan needs revision. Next: `/task-ai:plan` to revise based on the feedback above."
     - ACCEPT (post-exec) → "Implementation accepted. Next: `/task-ai:merge` to merge the task branch."
     - NEEDS_FIX (mid/post-exec) → "Issues found. Next: `/task-ai:exec` to apply fixes based on the findings above."
-    - ROLLBACK (post-exec) → "Convergence regressed — deliverables rolled back to previous stage endpoint. Next: `/task-ai:exec` to retry with a different approach. See `.analysis/<date>-convergence-rollback.md` for failure analysis."
+    - ROLLBACK (post-exec) → "Convergence regressed — deliverables rolled back to previous stage endpoint. Next: `/task-ai:exec` to retry with a different approach. Refer to `.analysis/<date>-convergence-rollback.md` for failure analysis."
     - REPLAN → "Fundamental issues found. Next: `/task-ai:plan` to re-plan based on the feedback above."
     - CONTINUE (mid-exec) → "Progress OK. Next: `/task-ai:exec` to continue implementation."
     - BLOCKED → "Task blocked. Manual intervention required."

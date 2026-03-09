@@ -1,6 +1,6 @@
 ---
 name: research
-description: "Investigate requirements and domain knowledge to support any lifecycle phase. Default mode: multi-stage objective refinement (O1→O2→O3) with background research, feasibility analysis, and goal synthesis. Also callable from plan, exec, verify, or check for gap-only reference collection. Use when the user wants to understand before acting — 'research this', 'what are the options', 'feasibility analysis', or 'deepen the objective'."
+description: "Investigate requirements and domain knowledge to support any lifecycle phase. Default mode: autonomous objective refinement (O1→O2→O3) with background research, feasibility analysis, and goal synthesis — all three stages completed in one pass. Also callable from plan, exec, verify, or check for gap-only reference collection. Use when the user wants to understand before acting — 'research this', 'what are the options', 'feasibility analysis', or 'deepen the objective'."
 model_tier: heavy
 auto_delegatable: true
 triggers:
@@ -13,7 +13,7 @@ triggers:
   disambiguate: >
     Core intent: investigate / explore / collect knowledge — output is Insights or .references/ files.
     User wants to understand before acting ("先调研一下") → research.
-    User says "深化目标" → research --caller target (progressive O1→O2→O3).
+    User says "深化目标" → research --caller target (autonomous O1→O2→O3).
     Ambiguous word "需求": user ANALYZING requirement gaps or proposing missing ones → research --caller target --phase requirements.
 arguments:
   - name: topic
@@ -28,7 +28,7 @@ arguments:
     required: false
     default: ""
   - name: phase
-    description: "Sub-phase for --caller target: objective (default, 3-stage: o1→o2→o3) or requirements"
+    description: "Sub-phase for --caller target: objective (default, autonomous o1→o2→o3 in one pass) or requirements"
     required: false
     default: objective
 ---
@@ -67,8 +67,8 @@ Collect external domain knowledge and organize it into `$NB_WORKSPACES_LIBRARY/.
 | --caller | --phase | Trigger | Output | next |
 |---------|---------|---------|--------|------|
 | (standalone) | — | Direct topic research | `.references/<topic>.md` + conversation output | — |
-| `target` | `objective` (default) | After init, 3-stage progressive deepening | `.target.md` with O1/O2/O3 staged Insights | `(stop)` |
-| `target` | `requirements` | After O3 confirmed | `.target.md` with Proposed Requirements | `plan` |
+| `target` | `objective` (default) | After init, autonomous 3-stage deepening (O1→O2→O3 in one pass) | `.target.md` with O1/O2/O3 Insights | `(stop)` |
+| `target` | `requirements` | After objective deepening complete | `.target.md` with Proposed Requirements | `plan` |
 | `plan` | — | Before/during plan | `.references/<topic>.md` | `plan` |
 | `test` | — | Before plan (planning) or before verify (executing) | `.references/testing-<type>.md` + `.test/<date>-research-*.md` | `plan`/`verify` |
 | `verify` | — | Gap detected during verify | `.references/testing-<type>.md` | `verify` |
@@ -108,14 +108,12 @@ Each phase invokes `/task-ai:library search` at entry to check existing coverage
 /task-ai:research --caller target --phase requirements
 ```
 
-After writing the `.target.md` draft post-init, the user progressively deepens the objective through 3 stages (each stage stops after execution to await user confirmation):
+After writing the `.target.md` draft post-init, the LLM autonomously deepens the objective through all 3 stages in a single pass (no per-round user confirmation):
 
 | Phase | Stage | Trigger | Output | next |
 |-------|-------|---------|--------|------|
-| `objective` | O1 | After writing objective draft (first invocation) | `.target.md` with `## Research Insights > O1: Background Research` | `(stop)` |
-| `objective` | O2 | After O1 confirmed (`[PROPOSED]` cleared) | `.target.md` with `### O2: Feasibility & Constraints` | `(stop)` |
-| `objective` | O3 | After O2 confirmed (`[PROPOSED]` cleared) | `.target.md` with `### O3: Refined Objective` | `(stop)` |
-| `requirements` | — | After O3 confirmed | `.target.md` with `Proposed Requirements` | `plan` |
+| `objective` | O1→O2→O3 | After writing objective draft (single invocation) | `.target.md` with `## Research Insights` containing O1: Background Research, O2: Feasibility & Constraints, O3: Refined Objective | `(stop)` |
+| `requirements` | — | After objective deepening complete | `.target.md` with Requirements | `plan` |
 
 ### 4. From test preparation (manual)
 
@@ -205,8 +203,7 @@ Callable independently for preparatory research before any phase, or to suppleme
 19. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture technology selection and feasibility reasoning from research process. Inline call failure should not block research's main flow — highlight is enhancement, not gating
 20. **Git commit**: `task-ai(<notebook>):research collect references` (skip if no files written; include `.type-profile.md` and `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` if updated)
 21. **Report** research summary. Then output next step prompt based on caller:
-    - `--caller target` (O1/O2/O3) → "Research stage complete. Please review the insights above and confirm or revise before continuing."
-    - `--caller target` (objective-complete) → "All research stages confirmed. Next: `/task-ai:plan` to generate the implementation plan."
+    - `--caller target` (objective) → "Target deepening complete (O1→O2→O3). Review the insights in `.target.md`. Next: `/task-ai:research --caller target --phase requirements` or `/task-ai:plan`."
     - `--caller plan` or default → "References collected. Next: `/task-ai:plan` to generate/revise the plan."
     - `--caller verify` → "References collected. Resuming verification."
     - `--caller check` → "References collected. Resuming evaluation."
@@ -218,33 +215,31 @@ These steps execute **in addition to** steps 1–18 when `--caller target` is sp
 Steps 1–18 handle type discovery and reference collection as usual; then the target-specific
 steps below produce the target insights.
 
-### --phase objective: 3-Stage Progressive Deepening (O1 → O2 → O3)
+### --phase objective: Autonomous 3-Stage Deepening (O1 → O2 → O3)
 
-Each invocation executes **one stage**, then stops for user confirmation. Re-invoke to advance.
+> 废弃：O1→O2→O3 逐轮人工确认、[PROPOSED] 标记门禁、detect_stage.py 阶段检测
+
+A single invocation completes **all three stages** autonomously. The LLM executes O1 → O2 → O3 in sequence without per-round user confirmation. Results are presented once at the end.
 
 **T0. Stage Detection** (always runs first)
 
-Read `.target.md` and determine current stage:
+Read `.target.md` and determine current state:
 
 ```
-if no `## Research Insights` section exists          → execute O1
-if `### O1:` exists AND no `[PROPOSED]` residual
-   AND no `### O2:` exists                           → execute O2
-if `### O2:` exists AND no `[PROPOSED]` residual
-   AND no `### O3:` exists                           → execute O3
-if `### O3:` exists AND no `[PROPOSED]` residual     → all stages complete
+if no `## Research Insights` section exists          → execute O1 + O2 + O3 (full pass)
+if `### O3:` exists                                  → all stages complete
                                                        → signal (objective-complete)
                                                        → suggest --phase requirements
-if `[PROPOSED]` residual found in latest stage       → STOP with message:
-   "Pending [PROPOSED] items in O{N} — review and confirm before continuing"
+if `### O1:` exists but incomplete                   → resume from missing stage(s)
 ```
 
-Use shell script to detect:
-```bash
-python3 "$TASK_AI_ROOT/skills/research/scripts/detect_stage.py" ".working/.target.md"
-```
+The LLM internally follows three stages as structural guidance:
 
-For each O-stage (O1: Background Research, O2: Feasibility & Constraints, O3: Refined Objective), structured findings are appended to `.target.md` with `[PROPOSED]` markers. After O3, `--phase requirements` proposes missing requirements.
+- **O1: Background Research** — domain context, prior art, related technologies
+- **O2: Feasibility & Constraints** — technical feasibility, resource constraints, risks
+- **O3: Refined Objective** — synthesized, sharpened objective incorporating O1/O2 findings
+
+All three stages' findings are appended to `.target.md` under `## Research Insights` in a single operation. After O3, `--phase requirements` proposes missing requirements.
 
 > See `references/target-deepening-templates.md` for O1/O2/O3 output format templates, git commit messages, append rules, and requirements deepening format.
 
@@ -267,8 +262,8 @@ Routes by `.status.json` status: planning/draft/re-planning -> methodology colle
 | Reference index | `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` | Keyword-searchable index of all reference files |
 | Type registry | `$NB_WORKSPACES_LIBRARY/.type-registry.md` | Auto-expanding type list (new types appended) |
 | Shared profiles | `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` | Cross-task type profiles (for types not in static tables) |
-| Insights (target-obj) | `.target.md` (appended) | O1/O2/O3 staged Insights with `[PROPOSED]` markers |
-| Insights (target-req) | `.target.md` (appended) | Proposed Requirements with `[PROPOSED]` markers |
+| Insights (target-obj) | `.target.md` (appended) | O1/O2/O3 staged Insights (autonomously generated) |
+| Insights (target-req) | `.target.md` (appended) | Proposed Requirements |
 | Test methodology | `.test/<date>-research-methodology.md` | Testing strategy, patterns, coverage standards |
 | Test tools | `.test/<date>-research-tools.md` | Frameworks, assertions, thresholds, CI integration |
 

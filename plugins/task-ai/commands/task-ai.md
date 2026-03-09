@@ -151,7 +151,7 @@ Writers: `check` sets `phase: needs-plan` on REPLAN and on NEEDS_REVISION when s
 | `executing` | Implementation in progress | `evolving`, `re-planning`, `blocked`, `cancelled` |
 | `re-planning` | Plan being revised | `review`, `blocked`, `cancelled` |
 | `evolving` | Current stage complete, ready for next evolution | `planning`, `satisfied`, `cancelled` |
-| `satisfied` | User temporarily satisfied (non-terminal, can re-enter) | `planning`, `cancelled` |
+| `satisfied` | User temporarily satisfied (non-terminal, can re-enter) | `evolving`, `planning`, `cancelled` |
 | `blocked` | Blocked by dependency/issue | `planning`, `cancelled` |
 | `cancelled` | Abandoned (via `cancel`) | — (terminal) |
 

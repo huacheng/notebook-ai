@@ -91,6 +91,7 @@ Build a JWT authentication system
 3. **If `objective` is provided (Write Mode)** — three-branch routing:
 
    3a. **IF status == `evolving`** → **Stage Advance Mode**:
+      触发：auto Phase 4 evolving 入口自动调用（子阶段目标由 LLM 自动生成），或用户手动 `/task-ai:target`
       1. Read `.target.md`, archive old plan: `.plan.md` → `.plan-stage-<N>.md` (where N = current stage); `.plan-superseded.md` → `.plan-superseded-stage-<N>.md` (if exists); `.analysis/` → `.analysis-stage-<N>/` (if exists); `.test/` → `.test-stage-<N>/` (if exists). Skip missing files (non-fatal).
       2. Clear (non-fatal — skip if directory missing or empty): `.bugfix/` directory contents
       3. Increment `stage.current`, append new Stage section to `.target.md` with user's objective
@@ -182,8 +183,9 @@ After write mode completes, output the exact next step based on the resulting st
 | `executing` | (updated) | `executing` | `mid-exec` | Goal adjustment mid-execution |
 | `re-planning` | (updated) | `re-planning` | `re-plan` | Objective refined during re-planning |
 | `blocked` | (updated) | `planning` | `post-target` | Target revised to unblock |
-| `evolving` | (updated) | `planning` | `post-target` | Next stage defined |
+| `evolving` | (updated) | `planning` | `post-target` | LLM auto-generates next substage target → stage advance |
 | `evolving` | --satisfy | `satisfied` | — | User temporarily satisfied |
+| `satisfied` | refine Overall Objective | `evolving` | — | 用户 refine Overall Objective → 更新 baseline → convergence 下降 |
 | `satisfied` | (updated) | `planning` | `post-target` | Re-enter evolution |
 | `cancelled` | REJECT | — | — | Terminal state |
 

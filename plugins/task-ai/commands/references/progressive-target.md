@@ -8,19 +8,21 @@ The progressive evolution model replaces predefined multi-stage planning with em
 - Stages are emergent, not predefined — no `stage.total`
 - No terminal "complete" state — `satisfied` is non-terminal, can re-enter evolution
 - Each stage follows the full lifecycle: target → plan → check → exec → merge → evolving
-- User decides when to continue (`target` next stage) or pause (`target --satisfy`)
+- LLM auto-generates next substage target based on convergence gap (see `auto/SKILL.md` Phase 4)
+- User can pause (`target --satisfy`) or refine Overall Objective to re-enter from `satisfied`
+- Stages do not merge independently — deliverables accumulate on the task branch. Only `--satisfy` triggers merge to main
 - The lifecycle diagram above is simplified; the full loop includes check, verify, and highlight steps — see `auto/SKILL.md` for the complete state machine
 
 ## Stage Lifecycle
 
 ```
 Stage 1: target → plan → exec → merge → evolving
-  ↓ user defines next direction
+  ↓ convergence < 0.95 → LLM auto-generates next substage target (see auto/SKILL.md Phase 4)
 Stage 2: target → plan → exec → merge → evolving
-  ↓ user says "enough for now"
+  ↓ convergence ≥ 0.95 → wait for user
 target --satisfy → satisfied
-  ↓ later, user has new ideas
-target (re-enter) → planning → ...
+  ↓ later, user refines Overall Objective
+satisfied → evolving → auto-generates substage → planning → ...
 ```
 
 ## .target.md Progressive Format
@@ -56,11 +58,11 @@ target (re-enter) → planning → ...
 <merge auto-fills>
 ```
 
-### User defines Stage 2 (appended):
+### Stage 2 auto-generated (appended by target via auto Phase 4):
 ```markdown
 ## Stage 2: <name> [ACTIVE]
 ### Stage Objective
-<user defines next step direction>
+<LLM auto-generates based on convergence gap — see auto/SKILL.md Phase 4>
 ### Requirements
 ### Constraints
 ```
@@ -75,9 +77,10 @@ target (re-enter) → planning → ...
 | From | To | Via | Note |
 |------|-----|-----|------|
 | `executing` | `evolving` | merge | Always (no stage.total comparison) |
-| `evolving` | `planning` | target | User defines next stage |
-| `evolving` | `satisfied` | target --satisfy | User says "enough" |
-| `satisfied` | `planning` | target | User re-enters evolution |
+| `evolving` | `planning` | target | LLM auto-generates next substage target (convergence < 0.95) |
+| `evolving` | `satisfied` | target --satisfy | User says "enough" (convergence ≥ 0.95) |
+| `satisfied` | `evolving` | target (refine) | User refines Overall Objective → convergence drops |
+| `satisfied` | `planning` | target | Direct re-entry (shortcut: satisfied → evolving → planning) |
 | `satisfied` | `cancelled` | cancel | Permanent abandonment |
 
 ## .status.json Stage Field

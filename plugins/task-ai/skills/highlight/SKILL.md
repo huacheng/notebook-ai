@@ -65,6 +65,36 @@ Unified protocol for experience and thinking library writes. Defines 7 scopes co
 - highlight → Library Write Protocol (call)
 - No circular dependencies
 
+## Experience File Naming — Semantic Names
+
+Experience files use **semantic names** (`<semantic>`) that describe the **knowledge domain**, not the source notebook instance. This enables cross-notebook knowledge accumulation: multiple notebooks contributing to the same domain append to the same experience file.
+
+### 语义名称确定（三级匹配）
+
+写入经验文件时，通过以下流程确定文件名：
+
+1. LLM 从经验内容提取核心知识领域关键词，组合为 kebab-case 名称
+2. **精确匹配**：检查 `.experiences/<type>/` 下是否有同名文件 → 命中则追加（O_APPEND）
+3. **索引匹配**：读取 `.experiences/<type>/.naming-index.md`，查找 semantic_name 或 aliases 列是否有语义等价条目 → 命中则使用规范名称追加
+4. **无匹配** → 新建文件，同时追加条目到 `.naming-index.md`（含 LLM 预生成的 2-3 个 alias）
+
+名称应描述**知识领域**而非任务实例：
+- 好: jwt-sliding-window-auth, react-virtual-scroll, sqlite-wal-concurrency
+- 坏: proj-a-auth, ticket-1234-fix, sprint-3-task
+
+### .naming-index.md 维护
+
+每次写入经验后，更新 `.experiences/<type>/.naming-index.md`：
+
+| semantic_name | aliases | file |
+|---------------|---------|------|
+| <name> | <alias1>, <alias2> | <name>-impl.md |
+
+- 新建文件时追加条目（含 LLM 预生成的 2-3 个 alias）
+- 索引用于后续写入的确定性匹配，避免同一知识领域被分散到多个文件
+
+---
+
 ## Scope Definitions
 
 highlight defines 7 scopes. Scopes §3.1–§3.4 are **inline protocols** (executed by calling skills). Scopes §3.5–§3.7 are **independent executions** (run as standalone skill invocations).
@@ -90,7 +120,7 @@ From exec's current context:
 
 #### Write Spec
 
-Target: `.memory/.experiences/<type>/<notebook>-impl.md` | Mode: O_APPEND | Lock: `.memory/.experiences/.lock` | quality_status: `provisional`
+Target: `.memory/.experiences/<type>/<semantic>-impl.md` | Mode: O_APPEND | Lock: `.memory/.experiences/.lock` | quality_status: `provisional`
 
 > See [references/scope-impl-spec.md](references/scope-impl-spec.md) for full write spec table, frontmatter template, content structure, and write steps.
 
@@ -125,7 +155,7 @@ From verify's current context (type-adaptive, not limited to software):
 
 #### Write Spec
 
-Target: `.memory/.experiences/<type>/<notebook>-verify.md` | Mode: O_APPEND | Lock: `.memory/.experiences/.lock` | quality_status: `provisional`
+Target: `.memory/.experiences/<type>/<semantic>-verify.md` | Mode: O_APPEND | Lock: `.memory/.experiences/.lock` | quality_status: `provisional`
 
 > See [references/scope-verify-spec.md](references/scope-verify-spec.md) for full write spec table, frontmatter template, content structure, and write steps.
 
@@ -281,12 +311,8 @@ auto-complete checks whether distillation is necessary before executing:
 input_files = [.target.md, .plan.md, .summary.md, *-impl.md, *-verify.md, ...]
 latest_input_mtime = max(mtime(f) for f in input_files if exists(f))
 
-# Stage-aware output filename
-Read .status.json stage field (default { current: 1, history: [] }):
-  IF status == "evolving" AND stage.current > 1:
-    filename = "<notebook>-stage-<stage.current>-complete.md"
-  ELSE:
-    filename = "<notebook>-complete.md"
+# Semantic output filename
+filename = "<semantic>-complete.md"
 
 existing_complete = .memory/.experiences/<type>/{filename}
 
@@ -315,12 +341,11 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 #### Output A — Experience Distillation
 
-**Stage-aware file naming** — read `.status.json` `stage` field (default `{ current: 1, history: [] }` if missing):
+**Semantic file naming** — all stages use the same filename; stage info is recorded in frontmatter `sources[].stage`:
 
 | Scenario | Target filename |
 |----------|----------------|
-| Intermediate stage (`status == "evolving"` AND `stage.current > 1`) | `<notebook>-stage-<stage.current>-complete.md` |
-| Final stage (`status == "satisfied"`, including `total: 1`) | `<notebook>-complete.md` |
+| All stages (intermediate or final) | `<semantic>-complete.md` |
 
 | Field | Value |
 |-------|-------|
@@ -333,19 +358,24 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 For multi-type (e.g., `data-pipeline|ml`), split on `|` and write one file per segment. Each segment name uses directory-safe transform (`:` → `-`, e.g., `audio:dsp` → `audio-dsp`).
 
-**Final stage distillation** (last stage merge → `satisfied`): uses `<notebook>-complete.md` (no stage prefix). Additionally reads ALL prior `-stage-*-complete.md` files as input to synthesize cumulative cross-stage experience into the final distillation.
+**Final stage distillation** (last stage merge → `satisfied`): uses `<semantic>-complete.md`. Since all stages append to the same file (with stage info in frontmatter `sources[]`), the final distillation overwrites with a synthesized version incorporating all stage experiences.
 
-**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.status.json` > `.target.md` > `.summary.md` > `.plan.md` > `.type-profile.md` > prior `-stage-*-complete.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
+**Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.status.json` > `.target.md` > `.summary.md` > `.plan.md` > `.type-profile.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
 
 Frontmatter:
 
 ```yaml
 ---
+semantic_name: <kebab-case-knowledge-domain>
 quality_status: verified
 completeness: complete
 source: highlight-complete
 type: <full type string>
-notebook: <notebook-name>
+sources:
+  - notebook: <notebook-name>
+    project: <project-path>
+    stage: <stage-number>
+    date: <YYYY-MM-DD>
 created_at: <ISO-8601>
 topic_keywords: [keyword1, keyword2, ...]
 ---
@@ -423,7 +453,7 @@ Steps:
 4. **Output A** — Experience distillation, per type segment:
    - 4a. `mkdir -p .memory/.experiences/<segment>/`
    - 4b. acquire `.memory/.experiences/.lock`
-   - 4c. write `<notebook>-complete.md` (overwrite)
+   - 4c. write `<semantic>-complete.md` (overwrite)
    - 4d. changelog append (per segment)
    - 4e. update `<segment>/.index.md` (overwrite matching row or append)
    - 4f. overwrite `<segment>/.summary.md` (distilled patterns + entry index table)

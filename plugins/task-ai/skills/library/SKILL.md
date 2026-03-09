@@ -27,6 +27,9 @@ arguments:
   - name: topic
     description: "Filter by reference topic (for search and list)"
     required: false
+  - name: notebook
+    description: "Filter experiences by source notebook name, matched against frontmatter sources.notebook (for search)"
+    required: false
   - name: rebuild-index
     description: "Rebuild all .index.md files from actual file contents (for maintain)"
     required: false
@@ -52,7 +55,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 ## Usage
 
 ```
-/task-ai:library search "<query>" [--type <type>] [--topic <topic>]
+/task-ai:library search "<query>" [--type <type>] [--topic <topic>] [--notebook <name>]
 /task-ai:library list [--type <type>]
 /task-ai:library status
 /task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all] [--scheduled [--force]] [--install-cron] [--uninstall-cron]
@@ -92,16 +95,17 @@ By default, `search` returns Layer 1 results and their Layer 2 summaries. Full c
 **Detailed Steps:**
 
 1.  **Read** `.memory/.references/.summary.md` — keyword match against query
-2.  **Read** `.memory/.experiences/.summary.md` — match by type or notebook keyword
+2.  **Read** `.memory/.experiences/.summary.md` — match by type or semantic-name keyword
 3.  **Read** `.memory/.thinking/patterns/.index.md` — match by problem-type keyword
 4.  **Read** `.memory/.type-profiles/.index.md` — match by type name
-5.  **Score each candidate** using directory-appropriate scoring:
+5.  **Filter** (optional): if `--notebook <name>` is provided, pre-filter experience candidates by checking frontmatter `sources.notebook` field — only retain experiences whose `sources.notebook` matches `<name>`. This is used by substage target generation to find failed experiences from a specific notebook.
+6.  **Score each candidate** using directory-appropriate scoring:
    - `.memory/.experiences/<type>/`: type exact match 10pts / shared segment 5pts / keyword 2pts each, threshold ≥ 8
    - `.memory/.references/`: topic exact match 10pts / topic keyword overlap 3pts each / type keyword 2pts each, threshold ≥ 8
    - `.memory/.thinking/patterns/`: problem-type keyword 3pts each / task type relevance 2pts, threshold ≥ 6
    - `.memory/.type-profiles/`: type exact match → always include (no threshold)
-6.  **Sort results** by score DESC; apply **4000-token context budget** — load files until budget exhausted; always include top-scored result regardless of budget
-7.  **Print scored results** table with file path, score, and match rationale
+7.  **Sort results** by score DESC; apply **4000-token context budget** — load files until budget exhausted; always include top-scored result regardless of budget
+8.  **Print scored results** table with file path, score, and match rationale
 
 ### `list [--type <type>]`
 
@@ -110,10 +114,10 @@ List library contents by category.
 **Detailed Steps:**
 
 1.  **Read** `.memory/.references/.index.md` — list all topics, version count, marked version, staleness flag
-2.  **Read** `.memory/.experiences/.index.md` — list all types and notebook entry counts
+2.  **Read** `.memory/.experiences/.index.md` — list all types and semantic-name entry counts
 3.  **Read** `.memory/.type-profiles/.index.md` — list all shared profiles with last-updated date
 4.  **Read** `.memory/.thinking/patterns/.index.md` — list all patterns with lifecycle state (draft/active/validated/deprecated)
-5.  **Read** `.memory/.thinking/raw/.index.md` — count entries by notebook and quality tier (H/M/L)
+5.  **Read** `.memory/.thinking/raw/.index.md` — count entries by semantic name and quality tier (H/M/L)
 6.  **If `--type` specified**: filter all tables to matching type or pipe-separated segments
 7.  **Print formatted summary tables**
 
@@ -172,7 +176,7 @@ Rebuild all `.index.md` files and `.master-index.md` from actual filesystem stat
 3.  **Acquire directory-level `.lock`** before writing each `.index.md`; release after
 4.  **Rebuild `.master-index.md`**: scan all files across `.memory/.experiences/`, `.memory/.references/`, `.memory/.type-profiles/`, `.memory/.thinking/patterns/`, `.skills/.candidates/`, `.skills/.drafts/`, and `.skills/.active/`; also scan all user-imported folders (non-dot-prefixed names in `$NB_WORKSPACES_LIBRARY/`); overwrite `.master-index.md` with complete flat index (topic, type, keywords, file path, source, and for `.skills/` entries: trust_tier T1–T4). This restores the cold-start fallback for the three-tier Changelog Consumption Protocol degradation path
 5.  **IOC scan**: extract all outbound URLs from `.memory/.references/` files; tally domain counts; write/overwrite `.ioc.md` if any domain appears in ≥ 3 documents; format: `| domain | doc_count | first_seen | last_seen | risk | note |`
-6.  **Fix `effectiveness_mark` uniqueness violations**: if multiple files in same topic scope or same notebook-type scope share `effectiveness_mark: true`, keep the one with latest `last_verified_at`, clear others (acquire lock before clearing)
+6.  **Fix `effectiveness_mark` uniqueness violations**: if multiple files in same topic scope or same semantic-name-type scope share `effectiveness_mark: true`, keep the one with latest `last_verified_at`, clear others (acquire lock before clearing)
 7.  **Clear `.inconsistency.log`** (all issues resolved by rebuild)
 8.  **Git commit**: `task-ai(library):maintain rebuild index`
 
@@ -199,7 +203,7 @@ Report stale knowledge without auto-triggering `research`.
 **Detailed Steps:**
 
 1.  **For each** `.memory/.references/<topic>-v*.md`: compute `now − last_verified_at`; flag if result > `staleness_threshold_days`
-2.  **For each** `.memory/.experiences/<type>/<notebook>-*.md`: flag `quality_status: provisional` entries older than 90 days with no corresponding `verified` sibling file
+2.  **For each** `.memory/.experiences/<type>/<semantic>-*.md`: flag `quality_status: provisional` entries older than 90 days (check frontmatter `quality_status`) with no corresponding `verified` sibling file
 3.  **Print staleness report** per file: path, days stale, suggested action (`research --scope gap` or `maintain --rebuild-index`)
 4.  **Do not auto-trigger research**; remediation is the user's decision
 
@@ -287,10 +291,10 @@ Security rules evolution loop — discovers new threats and evolves Core/Extende
 
 | Source file | Writer | Completeness | `quality_status` on write |
 |-------------|--------|--------------|--------------------------|
-| `<nb>-complete.md` | `highlight` | complete | `verified` (automatic) |
-| `<nb>-impl.md` | `exec` | partial | `provisional` |
-| `<nb>-verify.md` | `verify` | partial | `provisional` |
-| `<nb>-eval.md` | `check` | partial | `provisional` |
+| `<semantic>-complete.md` | `highlight` | complete | `verified` (automatic) |
+| `<semantic>-impl.md` | `exec` | partial | `provisional` |
+| `<semantic>-verify.md` | `verify` | partial | `provisional` |
+| `<semantic>-eval.md` | `check` | partial | `provisional` |
 
 ### Pattern Lifecycle (`.memory/.thinking/patterns/`)
 
