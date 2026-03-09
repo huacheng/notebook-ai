@@ -1,6 +1,6 @@
 ---
 name: auto
-description: Conversational task lifecycle — dialog-driven four-phase flow with automatic review and subagent delegation
+description: "Conversational task lifecycle automation — drives four phases (target definition → planning → execution → acceptance review) with automatic D1-D6 quality gates and subagent delegation. Use when the user wants hands-off end-to-end task execution, says 'auto', 'run it automatically', or wants the full lifecycle without manual step-by-step control."
 model_tier: heavy
 auto_delegatable: false
 triggers:
@@ -99,18 +99,7 @@ Thresholds and retry limits are **adaptive**: read from `.type-profile.md` `## A
 
 ### Four-File Anchored Review
 
-check evaluates deliverables against `.target.md` (requirements), `.convergence-baseline.md` (weighted R# scoring baseline), and `.plan.md` (design) per D1-D6 dimension:
-
-| Dimension | Anchor | Review Question |
-|-----------|--------|-----------------|
-| D1 Correctness | .target.md requirements + .convergence-baseline.md R# items | Does deliverable implement each requirement? Are R# completion scores accurate? |
-| D2 Security | .target.md security constraints | Does deliverable satisfy security requirements? |
-| D3 Reliability | .plan.md boundary conditions + .convergence-baseline.md weights | Does deliverable cover planned edge/exception cases? Are critical (weight=3) items prioritized? |
-| D4 Performance | .target.md performance metrics | Does deliverable meet performance requirements? |
-| D5 Architecture | .plan.md architecture design | Does deliverable structure match planned modules/interfaces? |
-| D6 Maintainability | .plan.md module division | Is deliverable organized per plan? Naming/conventions consistent? |
-
-> **Phase 2 exception:** When reviewing `.plan.md` itself, D3/D5/D6 anchors assess internal quality (boundary coverage, module structure, step clarity) rather than self-referencing .plan.md.
+check evaluates deliverables against `.target.md`, `.convergence-baseline.md`, and `.plan.md` per D1-D6 dimension. See `check/SKILL.md` §Four-File Anchored Review for the full dimension-anchor mapping table.
 
 ### Detailed Phase Flow
 
@@ -130,7 +119,7 @@ Phase 2: Planning (status=planning) — Full auto + user can intervene
   - User can intervene: "step 3 unnecessary" → modify .plan.md, re-check
 
 Phase 3: Execution (status=executing) — Full auto + user can intervene
-  - All non-system output (code, configs, assets) MUST be written to `<notebook>/.deliverables/`
+  - All non-system output (code, configs, assets) goes to `<notebook>/.deliverables/` (merge only copies this directory — anything outside it won't reach main branch)
   - Execute exec step by step
   - Key checkpoints trigger verify → check(mid-exec): significant issues, or every N steps (N from `.type-profile.md` Auto Adaptation `mid-exec check interval`, fallback 3)
   - All steps done → verify → check(post-exec)
@@ -171,7 +160,7 @@ Phase 4: Acceptance (status=executing→evolving) — Full auto
 
 No intent classification or rule matching. Claude reads current phase SKILL.md + user message, acts through semantic understanding — like a pair programming partner.
 
-Phase 1 (Target) — must wait for user confirmation:
+Phase 1 (Target) — waits for user confirmation (only users can validate objectives — LLM self-confirmation creates coherence bias):
 
 | User says | Claude does |
 |-----------|------------|
@@ -293,16 +282,6 @@ Auto mode runs as a **single long-lived Claude session**. The daemon monitors ex
 │  (stop request) │     │  - stall detection    │
 └─────────────────┘     └─────────────────────┘
 ```
-
-### Why Single Session
-
-| Aspect | Multi-session (old) | Single session (current) |
-|--------|-------------------|--------------------------|
-| Context | Lost between steps, rebuilt from `.summary.md` | Naturally shared across all steps |
-| Token cost | Re-read files each step, duplicate context loading | Read once, incrementally update |
-| Coherence | Each step is blind to implicit decisions | Claude remembers why it made choices |
-| Latency | Shell prompt wait + Claude startup per step | Zero inter-step overhead |
-| Daemon complexity | Command construction + dispatch + readiness check | Just monitoring + stop signal |
 
 ## Subagent Delegation
 

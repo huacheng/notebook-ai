@@ -113,7 +113,7 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
 22. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
 23. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 24. Update `.status.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
-25. Execute highlight protocol scope=thinking-raw — see `skills/highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
+25. Execute highlight protocol scope=thinking-raw — see `skills/highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure should not block plan's main flow — highlight is enhancement, not gating
 26. **L1 Six-Dimension Self-Audit** — scan `.plan.md` against `.target.md` and `.convergence-baseline.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
     - Read `.plan.md`, `.target.md`, `.convergence-baseline.md` (if exists), `.type-profile.md` (if exists)
     - D1 Correctness: requirements coverage, acceptance criteria mapping, input/output consistency
@@ -156,7 +156,7 @@ task-ai(<notebook>):plan generate implementation plan
 
 ## Task-Type-Aware Planning
 
-Plan methodology MUST adapt to the task domain. Different domains require different design approaches, tool choices, and milestones.
+Plan methodology adapts to the task domain — a software task needs test-first steps while a documentation task needs outline-first structure. Different domains require different step granularity and verification approaches.
 
 > **See `skills/init/references/seed-types/<type>.md`** for per-type seed methodology (plan structure, key considerations). Shared profiles in `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` take precedence when available.
 

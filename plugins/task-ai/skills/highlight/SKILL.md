@@ -1,6 +1,6 @@
 ---
 name: highlight
-description: "Experience distillation engine — defines the unified protocol for experience/thinking library writes, and provides independent complete distillation and ad-hoc experience capture. Replaces light."
+description: "Distill and persist reusable experience, lessons learned, and thinking patterns into the knowledge library. Supports comprehensive task distillation, ad-hoc experience capture from conversation, and experience-to-skill promotion. Use when the user says 'what did we learn', 'capture this insight', 'distill experience', or wants to save lessons for future tasks."
 model_tier: medium
 auto_delegatable: true
 triggers:
@@ -90,58 +90,13 @@ From exec's current context:
 
 #### Write Spec
 
-| Field | Value |
-|-------|-------|
-| Target file | `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<notebook>-impl.md` |
-| Write mode | O_APPEND + `---` separator (create if not exists) |
-| Lock | `.memory/.experiences/.lock` |
-| quality_status | `provisional` |
-| completeness | `partial` |
-| source | `highlight-exec` |
+Target: `.memory/.experiences/<type>/<notebook>-impl.md` | Mode: O_APPEND | Lock: `.memory/.experiences/.lock` | quality_status: `provisional`
 
-#### Frontmatter
-
-```yaml
----
-quality_status: provisional
-completeness: partial
-source: highlight-exec
-type: <from .status.json>
-notebook: <notebook-name>
-created_at: <ISO-8601>
-topic_keywords: [keyword1, keyword2]
----
-```
-
-#### Content Structure
-
-```markdown
-## Implementation Experience — <notebook> (<date>)
-
-### Decisions
-- <decision 1>: <rationale>
-
-### Patterns
-- <pattern/technique discovered>
-
-### Pitfalls
-- <pitfall/workaround>
-
-### Deviations from Plan
-- <what changed and why>
-```
-
-#### Write Steps
-
-1. acquire `.memory/.experiences/.lock`
-2. O_APPEND write to `<notebook>-impl.md` (if file has frontmatter, append after `---` separator)
-3. acquire `.changelog.lock` → append: `<ts> | experience | .memory/.experiences/<type>/<notebook>-impl.md | quality_status:provisional | source:highlight-exec` → release `.changelog.lock`
-4. update `<type>/.index.md` (overwrite matching row or append new row)
-5. release `.memory/.experiences/.lock`
+> See [references/scope-impl-spec.md](references/scope-impl-spec.md) for full write spec table, frontmatter template, content structure, and write steps.
 
 #### Fault Isolation
 
-> Inline call failure MUST NOT block exec's main flow. exec's code implementation and state transitions are unaffected. On failure: log warning and continue.
+> Inline call failure should not block the caller's main flow — highlight is an enhancement step, not a gating requirement.
 
 ---
 
@@ -170,54 +125,13 @@ From verify's current context (type-adaptive, not limited to software):
 
 #### Write Spec
 
-| Field | Value |
-|-------|-------|
-| Target file | `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/<notebook>-verify.md` |
-| Write mode | O_APPEND + `---` separator |
-| Lock | `.memory/.experiences/.lock` |
-| quality_status | `provisional` |
-| completeness | `partial` |
-| source | `highlight-verify` |
+Target: `.memory/.experiences/<type>/<notebook>-verify.md` | Mode: O_APPEND | Lock: `.memory/.experiences/.lock` | quality_status: `provisional`
 
-#### Frontmatter
-
-```yaml
----
-quality_status: provisional
-completeness: partial
-source: highlight-verify
-type: <from .status.json>
-notebook: <notebook-name>
-created_at: <ISO-8601>
-topic_keywords: [keyword1, keyword2]
----
-```
-
-#### Content Structure
-
-```markdown
-## Verification Experience — <notebook> (<date>)
-
-### Test Results
-- <outcome summary>
-
-### Effective Methods
-- <what verification approaches worked>
-
-### Thresholds
-- <discovered metric ranges>
-
-### VFP Patterns (software types)
-- <VH stub techniques, CGG results, refactoring patterns>
-```
-
-#### Write Steps
-
-Same as scope=impl (steps 1-5), with different filename and source field.
+> See [references/scope-verify-spec.md](references/scope-verify-spec.md) for full write spec table, frontmatter template, content structure, and write steps.
 
 #### Fault Isolation
 
-> Same as scope=impl. Inline call failure MUST NOT block verify's main flow.
+> **Fault isolation**: Same principle as §3.1 — inline call failure does not block the caller's main flow.
 
 ---
 
@@ -292,7 +206,7 @@ Follow `$NB_WORKSPACES_LIBRARY/references/quality-rubric.md` H/M/L self-assessme
 
 #### Fault Isolation
 
-> Same as other inline scopes. CoT capture is optional — failure does not affect caller's main flow.
+> **Fault isolation**: Same principle as §3.1 — inline call failure does not block the caller's main flow.
 
 ---
 
@@ -550,103 +464,9 @@ Examples:
 
 #### Execution Protocol
 
-**Step 1 — Instruction Understanding**
+9-step procedure: understand instruction → determine type → extract experience from conversation → structure content → generate frontmatter → generate filename slug → write with locks → git commit → user feedback.
 
-Identify from user's natural language:
-- Content scope to summarize (which conversation fragments, which operations)
-- Why it's valuable (what problem was solved, what pattern was discovered)
-- If instruction is ambiguous (cannot determine what to summarize) → clarify with user before continuing
-
-**Step 2 — Type Determination**
-
-```
-if in notebook context (CWD has .working/.status.json):
-    type = .status.json type field
-elif user specified a domain in instruction:
-    type = user-specified domain, match .type-registry.md existing types
-else:
-    agent infers type from experience content
-    prefer matching .type-registry.md existing types
-    no match → type = "general"
-```
-
-**Step 3 — Experience Extraction**
-
-Review current conversation context, extract:
-- Key decisions and rationale
-- Discovered patterns and techniques
-- Tools/technologies/commands used
-- Problems solved and methods
-- Pitfalls and workarounds encountered
-
-Filter out:
-- Temporary debug output (only useful for this session)
-- Unverified guesses and speculation
-- Sensitive information (tokens, passwords, usernames in paths, etc.)
-
-**Step 4 — Content Structuring**
-
-```markdown
-## Context
-<scenario that produced this experience, problem background>
-
-## What Worked
-- <successful approaches>
-
-## What Didn't Work
-- <failed attempts and reasons (if any)>
-
-## Key Decisions
-- <decision>: <rationale>
-
-## Patterns
-- <reusable patterns/techniques>
-```
-
-**Step 5 — Frontmatter Generation**
-
-```yaml
----
-quality_status: provisional
-completeness: partial
-source: highlight-adhoc
-type: <determined in step 2>
-created_at: <ISO-8601>
-topic_keywords: [keyword1, keyword2, ...]
----
-```
-
-**Step 6 — Filename Generation**
-
-- Extract 2-4 semantic keywords (English) from experience content
-- Convert to kebab-case slug (e.g., `websocket-reconnect-debugging`)
-- Validate slug matches `[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*`
-- Filename: `<slug>-adhoc.md`
-
-> User's natural language input is NOT used directly as filename. Slug is generated by agent from experience content semantics.
-
-**Step 7 — Write**
-
-1. `mkdir -p $NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/`
-2. acquire `.memory/.experiences/.lock`
-3. write `.memory/.experiences/<type>/<slug>-adhoc.md` (create new or overwrite same-name file)
-4. acquire `.changelog.lock` → append: `<ts> | experience | .memory/.experiences/<type>/<slug>-adhoc.md | quality_status:provisional | source:highlight-adhoc` → release `.changelog.lock`
-5. update `<type>/.index.md` (append row)
-6. update `<type>/.summary.md` (overwrite rewrite)
-7. update top-level `.memory/.experiences/.summary.md` (overwrite rewrite)
-8. release `.memory/.experiences/.lock`
-
-**Step 8 — Git commit**
-
-```
-task-ai(<scope>):highlight adhoc experience captured
-```
-
-scope = notebook slug (if in notebook context) or project directory name (fallback).
-
-**Step 9 — Feedback**
-
-Output to user: captured experience summary, write path, type classification.
+> See [references/scope-adhoc-steps.md](references/scope-adhoc-steps.md) for the full step-by-step execution protocol (Steps 1-9 with all sub-steps).
 
 ---
 

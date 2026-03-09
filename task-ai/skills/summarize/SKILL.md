@@ -1,6 +1,6 @@
 ---
 name: summarize
-description: "Regenerate .summary.md files for context recovery or refresh"
+description: "Regenerate .summary.md files when context is lost, stale, or after manual edits outside the skill flow. Use when the user says 'context is lost', 'refresh summaries', or returns to a task after a long break and needs to rebuild the working context."
 model_tier: light
 auto_delegatable: true
 triggers:

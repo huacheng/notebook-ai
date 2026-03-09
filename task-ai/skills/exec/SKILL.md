@@ -62,17 +62,17 @@ Execute the implementation plan for a task module that has passed evaluation.
 
 ### Per-Step Execution
 
-Read the `type` field from `.status.json` to determine the task domain. Execution strategy MUST adapt to the task type — different domains use fundamentally different tools, verification methods, and workflows.
+Read the `type` field from `.status.json` to determine the task domain. Execution strategy adapts to the task type — software tasks follow RED→GREEN per step, while documentation tasks follow outline→draft→review. Different domains use fundamentally different tools, verification methods, and workflows.
 
 For each implementation step:
 
 1. **Read** relevant files (source code, configs, scripts, documentation)
-   > **Output directory**: All non-system file output (code, configs, assets) MUST be written to `<notebook>/.deliverables/`. System files (`.status.json`, `.plan.md`, etc.) remain in `.working/`. Only `.deliverables/` content is copied to main on merge.
+   > **Output directory**: All non-system file output (code, configs, assets) goes to `<notebook>/.deliverables/` — merge only copies this directory to main branch, so anything outside it won't be preserved. System files (`.status.json`, `.plan.md`, etc.) remain in `.working/`.
 2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[VH: ...]` annotations in `.plan.md`) before implementing:
    - **Expected: all Red (failing)** → proceed to implementation
    - **Unexpected: any Green (passing)** → log warning in `.notes/`: "Step N: test X was Green before implementation — test may be trivially satisfied or implementation leaked from a prior step". Continue implementation but flag for review
 3. **Implement** the change using **domain-appropriate methods** as described in the plan (see `init/references/seed-types/<type>.md` for per-type seed methodology, or `.type-profile.md` for task-specific guidance)
-   - **Security Audit (Pre-hook)**: Before issuing any shell command that modifies state (file deletion, system config, package installation, network requests), MUST invoke `/task-ai:security verify-cmd "<command>"`. If verdict is `REJECT`, execution is halted immediately, signal `(mid-exec)`, state becomes `NEEDS_FIX`, and trigger lineage tracing to invalidate the source reference.
+   - **Security Audit (Pre-hook)**: Before issuing any shell command that modifies state (file deletion, system config, package installation, network requests), invoke `/task-ai:security verify-cmd "<command>"`. If verdict is `REJECT`, execution is halted immediately, signal `(mid-exec)`, state becomes `NEEDS_FIX`, and trigger lineage tracing to invalidate the source reference.
    - **Optional delegation — capability check**: Before implementing, follow `auto/references/plugin-delegation.md` to check if the current step matches a capability slot: `type` containing `frontend`/`web`/`ui` → `frontend-design` slot; `type` containing `bugfix` or NEEDS_FIX resumption → `debugging` slot; `type` containing `software` with `.test/` criteria → `tdd` slot; otherwise → `domain-*` semantic scan. If matched, invoke via Task subagent — guidance is incorporated into the implementation approach. No match or failure → use existing inline methods
 4. **HS confirmation** (VFP-applicable types with VH stubs): After implementing, run the same step-specific tests:
    - **All Green (passing)** → record successful VH→HS transition, proceed
@@ -128,8 +128,8 @@ For each implementation step:
 10. **After all steps** (or on failure):
     - Update `.status.json` timestamp
     - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
-    - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
-    - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
+    - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure should not block exec's main flow — highlight is an enhancement step, not a gating requirement
+    - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure should not block exec's main flow (same fault isolation)
 11. **Report** execution summary with per-step results. Then output next step prompt based on outcome:
     - All steps done → "Execution complete. Next: `/task-ai:check --checkpoint post-exec` to evaluate the result."
     - Significant issue mid-exec → "Issue encountered. Next: `/task-ai:check --checkpoint mid-exec` to evaluate and determine fix approach."
@@ -167,7 +167,7 @@ For long-running executions, intermediate progress can be observed by:
 
 - Each step should be atomic — if a step fails, previous steps remain applied
 - The executor should follow project coding conventions (check CLAUDE.md if present)
-- **NEEDS_FIX regression test obligation**: When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` (fix items with regression test specs, from mid-exec or post-exec) and `.analysis/` (evaluation context). Each fix MUST follow the RED→GREEN protocol (step 6a-6f) using the regression test specification provided by check in `.bugfix/` — this is exec's binding to the Regression Test Protocol from `commands/references/test-strategy-by-type.md`
+- **NEEDS_FIX regression test obligation**: When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` (fix items with regression test specs, from mid-exec or post-exec) and `.analysis/` (evaluation context). Each fix follows the RED→GREEN protocol (step 6a-6f) using the regression test specification provided by check in `.bugfix/` — this is exec's binding to the Regression Test Protocol from `commands/references/test-strategy-by-type.md`
 - When `--step N` is used, the executor verifies prerequisites for that step are met, then signals `(step-N)` on completion for mid-exec checkpoint
 - After successful execution of all steps, the user should run `/task-ai:verify --checkpoint post-exec` followed by `/task-ai:check --checkpoint post-exec`
 - Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec `verify` + `check` evaluation

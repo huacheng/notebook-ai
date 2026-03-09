@@ -81,12 +81,29 @@
 | File | Description |
 |------|-------------|
 | `references/six-dimension-audit.md` | Six-dimension audit framework (D1-D6) with domain adaptation |
+| `references/convergence-evaluation.md` | Convergence formula, 5-level scoring scale, anchor mechanism |
 
 ### annotate
 
 | File | Description |
 |------|-------------|
 | `references/annotation-processing.md` | Annotation triage rules, cross-impact, conflict detection |
+| `references/state-transitions.md` | Annotation state transition tables |
+
+### highlight
+
+| File | Description |
+|------|-------------|
+| `references/scope-impl-spec.md` | scope=impl distillation specification |
+| `references/scope-verify-spec.md` | scope=verify distillation specification |
+| `references/scope-adhoc-steps.md` | scope=adhoc execution steps |
+
+### research
+
+| File | Description |
+|------|-------------|
+| `references/target-deepening-templates.md` | O1/O2/O3 target deepening output templates |
+| `references/test-intelligence-templates.md` | Test intelligence collection templates |
 
 ### auto
 
@@ -102,6 +119,8 @@
 | File | Description |
 |------|-------------|
 | `references/blocked-sources.md` | Three-tier source classification (reject/high-risk/caution) |
+| `references/directory-structure.md` | Library directory layout and naming conventions |
 | `references/injection-rules.md` | Ten-category injection protection rules |
 | `references/quality-rubric.md` | H/M/L thinking quality self-assessment rubric |
+| `references/skill-hotreload.md` | Skill hot-reload protocol for library rule evolution |
 | `references/write-protocol.md` | Per-directory lock table, hold duration, stale-lock recovery |

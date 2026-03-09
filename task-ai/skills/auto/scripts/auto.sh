@@ -7,7 +7,6 @@ set -euo pipefail
 # Load context discovery from lib.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
-# v2: .auto-signal abolished — daemon monitors .status.json directly
 
 # Derive conversational phase from .status.json status
 derive_phase() {
@@ -174,7 +173,6 @@ case "$STATUS" in
     ;;
 esac
 
-# 4. v2: No .auto-signal file — daemon monitors .status.json directly
 # Enforce hard safety limit on iteration counter
 ITERATION=$((ITERATION + 1))
 MAX_ITERATIONS=200

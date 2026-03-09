@@ -80,8 +80,8 @@ When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, veri
     - Coverage: X% (if coverage tooling is available, otherwise "N/A")
     - VFP compliance: (K / total_steps)% of steps followed VH→HS discipline
     ```
-12. If checkpoint != quick: execute highlight protocol scope=verify — see `highlight/SKILL.md` §3.2. Extract verification experience (type-adaptive, not limited to software) from current context, write to library. Inline call failure MUST NOT block verify's main flow. Skip if `--checkpoint quick` (insufficient evidence for experience)
-    - Also execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture verification strategy selection and result analysis reasoning. Inline call failure MUST NOT block verify's main flow
+12. If checkpoint != quick: execute highlight protocol scope=verify — see `highlight/SKILL.md` §3.2. Extract verification experience (type-adaptive, not limited to software) from current context, write to library. Inline call failure should not block verify's main flow — highlight is enhancement, not gating. Skip if `--checkpoint quick` (insufficient evidence for experience)
+    - Also execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture verification strategy selection and result analysis reasoning. Inline call failure should not block verify's main flow (same fault isolation)
 13. **Update** `.test/.summary.md` — overwrite with condensed summary of ALL criteria & results files in `.test/`
 14. **Git commit**: `task-ai(<notebook>):verify <checkpoint> verification`
 15. **Report** results summary to user. Then output next step prompt: "Verification complete. Next: `/task-ai:check --checkpoint <checkpoint>` to evaluate the results and render a verdict." (substitute the actual checkpoint value)
@@ -118,5 +118,5 @@ task-ai(auth-refactor):verify step-3 verification
 - **Utility, not gatekeeper**: `verify` runs tests and produces results; `check` reads those results and renders verdicts. This separation allows tests to be re-run independently without triggering state transitions
 - **check integration**: `check` can optionally invoke `verify` internally, or read pre-existing `verify` results from `.test/`. When recent `verify` results exist (same day, matching checkpoint), `check` incorporates them instead of re-running tests
 - **exec integration**: Per-step verification in `exec` can optionally invoke `verify --checkpoint step-N` for domain-specific testing. For lightweight checks (build + lint), inline verification is sufficient
-- **Domain adaptation**: Verification strategy MUST match the task `type` — use `.type-profile.md` first, then per-type seed file `init/references/seed-types/<type>.md` for domain-specific testing procedures, tools, and thresholds. Supplement with web search for current best practices
+- **Domain adaptation**: Verification strategy should match the task `type` — running unit tests for a documentation task produces false confidence, while prose review for a software task misses regressions. Use `.type-profile.md` first, then per-type seed file `init/references/seed-types/<type>.md` for domain-specific testing procedures, tools, and thresholds. Supplement with web search for current best practices
 - **Concurrency**: Verify acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)

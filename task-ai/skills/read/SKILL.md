@@ -1,6 +1,6 @@
 ---
 name: read
-description: "Knowledge Synthesizer — ingests local documents, deduplicates against library, and synthesizes into validated .references/ files."
+description: "Knowledge Synthesizer — ingests local documents, deduplicates against library, and synthesizes into validated .references/ files. Use when the user provides external documents (PDFs, web pages, code samples) to incorporate into the task knowledge base, or says 'read this', 'add this reference', 'ingest this document'."
 model_tier: medium
 auto_delegatable: true
 triggers:

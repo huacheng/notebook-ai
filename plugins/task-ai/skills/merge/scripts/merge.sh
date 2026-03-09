@@ -187,7 +187,7 @@ if ! git checkout "$TASK_BRANCH"; then
 fi
 
 # Phase 3: Post-merge finalization — unified evolving path (progressive evolution)
-# D1: Always transition to evolving (no stage.total comparison — progressive evolution model)
+# D1: Always transition to evolving — stages are emergent, not predefined
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # v2: stage.history entry includes commit (current HEAD) and convergence (from latest analysis)

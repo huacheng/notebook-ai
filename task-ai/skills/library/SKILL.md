@@ -60,75 +60,9 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 
 ## Library Directory Structure
 
-```
-$NB_WORKSPACES_ROOT/
-└── .library/                              # $NB_WORKSPACES_LIBRARY
-    ├── .changelog                         # Append-only write log (gitignore)
-    ├── .changelog-archive/                # Monthly archived entries (git tracked)
-    │   └── YYYY-MM.md
-    ├── .master-index.md                   # Flat index of all library files (git tracked)
-    ├── .type-registry.md                  # Known type registry (git tracked)
-    ├── .ioc.md                            # Domain convergence IOC log (gitignore)
-    ├── .inconsistency.log                 # Index–file mismatch log (gitignore)
-    ├── .last-scheduled                     # Epoch timestamp of last --scheduled run (gitignore)
-    ├── .scheduled.log                      # Cron output log for --scheduled (gitignore)
-    ├── .plugin-registry.md                # Plugin capability cache (lazily created, gitignore)
-    ├── .memory/                           # System-managed knowledge base
-    │   ├── .references/
-    │   │   ├── .lock                      # Directory write lock (gitignore)
-    │   │   ├── .index.md                  # topic → file lookup table
-    │   │   ├── .summary.md                # References overview (prose, for sub-command context loading)
-    │   │   ├── <topic>.md                 # Initial reference file (unversioned, created by research/exec)
-    │   │   └── <topic>-v<N>-<date>.md     # Versioned file (created on staleness refresh when content changes)
-    │   ├── .experiences/
-    │   │   ├── .lock                      # Directory write lock (gitignore)
-    │   │   ├── .index.md                  # type → sub-directory pointer table
-    │   │   ├── .summary.md                # Experiences overview (prose)
-    │   │   └── <type>/
-    │   │       ├── .index.md              # notebook → file lookup table
-    │   │       ├── .summary.md            # Per-type experience overview (prose)
-    │   │       └── <notebook>-<source>.md # source: complete | impl | verify | eval
-    │   ├── .type-profiles/
-    │   │   ├── .lock                      # Directory write lock (gitignore)
-    │   │   ├── .index.md                  # type → file pointer table
-    │   │   └── <type>.md                  # Shared domain methodology profile
-    │   └── .thinking/
-    │       ├── .index.md                  # raw vs patterns navigation
-    │       ├── raw/                       # L0: raw CoT + quality scores (gitignore)
-    │       │   ├── .index.md              # Append-log index (O_APPEND, no lock)
-    │       │   └── <notebook>-<step>-<date>.md
-    │       └── patterns/                  # L1: distilled reasoning patterns (git tracked)
-    │           ├── .lock                  # Directory write lock (gitignore)
-    │           ├── .index.md              # problem-type → file lookup table
-    │           └── <problem-type>.md
-    ├── .skills/                              # Experience-to-skill promotion pipeline
-    │   ├── .candidates/                      # T1: auto-promoted candidates (from highlight promote)
-    │   │   └── <slug>/
-    │   │       ├── SKILL.md
-    │   │       └── trust-report.md
-    │   ├── .drafts/                          # T2: passed check skill-review (score ≥ 0.70)
-    │   │   └── <slug>/
-    │   │       ├── SKILL.md
-    │   │       └── trust-report.md
-    │   └── .active/                          # T3: LLM deep-reviewed / T4: production-validated
-    │       └── <name>/
-    │           ├── SKILL.md
-    │           └── trust-report.md
-    └── <user-imported>/                   # User-imported files/folders (non-dot-prefixed)
-        └── ...                            # Any structure; indexed by maintain --rebuild-index
+The library lives at `$NB_WORKSPACES_ROOT/.library/` with sub-directories for `.memory/` (references, experiences, type-profiles, thinking), `.skills/` (candidate/draft/active promotion pipeline), and user-imported content. Each directory level has `.index.md` (structured lookup) and `.summary.md` (prose overview).
 
-<project>/<notebook>/.working/
-└── .library-state.json                    # Per-notebook library read cursor (gitignore)
-```
-
-### .index.md vs .summary.md
-
-| File | Form | Reader | Purpose |
-|------|------|--------|---------|
-| `.index.md` | Structured lookup table | `library` (routing & search) | "Which file contains this?" |
-| `.summary.md` | Prose overview | Sub-commands (context loading) | "What is available here?" |
-
-Both files exist at each directory level. Sub-commands read `.summary.md` for quick orientation; `library search` reads `.index.md` for precise routing.
+> See `references/directory-structure.md` for the full filesystem tree and `.index.md` vs `.summary.md` distinction.
 
 ---
 
@@ -375,20 +309,7 @@ deprecated failure_count ≥ 2  (plan cited this pattern → task triggered REPL
 
 ## Injection Protection
 
-All external content written to `.library/.memory/.references/` MUST be sanitised before storage. Ten active threat categories:
-
-| # | Category | Detection targets | Risk on match |
-|---|----------|------------------|---------------|
-| 1 | Direct instruction + social engineering | XML/LLM special tokens, jailbreak phrases; crypto/finance topic + executable content → high; "init required"/"security update" + download instruction → high; "install dependencies" + URL in code block → medium | medium–high |
-| 2 | Markup format exploitation | HTML comments (`<!-- -->`), YAML frontmatter injection, Markdown fence-escape sequences | medium–high |
-| 3 | Unicode hidden attacks | Zero-width chars, bidirectional control chars (U+202A–U+202E), C0/C1 control chars, NFC normalisation bypass | medium–high |
-| 4 | ANSI / terminal sequences | Terminal control codes (`\x1b[...`) | medium |
-| 5 | Resource exhaustion | Files > 50KB hard limit; repeated content blocks > 3 repetitions → fold | low–medium |
-| 6 | System format impersonation | Strings matching `task-ai(` commit prefix, `.status.json` schema fields | high |
-| 7 | Encoding obfuscation | Base64 string (> 30 chars) adjacent to `decode`/`eval`/`exec`/`base64 -d`; hex-encoded commands (`\x41\x42…`); split-string concatenation forming shell commands | high (non-degradable) |
-| 8 | Two-stage loading | `curl \| bash`, `wget \| sh`, `eval $(curl …)`, download + `chmod +x` + execute chains; embedded `#!/bin/bash` inside document code blocks | high (non-degradable) |
-| 9 | Cross-document domain convergence | Source three-tier classification at fetch time; IOC tracking in `.ioc.md` at maintain time | medium–high |
-| 10 | Command semantics injection (VFP) | Malicious CLI flags (`--conftest=`, `--require=`), environment manipulation (`LD_PRELOAD=`, `NODE_OPTIONS=`), external test config injection, non-registry install URLs. Also applied at plan step 18 VH stub generation | medium–high |
+External content is sanitised using 10 injection protection categories before storage. See `references/injection-rules.md` for the full category list.
 
 ---
 

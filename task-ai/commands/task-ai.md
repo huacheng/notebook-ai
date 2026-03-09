@@ -191,10 +191,6 @@ Every task has a dedicated branch (`task/<notebook-name>`) with optional worktre
 
 > **See `commands/references/git-details.md`** for branch convention, commit message format table, commit examples, worktree execution, rollback, and `.gitignore` entries.
 
-#### Status-Based Loop Coordination (v2)
-
-In v2, the `.auto-signal` file is abolished. The auto daemon monitors `.status.json` directly via filesystem watches. Sub-commands update `.status.json` on completion (status, phase, completed_steps), and the daemon reads these changes to determine loop progression. The auto loop uses in-memory counters for `retry_count`, `compaction_count`, `delegation_failures`, and `iteration`.
-
 ### Computation Rule
 
 **No mental math.** When ANY sub-command involves numerical reasoning — performance estimates, size calculations, capacity limits, threshold comparisons, algorithm parameters, benchmarks, option evaluation — write a script and run it in shell instead of computing mentally. Scripts produce verifiable, reproducible results.
@@ -336,7 +332,7 @@ deepening requirements, or building testing methodology before each phase.
 
 ```
 skills/<name>/
-├── SKILL.md                # Core logic: steps, state transitions, signals, git
+├── SKILL.md                # Core logic: steps, state transitions, git conventions
 └── references/             # On-demand reference material (loaded when needed)
     └── *.md                # Domain guidelines, annotation processing, audit frameworks, etc.
 ```
