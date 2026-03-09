@@ -44,13 +44,6 @@ export const CONTINUE_PROMPT = '继续';
 export const TOOL_LONG_RUNNING_MS = 5 * 60 * 1000;
 
 /**
- * If agent output was received within this many ms, autoTick skips sending
- * CONTINUE — the agent is actively working and doesn't need prompting.
- * Defaults to half of DEFAULT_AUTO_INTERVAL_MS (2.5 min).
- */
-export const AUTO_OUTPUT_QUIET_MS = Math.floor(DEFAULT_AUTO_INTERVAL_MS / 2);
-
-/**
  * Default cooldown when a rate-limit / usage-limit error is detected.
  * Auto mode pauses for this duration before resuming.  (5 minutes)
  */
@@ -969,65 +962,73 @@ export class SessionManager {
       return;
     }
 
+    // Determine whether to skip or send CONTINUE
+    let skipReason: string | null = null;
+
     // Rate limit cooldown: skip tick if paused, broadcast resume when cooldown expires
     if (session._autoPausedUntil > 0) {
       if (Date.now() < session._autoPausedUntil) {
         const remainMs = session._autoPausedUntil - Date.now();
-        console.log(`[session ${session.id}] Auto tick: paused for rate limit cooldown (${Math.ceil(remainMs / 1000)}s remaining)`);
-        return;
+        skipReason = `rate limit cooldown (${Math.ceil(remainMs / 1000)}s remaining)`;
+      } else {
+        // Cooldown expired — resume
+        session._autoPausedUntil = 0;
+        console.log(`[session ${session.id}] Auto tick: rate limit cooldown expired, resuming`);
+        this.broadcast(session, { type: 'auto_resumed' });
       }
-      // Cooldown expired — resume
-      session._autoPausedUntil = 0;
-      console.log(`[session ${session.id}] Auto tick: rate limit cooldown expired, resuming`);
-      this.broadcast(session, { type: 'auto_resumed' });
     }
 
     // Pending tool check: skip if agent is waiting for tool results (e.g., sub-agent running)
-    if (session._pendingToolUseIds.size > 0) {
-      console.log(`[session ${session.id}] Auto tick: ${session._pendingToolUseIds.size} tool(s) pending, skipping`);
-      return;
+    if (!skipReason && session._pendingToolUseIds.size > 0) {
+      skipReason = `${session._pendingToolUseIds.size} tool(s) pending`;
     }
 
     // Active output check: skip if agent produced output recently (still working)
-    const outputAge = Date.now() - session._lastOutputTime;
-    if (outputAge < AUTO_OUTPUT_QUIET_MS) {
-      console.log(`[session ${session.id}] Auto tick: agent active (output ${Math.floor(outputAge / 1000)}s ago), skipping`);
-      return;
-    }
-
-    session._autoIterationCount++;
-
-    const runningCellId = findRunningCellId(session.notebook);
-    if (runningCellId) {
-      // Append CONTINUE to the running cell
-      try {
-        this.appendPrompt(session.id, runningCellId, CONTINUE_PROMPT);
-      } catch (err) {
-        console.error(`[session ${session.id}] Auto tick: appendPrompt failed:`, err);
+    // Quiet threshold = half the session's interval (dynamic, not global constant)
+    if (!skipReason) {
+      const quietMs = Math.floor(session._autoIntervalMs / 2);
+      const outputAge = Date.now() - session._lastOutputTime;
+      if (outputAge < quietMs) {
+        skipReason = `agent active (output ${Math.floor(outputAge / 1000)}s ago, quiet=${Math.floor(quietMs / 1000)}s)`;
       }
-    } else if (!session._autoExecuting) {
-      // No running cell — create a new cell and execute CONTINUE to drive progress
-      // Guard: _autoExecuting prevents cascade when previous executeCell is still pending
-      session._autoExecuting = true;
-      const newCellId = crypto.randomUUID();
-      console.log(`[session ${session.id}] Auto tick #${session._autoIterationCount}: no running cell, creating new cell ${newCellId}`);
-      this.executeCell(session.id, newCellId, CONTINUE_PROMPT)
-        .catch((err) => {
-          console.error(`[session ${session.id}] Auto tick: executeCell failed:`, err);
-        })
-        .finally(() => {
-          session._autoExecuting = false;
-        });
     }
 
-    // Broadcast heartbeat tick to frontend
+    if (!skipReason) {
+      // All checks passed — send CONTINUE
+      session._autoIterationCount++;
+
+      const runningCellId = findRunningCellId(session.notebook);
+      if (runningCellId) {
+        try {
+          this.appendPrompt(session.id, runningCellId, CONTINUE_PROMPT);
+        } catch (err) {
+          console.error(`[session ${session.id}] Auto tick: appendPrompt failed:`, err);
+        }
+      } else if (!session._autoExecuting) {
+        // No running cell — create a new cell and execute CONTINUE to drive progress
+        // Guard: _autoExecuting prevents cascade when previous executeCell is still pending
+        session._autoExecuting = true;
+        const newCellId = crypto.randomUUID();
+        console.log(`[session ${session.id}] Auto tick #${session._autoIterationCount}: no running cell, creating new cell ${newCellId}`);
+        this.executeCell(session.id, newCellId, CONTINUE_PROMPT)
+          .catch((err) => {
+            console.error(`[session ${session.id}] Auto tick: executeCell failed:`, err);
+          })
+          .finally(() => {
+            session._autoExecuting = false;
+          });
+      }
+    } else {
+      console.log(`[session ${session.id}] Auto tick: skipped (${skipReason})`);
+    }
+
+    // Always broadcast heartbeat — lets frontend distinguish "skipped" from "timer dead"
     this.broadcast(session, {
       type: 'auto_heartbeat',
       iteration: session._autoIterationCount,
       interval_ms: session._autoIntervalMs,
+      skipped: skipReason ?? undefined,
     });
-
-    console.log(`[session ${session.id}] Auto tick #${session._autoIterationCount}`);
   }
 
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */
