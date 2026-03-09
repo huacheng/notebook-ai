@@ -185,6 +185,64 @@ describe('PATCH /api/projects/:projectId (rename)', () => {
     expect(existsSync(project.path)).toBe(true);
   });
 
+  it('updates project-root .claude/settings.json with new paths', async () => {
+    // Project root has its own .claude/settings.json with absolute paths
+    const claudeDir = path.join(projectDir, '.claude');
+    await mkdir(claudeDir, { recursive: true });
+
+    const oldSettings = JSON.stringify({
+      hooks: {
+        SessionStart: [{
+          command: `cat "${path.join(projectDir, '.worktrees', 'task-foo', '.MEMORY.md')}" 2>/dev/null || echo '无记忆文件'`,
+          description: '加载记忆文件',
+        }],
+      },
+    }, null, 2);
+    await writeFile(path.join(claudeDir, 'settings.json'), oldSettings);
+
+    await request(app)
+      .patch(`/api/projects/${PROJECT_ID}`)
+      .send({ title: 'Renamed Project' })
+      .expect(200);
+
+    const newProjectDir = path.join(tmpDir, 'renamed-project');
+    const newSettingsPath = path.join(newProjectDir, '.claude', 'settings.json');
+
+    expect(existsSync(newSettingsPath)).toBe(true);
+    const content = await readFile(newSettingsPath, 'utf-8');
+    expect(content).toContain(newProjectDir);
+    expect(content).not.toContain(projectDir);
+  });
+
+  it('updates .MEMORY.md files with new absolute paths', async () => {
+    // Create a worktree with .MEMORY.md containing old absolute paths
+    const worktreeDir = path.join(projectDir, '.worktrees', 'task-my-nb');
+    await mkdir(worktreeDir, { recursive: true });
+    await writeFile(path.join(worktreeDir, 'my-nb.notebook.json'), '{}');
+    await writeFile(path.join(worktreeDir, '.MEMORY.md'),
+      `Absolute path: \`${path.join(worktreeDir, '.deliverables')}\`\n` +
+      `Absolute path: \`${path.join(projectDir, '.deliverables')}\`\n`
+    );
+
+    db._notebooks.push({
+      id: 'nb-1',
+      project_id: PROJECT_ID,
+      workspace_dir: worktreeDir,
+      notebook_path: path.join(worktreeDir, 'my-nb.notebook.json'),
+    });
+
+    await request(app)
+      .patch(`/api/projects/${PROJECT_ID}`)
+      .send({ title: 'Renamed Project' })
+      .expect(200);
+
+    const newProjectDir = path.join(tmpDir, 'renamed-project');
+    const newWorktreeDir = path.join(newProjectDir, '.worktrees', 'task-my-nb');
+    const memoryContent = await readFile(path.join(newWorktreeDir, '.MEMORY.md'), 'utf-8');
+    expect(memoryContent).toContain(newProjectDir);
+    expect(memoryContent).not.toContain(projectDir);
+  });
+
   it('skips directory rename when title change produces same slug', async () => {
     await request(app)
       .patch(`/api/projects/${PROJECT_ID}`)

@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, copyFile, readFile, unlink, stat, rm, readdir, realpath } from 'fs/promises';
-import { createReadStream, existsSync } from 'fs';
+import { mkdir, writeFile, copyFile, readFile, unlink, stat, rm, readdir, realpath, chmod, access } from 'fs/promises';
+import { createReadStream, existsSync, constants } from 'fs';
 import path from 'path';
 import os from 'os';
 import multer from 'multer';
@@ -17,6 +17,34 @@ import { titleToSlug, initWorkspaceMemory } from '../workspace.js';
 import { computeProjectFileList } from '../project-file-list.js';
 
 const execFileAsync = promisify(execFile);
+
+/** Files that may contain absolute paths and need rewriting after project rename. */
+const PATH_REWRITE_FILES = new Set(['settings.json', '.MEMORY.md']);
+
+/**
+ * Recursively find and rewrite files that contain the old absolute path.
+ * Only touches known config files (settings.json, .MEMORY.md).
+ */
+async function rewriteAbsolutePaths(dir: string, oldPrefix: string, newPrefix: string): Promise<void> {
+  let entries;
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await rewriteAbsolutePaths(fullPath, oldPrefix, newPrefix);
+    } else if (PATH_REWRITE_FILES.has(entry.name)) {
+      try {
+        const content = await readFile(fullPath, 'utf-8');
+        if (!content.includes(oldPrefix)) continue;
+        const updated = content.replaceAll(oldPrefix, newPrefix);
+        // Handle read-only files (.MEMORY.md, settings.json are 444)
+        try { await access(fullPath, constants.W_OK); } catch { await chmod(fullPath, 0o644); }
+        await writeFile(fullPath, updated, 'utf-8');
+        await chmod(fullPath, 0o444);
+      } catch { /* skip unreadable files */ }
+    }
+  }
+}
 
 export function createProjectsRouter(
   db: NotebookDb,
@@ -125,7 +153,7 @@ export function createProjectsRouter(
       });
       if (!updated) return res.status(500).json({ error: 'Failed to update project' });
 
-      // 3. Update notebook records and regenerate .claude/settings.json
+      // 3. Update notebook DB records
       const notebooks = db.listProjectNotebooks(req.params.projectId);
       for (const nb of notebooks) {
         if (!nb.workspace_dir) continue;
@@ -133,7 +161,6 @@ export function createProjectsRouter(
         const newWorkspaceDir = path.join(newPath, relDir);
 
         const nbUpdates: Record<string, string> = { workspace_dir: newWorkspaceDir };
-        // Derive notebook_path from the .notebook.json file in the new directory
         if (existsSync(newWorkspaceDir)) {
           const { readdirSync } = await import('fs');
           const notebookFiles = readdirSync(newWorkspaceDir).filter((f: string) => f.endsWith('.notebook.json'));
@@ -141,14 +168,12 @@ export function createProjectsRouter(
             nbUpdates.notebook_path = path.join(newWorkspaceDir, notebookFiles[0]);
           }
         }
-
         db.updateNotebook(nb.id, nbUpdates);
-
-        // 4. Regenerate .claude/settings.json with new absolute paths
-        if (existsSync(newWorkspaceDir)) {
-          await initWorkspaceMemory(newWorkspaceDir, newPath);
-        }
       }
+
+      // 4. Rewrite all files containing old absolute paths
+      //    (.claude/settings.json, .MEMORY.md, etc.)
+      await rewriteAbsolutePaths(newPath, oldPath, newPath);
 
       res.json(updated);
     } catch (err: unknown) {
