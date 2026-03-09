@@ -248,9 +248,5 @@ if ! git commit -m "task-ai($NOTEBOOK):plan generate implementation plan" 2>/dev
     echo "[WARN] git commit failed (may be no changes)" >&2
 fi
 
-# 6. Write .auto-signal (SKILL.md step 27)
-AUTO_SIGNAL="$WORK_DIR/.auto-signal"
-printf '{ "step": "plan", "result": "(generated)", "next": "verify", "checkpoint": "post-plan", "timestamp": "%s" }\n' "$(date -Iseconds)" > "$AUTO_SIGNAL" 2>/dev/null || true
-
 echo "[plan] Plan generated. Entered plan-refinement phase."
 echo "[plan] Continue discussing to refine. Use /exec when ready."

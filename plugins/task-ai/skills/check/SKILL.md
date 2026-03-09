@@ -230,15 +230,15 @@ Validates rule candidates in `.evolving-rules/*/candidates/`. Implemented in `ch
 
 ---
 
-## Three-File Anchored Review
+## Four-File Anchored Review
 
-All lifecycle checkpoints use **three-file anchored review**: evaluating deliverables against `.target.md` (requirements) and `.plan.md` (design) per D1-D6 dimension. Scores reflect "deliverable vs requirements+plan" deviation, not subjective LLM judgment.
+All lifecycle checkpoints use **four-file anchored review**: evaluating deliverables against `.target.md` (requirements), `.convergence-baseline.md` (weighted R# scoring baseline), and `.plan.md` (design) per D1-D6 dimension. Scores reflect "deliverable vs requirements+baseline+plan" deviation, not subjective LLM judgment.
 
 | Dimension | Anchor | Review Question |
 |-----------|--------|-----------------|
-| D1 Correctness | .target.md requirements | Does deliverable implement each requirement? |
+| D1 Correctness | .target.md requirements + .convergence-baseline.md R# items | Does deliverable implement each requirement? Are R# completion scores accurate? |
 | D2 Security | .target.md security constraints | Does deliverable satisfy security requirements? |
-| D3 Reliability | .plan.md boundary conditions | Does deliverable cover planned edge/exception cases? |
+| D3 Reliability | .plan.md boundary conditions + .convergence-baseline.md weights | Does deliverable cover planned edge/exception cases? Are critical (weight=3) items prioritized? |
 | D4 Performance | .target.md performance metrics | Does deliverable meet performance requirements? |
 | D5 Architecture | .plan.md architecture design | Does deliverable structure match planned modules/interfaces? |
 | D6 Maintainability | .plan.md module division | Is deliverable organized per plan? Naming/conventions consistent? |
@@ -322,7 +322,7 @@ To prevent score drift across evaluations:
 1. Read previous `.analysis/*-convergence.md` (latest by filename sort) as **anchor**
 2. For each R# item, compare current assessment against previous score
 3. If score changed by more than ±0.25 from previous, provide explicit justification in the per-R# detail table
-4. If no previous convergence file exists (first evaluation), scores are unanchored — note this in the output
+4. If no previous convergence file exists (first stage evaluation), scores are unanchored — note this in the output. Previous convergence defaults to 0.0 so first stage always passes the direction gate (any progress > 0)
 
 ### Output Format
 
@@ -423,7 +423,7 @@ Evaluates progress during execution when issues are encountered.
 
 Evaluates whether execution results meet the task requirements.
 
-**Reads:** `.target.md` + `.plan.md` + `.summary.md` (if exists) + `.test/.summary.md` (primary; drill into individual `.test/` files only if summary is missing or insufficient) + `.analysis/` (latest file only) + code changes + test results. For `software` types, also read `.test/<date>-vh-baseline.md` (VH baseline from plan), `.test/<date>-cumulative-green.jsonl` (CGG records), `.test/hil-snapshots/` (HIL approval records if applicable), and `.notes/` exec files for VFP cycle summaries
+**Reads:** `.target.md` + `.convergence-baseline.md` (if exists) + `.plan.md` + `.summary.md` (if exists) + `.test/.summary.md` (primary; drill into individual `.test/` files only if summary is missing or insufficient) + `.analysis/` (latest file only) + code changes + test results. For `software` types, also read `.test/<date>-vh-baseline.md` (VH baseline from plan), `.test/<date>-cumulative-green.jsonl` (CGG records), `.test/hil-snapshots/` (HIL approval records if applicable), and `.notes/` exec files for VFP cycle summaries
 
 **Evaluation Criteria:**
 
@@ -466,20 +466,20 @@ The convergence gate only fires after D1-D6 passes. See [Convergence Evaluation]
 
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
-| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Record commit hash + convergence score to `stage.history` | Status unchanged (`executing`), signal → `merge` sub-command |
+| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Convergence score is persisted in the convergence analysis file for downstream consumption by `merge` | Status unchanged (`executing`), proceed to `merge` (auto routes via Result-Based Routing) |
 | **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with evaluation + `.bugfix/<date>-<summary>.md` per fix item (with regression test spec per §Regression Test Applicability) | Status unchanged |
-| **ROLLBACK** | Create `.analysis/<date>-convergence-rollback.md` with failure reason + convergence delta. Record failure experience to `.analysis/` + highlight archive. Execute: `git reset --hard <previous stage commit>`, trim `stage.history`, set `status → evolving` | `executing` → `evolving` (at previous stage endpoint) |
+| **ROLLBACK** | Create `.analysis/<date>-convergence-rollback.md` with failure reason + convergence delta. Record failure experience to highlight archive. Check renders the verdict only — the caller (auto loop or user) executes the actual rollback (`git reset --hard`, trim `stage.history`, set `status → evolving`) | Status unchanged by check; caller transitions `executing` → `evolving` |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
 
 ### 4. pre-merge
 
-Final quality gate before merge. Runs three-file anchored D1-D6 scoring with threshold 0.80.
+Final quality gate before merge. Runs four-file anchored D1-D6 scoring with threshold 0.80.
 
-**Reads:** `.target.md` + `.plan.md` + `.summary.md` + `.analysis/` (post-exec ACCEPT file) + `.test/` (results) + code changes
+**Reads:** `.target.md` + `.convergence-baseline.md` (if exists) + `.plan.md` + `.summary.md` + `.analysis/` (post-exec ACCEPT file) + `.test/` (results) + code changes
 
 **Evaluation Criteria:**
 
-All six dimensions scored 0.0-1.0 using three-file anchored review (see above). Overall composite calculated with weighted formula.
+All six dimensions scored 0.0-1.0 using four-file anchored review (see above). Overall composite calculated with weighted formula.
 
 **Outcomes:**
 
@@ -543,15 +543,12 @@ Before step 1, determine scope from invocation:
       - 10h. Read latest `.analysis/*-convergence.md` (if exists) as score anchor
       - 10i. Evaluate each R# against current deliverables using scoring scale (1.00/0.75/0.50/0.25/0.00)
       - 10j. Compute weighted convergence score: `Σ(wᵢ × cᵢ) / Σ(wᵢ)`
-      - 10k. Determine previous convergence (from `stage.history` in `.status.json` or previous convergence.md)
-      - 10l. **If convergence > previous** → proceed to ACCEPT. Write `.analysis/<date>-convergence.md` with per-R# detail. Record commit hash + convergence score to `stage.history`
-      - 10m. **If convergence ≤ previous** → ROLLBACK:
+      - 10k. Determine previous convergence (from `stage.history` in `.status.json` or previous convergence.md). **First stage (empty history)**: use 0.0 as previous — first stage always passes the convergence gate since any progress > 0
+      - 10l. **If convergence > previous** → proceed to ACCEPT. Write `.analysis/<date>-convergence.md` with per-R# detail (merge reads this file to record commit hash + convergence score to `stage.history`)
+      - 10m. **If convergence ≤ previous** → render ROLLBACK verdict:
         1. Write `.analysis/<date>-convergence-rollback.md` with failure reason, convergence delta, and failure experience
         2. Record failure experience to highlight archive (scope=impl pattern)
-        3. Execute `git reset --hard <previous stage commit>` (commit from last ACCEPT in `stage.history`)
-        4. Trim `stage.history` (remove the rolled-back entry)
-        5. Set `status → evolving`
-        6. Output failure reason + convergence change in report
+        3. Render verdict as ROLLBACK — the **caller** (auto loop or user) executes the actual rollback (git reset, history trim, status change). Check does NOT execute destructive git operations
       - 10n. If `.convergence-baseline.md` does not exist, skip convergence gate entirely — proceed directly to ACCEPT/NEEDS_FIX/REPLAN based on D1-D6 alone
     - **R# coverage check** (post-plan checkpoint only):
       - 10o. If `.convergence-baseline.md` exists, scan `.plan.md` for `Covers: R#` annotations

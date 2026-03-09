@@ -97,15 +97,15 @@ Thresholds and retry limits are **adaptive**: read from `.type-profile.md` `## A
 
 > **check runtime errors:** If check itself fails (file read error, state.py exception — not low score), it does NOT count toward retry_count. Stop immediately, await user intervention. Only normal execution with score below threshold triggers retry.
 
-### Three-File Anchored Review
+### Four-File Anchored Review
 
-check evaluates deliverables against `.target.md` (requirements) and `.plan.md` (design) per D1-D6 dimension:
+check evaluates deliverables against `.target.md` (requirements), `.convergence-baseline.md` (weighted R# scoring baseline), and `.plan.md` (design) per D1-D6 dimension:
 
 | Dimension | Anchor | Review Question |
 |-----------|--------|-----------------|
-| D1 Correctness | .target.md requirements | Does deliverable implement each requirement? |
+| D1 Correctness | .target.md requirements + .convergence-baseline.md R# items | Does deliverable implement each requirement? Are R# completion scores accurate? |
 | D2 Security | .target.md security constraints | Does deliverable satisfy security requirements? |
-| D3 Reliability | .plan.md boundary conditions | Does deliverable cover planned edge/exception cases? |
+| D3 Reliability | .plan.md boundary conditions + .convergence-baseline.md weights | Does deliverable cover planned edge/exception cases? Are critical (weight=3) items prioritized? |
 | D4 Performance | .target.md performance metrics | Does deliverable meet performance requirements? |
 | D5 Architecture | .plan.md architecture design | Does deliverable structure match planned modules/interfaces? |
 | D6 Maintainability | .plan.md module division | Is deliverable organized per plan? Naming/conventions consistent? |
@@ -329,7 +329,7 @@ SKILL.md `auto_delegatable` and `model_tier` are **default hints**. Actual deleg
 | target | false | heavy | Always inline (dialog interaction) |
 | research | true | heavy | target phase O1/O2/O3 → inline (needs dialog); planning phase reference collection → can delegate |
 | plan | false | heavy | Always inline (needs decision context) |
-| check | false | heavy | Always inline (needs global context for three-file anchored review) |
+| check | false | heavy | Always inline (needs global context for four-file anchored review) |
 | exec | false | heavy | Always inline (step-by-step needs main session context) |
 | security | true | heavy | Usually can delegate; context-dependent security analysis → inline |
 
@@ -461,10 +461,11 @@ Phase 4: Acceptance (auto)
                                                              │
                                                              └─ convergence ≤ previous ──→ ROLLBACK
                                                                  1. highlight records failure experience
-                                                                 2. git reset --hard <previous stage commit>
-                                                                 3. trim stage.history
-                                                                 4. status → evolving
-                                                                 5. output failure reason + convergence delta → (stop)
+                                                                 2. first-stage guard: history empty → NEEDS_FIX (stop)
+                                                                 3. git reset --hard <previous stage commit>
+                                                                 4. decrement stage.current
+                                                                 5. status → evolving
+                                                                 6. output failure reason + convergence delta → (stop)
 
   Entry on evolving: highlight → report → (stop)
   Entry on satisfied: report → (stop)
@@ -556,13 +557,14 @@ When check returns ROLLBACK (convergence not improving after post-exec acceptanc
 
 1. **Read rollback info**: auto reads `.analysis/<date>-convergence-rollback.md` written by check, containing failure reason and convergence delta
 2. **Record failure experience**: Execute highlight to distill failure into `.library/.memory/.experiences/<type>/<notebook>-stage-N-failed.md`
-3. **Git rollback**: Execute `git reset --hard <previous stage commit>` — commit hash from `stage.history` in `.status.json`
-4. **Trim stage.history**: Remove current stage entry from the history array
-5. **Update status**: Set status → `evolving` via state.py
-6. **Output**: Report failure reason, convergence change (e.g., `0.65 → 0.58`), suggest different approach direction
-7. **Stop**: Wait for user to define next stage target
+3. **First-stage guard**: if `stage.history` is empty (stage 1), **abort ROLLBACK** — skip steps 4-7. Instead, route to NEEDS_FIX (first stage cannot ROLLBACK, only retry with a different approach). Output failure reason and stop
+4. **Git rollback**: Execute `git reset --hard <previous stage commit>` — commit hash from `stage.history[-1].commit` (last completed stage)
+5. **Decrement `stage.current`**: Set `stage.current` back to the previous stage number (pre-merge, current stage has no history entry to trim — the decrement is the only state adjustment needed)
+6. **Update status**: Set status → `evolving` via state.py
+7. **Output**: Report failure reason, convergence change (e.g., `0.65 → 0.58`), suggest different approach direction
+8. **Stop**: Wait for user to define next stage target
 
-> **Safety**: git reset --hard only affects the task branch, not master. The previous stage commit is always available in stage.history.
+> **Safety**: git reset --hard only affects the task branch, not master. The previous stage commit is always available in stage.history (for stage 2+). Stage 1 ROLLBACK is blocked — falls back to NEEDS_FIX.
 
 ### Context Advantage
 
@@ -672,5 +674,5 @@ Auto mode inherits git behavior from each sub-command. No additional git commits
 - `.auto-stop` is a transient file — should be in `.gitignore`
 - **Known trade-off**: First entry on `executing` status always runs verify → check (post-exec). If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration
 - **Plugin delegation**: External plugin delegation works naturally. Skills invoke plugins via Task tool, creating isolated subagents
-- **Self-service bias**: check evaluates its own LLM output — structural bias toward high scores. v1 mitigates via three-file anchored review. Future: external verification signals (coverage, lint, user feedback) as score calibration
+- **Self-service bias**: check evaluates its own LLM output — structural bias toward high scores. v1 mitigates via four-file anchored review. Future: external verification signals (coverage, lint, user feedback) as score calibration
 - **No merge in Phase 4**: v2 removes merge from the auto loop. Phase 4 uses D1-D6 acceptance + convergence gate instead. Rollback replaces merge conflict handling

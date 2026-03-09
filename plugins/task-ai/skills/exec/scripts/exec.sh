@@ -75,7 +75,6 @@ fi
 STATUS_JSON="$WORK_DIR/.status.json"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
 NOTES_DIR="$WORK_DIR/.notes"
-SIGNAL_FILE="$WORK_DIR/.auto-signal"
 SUMMARY_FILE="$WORK_DIR/.summary.md"
 mkdir -p "$NOTES_DIR"
 
@@ -91,24 +90,8 @@ LOCK_DIR="$WORK_DIR/.working"
 LOCK_FILE="$LOCK_DIR/.lock"
 mkdir -p "$LOCK_DIR"
 cleanup_exec() {
-    local exit_code=$?
-    # D3: On unexpected exit (non-zero, non-caught), write mid-exec signal so auto mode can route
-    if [[ $exit_code -ne 0 && -n "${SIGNAL_FILE:-}" && ! -f "${SIGNAL_FILE:-}" ]]; then
-        local ts
-        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")
-        cat > "${SIGNAL_FILE}.tmp" 2>/dev/null <<TRAP_EOF
-{
-  "step": "exec",
-  "result": "(mid-exec)",
-  "next": "verify",
-  "checkpoint": "mid-exec",
-  "timestamp": "$ts"
-}
-TRAP_EOF
-        mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE" 2>/dev/null || true
-    fi
     rm -rf "$LOCK_FILE" 2>/dev/null || true
-    rm -f "${SIGNAL_FILE}.tmp" "${SUMMARY_FILE}.tmp" 2>/dev/null || true
+    rm -f "${SUMMARY_FILE}.tmp" 2>/dev/null || true
     rm -f "$NOTES_DIR"/*.tmp 2>/dev/null || true
 }
 trap cleanup_exec EXIT INT TERM
@@ -209,18 +192,6 @@ if [[ $NEXT_STEP -gt $TOTAL_STEPS ]]; then
         echo "[WARN] completed_steps ($COMPLETED) exceeds total steps ($TOTAL_STEPS) — plan may have been re-generated" >&2
     fi
     echo "All steps already completed ($COMPLETED/$TOTAL_STEPS)."
-    # D1: Still write signal so auto mode can route correctly
-    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{
-  "step": "exec",
-  "result": "(done)",
-  "next": "verify",
-  "checkpoint": "post-exec",
-  "timestamp": "$TIMESTAMP"
-}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 0
 fi
 
@@ -252,7 +223,6 @@ fi
 
 DATE=$(date +%Y-%m-%d)
 EXEC_RESULT="(done)"
-EXEC_CHECKPOINT="post-exec"
 
 # D1: Step 8/9 — Execute steps in order
 for (( STEP=STEP_START; STEP<=STEP_END; STEP++ )); do
@@ -298,10 +268,9 @@ done
 # D1: Step 10 — Update .status.json timestamp after execution loop
 python3 "$STATE_PY" transition "$STATUS_JSON" --status executing 2>/dev/null || true
 
-# D1: Step 10 — Determine signal result before writing files
+# D1: Step 10 — Determine result before writing files
 if [[ -n "$TARGET_STEP" ]]; then
     EXEC_RESULT="(step-$TARGET_STEP)"
-    EXEC_CHECKPOINT="mid-exec"
 fi
 
 # D1/D3: Step 10 — Write .summary.md atomically
@@ -315,18 +284,4 @@ cat > "${SUMMARY_FILE}.tmp" <<EOF
 EOF
 mv "${SUMMARY_FILE}.tmp" "$SUMMARY_FILE"
 
-# D1/D3: Step 10 — Write .auto-signal atomically
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > "${SIGNAL_FILE}.tmp" <<EOF
-{
-  "step": "exec",
-  "result": "$EXEC_RESULT",
-  "next": "verify",
-  "checkpoint": "$EXEC_CHECKPOINT",
-  "timestamp": "$TIMESTAMP"
-}
-EOF
-mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
-
-echo "[exec] Signal written: result=$EXEC_RESULT, checkpoint=$EXEC_CHECKPOINT"
 echo "Execution complete: $STEP_END/$TOTAL_STEPS steps done."

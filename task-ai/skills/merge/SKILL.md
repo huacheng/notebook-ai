@@ -31,7 +31,7 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 
 ## Prerequisites
 
-- Task status must be `executing`
+- Task status must be `executing` or `evolving`
 - Latest `.analysis/` file must contain an ACCEPT verdict (from `check --checkpoint post-exec`)
 - **Dependency gate**: All `depends_on` modules must meet their required status — simple string entries require `satisfied`, extended `{ module, min_status }` entries require at-or-past `min_status` (see depends_on Format in `commands/task-ai.md`). If any dependency is not met, merge REJECTS with error listing blocking dependencies and their current statuses
 
@@ -59,8 +59,9 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 
 After deliverables are copied and committed on main, checkout back to task branch for state update:
 
-1. Update `.status.json`: status → `evolving`, push completed stage entry to `stage.history`
-2. Git commit state changes on task branch
+1. **If status is `executing`**: Update `.status.json`: status → `evolving`, push completed stage entry to `stage.history` (with commit hash and convergence score)
+2. **If status is `evolving`**: Skip stage.history write (auto Phase 4 already wrote it). Merge only copies deliverables in this case
+3. Git commit state changes on task branch
 
 **Atomicity**: If state transition fails, status remains `executing` — user can retry merge. If status update succeeds but git commit fails, status is `evolving` — auto re-enters from evolving entry point (highlight → report), no repeated merge.
 
@@ -68,7 +69,7 @@ After deliverables are copied and committed on main, checkout back to task branc
 
 ## Execution Steps
 
-1. **Read** `.status.json` — validate status is `executing`
+1. **Read** `.status.json` — validate status is `executing` or `evolving`
 2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `satisfied`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
 3. **Verify** ACCEPT verdict: check latest `.analysis/` file for `post-exec-accept`
 4. **Read** `.summary.md` for task context (plan overview, completed steps, key decisions)

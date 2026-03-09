@@ -114,6 +114,8 @@ The `stage` field tracks progressive task evolution. Default: `{ "current": 1, "
 | `stage.history[].stage` | integer | Stage number |
 | `stage.history[].name` | string | Stage name/description |
 | `stage.history[].completed_at` | string | ISO 8601 completion timestamp |
+| `stage.history[].commit` | string | Git commit SHA at stage completion (set by merge) |
+| `stage.history[].convergence` | number | Convergence score at completion (0.0–1.0) |
 
 **Validation Rules**: `stage.current >= 1`. If violated, treat as corrupted — log warning and fall back to `{ "current": 1, "history": [] }`.
 

@@ -39,10 +39,10 @@ if [[ ! -f "$STATE_PY" ]]; then
     exit 1
 fi
 
-# D1: Validate status is 'executing' (per SKILL.md prerequisite)
+# D1: Validate status is 'executing' or 'evolving' (per SKILL.md prerequisite)
 CURRENT_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "")
-if [[ "$CURRENT_STATUS" != "executing" ]]; then
-    echo "[ERROR] Task status is '$CURRENT_STATUS', expected 'executing'. Cannot merge." >&2
+if [[ "$CURRENT_STATUS" != "executing" && "$CURRENT_STATUS" != "evolving" ]]; then
+    echo "[ERROR] Task status is '$CURRENT_STATUS', expected 'executing' or 'evolving'. Cannot merge." >&2
     exit 1
 fi
 
@@ -190,11 +190,35 @@ fi
 # D1: Always transition to evolving (no stage.total comparison — progressive evolution model)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-echo "[STAGE] Stage $STAGE_CURRENT completed. Status → evolving."
-if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status evolving \
-    --stage-history "{\"stage\":$STAGE_CURRENT,\"name\":\"stage-$STAGE_CURRENT\",\"completed_at\":\"$TIMESTAMP\"}"; then
-    echo "[ERROR] Failed to update task state to evolving" >&2
-    exit 1
+# v2: stage.history entry includes commit (current HEAD) and convergence (from latest analysis)
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+# Read convergence score from latest convergence analysis file if available
+CONVERGENCE_SCORE=$(python3 -c "
+import os, re, glob
+analysis_dir = os.path.join('$WORK_DIR', '.analysis')
+if os.path.isdir(analysis_dir):
+    files = sorted(glob.glob(os.path.join(analysis_dir, '*convergence*.md')), reverse=True)
+    for f in files:
+        with open(f) as fh:
+            for line in fh:
+                m = re.search(r'Current convergence[^0-9]*([0-9.]+)', line)
+                if m:
+                    print(m.group(1))
+                    exit()
+print('0.0')
+" 2>/dev/null || echo "0.0")
+
+# D3: Only write stage.history when transitioning from executing.
+# When called from evolving (auto already wrote history + set evolving), skip history push to avoid duplicates.
+if [[ "$CURRENT_STATUS" == "executing" ]]; then
+    echo "[STAGE] Stage $STAGE_CURRENT completed. Status → evolving."
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status evolving \
+        --stage-history "{\"stage\":$STAGE_CURRENT,\"name\":\"stage-$STAGE_CURRENT\",\"completed_at\":\"$TIMESTAMP\",\"commit\":\"$COMMIT_SHA\",\"convergence\":$CONVERGENCE_SCORE}"; then
+        echo "[ERROR] Failed to update task state to evolving" >&2
+        exit 1
+    fi
+else
+    echo "[STAGE] Status already evolving. Skipping stage.history write (auto handled)."
 fi
 
 # Git commit stage state

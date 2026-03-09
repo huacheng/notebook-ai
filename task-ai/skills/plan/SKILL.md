@@ -114,8 +114,8 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
 23. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
 24. Update `.status.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
 25. Execute highlight protocol scope=thinking-raw — see `skills/highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure MUST NOT block plan's main flow
-26. **L1 Six-Dimension Self-Audit** — scan `.plan.md` against `.target.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
-    - Read `.plan.md`, `.target.md`, `.type-profile.md` (if exists)
+26. **L1 Six-Dimension Self-Audit** — scan `.plan.md` against `.target.md` and `.convergence-baseline.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
+    - Read `.plan.md`, `.target.md`, `.convergence-baseline.md` (if exists), `.type-profile.md` (if exists)
     - D1 Correctness: requirements coverage, acceptance criteria mapping, input/output consistency
     - D2 Security: security-sensitive step identification, input validation coverage
     - D3 Reliability: dependency explicitness, failure fallback, inter-step coupling

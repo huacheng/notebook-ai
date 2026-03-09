@@ -90,7 +90,6 @@ else
     # D3: Release lock and clean temp files on exit (normal or error)
     cleanup() {
         rm -f "$LOCK_FILE" 2>/dev/null || true
-        rm -f "$WORK_DIR"/.auto-signal.tmp.$$ 2>/dev/null || true
         rm -f "$WORK_DIR"/.analysis/*.tmp.$$ 2>/dev/null || true
     }
     trap cleanup EXIT
@@ -851,11 +850,6 @@ EOF
             if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status re-planning --phase needs-plan 2>/dev/null; then
                 echo "[WARN] Failed to transition status to re-planning" >&2
             fi
-            # D1: Write .auto-signal per SKILL.md step 18 (REPLAN → checkpoint empty per signal table)
-            # D3: Atomic write — auto loop may read signal concurrently
-            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"REPLAN\",\"next\":\"plan\",\"checkpoint\":\"\",\"timestamp\":\"$(date -Iseconds)\"}"
-            SIGNAL_TMP="$WORK_DIR/.auto-signal.tmp.$$"
-            echo "$SIGNAL_JSON" > "$SIGNAL_TMP" && mv -f "$SIGNAL_TMP" "$WORK_DIR/.auto-signal"
             echo "Check completed. Security blocked. Analysis: $ANALYSIS_FILE"
             exit 0
         fi
@@ -868,14 +862,6 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 if [[ "$CHECKPOINT" == "pre-merge" ]]; then
     echo "[pre-merge] Running pre-merge quality gate..."
-
-    # Source signal-writer for check_score output
-    SIGNAL_WRITER="$SCRIPT_DIR/../../auto/scripts/signal-writer.sh"
-    if [[ -f "$SIGNAL_WRITER" ]]; then
-        source "$SIGNAL_WRITER"
-    else
-        echo "[WARN] signal-writer.sh not found, check_score will not be written" >&2
-    fi
 
     # Verify bc is available
     if ! command -v bc &>/dev/null; then
@@ -939,12 +925,6 @@ if [[ "$CHECKPOINT" == "pre-merge" ]]; then
 
     echo "[pre-merge] Scores: D1=$D1_SCORE D2=$D2_SCORE D3=$D3_SCORE D4=$D4_SCORE D5=$D5_SCORE D6=$D6_SCORE overall=$OVERALL"
 
-    # Write check_score to .auto-signal if signal file exists
-    SIGNAL_FILE="$WORK_DIR/.auto-signal"
-    if [[ -f "$SIGNAL_FILE" ]] && type write_check_score &>/dev/null; then
-        write_check_score "$SIGNAL_FILE" "$OVERALL" "$D1_SCORE" "$D2_SCORE" "$D3_SCORE" "$D4_SCORE" "$D5_SCORE" "$D6_SCORE"
-    fi
-
     # Determine verdict
     if (( $(echo "$OVERALL >= 0.80" | bc -l) )); then
         VERDICT="PASS"
@@ -967,26 +947,6 @@ if [[ "$CHECKPOINT" == "pre-merge" ]]; then
 
 Threshold: 0.80 — PASSED. Ready to merge.
 EOF
-
-        # Write .auto-signal (merge with existing check_score if present)
-        # D2: Pass timestamp as argument to avoid shell interpolation in Python code
-        MERGE_TS=$(date -Iseconds)
-        if [[ -f "$WORK_DIR/.auto-signal" ]] && command -v python3 &>/dev/null; then
-            python3 -c "
-import json, sys
-try:
-    with open(sys.argv[1]) as f: d = json.load(f)
-except Exception: d = {}
-d.update({'step':'check','result':'PASS','next':'merge','checkpoint':'pre-merge','timestamp':sys.argv[2]})
-with open(sys.argv[1],'w') as f: json.dump(d,f)
-" "$WORK_DIR/.auto-signal" "$MERGE_TS" 2>/dev/null || {
-                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$MERGE_TS\"}"
-                echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
-            }
-        else
-            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"PASS\",\"next\":\"merge\",\"checkpoint\":\"pre-merge\",\"timestamp\":\"$MERGE_TS\"}"
-            echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
-        fi
 
     else
         VERDICT="NEEDS_FIX"
@@ -1025,30 +985,6 @@ $(printf '%b' "$FAILING_DIMS")
 Address failing dimensions and re-run post-exec check.
 EOF
 
-        # Reset retry_count for Phase 3 re-entry
-        if [[ -f "$SIGNAL_FILE" ]] && type write_phase &>/dev/null; then
-            write_phase "$SIGNAL_FILE" "execution" 0.90
-        fi
-
-        # Write .auto-signal (merge with existing check_score if present)
-        # D2: Pass timestamp as argument to avoid shell interpolation in Python code
-        FIX_TS=$(date -Iseconds)
-        if [[ -f "$WORK_DIR/.auto-signal" ]] && command -v python3 &>/dev/null; then
-            python3 -c "
-import json, sys
-try:
-    with open(sys.argv[1]) as f: d = json.load(f)
-except Exception: d = {}
-d.update({'step':'check','result':'NEEDS_FIX','next':'exec','checkpoint':'pre-merge','retry_count':0,'timestamp':sys.argv[2]})
-with open(sys.argv[1],'w') as f: json.dump(d,f)
-" "$WORK_DIR/.auto-signal" "$FIX_TS" 2>/dev/null || {
-                SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$FIX_TS\"}"
-                echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
-            }
-        else
-            SIGNAL_JSON="{\"step\":\"check\",\"result\":\"NEEDS_FIX\",\"next\":\"exec\",\"checkpoint\":\"pre-merge\",\"retry_count\":0,\"timestamp\":\"$FIX_TS\"}"
-            echo "$SIGNAL_JSON" > "$WORK_DIR/.auto-signal"
-        fi
     fi
 
     echo "Analysis written to $ANALYSIS_FILE"
@@ -1123,31 +1059,5 @@ cat > "$ANALYSIS_TMP" <<EOF
 - Rationale: Plumbing stub — full LLM-driven evaluation not yet implemented for this checkpoint.
 EOF
 mv -f "$ANALYSIS_TMP" "$ANALYSIS_FILE"
-
-# D1: Write .auto-signal per SKILL.md Step 18
-# D6: checkpoint field follows SKILL.md .auto-signal table:
-#   NEEDS_FIX includes checkpoint for routing; others use empty string
-case "$VERDICT" in
-  PASS)
-    SIGNAL_NEXT="exec"; SIGNAL_CP="" ;;
-  ACCEPT)
-    SIGNAL_NEXT="merge"; SIGNAL_CP="" ;;
-  CONTINUE)
-    SIGNAL_NEXT="exec"; SIGNAL_CP="" ;;
-  NEEDS_REVISION)
-    SIGNAL_NEXT="plan"; SIGNAL_CP="" ;;
-  NEEDS_FIX)
-    SIGNAL_NEXT="exec"; SIGNAL_CP="$CHECKPOINT" ;;
-  REPLAN)
-    SIGNAL_NEXT="plan"; SIGNAL_CP="" ;;
-  BLOCKED)
-    SIGNAL_NEXT="(stop)"; SIGNAL_CP="" ;;
-  *)
-    SIGNAL_NEXT="unknown"; SIGNAL_CP="" ;;
-esac
-# D3: Atomic write — auto loop may read signal concurrently
-SIGNAL_JSON="{\"step\":\"check\",\"result\":\"$VERDICT\",\"next\":\"$SIGNAL_NEXT\",\"checkpoint\":\"$SIGNAL_CP\",\"timestamp\":\"$(date -Iseconds)\"}"
-SIGNAL_TMP="$WORK_DIR/.auto-signal.tmp.$$"
-echo "$SIGNAL_JSON" > "$SIGNAL_TMP" && mv -f "$SIGNAL_TMP" "$WORK_DIR/.auto-signal"
 
 echo "Check completed. Analysis written to $ANALYSIS_FILE."

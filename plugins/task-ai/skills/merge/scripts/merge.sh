@@ -26,12 +26,9 @@ fi
 
 STATUS_JSON="$WORK_DIR/.status.json"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
-SIGNAL_FILE="$WORK_DIR/.auto-signal"
-
 # D3: Cleanup handler — remove temp files on exit
 MERGE_TMPDIR=""
 cleanup_merge() {
-    rm -f "${SIGNAL_FILE}.tmp" 2>/dev/null || true
     [[ -n "$MERGE_TMPDIR" ]] && rm -rf "$MERGE_TMPDIR" 2>/dev/null || true
 }
 trap cleanup_merge EXIT INT TERM
@@ -42,10 +39,10 @@ if [[ ! -f "$STATE_PY" ]]; then
     exit 1
 fi
 
-# D1: Validate status is 'executing' (per SKILL.md prerequisite)
+# D1: Validate status is 'executing' or 'evolving' (per SKILL.md prerequisite)
 CURRENT_STATUS=$(python3 "$STATE_PY" get "$STATUS_JSON" status 2>/dev/null || echo "")
-if [[ "$CURRENT_STATUS" != "executing" ]]; then
-    echo "[ERROR] Task status is '$CURRENT_STATUS', expected 'executing'. Cannot merge." >&2
+if [[ "$CURRENT_STATUS" != "executing" && "$CURRENT_STATUS" != "evolving" ]]; then
+    echo "[ERROR] Task status is '$CURRENT_STATUS', expected 'executing' or 'evolving'. Cannot merge." >&2
     exit 1
 fi
 
@@ -59,13 +56,6 @@ fi
 reject_no_accept() {
     local msg="$1"
     echo "[ERROR] $msg" >&2
-    local ts
-    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    # D3: Atomic write via .tmp + mv
-    cat > "${SIGNAL_FILE}.tmp" <<EOSIG
-{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"no-accept","timestamp":"$ts"}
-EOSIG
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 }
 
@@ -88,11 +78,6 @@ fi
 # D3: Check for uncommitted changes that would block checkout
 if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     echo "[ERROR] Working tree has uncommitted changes. Commit or stash before merging." >&2
-    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 fi
 
@@ -153,7 +138,11 @@ DELIVERABLES_TARGET="$PROJECT_DIR/.deliverables/$NOTEBOOK"
 MERGE_TMPDIR=$(mktemp -d)
 HAS_DELIVERABLES=0
 if [[ -d "$SRC_DELIVERABLES" ]] && [[ -n "$(ls -A "$SRC_DELIVERABLES" 2>/dev/null)" ]]; then
-    cp -a "$SRC_DELIVERABLES/." "$MERGE_TMPDIR/"
+    # D3: Explicit error handling — set -e exits on failure but won't write signal
+    if ! cp -a "$SRC_DELIVERABLES/." "$MERGE_TMPDIR/"; then
+        echo "[ERROR] Failed to copy deliverables to temp dir" >&2
+        exit 1
+    fi
     HAS_DELIVERABLES=1
 else
     echo "[INFO] No .deliverables/ found on $TASK_BRANCH — nothing to copy."
@@ -162,19 +151,18 @@ fi
 # Phase 1: Checkout master
 if ! git checkout "$MAIN_BRANCH"; then
     echo "[ERROR] Failed to checkout $MAIN_BRANCH" >&2
-    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 fi
 
 # Phase 1b: Copy deliverables from temp to project-level .deliverables/<notebook>/
 MERGE_FAILED=0
 if [[ "$HAS_DELIVERABLES" -eq 1 ]]; then
-    mkdir -p "$DELIVERABLES_TARGET"
-    cp -a "$MERGE_TMPDIR/." "$DELIVERABLES_TARGET/"
+    # D3: Explicit error handling for mkdir/cp on master branch
+    if ! mkdir -p "$DELIVERABLES_TARGET" || ! cp -a "$MERGE_TMPDIR/." "$DELIVERABLES_TARGET/"; then
+        echo "[ERROR] Failed to write deliverables on $MAIN_BRANCH" >&2
+        git checkout "$TASK_BRANCH" 2>/dev/null || true
+        exit 1
+    fi
     git add "$DELIVERABLES_TARGET/"
     if git diff --cached --quiet 2>/dev/null; then
         echo "[INFO] No deliverables changes to commit."
@@ -187,28 +175,14 @@ MERGE_TMPDIR=""
 
 if [[ "$MERGE_FAILED" -ne 0 ]]; then
     echo "[ERROR] Failed to commit deliverables." >&2
-    # D1: Checkout back to task branch before writing signal (signal file is on task branch)
     git checkout "$TASK_BRANCH" 2>/dev/null || true
-    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"conflict","next":"(stop)","checkpoint":"","timestamp":"$TIMESTAMP"}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
     exit 1
 fi
 
 # Deliverables copied — checkout back to task branch for state update
-# D1: .status.json and .auto-signal live on task branch, not master
+# D1: .status.json lives on task branch, not master
 if ! git checkout "$TASK_BRANCH"; then
     echo "[ERROR] Failed to checkout back to $TASK_BRANCH for state update" >&2
-    # D3: Write signal so auto daemon can detect the failure
-    # Note: SIGNAL_FILE path may not exist on master, but attempt anyway
-    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    mkdir -p "$(dirname "$SIGNAL_FILE")" 2>/dev/null || true
-    cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"rejected","next":"(stop)","checkpoint":"checkout-failed","timestamp":"$TIMESTAMP"}
-EOF
-    mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE" 2>/dev/null || true
     exit 1
 fi
 
@@ -216,22 +190,40 @@ fi
 # D1: Always transition to evolving (no stage.total comparison — progressive evolution model)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-echo "[STAGE] Stage $STAGE_CURRENT completed. Status → evolving."
-if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status evolving \
-    --stage-history "{\"stage\":$STAGE_CURRENT,\"name\":\"stage-$STAGE_CURRENT\",\"completed_at\":\"$TIMESTAMP\"}"; then
-    echo "[ERROR] Failed to update task state to evolving" >&2
-    exit 1
-fi
+# v2: stage.history entry includes commit (current HEAD) and convergence (from latest analysis)
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+# Read convergence score from latest convergence analysis file if available
+CONVERGENCE_SCORE=$(python3 -c "
+import os, re, glob
+analysis_dir = os.path.join('$WORK_DIR', '.analysis')
+if os.path.isdir(analysis_dir):
+    files = sorted(glob.glob(os.path.join(analysis_dir, '*convergence*.md')), reverse=True)
+    for f in files:
+        with open(f) as fh:
+            for line in fh:
+                m = re.search(r'Current convergence[^0-9]*([0-9.]+)', line)
+                if m:
+                    print(m.group(1))
+                    exit()
+print('0.0')
+" 2>/dev/null || echo "0.0")
 
-# Write .auto-signal for evolving (atomic)
-cat > "${SIGNAL_FILE}.tmp" <<EOF
-{"step":"merge","result":"evolving","next":"highlight","checkpoint":"","timestamp":"$TIMESTAMP"}
-EOF
-mv "${SIGNAL_FILE}.tmp" "$SIGNAL_FILE"
+# D3: Only write stage.history when transitioning from executing.
+# When called from evolving (auto already wrote history + set evolving), skip history push to avoid duplicates.
+if [[ "$CURRENT_STATUS" == "executing" ]]; then
+    echo "[STAGE] Stage $STAGE_CURRENT completed. Status → evolving."
+    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status evolving \
+        --stage-history "{\"stage\":$STAGE_CURRENT,\"name\":\"stage-$STAGE_CURRENT\",\"completed_at\":\"$TIMESTAMP\",\"commit\":\"$COMMIT_SHA\",\"convergence\":$CONVERGENCE_SCORE}"; then
+        echo "[ERROR] Failed to update task state to evolving" >&2
+        exit 1
+    fi
+else
+    echo "[STAGE] Status already evolving. Skipping stage.history write (auto handled)."
+fi
 
 # Git commit stage state
 cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }
-git add .status.json .auto-signal 2>/dev/null || echo "[WARN] git add failed for stage state" >&2
+git add .status.json 2>/dev/null || echo "[WARN] git add failed for stage state" >&2
 git commit -m "task-ai($NOTEBOOK):merge stage $STAGE_CURRENT completed" 2>/dev/null || echo "[WARN] git commit failed for stage state" >&2
 
 echo "Task $NOTEBOOK stage $STAGE_CURRENT complete. Use /task-ai:target to define next stage or --satisfy to mark satisfied."
