@@ -139,10 +139,21 @@ export async function gitFallbackUpdate(pluginKey: string, baseOverride?: string
 
   // Read marketplace source URL from known_marketplaces.json
   const knownPath = path.join(base, 'known_marketplaces.json');
-  const known = await readJson<Record<string, { source?: string }>>(knownPath);
-  if (!known?.[marketplace]?.source) return false;
+  const known = await readJson<Record<string, { source?: string | { source?: string; url?: string; repo?: string } }>>(knownPath);
+  const sourceEntry = known?.[marketplace]?.source;
+  if (!sourceEntry) return false;
 
-  const repoUrl = known[marketplace].source as string;
+  // source can be a plain URL string or { source: "git", url: "..." } or { source: "github", repo: "owner/name" }
+  let repoUrl: string;
+  if (typeof sourceEntry === 'string') {
+    repoUrl = sourceEntry;
+  } else if (sourceEntry.url) {
+    repoUrl = sourceEntry.url;
+  } else if (sourceEntry.repo) {
+    repoUrl = `https://github.com/${sourceEntry.repo}.git`;
+  } else {
+    return false;
+  }
   const tmpClone = path.join(os.tmpdir(), `plugin-update-${marketplace}-${Date.now()}`);
 
   try {
@@ -172,6 +183,15 @@ export async function gitFallbackUpdate(pluginKey: string, baseOverride?: string
 
     // Now fix installed_plugins.json to point to new version
     await fixInstalledPluginVersion(pluginKey, baseOverride);
+
+    // Sync local marketplace directory so GET /status shows updated version
+    const mpDir = path.join(base, 'marketplaces', marketplace, '.claude-plugin');
+    try {
+      await execFile('mkdir', ['-p', mpDir]);
+      await execFile('cp', ['-r', `${path.join(tmpClone, '.claude-plugin')}/.`, mpDir], { timeout: 10_000 });
+    } catch {
+      // Non-fatal: plugin is updated even if marketplace metadata sync fails
+    }
 
     return true;
   } catch {
@@ -366,7 +386,17 @@ export function createPluginRouter(): IRouter {
       steps.push(`fixInstalledPluginVersion failed: ${msg.slice(0, 300)}`);
     }
 
-    // Step 3: Git fallback if needed
+    // Step 3: Check current vs remote version
+    try {
+      const [pName, mpName] = pluginKey.split('@');
+      const base = pluginsDir();
+      const cacheDir = path.join(base, 'cache', mpName ?? '', pName ?? '');
+      const { readdir: rd } = await import('fs/promises');
+      const cached = await rd(cacheDir).catch(() => [] as string[]);
+      steps.push(`Cached versions: [${cached.join(', ')}]`);
+    } catch { /* ignore */ }
+
+    // Step 4: Git fallback if needed
     try {
       const didFallback = await gitFallbackUpdate(pluginKey);
       if (didFallback) {
