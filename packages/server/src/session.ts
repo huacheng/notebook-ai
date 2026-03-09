@@ -982,6 +982,12 @@ export class SessionManager {
       this.broadcast(session, { type: 'auto_resumed' });
     }
 
+    // Pending tool check: skip if agent is waiting for tool results (e.g., sub-agent running)
+    if (session._pendingToolUseIds.size > 0) {
+      console.log(`[session ${session.id}] Auto tick: ${session._pendingToolUseIds.size} tool(s) pending, skipping`);
+      return;
+    }
+
     // Active output check: skip if agent produced output recently (still working)
     const outputAge = Date.now() - session._lastOutputTime;
     if (outputAge < AUTO_OUTPUT_QUIET_MS) {
