@@ -290,18 +290,7 @@ if [[ -x "$MAINTAIN_SH" ]]; then
     fi
 fi
 
-# 14. Write .auto-signal (D1: consistent with SKILL.md, with actual timestamp)
-# D3: Atomic write via temp file + rename (consistent with auto.sh pattern)
-SIGNAL_TMP="$WORK_DIR/.auto-signal.tmp.$$"
-SIGNAL_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-if printf '{"step":"report","result":"(generated)","next":"(stop)","checkpoint":"","timestamp":"%s"}\n' "$SIGNAL_TS" > "$SIGNAL_TMP" 2>/dev/null && mv "$SIGNAL_TMP" "$WORK_DIR/.auto-signal" 2>/dev/null; then
-    :
-else
-    rm -f "$SIGNAL_TMP"
-    echo "[WARN] Failed to write .auto-signal" >&2
-fi
-
-# 15. Print report to screen
+# 14. Print report to screen
 if [[ -f "$REPORT_FILE" ]]; then
     cat "$REPORT_FILE"
 else

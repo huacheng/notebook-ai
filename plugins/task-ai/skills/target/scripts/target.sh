@@ -46,6 +46,7 @@ fi
 
 TARGET_FILE="$NB_WORKING/.target.md"
 STATUS_FILE="$NB_WORKING/.status.json"
+BASELINE_FILE="$NB_WORKING/.convergence-baseline.md"
 STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -149,8 +150,12 @@ if [[ "$REFINE_MODE" -eq 1 ]]; then
         printf '\n## Refinements\n\n%s\n' "$REFINEMENT_LINE" >> "$TARGET_FILE"
     fi
 
-    # D3: git with error handling
-    if ! git add "$TARGET_FILE" 2>/dev/null; then
+    # D3: git with error handling — include baseline file if it exists
+    REFINE_GIT_FILES=("$TARGET_FILE")
+    if [[ -f "$BASELINE_FILE" ]]; then
+        REFINE_GIT_FILES+=("$BASELINE_FILE")
+    fi
+    if ! git add "${REFINE_GIT_FILES[@]}" 2>/dev/null; then
         echo "[ERROR] git add failed" >&2
         exit 1
     fi
@@ -219,6 +224,25 @@ else
     fi
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Convergence Baseline: create template if it doesn't exist (SKILL.md step 3e)
+# Actual R# extraction requires LLM intelligence — script only ensures the file
+# exists with the correct header structure so the agent can populate it.
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ ! -f "$BASELINE_FILE" ]]; then
+    BASELINE_DATE=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+    cat > "$BASELINE_FILE" << BASELINE_END
+# Convergence Baseline
+
+Generated from: .target.md Overall Objective + Requirements
+Updated: $BASELINE_DATE
+
+| # | Requirement | Weight | Source |
+|---|------------|--------|--------|
+BASELINE_END
+    echo "[target] Created convergence baseline template: $BASELINE_FILE"
+fi
+
 # D1: Update .status.json status transition (SKILL.md State Transitions table)
 # draft → planning; blocked → planning; review → re-planning; satisfied → planning (re-enter evolution)
 if [[ -f "$STATUS_FILE" ]] && ! command -v jq &>/dev/null; then
@@ -240,10 +264,13 @@ elif [[ -f "$STATUS_FILE" ]]; then
     fi
 fi
 
-# D3: git with error handling — always add target file; add status file if it was modified
+# D3: git with error handling — always add target file; add status/baseline files if modified
 GIT_ADD_FILES=("$TARGET_FILE")
 if [[ -n "${NEW_STATUS:-}" ]]; then
     GIT_ADD_FILES+=("$STATUS_FILE")
+fi
+if [[ -f "$BASELINE_FILE" ]]; then
+    GIT_ADD_FILES+=("$BASELINE_FILE")
 fi
 if ! git add "${GIT_ADD_FILES[@]}" 2>/dev/null; then
     echo "[ERROR] git add failed" >&2

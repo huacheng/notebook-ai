@@ -111,7 +111,7 @@ For each implementation step:
    After all fix items are addressed, continue remaining steps
 7. **Executor discovery** (before per-step loop): Follow `auto/references/plugin-delegation.md` executor slot discovery. Semantic match against three signal sources (`.status.json` type, `.target.md` content, `.plan.md` step structure) — not rigid type-string comparison. Check `plan-executor` seed slot first, then `domain-executor-*` registry/semantic scan. If a matching executor plugin is found with health score >= 0.70:
    - Delegate entire remaining plan execution to the executor via Task subagent (see Executor Integration Contract in `plugin-delegation.md`)
-   - After executor completes: read `.status.json` `completed_steps`, `.auto-signal`, `.summary.md` to restore context
+   - After executor completes: read `.status.json` `completed_steps`, `.summary.md` to restore context
    - If executor fails mid-execution: fall back to native per-step loop, resuming from `completed_steps + 1`
    - If no executor matched or `--step N` is specified: proceed with native per-step loop below
 8. **If** `--step N` specified, execute only that step; otherwise execute remaining incomplete steps in order
@@ -130,10 +130,6 @@ For each implementation step:
     - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
     - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure MUST NOT block exec's main flow
     - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure MUST NOT block exec's main flow
-    - If all steps complete: signal `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }`
-    - If significant issue: signal `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-    - If `--step N` single step complete (manual invocation only — auto mode does not use `--step`): signal `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }`
-    - If blocking dependency: signal `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }`
 11. **Report** execution summary with per-step results. Then output next step prompt based on outcome:
     - All steps done → "Execution complete. Next: `/task-ai:check --checkpoint post-exec` to evaluate the result."
     - Significant issue mid-exec → "Issue encountered. Next: `/task-ai:check --checkpoint mid-exec` to evaluate and determine fix approach."
@@ -166,15 +162,6 @@ For long-running executions, intermediate progress can be observed by:
 - Per step progress: `task-ai(<notebook>):exec step N/M done`
 - On blocked: `task-ai(<notebook>):exec blocked`
 - Project file changes use `feat`/`fix` type, state file changes use `exec` type
-
-## .auto-signal
-
-| Result | Signal |
-|--------|--------|
-| All steps done | `{ "step": "exec", "result": "(done)", "next": "verify", "checkpoint": "post-exec", "timestamp": "..." }` |
-| Significant issue | `{ "step": "exec", "result": "(mid-exec)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }` |
-| Single step (--step N) | `{ "step": "exec", "result": "(step-N)", "next": "verify", "checkpoint": "mid-exec", "timestamp": "..." }` |
-| Blocking dependency | `{ "step": "exec", "result": "(blocked)", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
 
 ## Notes
 

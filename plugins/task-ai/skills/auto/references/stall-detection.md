@@ -42,16 +42,16 @@ Track hashes of recent `assistant` stream-json messages:
 
 1. Maintain a rolling window of the last 5 `assistant` message content hashes
 2. If 3 consecutive hashes are identical → suspected reasoning loop
-3. Recovery: send `{"type":"human","message":"You appear to be in a loop. Stop current approach. Re-read .auto-signal and .status.json to determine your next step, then proceed."}` via stream-json stdin
+3. Recovery: send `{"type":"human","message":"You appear to be in a loop. Stop current approach. Re-read .status.json and .status.json to determine your next step, then proceed."}` via stream-json stdin
 4. If dedup recovery fails three times consecutively → write `.auto-stop` with reason `"reasoning_loop"`
 
 ### Single-Step Timeout
 
-Monitor `.auto-signal` file timestamp independently of stream activity:
+Monitor `.status.json` file timestamp independently of stream activity:
 
-1. Record `last_signal_update = mtime(.auto-signal)` on each `fs.watch` event
+1. Record `last_signal_update = mtime(.status.json)` on each `fs.watch` event
 2. If `now - last_signal_update > 10 minutes` AND stream is still active → step is taking too long
-3. Recovery: send `{"type":"human","message":"Current step has exceeded 10 minutes without signal update. Write .auto-signal with current progress and either complete or skip to next step."}` via stream-json stdin
+3. Recovery: send `{"type":"human","message":"Current step has exceeded 10 minutes without signal update. Write .status.json with current progress and either complete or skip to next step."}` via stream-json stdin
 4. If no signal update within 3 minutes after prompt → increment stall recovery count (same limits as idle recovery)
 
 ### Combined Detection Priority
@@ -72,4 +72,4 @@ Monitor `.auto-signal` file timestamp independently of stream activity:
 | Max recoveries per step | 3 | Write `.auto-stop` with reason `"stall_limit"` |
 | Max total recoveries | 10 | Write `.auto-stop` with reason `"stall_limit"` |
 
-Recovery counts are tracked in SQLite (see `backend-api.md` §SQLite State). `recovery_count_step` (per-step stall recoveries) resets on each new `.auto-signal` receipt; `recovery_count_total` persists across the entire auto session and does NOT reset. Note: these are stall-recovery counters, distinct from `.auto-signal`'s `retry_count` (which tracks check-triggered retries at a given checkpoint).
+Recovery counts are tracked in SQLite (see `backend-api.md` §SQLite State). `recovery_count_step` (per-step stall recoveries) resets on each new `.status.json` receipt; `recovery_count_total` persists across the entire auto session and does NOT reset. Note: these are stall-recovery counters, distinct from `.status.json`'s `retry_count` (which tracks check-triggered retries at a given checkpoint).

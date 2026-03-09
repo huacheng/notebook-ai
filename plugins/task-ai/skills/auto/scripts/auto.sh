@@ -17,7 +17,7 @@ derive_phase() {
         planning|re-planning) echo "planning" ;;
         review|executing) echo "execution" ;;
         blocked) echo "execution" ;;
-        evolving|satisfied) echo "finalization" ;;
+        evolving|satisfied) echo "acceptance" ;;
         cancelled) echo "terminal" ;;  # Not in signal validation whitelist; auto exits before writing signal
         *) echo "unknown" ;;
     esac

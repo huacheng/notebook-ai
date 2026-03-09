@@ -115,8 +115,7 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 12. **Compose** report in requested format
 13. **Write** to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md`
 14. **Git commit**: `task-ai(<notebook>):report generate completion report`
-15. **Write** `.auto-signal`: `{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
-16. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/<notebook>/.report.md`."
+15. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/<notebook>/.report.md`."
 
 > *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. For manual workflows: run `/task-ai:highlight` before `/task-ai:report` if distillation is needed.*
 
@@ -139,12 +138,6 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 ## Git
 
 - `task-ai(<notebook>):report generate completion report`
-
-## .auto-signal
-
-`{ "step": "report", "result": "(generated)", "next": "(stop)", "checkpoint": "", "timestamp": "..." }`
-
-Report is always a terminal step — `next` is always `(stop)`.
 
 ## Stage Review (evolving status)
 

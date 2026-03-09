@@ -60,8 +60,7 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 After deliverables are copied and committed on main, checkout back to task branch for state update:
 
 1. Update `.status.json`: status → `evolving`, push completed stage entry to `stage.history`
-2. Write `.auto-signal` for daemon routing
-3. Git commit state changes on task branch
+2. Git commit state changes on task branch
 
 **Atomicity**: If state transition fails, status remains `executing` — user can retry merge. If status update succeeds but git commit fails, status is `evolving` — auto re-enters from evolving entry point (highlight → report), no repeated merge.
 
@@ -76,7 +75,7 @@ After deliverables are copied and committed on main, checkout back to task branc
 5. **Phase 1**: Save `<notebook>/.deliverables/` to temp → checkout main → copy to `<project>/.deliverables/<notebook>/` → commit
 6. **If no `<notebook>/.deliverables/`**: skip copy, proceed to Phase 3 (state update still happens)
 7. **Checkout back** to task branch (state files live on task branch, not master)
-8. **Phase 3**: Update `.status.json`: status → `evolving`, push entry to `stage.history` → write `.auto-signal` → git commit `stage <N> completed`
+8. **Phase 3**: Update `.status.json`: status → `evolving`, push entry to `stage.history` → git commit `stage <N> completed`
 9. **Report** merge result. Then output next step prompt based on outcome:
     - `evolving` → "Stage <N> deliverables copied. Next: `/task-ai:highlight` to distill stage experience, then `/task-ai:report` for the stage report."
 
@@ -93,17 +92,6 @@ After deliverables are copied and committed on main, checkout back to task branc
 |--------|---------------|
 | Copy deliverables | `task-ai(<notebook>):merge copy deliverables from <task-branch>` |
 | State update | `task-ai(<notebook>):merge stage <N> completed` |
-
-## .auto-signal
-
-| Result | Signal |
-|--------|--------|
-| Merged | `{ "step": "merge", "result": "evolving", "next": "highlight", "checkpoint": "", "timestamp": "..." }` |
-| Commit failed | `{ "step": "merge", "result": "conflict", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
-| Dependency not met | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "dependency-blocked", "timestamp": "..." }` |
-| No ACCEPT verdict | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "no-accept", "timestamp": "..." }` |
-| Checkout failed | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "checkout-failed", "timestamp": "..." }` |
-| State transition failed | `{ "step": "merge", "result": "rejected", "next": "(stop)", "checkpoint": "state-transition-failed", "timestamp": "..." }` |
 
 ## Notes
 

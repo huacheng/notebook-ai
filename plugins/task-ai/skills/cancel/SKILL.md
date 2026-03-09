@@ -48,7 +48,6 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
    - Call `GET /api/task-auto/lookup?taskDir=<notebook_working_dir>` to find the session running this task's auto loop
    - If found (200): call `DELETE /api/sessions/<session_name>/task-auto`
    - If not found (404): no auto loop running, skip
-   - Delete `.working/.auto-signal` file if it exists
    - Delete `.working/.auto-stop` file if it exists
    - Handle `.working/.lock` — first read lock content and verify the holder:
      - (a) if holder `pid` is dead → delete lock (stale)
@@ -88,10 +87,6 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
 task-ai(<notebook>):cancel pre-cancel snapshot   # (only if uncommitted changes)
 task-ai(<notebook>):cancel user cancelled
 ```
-
-## .auto-signal
-
-None — `cancel` does not write `.auto-signal`. It is a lifecycle-terminating command that stops the auto loop rather than continuing it.
 
 ## Notes
 

@@ -141,7 +141,7 @@ topic_keywords: [keyword1, keyword2]
 
 #### Fault Isolation
 
-> Inline call failure MUST NOT block exec's main flow. exec's code implementation, state transitions, and .auto-signal write are unaffected. On failure: log warning and continue.
+> Inline call failure MUST NOT block exec's main flow. exec's code implementation and state transitions are unaffected. On failure: log warning and continue.
 
 ---
 
@@ -378,7 +378,6 @@ existing_complete = .memory/.experiences/<type>/{filename}
 
 if existing_complete exists AND mtime(existing_complete) >= latest_input_mtime:
     log "No new content since last distillation, skipping"
-    write .auto-signal { step: "highlight", result: "(skipped-idempotent)", next: "report" }
     return
 ```
 
@@ -529,11 +528,7 @@ Steps:
 7. **Output C** — Type-profiles sync
 9. **library maintain --compact** (only check if `.changelog` exceeds 2000-line threshold)
 10. **Git commit**: `task-ai(<notebook>):highlight complete distillation`
-11. **Write .auto-signal** (only when running within auto loop):
-   ```json
-   { "step": "highlight", "result": "(distilled)", "next": "report", "checkpoint": "", "timestamp": "..." }
-   ```
-12. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
+11. **Report** distillation summary. Then output next step prompt: "Experience distilled. Next: `/task-ai:report` to generate the completion report."
 
 ---
 
@@ -653,10 +648,6 @@ scope = notebook slug (if in notebook context) or project directory name (fallba
 
 Output to user: captured experience summary, write path, type classification.
 
-#### Does NOT Write .auto-signal
-
-adhoc mode does not participate in auto loop, does not write .auto-signal.
-
 ---
 
 ## State Transitions
@@ -682,17 +673,6 @@ highlight **does not change notebook status**. Regardless of scope, `.status.jso
 | promote | No independent commit (changelog update only; candidates are committed by subsequent skill-review) |
 
 > Inline calls (impl/verify/thinking-raw/quality-update) do not produce independent commits. Their changelog updates are included in the caller's git commit (e.g., exec's commit includes impl experience write changelog changes).
-
-## .auto-signal
-
-| scope | signal |
-|-------|--------|
-| complete (success) | `{ "step": "highlight", "result": "(distilled)", "next": "report", "checkpoint": "", "timestamp": "..." }` |
-| complete (idempotent skip) | `{ "step": "highlight", "result": "(skipped-idempotent)", "next": "report", "checkpoint": "", "timestamp": "..." }` |
-| complete (failure) | `{ "step": "highlight", "result": "failed", "next": "report", "checkpoint": "", "timestamp": "..." }` |
-| adhoc | No signal (not part of auto) |
-| inline scopes | No signal (callers write their own signals) |
-| promote | No signal (batch operation, not part of auto) |
 
 ---
 

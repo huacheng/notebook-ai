@@ -84,8 +84,7 @@ When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, veri
     - Also execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture verification strategy selection and result analysis reasoning. Inline call failure MUST NOT block verify's main flow
 13. **Update** `.test/.summary.md` — overwrite with condensed summary of ALL criteria & results files in `.test/`
 14. **Git commit**: `task-ai(<notebook>):verify <checkpoint> verification`
-15. **Write** `.auto-signal`: `{ "step": "verify", "result": "(pass|fail|partial)", "next": "check", "checkpoint": "<checkpoint>", "timestamp": "..." }`
-16. **Report** results summary to user. Then output next step prompt: "Verification complete. Next: `/task-ai:check --checkpoint <checkpoint>` to evaluate the results and render a verdict." (substitute the actual checkpoint value)
+15. **Report** results summary to user. Then output next step prompt: "Verification complete. Next: `/task-ai:check --checkpoint <checkpoint>` to evaluate the results and render a verdict." (substitute the actual checkpoint value)
 
 ## Result Values
 
@@ -113,20 +112,6 @@ task-ai(auth-refactor):verify quick verification
 task-ai(auth-refactor):verify full verification
 task-ai(auth-refactor):verify step-3 verification
 ```
-
-## .auto-signal
-
-The `checkpoint` field in verify's signal carries **the verification scope** (what was tested), not the check checkpoint. When `check` receives verify results, it uses the **invoking context** (status + triggering signal) to determine its own checkpoint — NOT verify's checkpoint field.
-
-| Verify Scope | Signal |
-|------------|--------|
-| quick | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "quick", "timestamp": "..." }` |
-| full | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "full", "timestamp": "..." }` |
-| step-N | `{ "step": "verify", "result": "(pass)", "next": "check", "checkpoint": "step-N", "timestamp": "..." }` |
-
-Result values use the same `(pass)`, `(fail)`, `(partial)` notation defined in the Result Values table above.
-
-**Auto routing note**: In the auto loop, verify's checkpoint field is informational for the daemon. The auto loop determines the correct `check` checkpoint from the triggering context (e.g., after `plan` → `check --checkpoint post-plan`; after `exec (done)` → `check --checkpoint post-exec`; after `exec (mid-exec)` → `check --checkpoint mid-exec`).
 
 ## Notes
 

@@ -167,7 +167,7 @@ echo "$$" > "$LOCK_FILE/pid"
 # D3: Ensure lock is released and temp files cleaned on exit (normal, error, or signal)
 cleanup() {
     rm -rf "$LOCK_FILE" 2>/dev/null || true
-    rm -f "$TEST_DIR"/*.tmp.$$ "$WORK_DIR"/.auto-signal.tmp.$$ 2>/dev/null || true
+    rm -f "$TEST_DIR"/*.tmp.$$ 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -237,21 +237,6 @@ fi
 # D1 Step 14: Git commit
 # TODO: Implement git commit: task-ai($NOTEBOOK):verify $CHECKPOINT verification
 # Should stage .test/ results and .summary.md, skip if no git repo or nothing to commit
-
-# D1 Step 15: Write .auto-signal
-SIGNAL_FILE="$WORK_DIR/.auto-signal"
-TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-# D2: Use printf to avoid variable injection in JSON; CHECKPOINT is validated, RESULT is hardcoded
-# D3: Atomic write — auto loop may read signal concurrently
-SIGNAL_TMP="$SIGNAL_FILE.tmp.$$"
-if ! printf '{ "step": "verify", "result": "%s", "next": "check", "checkpoint": "%s", "timestamp": "%s" }\n' \
-    "$RESULT" "$CHECKPOINT" "$TIMESTAMP" > "$SIGNAL_TMP"
-then
-    rm -f "$SIGNAL_TMP"
-    echo "[WARN] Failed to write .auto-signal" >&2
-else
-    mv -f "$SIGNAL_TMP" "$SIGNAL_FILE"
-fi
 
 # D1 Step 16: Report results summary
 echo "Verification completed: $RESULT. Results written to $RESULTS_FILE."

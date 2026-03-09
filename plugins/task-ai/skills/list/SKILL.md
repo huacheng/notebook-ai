@@ -102,10 +102,6 @@ Parse commit messages to reconstruct the timeline of status changes.
 
 None — `list` does not create any commits.
 
-## .auto-signal
-
-None — `list` does not write `.auto-signal`. It is a utility command that does not participate in the automation loop.
-
 ## Notes
 
 - **Pure read-only**: `list` never writes files, never changes status, never creates commits. It is safe to run at any time without side effects

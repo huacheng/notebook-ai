@@ -133,8 +133,6 @@ else
 fi
 _GI_ENTRIES=(
   ".worktrees/"
-  "**/.working/.auto-signal"
-  "**/.working/.auto-signal.tmp"
   "**/.working/.auto-stop"
   "**/.working/.lock"
   "**/.working/.library-state.json"

@@ -199,7 +199,7 @@ Verdict: PASS (after fix)
 
 #### Does NOT Write State Files
 
-scope=context does not write `.analysis/` files, `.auto-signal`, or update `.status.json`. In audit-and-fix mode, it modifies project source files (with RED→GREEN) but not task lifecycle state.
+scope=context does not write `.analysis/` files or update `.status.json`. In audit-and-fix mode, it modifies project source files (with RED→GREEN) but not task lifecycle state.
 
 ---
 
@@ -249,13 +249,6 @@ All lifecycle checkpoints use **three-file anchored review**: evaluating deliver
 
 Every lifecycle checkpoint outputs D1-D6 numeric scores (0.0 - 1.0). Scores are written to:
 1. `.analysis/<date>-<checkpoint>.md` — human-readable table in the evaluation file
-2. `.auto-signal` `check_score` field — machine-readable for frontend display and threshold comparison
-
-Score writing uses `signal-writer.sh` utility:
-```bash
-source "$SCRIPT_DIR/../../auto/scripts/signal-writer.sh"
-write_check_score "$SIGNAL_FILE" "$OVERALL" "$D1" "$D2" "$D3" "$D4" "$D5" "$D6"
-```
 
 ### Threshold System
 
@@ -266,13 +259,75 @@ write_check_score "$SIGNAL_FILE" "$OVERALL" "$D1" "$D2" "$D3" "$D4" "$D5" "$D6"
 | post-exec | 0.75 | 3 fix/replan | Stop, notify user |
 | pre-merge | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0) |
 
+## Convergence Evaluation
+
+Convergence measures whether deliverables are moving toward the task's target requirements. Used by the post-exec dual gate to distinguish "quality OK but wrong direction" (ROLLBACK) from "quality OK and progressing" (ACCEPT).
+
+### Formula
+
+```
+convergence = Σ(wᵢ × cᵢ) / Σ(wᵢ)
+```
+
+Where:
+- `wᵢ` = weight of R# item (from `.convergence-baseline.md`)
+- `cᵢ` = coverage score for R# item (see scale below)
+
+### Scoring Scale
+
+Each R# item is evaluated against current deliverables:
+
+| Score | Meaning |
+|-------|---------|
+| **1.00** | Fully satisfied — requirement completely implemented and verified |
+| **0.75** | Mostly satisfied — core functionality present, minor gaps |
+| **0.50** | Partially satisfied — some progress but significant gaps remain |
+| **0.25** | Minimally addressed — initial work started, mostly incomplete |
+| **0.00** | Not addressed — no deliverable progress toward this requirement |
+
+### Anchor Mechanism
+
+To prevent score drift across evaluations:
+
+1. Read previous `.analysis/*-convergence.md` (latest by filename sort) as **anchor**
+2. For each R# item, compare current assessment against previous score
+3. If score changed by more than ±0.25 from previous, provide explicit justification in the per-R# detail table
+4. If no previous convergence file exists (first evaluation), scores are unanchored — note this in the output
+
+### Output Format
+
+Write evaluation to `.analysis/<date>-convergence.md`:
+
+```markdown
+# Convergence Evaluation — <date>
+
+**Previous convergence**: <score or "N/A (first evaluation)">
+**Current convergence**: <score>
+**Delta**: <+/- change>
+**Verdict**: ACCEPT / ROLLBACK
+
+## Per-R# Detail
+
+| R# | Description | Weight | Previous | Current | Justification |
+|----|-------------|--------|----------|---------|---------------|
+| R1 | ... | 3 | 0.50 | 0.75 | Added error handling module |
+| R2 | ... | 2 | 0.75 | 0.75 | No change |
+| ... | | | | | |
+
+## Decision Rationale
+
+<Why convergence improved/regressed, what deliverables contributed>
+```
+
+For ROLLBACK outcomes, the file is named `.analysis/<date>-convergence-rollback.md` and includes an additional `## Failure Experience` section documenting what went wrong and lessons learned for the next attempt.
+
 ## Checkpoints (scope=lifecycle)
 
 ### 1. post-plan (default)
 
 Evaluates whether the implementation plan is ready for execution.
 
-**Reads:** `.target.md` + `.plan.md` + `.summary.md` (if exists) + `.test/` (latest criteria file) + `.bugfix/` (latest file if exists, to verify revised plan addresses execution issues)
+**Reads:** `.target.md` + `.plan.md` + `.summary.md` (if exists) + `.test/` (latest criteria file) + `.bugfix/` (latest file if exists, to verify revised plan addresses execution issues) + `.convergence-baseline.md` (if exists, for R# coverage check)
 
 **Evaluation Criteria (unified six-dimension framework, L2 depth):**
 
@@ -287,12 +342,27 @@ Evaluates whether the implementation plan is ready for execution.
 
 **Domain weight adjustment**: Weights above are defaults. Read `.type-profile.md` "Audit Adaptation" section to shift emphasis per task domain (e.g., `software` → Security↑ Reliability↑, `infrastructure` → Security↑↑ Reliability↑↑, `data-pipeline` → Performance↑ Reliability↑). When profile lacks adaptation guidance, use seed tables in `references/six-dimension-audit.md` Domain Adaptation section. Adjustments increase attention on specific dimensions without skipping any.
 
+**Convergence R# Coverage Check:**
+
+When `.convergence-baseline.md` exists, scan plan steps for `Covers: R#` annotations and cross-check against all R# items in the baseline:
+
+1. Read `.convergence-baseline.md` → extract all `R#` items
+2. Scan `.plan.md` steps for `Covers: R#, R#, ...` annotations
+3. Compute coverage: which R# items are covered by at least one plan step
+4. If any R# is uncovered → verdict is **NEEDS_REVISION** with the specific uncovered items listed:
+   ```
+   Convergence coverage gap: R3 (user auth flow), R7 (error recovery) not covered by any plan step.
+   Revise plan to add steps covering these requirements.
+   ```
+
+> This check runs independently of the D1-D6 gate. A plan can pass all six dimensions but still receive NEEDS_REVISION if convergence baseline items are not covered.
+
 **Outcomes:**
 
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
 | **PASS** | Create `.analysis/<date>-post-plan-pass.md` with approval summary | `planning` → `review` |
-| **NEEDS_REVISION** | Create `.analysis/<date>-post-plan-needs-revision.md` with specific issues | Status unchanged |
+| **NEEDS_REVISION** | Create `.analysis/<date>-post-plan-needs-revision.md` with specific issues (including uncovered R# items if applicable) | Status unchanged |
 | **BLOCKED** | Create `.analysis/<date>-post-plan-blocked.md` with blocking reasons | → `blocked` |
 
 ### 2. mid-exec
@@ -351,12 +421,24 @@ When evaluating post-exec for software types, assess TDD compliance as an additi
 
 Include a `## VFP Compliance` section in the `.analysis/<date>-post-exec-*.md` output file with the score and findings.
 
+**Convergence Dual Gate** (post-exec only):
+
+After D1-D6 scores are computed, post-exec applies a **two-gate** evaluation:
+
+| Gate | Question | Pass | Fail |
+|------|----------|------|------|
+| **D1-D6** | Quality OK? (composite ≥ threshold) | Continue to convergence gate | **NEEDS_FIX** — fix until quality passes |
+| **Convergence** | Direction correct? (score > previous) | **ACCEPT** — keep deliverables | **ROLLBACK** — discard, redo from previous stage endpoint |
+
+The convergence gate only fires after D1-D6 passes. See [Convergence Evaluation](#convergence-evaluation) for scoring details.
+
 **Outcomes:**
 
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
-| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md`, write `.test/<date>-post-exec-results.md` | Status unchanged (`executing`), signal → `merge` sub-command |
+| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Record commit hash + convergence score to `stage.history` | Status unchanged (`executing`), signal → `merge` sub-command |
 | **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with evaluation + `.bugfix/<date>-<summary>.md` per fix item (with regression test spec per §Regression Test Applicability) | Status unchanged |
+| **ROLLBACK** | Create `.analysis/<date>-convergence-rollback.md` with failure reason + convergence delta. Record failure experience to `.analysis/` + highlight archive. Execute: `git reset --hard <previous stage commit>`, trim `stage.history`, set `status → evolving` | `executing` → `evolving` (at previous stage endpoint) |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
 
 ### 4. pre-merge
@@ -373,7 +455,7 @@ All six dimensions scored 0.0-1.0 using three-file anchored review (see above). 
 
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
-| **PASS** (overall >= 0.80) | Create `.analysis/<date>-pre-merge.md`, write check_score to `.auto-signal` | Status unchanged, signal → `merge` |
+| **PASS** (overall >= 0.80) | Create `.analysis/<date>-pre-merge.md` | Status unchanged, proceed → `merge` |
 | **NEEDS_FIX** (overall < 0.80) | Create `.analysis/<date>-pre-merge.md` with failing dimensions | Fall back to Phase 3: reset `retry_count` to 0, resume from failing dimension steps |
 
 No retry at pre-merge — failure means the deliverable needs more Phase 3 work on the specific failing dimensions.
@@ -394,8 +476,8 @@ When writing to any history directory (`.analysis/`, `.bugfix/`, `.test/`), also
 
 Before step 1, determine scope from invocation:
 
-- **No `--checkpoint`** → **scope=context**: execute §S1 flow directly (Input Identification → Gated Execution → Output Mode 1 or 2). Do NOT proceed to steps 1-19 below. If audit-and-fix mode is entered (Mode 2), the RED→GREEN protocol defined in §S1 is mandatory for each non-exempt fix
-- **`--checkpoint` present** → **scope=lifecycle/skill/rules**: proceed to steps 1-19 below
+- **No `--checkpoint`** → **scope=context**: execute §S1 flow directly (Input Identification → Gated Execution → Output Mode 1 or 2). Do NOT proceed to steps 1-18 below. If audit-and-fix mode is entered (Mode 2), the RED→GREEN protocol defined in §S1 is mandatory for each non-exempt fix
+- **`--checkpoint` present** → **scope=lifecycle/skill/rules**: proceed to steps 1-18 below
 
 ### Lifecycle Steps (scope=lifecycle only)
 
@@ -425,6 +507,24 @@ Before step 1, determine scope from invocation:
     - **Exemptions** (from test-strategy-by-type.md): Pure typo fix (≤3 chars), comment-only change, historical doc annotation — these skip RED/GREEN (steps 10a-10e) but still require step 10f (full suite)
     - See [Regression Test Applicability](#regression-test-applicability) for which scopes and modes trigger this protocol
     - **Lifecycle NEEDS_FIX output**: When check renders NEEDS_FIX (not fixing itself), the `.bugfix/` file MUST include a regression test specification for each finding — test approach, RED assertion, expected GREEN behavior — so that `exec` can execute the RED→GREEN protocol when applying the fix
+    - **Convergence evaluation** (post-exec checkpoint only, after D1-D6 passes threshold):
+      - 10g. Read `.convergence-baseline.md` → extract R# items and weights
+      - 10h. Read latest `.analysis/*-convergence.md` (if exists) as score anchor
+      - 10i. Evaluate each R# against current deliverables using scoring scale (1.00/0.75/0.50/0.25/0.00)
+      - 10j. Compute weighted convergence score: `Σ(wᵢ × cᵢ) / Σ(wᵢ)`
+      - 10k. Determine previous convergence (from `stage.history` in `.status.json` or previous convergence.md)
+      - 10l. **If convergence > previous** → proceed to ACCEPT. Write `.analysis/<date>-convergence.md` with per-R# detail. Record commit hash + convergence score to `stage.history`
+      - 10m. **If convergence ≤ previous** → ROLLBACK:
+        1. Write `.analysis/<date>-convergence-rollback.md` with failure reason, convergence delta, and failure experience
+        2. Record failure experience to highlight archive (scope=impl pattern)
+        3. Execute `git reset --hard <previous stage commit>` (commit from last ACCEPT in `stage.history`)
+        4. Trim `stage.history` (remove the rolled-back entry)
+        5. Set `status → evolving`
+        6. Output failure reason + convergence change in report
+      - 10n. If `.convergence-baseline.md` does not exist, skip convergence gate entirely — proceed directly to ACCEPT/NEEDS_FIX/REPLAN based on D1-D6 alone
+    - **R# coverage check** (post-plan checkpoint only):
+      - 10o. If `.convergence-baseline.md` exists, scan `.plan.md` for `Covers: R#` annotations
+      - 10p. Cross-check against all R# items in baseline — if any R# uncovered → NEEDS_REVISION with specific uncovered items listed
 11. **Write** output files per outcome: evaluation to `.analysis/` or `.bugfix/` (per Outcomes tables above), and test results to `.test/<date>-<checkpoint>-results.md` when tests are evaluated (mid-exec and post-exec checkpoints)
     - **REPLAN with traceable reference**: if verdict is REPLAN AND evaluation identifies a specific `.memory/.references/<file>` as misleading (e.g., bad API docs caused wrong approach), increment `failure_count` in that reference file's frontmatter (acquire `.memory/.references/.lock` → read frontmatter → `failure_count++` → write atomically → append `reference` changelog update line → release lock)
 12. **Experience and quality updates** (skip for CONTINUE verdict — insufficient evaluation evidence):
@@ -435,12 +535,12 @@ Before step 1, determine scope from invocation:
 15. **Update** `.status.json` status and timestamp per outcome
 16. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture quality judgment and ACCEPT/REPLAN decision reasoning. Inline call failure MUST NOT block check's main flow
 17. **Git commit**: per outcome (see Git section below). All outcomes commit their output files and state updates, regardless of whether status changes
-18. **Write** `.auto-signal` with verdict, next action, and checkpoint (see .auto-signal section below)
-19. **Report** evaluation result with detailed reasoning. Then output next step prompt based on verdict:
+18. **Report** evaluation result with detailed reasoning. Then output next step prompt based on verdict:
     - PASS (post-plan) → "Plan approved. Ready to execute — say 'auto' to start the automatic execution loop, or `/task-ai:exec` to execute manually step by step."
     - NEEDS_REVISION (post-plan) → "Plan needs revision. Next: `/task-ai:plan` to revise based on the feedback above."
     - ACCEPT (post-exec) → "Implementation accepted. Next: `/task-ai:merge` to merge the task branch."
     - NEEDS_FIX (mid/post-exec) → "Issues found. Next: `/task-ai:exec` to apply fixes based on the findings above."
+    - ROLLBACK (post-exec) → "Convergence regressed — deliverables rolled back to previous stage endpoint. Next: `/task-ai:exec` to retry with a different approach. See `.analysis/<date>-convergence-rollback.md` for failure analysis."
     - REPLAN → "Fundamental issues found. Next: `/task-ai:plan` to re-plan based on the feedback above."
     - CONTINUE (mid-exec) → "Progress OK. Next: `/task-ai:exec` to continue implementation."
     - BLOCKED → "Task blocked. Manual intervention required."
@@ -463,6 +563,7 @@ Before step 1, determine scope from invocation:
 | `executing` | `blocked` | mid-exec BLOCKED |
 | `executing` | `executing` | post-exec ACCEPT |
 | `executing` | `executing` | post-exec NEEDS_FIX |
+| `executing` | `evolving` | post-exec ROLLBACK |
 | `executing` | `re-planning` | post-exec REPLAN |
 | `executing` | `executing` | pre-merge PASS (→ merge) |
 | `executing` | `executing` | pre-merge NEEDS_FIX (→ Phase 3 retry) |
@@ -478,32 +579,12 @@ Before step 1, determine scope from invocation:
 | NEEDS_REVISION | `task-ai(<notebook>):check post-plan NEEDS_REVISION` |
 | NEEDS_FIX (mid-exec) | `task-ai(<notebook>):check mid-exec NEEDS_FIX` |
 | NEEDS_FIX (post-exec) | `task-ai(<notebook>):check post-exec NEEDS_FIX` |
+| ROLLBACK | `task-ai(<notebook>):check post-exec ROLLBACK` |
 | CONTINUE | `task-ai(<notebook>):check mid-exec CONTINUE` |
 | PASS (pre-merge) | `task-ai(<notebook>):check pre-merge PASS → merge` |
 | NEEDS_FIX (pre-merge) | `task-ai(<notebook>):check pre-merge NEEDS_FIX → Phase 3` |
 
 All outcomes commit their output files and state updates, regardless of whether status changes.
-
-## .auto-signal
-
-Every check outcome writes `.auto-signal` on completion:
-
-| Checkpoint | Result | Signal |
-|------------|--------|--------|
-| post-plan | PASS | `{ "step": "check", "result": "PASS", "next": "exec", "checkpoint": "", "timestamp": "..." }` |
-| post-plan | NEEDS_REVISION | `{ "step": "check", "result": "NEEDS_REVISION", "next": "plan", "checkpoint": "", "timestamp": "..." }` |
-| post-plan | BLOCKED | `{ "step": "check", "result": "BLOCKED", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
-| mid-exec | CONTINUE | `{ "step": "check", "result": "CONTINUE", "next": "exec", "checkpoint": "", "timestamp": "..." }` |
-| mid-exec | NEEDS_FIX | `{ "step": "check", "result": "NEEDS_FIX", "next": "exec", "checkpoint": "mid-exec", "timestamp": "..." }` |
-| mid-exec | REPLAN | `{ "step": "check", "result": "REPLAN", "next": "plan", "checkpoint": "", "timestamp": "..." }` |
-| mid-exec | BLOCKED | `{ "step": "check", "result": "BLOCKED", "next": "(stop)", "checkpoint": "", "timestamp": "..." }` |
-| post-exec | ACCEPT | `{ "step": "check", "result": "ACCEPT", "next": "merge", "checkpoint": "", "timestamp": "..." }` |
-| post-exec | NEEDS_FIX | `{ "step": "check", "result": "NEEDS_FIX", "next": "exec", "checkpoint": "post-exec", "timestamp": "..." }` |
-| post-exec | REPLAN | `{ "step": "check", "result": "REPLAN", "next": "plan", "checkpoint": "", "timestamp": "..." }` |
-| pre-merge | PASS | `{ "step": "check", "result": "PASS", "next": "merge", "checkpoint": "pre-merge", "timestamp": "..." }` |
-| pre-merge | NEEDS_FIX | `{ "step": "check", "result": "NEEDS_FIX", "next": "exec", "checkpoint": "pre-merge", "timestamp": "..." }` |
-
-When ACCEPT (post-exec) or PASS (pre-merge), the `merge` sub-command copies `<notebook>/.deliverables/` to main and transitions status to `evolving`. See `skills/merge/SKILL.md`.
 
 ## Task-Type-Aware Verification
 

@@ -114,6 +114,8 @@ The `stage` field tracks progressive task evolution. Default: `{ "current": 1, "
 | `stage.history[].stage` | integer | Stage number |
 | `stage.history[].name` | string | Stage name/description |
 | `stage.history[].completed_at` | string | ISO 8601 completion timestamp |
+| `stage.history[].commit` | string | Git commit SHA at stage completion (set by merge) |
+| `stage.history[].convergence` | number | Convergence score at completion (0.0–1.0) |
 
 **Validation Rules**: `stage.current >= 1`. If violated, treat as corrupted — log warning and fall back to `{ "current": 1, "history": [] }`.
 
@@ -189,35 +191,9 @@ Every task has a dedicated branch (`task/<notebook-name>`) with optional worktre
 
 > **See `commands/references/git-details.md`** for branch convention, commit message format table, commit examples, worktree execution, rollback, and `.gitignore` entries.
 
-#### .auto-signal Convention
+#### Status-Based Loop Coordination (v2)
 
-Every sub-command that participates in the automation loop (plan, check, exec, merge, report, research, verify, annotate) MUST write `.auto-signal` on completion, regardless of whether auto mode is active. Utility sub-commands (list, summarize) do NOT write `.auto-signal`:
-
-```json
-{
-  "step": "<sub-command>",
-  "result": "<outcome>",
-  "next": "<next sub-command or (stop)>",
-  "checkpoint": "<checkpoint hint for next command, optional>",
-  "timestamp": "<ISO 8601>"
-}
-```
-
-- The `next` field follows the signal routing table documented in the `auto` sub-command.
-- The `checkpoint` field provides context for the next command (e.g., `"post-plan"`, `"mid-exec"`, `"post-exec"`) when the `next` command needs it. Optional — omit when not applicable. If auto mode is not active, the file is harmless (gitignored, ephemeral). This fire-and-forget pattern avoids each skill needing to detect auto mode.
-
-**Result value format convention**: The `result` field uses two distinct formats depending on the skill's role:
-
-| Format | Used By | Examples | Rationale |
-|--------|---------|---------|-----------|
-| `UPPERCASE` | `check` (judgment skills) | `PASS`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED` | Verdicts that drive state transitions — emphasized as formal decisions |
-| `(lowercase)` | `plan`, `exec`, `verify`, `research`, `report`, `annotate` (action skills) | `(generated)`, `(done)`, `(pass)`, `(collected)`, `(processed)` | Outcomes wrapped in parentheses — informational status without state-changing authority |
-| `lowercase` | `merge` (git operations) | `success`, `conflict`, `rejected` | Git-style bare results — merge outcomes are self-descriptive |
-
-The auto daemon's signal validation whitelist (see `auto/SKILL.md`) accepts all three formats. New skills SHOULD follow this convention: judgment → UPPERCASE, action → (lowercase), git → lowercase.
-- **Atomic write**: `.auto-signal` MUST be written atomically — write to `.auto-signal.tmp` first, then `rename` to `.auto-signal`. POSIX `rename` is atomic, preventing the daemon from reading partially written JSON.
-
-**Worktree note**: In worktree mode, `.auto-signal` MUST be written to the **main worktree's** `$NB_WORKSPACES_ROOT/<project>/<notebook>/.working/` directory (not the task worktree copy) to survive worktree removal during merge cleanup.
+In v2, the `.auto-signal` file is abolished. The auto daemon monitors `.status.json` directly via filesystem watches. Sub-commands update `.status.json` on completion (status, phase, completed_steps), and the daemon reads these changes to determine loop progression. The auto loop uses in-memory counters for `retry_count`, `compaction_count`, `delegation_failures`, and `iteration`.
 
 ### Computation Rule
 
@@ -367,7 +343,7 @@ skills/<name>/
 
 Per-type seed methodology files are centralized in `skills/init/references/seed-types/` (one file per type, with `.summary.md` index). Each per-type file contains Phase Intelligence for all 4 lifecycle phases (plan/verify/check/exec), structured to mirror `.type-profile.md`.
 
-**Main SKILL.md** contains the workflow: prerequisites, execution steps, state transitions, git conventions, `.auto-signal` definitions, and notes. It should be self-sufficient for understanding the sub-command's behavior.
+**Main SKILL.md** contains the workflow: prerequisites, execution steps, state transitions, git conventions, and notes. It should be self-sufficient for understanding the sub-command's behavior.
 
 **references/** contains large reference tables and domain-specific details that are only needed in specific situations. The main SKILL.md references these files with `See references/<file>.md` directives — the agent reads them on demand when the context requires it.
 

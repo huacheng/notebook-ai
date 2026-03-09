@@ -16,7 +16,7 @@ Plugins serve two fundamentally different roles:
 | Category | Role | Output | Integration |
 |----------|------|--------|-------------|
 | **Capability** | Supplementary guidance — returns findings/action items | <=500 char structured summary | Main session incorporates as input |
-| **Executor** | Execution engine replacement — takes over the step/plan execution loop | Deliverable files + signal | Main session reads results, writes `.auto-signal` |
+| **Executor** | Execution engine replacement — takes over the step/plan execution loop | Deliverable files + status update | Main session reads results via `.status.json` |
 
 Capability slots provide advice; executor slots do the work. Both use the same three-level discovery algorithm and Task subagent isolation.
 
@@ -88,7 +88,7 @@ You have access to the [{plugin_name}] skill/tool.
 - Write .summary.md on completion with condensed context
 ```
 
-**Key difference from capability delegation**: No 500-char output limit. The executor operates on the actual working directory, makes real file changes, and commits. The main session reads `.status.json`, `.auto-signal`, and `.summary.md` after the executor subagent completes.
+**Key difference from capability delegation**: No 500-char output limit. The executor operates on the actual working directory, makes real file changes, and commits. The main session reads `.status.json` and `.summary.md` after the executor subagent completes.
 
 ### Executor vs Capability: When to Use Which
 
@@ -270,7 +270,7 @@ if (result.risk_level === 'high') {
 | 2 | Unicode hidden attacks | Zero-width chars, bidirectional control | medium |
 | 3 | ANSI terminal sequences | `\x1b[...` escape codes | medium |
 | 4 | Resource exhaustion | Output > per-slot Output Limit × 1.2 | low |
-| 5 | System format impersonation | `{"step":`, `.auto-signal`, `task-ai(` | high |
+| 5 | System format impersonation | `{"step":`, `task-ai(` | high |
 | 6 | Encoding obfuscation | `base64 -d`, hex sequences | high |
 | 7 | Two-stage loading | `curl \|`, `wget \|`, `eval(` | high |
 | 8 | Command injection | `--require=`, `--eval=`, `LD_PRELOAD` | high |

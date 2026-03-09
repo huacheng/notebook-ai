@@ -24,11 +24,11 @@ arguments:
 
 # /task-ai:auto — Conversational Task Lifecycle
 
-Dialog-driven four-phase flow: Target → Planning → Execution → Finalization. Claude reads state files to determine the current phase and acts accordingly. No "auto mode" to activate — notebook existence IS the context.
+Dialog-driven four-phase flow: Target → Planning → Execution → Acceptance. Claude reads state files to determine the current phase and acts accordingly. No "auto mode" to activate — notebook existence IS the context.
 
 ## Core Principle
 
-**No auto mode to activate.** Notebook existence IS the context. Claude reads `.status.json` + `.auto-signal` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
+**No auto mode to activate.** Notebook existence IS the context. Claude reads `.status.json` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
 
 ```
 Frontend UI: init (create notebook) → .status.json status=draft
@@ -72,8 +72,8 @@ Deliverables + .target.md + .plan.md → check(D1-D6 scoring) → overall ≥ th
 | `planning` / `re-planning` | `planning` | Generating/revising plan |
 | `review` / `executing` | `execution` | Executing plan steps |
 | `blocked` | `execution` (stalled) | Blocked, awaiting user intervention |
-| `evolving` | `finalization` | Merge done, distill + report |
-| `satisfied` | `finalization` | User satisfied, final report |
+| `evolving` | `acceptance` | Stage accepted, distill + report |
+| `satisfied` | `acceptance` | User satisfied, final report |
 | `cancelled` | — (terminal) | Loop stops immediately, no phase |
 
 ### Threshold & Retry Limits — Adaptive
@@ -87,14 +87,13 @@ Thresholds and retry limits are **adaptive**: read from `.type-profile.md` `## A
 | post-plan (Phase 2) | 0.70 | 3 replans | Stop, notify user: "Plan repeatedly failed review, manual intervention needed" |
 | mid-exec (Phase 3 mid) | 0.60 | 2 fixes | Stop current step, notify user |
 | post-exec (Phase 3 done) | 0.75 | 3 fix/replan | Stop, notify user |
-| pre-merge (Phase 4) | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0, resume from failing dimensions) |
 
 **Adaptive threshold examples** (from `.type-profile.md` Auto Adaptation):
 - Simple bugfix task → lower thresholds (post-plan 0.60, post-exec 0.65), fewer retries (post-plan 2)
 - Complex architecture redesign → higher thresholds (post-plan 0.75, post-exec 0.80), more retries (post-exec 4)
 - Data pipeline task → verify-heavy profile (mid-exec threshold 0.70, more mid-exec retries)
 
-`retry_count` persists in `.auto-signal`. Resets to 0 on phase transition. `delegation_failures` clears on phase transition (new phase = new context).
+`retry_count` is an in-memory counter. Resets to 0 on phase transition. `delegation_failures` clears on phase transition (new phase = new context).
 
 > **check runtime errors:** If check itself fails (file read error, state.py exception — not low score), it does NOT count toward retry_count. Stop immediately, await user intervention. Only normal execution with score below threshold triggers retry.
 
@@ -140,7 +139,28 @@ Phase 3: Execution (status=executing) — Full auto + user can intervene
   - Exceeds retry limit → stop, notify user
   - User can intervene: "what does this error mean?" → explain + fix, continue
 
-Phase 4: Finalization (status=evolving/satisfied) — Full auto
+Phase 4: Acceptance (status=executing→evolving) — Full auto
+  - Step 1: check(post-exec, D1-D6, threshold=0.75)
+    ├─ ACCEPT → Step 2 (convergence gate)
+    ├─ NEEDS_FIX → exec(fix) → re-check (max 3)
+    └─ Max exceeded → rollback → re-planning
+
+  - Step 2: Convergence gate (within check)
+    - check evaluates convergence score vs previous baseline
+    ├─ convergence > previous → ACCEPT
+    │   auto sets status → evolving → highlight → report → (stop)
+    │   Output: "Stage <N> completed. Define next stage target or /task-ai:target --satisfy"
+    └─ convergence ≤ previous → ROLLBACK
+        auto executes rollback:
+        1. highlight records failure experience
+        2. git reset --hard <previous stage commit>
+        3. trim stage.history
+        4. status → evolving
+        5. output failure reason + convergence delta
+
+  No merge. No pre-merge check.
+
+  Entry on evolving/satisfied:
   - evolving: highlight → report → (stop, wait for user to define next stage or --satisfy)
   - satisfied: report → (stop)
 ```
@@ -169,7 +189,6 @@ Phases 2-4 — full auto, user can intervene:
 | "What does this error mean?" | Explain + fix, continue |
 | "Run tests again" | Trigger verify |
 | "Continue" / Silence | Continue next step |
-| "Don't merge yet" | Pause merge, await further instructions |
 
 ### Explicit Override (Sub-command)
 
@@ -178,9 +197,69 @@ User can override via dialog (`/task-ai:check`) or frontend toolbar button — b
 Behavior:
 1. auto yields control (after current step completes, not mid-step)
 2. Sub-command executes full flow independently
-3. Sub-command writes `.auto-signal` / updates `.status.json`
+3. Sub-command updates `.status.json`
 4. auto reads latest state on next trigger (user message / daemon continuation)
 5. auto re-routes from new state
+
+## Pending Refinement Buffer
+
+User messages arriving during auto execution are semantically classified:
+
+| User says | Category | auto behavior |
+|-----------|----------|---------------|
+| "增加 OAuth 支持" | refinement | Write to buffer → confirm → continue |
+| "这个错误什么意思？" | question | Answer → continue |
+| "跳过步骤 3" | directive | Adjust → continue |
+| "继续" | continue | Continue |
+
+### Buffer File
+
+Path: `.working/.pending-refinements.md` (git tracked)
+
+```markdown
+- [2026-03-08 14:05] 增加 OAuth Google 登录支持
+- [2026-03-08 14:12] 登录失败限流从5次改为10次
+```
+
+Each write is committed: `git add .working/.pending-refinements.md && git commit -m "auto: buffer refinement"`.
+
+### Two-Level Processing
+
+**Level 1 — Inter-step quick check** (between exec steps):
+```
+if .pending-refinements.md exists and non-empty:
+    Scan each item → annotate impact scope (which R#)
+    if affects currently executing step:
+        mark needs_reassess = true (trigger mid-exec check after current step)
+    else:
+        continue (leave to checkpoint batch processing)
+```
+
+**Level 2 — Checkpoint batch processing** (at mid-exec / post-exec check):
+```
+if .pending-refinements.md exists and non-empty:
+    1. Call target --refine "..." for each item
+    2. Update .convergence-baseline.md (add/modify R#, adjust weights)
+    3. Impact assessment:
+       - Pure addition (new R# doesn't affect completed steps) → append to plan tail, continue
+       - Modify existing R# (weight/content change) → NEEDS_FIX or REPLAN
+    4. Clear buffer
+```
+
+### Impact Assessment Levels
+
+| Level | Judgment | Action |
+|-------|----------|--------|
+| None | New R# unrelated to current/completed steps | Append plan steps, continue |
+| Minor | Modified optional R# detail | Mark, handle at post-exec |
+| Moderate | Modified important R# | Trigger mid-exec check |
+| Major | Modified critical R# or Overall Objective | REPLAN |
+
+### Confirm/Withdraw
+
+User can withdraw a buffered refinement before it is processed:
+- "取消刚才的 OAuth 需求" → remove matching entry from buffer, confirm removal
+- Already processed (buffer cleared at checkpoint) → inform user it was already applied
 
 ## Architecture
 
@@ -198,17 +277,17 @@ Auto mode runs as a **single long-lived Claude session**. The daemon monitors ex
 │    ├→ execute check logic             │ loop     │
 │    ├→ execute exec logic              │ (shared  │
 │    ├→ execute check logic             │ context) │
-│    ├→ execute merge logic            ─┘          │
+│    ├→ execute rollback logic (if needed)─┘       │
 │    └→ execute report logic                      │
 │                                                 │
-│  writes .auto-signal ──→ (progress report)      │
-│  reads  .auto-stop   ──→ (stop request)         │
+│  writes .status.json ──→ (state update)          │
+│  reads  .auto-stop   ──→ (stop request)          │
 └─────────────────────────────────────────────────┘
          │                          ▲
          ▼                          │
 ┌─────────────────┐     ┌──────────┴──────────┐
-│  .auto-signal   │     │  Backend Daemon      │
-│  (progress)     │────▶│  - monitors progress │
+│  .status.json   │     │  Backend Daemon      │
+│  (state)        │────▶│  - monitors progress │
 │                 │     │  - enforces timeout   │
 │  .auto-stop     │◀────│  - writes stop file   │
 │  (stop request) │     │  - stall detection    │
@@ -238,7 +317,7 @@ SKILL.md `auto_delegatable` and `model_tier` are **default hints**. Actual deleg
 | **Current phase** | `.status.json` status | Different status → different delegation strategy for same sub-command | status=draft: research NOT delegated (O1/O2/O3 need dialog); status=planning: research CAN delegate |
 | **Context dependency** | (1) Unpersisted decisions in dialog (2) `.summary.md` freshness (3) `git diff --stat` from prior steps | High dependency → don't delegate | exec just refactored 5 files + dialog tradeoffs → verify inline; exec changed 1 file + no discussion → verify can delegate |
 | **Task complexity** | (1) `.plan.md` step description length + file count (2) Test type (unit/integration/e2e) (3) `.target.md` complexity markers | Simple → light tier; Complex → medium/heavy | verify runs lint → haiku; verify runs e2e → sonnet |
-| **Execution history** | `.auto-signal` `delegation_failures` array | Same sub-command failed as subagent before → inline from now on | `"delegation_failures": ["verify@iter3"]` → verify never delegates again |
+| **Execution history** | In-memory `delegation_failures` array | Same sub-command failed as subagent before → inline from now on | `delegation_failures: ["verify@iter3"]` → verify never delegates again |
 
 #### Sub-command Default Hints & Dynamic Overrides
 
@@ -259,7 +338,6 @@ SKILL.md `auto_delegatable` and `model_tier` are **default hints**. Actual deleg
 | Sub-command | Default delegatable | Default tier | Dynamic override |
 |-------------|-------------------|-------------|-----------------|
 | verify | true | medium | exec has complex context dependency → inline; simple lint → tier down to light |
-| merge | true | medium | Complex conflict history → inline |
 | highlight | true | medium | Usually can delegate |
 | report | true | medium | Usually can delegate |
 | read | true | medium | Usually can delegate |
@@ -307,10 +385,10 @@ The exec sub-command handles executor discovery at step 7 (before per-step loop)
 ### Context Savings
 
 ```
-Full inline:    target(dialog) + plan + check + exec + verify*N + check*N + merge + highlight + report
+Full inline:    target(dialog) + plan + check + exec + verify*N + check*N + highlight + report
                 → main session context grows continuously, may trigger multiple compactions
 
-Delegation:     target(dialog) + plan + check + exec + [verify→subagent] + check + [merge→subagent] + [highlight→subagent] + [report→subagent]
+Delegation:     target(dialog) + plan + check + exec + [verify→subagent] + check + [highlight→subagent] + [report→subagent]
                 → main session keeps only decision path, delegated output flows back as summaries
 ```
 
@@ -318,16 +396,14 @@ Delegation:     target(dialog) + plan + check + exec + [verify→subagent] + che
 
 User returns and says "continue":
 
-1. Read `.auto-signal` → iteration, step, next, retry_count, delegation_failures
-   - If `.auto-signal` absent → entry-point routing from `.status.json` status
-2. Read `.status.json` → status, stage
-3. Read `.summary.md` → context summary
+1. Read `.status.json` → status, stage
+2. Read `.summary.md` → context summary
    - If `.summary.md` absent → read `.target.md` + `.plan.md` to rebuild minimal context
 4. Resume from interruption point
 
 ### Cross-Stage Continuation
 
-When status is `evolving`, auto stops and waits for user input. If the user provides next-stage direction in the same session (e.g., "now build the OAuth layer"), auto can route from `evolving` back to `target` to define the next stage, then continue the loop through planning → execution → merge for the new stage.
+When status is `evolving`, auto stops and waits for user input. If the user provides next-stage direction in the same session (e.g., "now build the OAuth layer"), auto can route from `evolving` back to `target` to define the next stage, then continue the loop through planning → execution → acceptance for the new stage.
 
 ### "Silent Continue" Mechanism
 
@@ -335,93 +411,7 @@ Claude Code is request-response. Phases 2-4 "auto-advance without intervention" 
 - **Within same turn**: Claude finishes one sub-command, continues to next without waiting (continuous execution within single request)
 - **Across turns**: User must say "continue" or any message to trigger next round
 - Backend daemon can trigger: detects step complete with no follow-up → sends continuation prompt
-- **Race protection**: daemon checks `.auto-signal` `timestamp` hasn't changed (CAS) before sending continuation. If changed (user already triggered), abort to prevent double-trigger
-
-## Signal File (`.auto-signal`)
-
-After each sub-command step completes, Claude writes a progress signal. This is a **monitoring report** for the daemon, NOT a dispatch trigger:
-
-```json
-{
-  "step": "check",
-  "result": "PASS",
-  "next": "exec",
-  "checkpoint": "post-plan",
-  "iteration": 3,
-  "compaction_count": 0,
-  "vfp_cycles_completed": 2,
-  "phase": "planning",
-  "phase_progress": 0.75,
-  "stage": { "current": 1 },
-  "check_score": {
-    "overall": 0.85,
-    "d1_correctness": 0.90,
-    "d2_security": 0.80,
-    "d3_reliability": 0.85,
-    "d4_performance": 0.88,
-    "d5_architecture": 0.82,
-    "d6_maintainability": 0.85
-  },
-  "retry_count": 1,
-  "delegation_failures": ["verify@iter3"],
-  "timestamp": "2024-01-01T00:00:00Z"
-}
-```
-
-Fields:
-- `step`: sub-command that just completed
-- `result`: outcome of the step
-- `next`: what the agent will execute next (or `"(stop)"`)
-- `checkpoint`: context hint (e.g., `"post-plan"`, `"mid-exec"`, `"post-exec"`, `"pre-merge"`). Empty when not applicable
-- `iteration`: current iteration count. **Auto-mode only** — absent in manual execution
-- `compaction_count`: context compaction invocations within current auto session. **Auto-mode only**. Reset to `0` on normal iteration advance. On compaction recovery, incremented by 1 (NOT reset). If `>= 3` → stop with warning (see Compaction frequency limit)
-- `vfp_cycles_completed`: VH→HS cycles completed during Phase 3 execution. **Auto-mode only**, software types only
-- `phase`: derived from `.status.json` status — `target` (draft), `planning` (planning/re-planning), `execution` (review/executing/blocked), `finalization` (evolving/satisfied)
-- `phase_progress`: float 0-1, progress within current phase
-- `stage`: `{ current }` current stage number, synced from `.status.json` (no total — stages emerge progressively)
-- `check_score`: last check D1-D6 scores + overall, or null if no check has run. Written by check, not auto
-- `retry_count`: retries at current checkpoint, reset to 0 on phase transition
-- `delegation_failures`: subagent failure records (`"cmd@iterN"`), cleared on phase transition
-- `timestamp`: ISO 8601
-
-The daemon reads this via `fs.watch` to:
-1. Update progress display (iteration count, current step, elapsed time)
-2. Check iteration limit (`iteration >= maxIterations` → write `.auto-stop`)
-3. Check timeout (`elapsed >= timeoutMinutes` → write `.auto-stop`)
-4. Update `last_signal_at` in SQLite for stall detection baseline
-
-The daemon does **NOT** construct or send commands based on the signal.
-
-### Signal File Ownership
-
-Each sub-command's SKILL.md includes a "write `.auto-signal`" step. In auto mode, the auto loop **subsumes** that step — Claude writes the signal once at step 2.5 (with `iteration` field). The sub-command's own signal-write instruction is skipped.
-
-In manual (non-auto) execution, sub-commands write `.auto-signal` themselves (without `iteration` field).
-
-**How to detect auto mode** (for inline execution): Skip any step that says "Write `.auto-signal`". The auto loop's step 2.5 handles it. No env var or flag needed — auto mode always uses inline execution.
-
-### Signal Validation
-
-The daemon validates `.auto-signal` fields for monitoring integrity:
-
-| Field | Validation | Allowed Values |
-|-------|-----------|----------------|
-| `step` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize` |
-| `result` | Whitelist | `PASS`, `NEEDS_REVISION`, `ACCEPT`, `NEEDS_FIX`, `REPLAN`, `BLOCKED`, `CONTINUE`, `(generated)`, `(done)`, `(mid-exec)`, `(step-N)` (where N is integer), `(blocked)`, `(collected)`, `(sufficient)`, `(o1-collected)`, `(o2-collected)`, `(o3-collected)`, `(objective-complete)`, `(pass)`, `(fail)`, `(partial)`, `(processed)`, `(distilled)`, `(skipped-idempotent)`, `failed`, `evolving`, `satisfied`, `conflict`, `rejected` |
-| `next` | Whitelist | `plan`, `check`, `exec`, `merge`, `highlight`, `report`, `research`, `verify`, `annotate`, `target`, `summarize`, `(stop)`, `(none)` |
-| `checkpoint` | Whitelist | `""`, `post-plan`, `post-research`, `post-o1`, `post-o2`, `post-o3`, `mid-exec`, `post-exec`, `pre-merge`, `post-annotate`, `quick`, `full`, `step-N`, `dependency-blocked`, `no-accept` |
-| `iteration` | Integer | ≥ 0 |
-| `compaction_count` | Integer | ≥ 0 |
-| `vfp_cycles_completed` | Integer (optional) | ≥ 0 (present only for software types in auto mode) |
-| `phase` | Whitelist | `target`, `planning`, `execution`, `finalization` |
-| `phase_progress` | Float | 0.0 - 1.0 |
-| `stage` | Object | `{ "current": int }` where current ≥ 1 |
-| `check_score` | Object or null | `{ "overall": float, "d1_correctness": float, ..., "d6_maintainability": float }` all 0.0-1.0 |
-| `retry_count` | Integer | ≥ 0 |
-| `delegation_failures` | Array | String array, each matching pattern `cmd@iterN` |
-| `timestamp` | Format check | ISO 8601 |
-
-Invalid signals are logged but do not affect Claude's internal loop (daemon is observer, not dispatcher).
+- **Race protection**: daemon checks `.status.json` `updated_at` hasn't changed (CAS) before sending continuation. If changed (user already triggered), abort to prevent double-trigger
 
 ### Stop File (`.auto-stop`)
 
@@ -461,19 +451,25 @@ Phase 3: Execution (auto-review)
                                          │
                                     NEEDS_FIX / REPLAN (max 3)
 
-Phase 4: Finalization (auto)
-  check(pre-merge, threshold=0.80) ─── PASS ──→ merge ──→ highlight ──→ report → (stop)
-            │
-            FAIL ──→ [Phase 3] (retry_count reset, resume from failing dimensions)
+Phase 4: Acceptance (auto)
+  check(post-exec, D1-D6, threshold=0.75) ─── ACCEPT ──→ convergence gate
+            │                                                │
+            NEEDS_FIX ──→ exec(fix) → re-check (max 3)     ├─ convergence > previous ──→ ACCEPT
+            │                                                │   status → evolving → highlight → report → (stop)
+            Max exceeded ──→ rollback → re-planning         │   Output: "Stage <N> completed.
+                                                             │   Define next stage target or /task-ai:target --satisfy"
+                                                             │
+                                                             └─ convergence ≤ previous ──→ ROLLBACK
+                                                                 1. highlight records failure experience
+                                                                 2. git reset --hard <previous stage commit>
+                                                                 3. trim stage.history
+                                                                 4. status → evolving
+                                                                 5. output failure reason + convergence delta → (stop)
 
-  merge ─── evolving (always) ──→ highlight ──→ report → (stop)
-    │                              Output: "Stage <N> completed.
-    │                              Define next stage target or /task-ai:target --satisfy"
-    │
-    └── conflict unresolvable (after 3 retries) → (stop)
+  Entry on evolving: highlight → report → (stop)
+  Entry on satisfied: report → (stop)
 
 Terminal: BLOCKED at any check → (stop, status → blocked)
-Terminal: merge conflict → (stop, status stays executing — retryable)
 ```
 
 ## Execution Steps
@@ -489,15 +485,13 @@ The auto skill runs this loop within a single Claude session:
       - Evaluate four delegation factors (phase, context dependency, complexity, execution history)
       - **If delegatable**: Invoke via Task subagent with `model = tier_to_model(model_tier)`. Subagent receives SKILL.md + `.summary.md` + `.status.json` + input files. On completion, read output files. On failure/timeout → fallback to inline
       - **If not delegatable**: Execute inline (Read SKILL.md steps, execute in main session)
-      — In both paths, SKIP the sub-command's own .auto-signal write step (auto loop handles it at step 2.5)
    2.4. Evaluate result → determine next step (result-based routing)
-   2.5. Write .auto-signal (progress report for daemon, WITH iteration, phase, retry_count, delegation_failures fields)
-   2.6. Increment iteration counter
-   2.7. If next == "(stop)" → break loop
-   2.8. Set current step = next step → continue loop
+   2.5. Increment iteration counter
+   2.6. If next == "(stop)" → break loop
+   2.7. Set current step = next step → continue loop
 3. **Post-loop learning**: Write execution metrics back to `.type-profile.md` `## Auto Adaptation` section — actual retries used per checkpoint, total iterations, mid-exec checks triggered, compaction count, phase durations. This enables future tasks of the same type to use refined thresholds. If `.type-profile.md` lacks `## Auto Adaptation`, create the section with observed metrics. Sync updated profile to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<type>.md` (same write protocol as research — acquire `.type-profiles/.lock`)
 4. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
-5. Cleanup: delete .auto-signal and .auto-stop if exist, report final status
+5. Cleanup: delete .auto-stop if exists, report final status
 
 ## Detailed Loop Logic
 
@@ -520,9 +514,9 @@ The auto skill runs this loop within a single Claude session:
 | step | result | next | checkpoint | Rationale |
 |------|--------|------|------------|-----------|
 | check | PASS | exec | post-plan | Plan approved, proceed to execution |
-| check | PASS | merge | pre-merge | Pre-merge check passed, proceed to merge |
 | check | NEEDS_REVISION | plan | — | Plan needs revision |
-| check | ACCEPT | merge | — | Task verified, merge to main |
+| check | ACCEPT | highlight | post-exec | D1-D6 + convergence gate passed, finalize |
+| check | ROLLBACK | (rollback) | post-exec | Convergence not improving, rollback |
 | check | NEEDS_FIX | exec | mid-exec / post-exec | Minor issues, re-execute to fix |
 | check | REPLAN | plan | — | Fundamental issues, revise plan |
 | check | BLOCKED | (stop) | — | Cannot continue |
@@ -532,9 +526,6 @@ The auto skill runs this loop within a single Claude session:
 | exec | (mid-exec) | verify | mid-exec | Significant issue, verify before checkpoint |
 | exec | (step-N) | verify | mid-exec | Single step completed (manual `--step N` only) |
 | exec | (blocked) | (stop) | — | Cannot continue |
-| merge | evolving | highlight | — | Merge complete, distill experience |
-| merge | conflict | (stop) | — | Merge conflict unresolvable |
-| merge | rejected | (stop) | dependency-blocked / no-accept | Prerequisite not met |
 | highlight | (distilled) | report | — | Distillation complete |
 | highlight | (skipped-idempotent) | report | — | No new content |
 | highlight | failed | report | — | Distillation failed (non-blocking) |
@@ -547,8 +538,22 @@ The auto skill runs this loop within a single Claude session:
 | verify | (pass) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (fail) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (partial) | check | (from trigger context) | Verification done, check renders verdict |
-| annotate | (processed) | `<by-layer>` | post-annotate | Layer-based: Requirement→plan/check, Planning→check, Eval-analysis→check, Eval-test→verify, Methodology→verify, Information/Comment-only→(none). See annotate SKILL.md §.auto-signal Routing |
+| annotate | (processed) | `<by-layer>` | post-annotate | Layer-based: Requirement→plan/check, Planning→check, Eval-analysis→check, Eval-test→verify, Methodology→verify, Information/Comment-only→(none) |
 | report | (generated) | (stop) | — | Loop complete |
+
+### ROLLBACK Routing
+
+When check returns ROLLBACK (convergence not improving after post-exec acceptance):
+
+1. **Read rollback info**: auto reads `.analysis/<date>-convergence-rollback.md` written by check, containing failure reason and convergence delta
+2. **Record failure experience**: Execute highlight to distill failure into `.library/.memory/.experiences/<type>/<notebook>-stage-N-failed.md`
+3. **Git rollback**: Execute `git reset --hard <previous stage commit>` — commit hash from `stage.history` in `.status.json`
+4. **Trim stage.history**: Remove current stage entry from the history array
+5. **Update status**: Set status → `evolving` via state.py
+6. **Output**: Report failure reason, convergence change (e.g., `0.65 → 0.58`), suggest different approach direction
+7. **Stop**: Wait for user to define next stage target
+
+> **Safety**: git reset --hard only affects the task branch, not master. The previous stage commit is always available in stage.history.
 
 ### Context Advantage
 
@@ -562,7 +567,7 @@ The `.summary.md` file is still written by each sub-command as a **compaction sa
 
 ## Stall Detection & Recovery
 
-Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle heartbeats = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.auto-signal` update for 10 minutes). Recovery limits: 3 per step, 10 total.
+Claude may stall mid-execution. The daemon detects stalls at two levels: (1) **time-based** — heartbeat polling (60s interval, 3 consecutive idle heartbeats = suspected stall) with pattern matching recovery; (2) **content-based** — output deduplication (3 identical consecutive messages = reasoning loop) and single-step timeout (no `.status.json` update for 10 minutes). Recovery limits: 3 per step, 10 total.
 
 > **See `references/stall-detection.md`** for the full heartbeat polling logic, stall determination rules, pattern matching recovery table, and recovery limits.
 
@@ -576,7 +581,7 @@ Compaction threshold is adaptive based on task complexity from `.type-profile.md
 - Fallback default: 82%
 
 1. **First compaction at ≥ compaction_threshold**: Send the Structured Compaction Prompt (template below)
-2. **No subsequent active compaction**: After first, rely on `.summary.md` + `.auto-signal` + `.status.json` for recovery
+2. **No subsequent active compaction**: After first, rely on `.summary.md` + `.status.json` for recovery
 3. **Daemon detection**: If Claude's system compaction is detected, daemon sends recovery signal
 
 #### Structured Compaction Prompt Template
@@ -601,16 +606,15 @@ Summarize and compress our conversation context for continuation. Task identity 
 ## Error Context
 {Active NEEDS_FIX/NEEDS_REVISION feedback, or "none". Include the specific fix guidance if present}
 
-Discard all other conversation detail. Task identity, iteration count, and file paths are recovered from .auto-signal / .status.json / .summary.md during the recovery protocol.
+Discard all other conversation detail. Task identity, iteration count, and file paths are recovered from .status.json / .summary.md during the recovery protocol.
 ```
 
-**Compaction frequency limit**: If 3+ compactions within same iteration → stop with warning: "context budget insufficient for this task — consider breaking into smaller sub-tasks". Count tracked in `.auto-signal` `compaction_count` field.
+**Compaction frequency limit**: If 3+ compactions within same iteration → stop with warning: "context budget insufficient for this task — consider breaking into smaller sub-tasks". Count tracked in-memory.
 
 **Compaction recovery**: If context compaction occurs mid-loop:
-1. Read `.auto-signal` — `iteration`, `compaction_count`, `step`, `next` for position recovery. If missing: fall back to step 2, start iteration/compaction from 0
-2. Read `.status.json` — status confirms lifecycle phase
-3. Read `.summary.md` — condensed task context
-4. Resume loop from `next` step at `iteration + 1`. Increment `compaction_count` by 1
+1. Read `.status.json` — status confirms lifecycle phase, recover position
+2. Read `.summary.md` — condensed task context
+3. Resume loop from current phase entry point. Increment in-memory `compaction_count` by 1
 
 **Milestone summarize**: auto calls summarize at key milestones (phase transitions, check completions) to keep `.summary.md` fresh for compaction recovery.
 
@@ -621,7 +625,7 @@ Discard all other conversation detail. Task identity, iteration count, and file 
 When `type` contains `software`, the auto loop tracks VH→HS cycle progress during Phase 3 (Execution):
 
 1. **Initialization**: After plan generates VH stubs, read vh-baseline.md. Set `vfp_cycles_completed = 0`
-2. **Per-step tracking**: After each exec step, check for VH→HS transition. If yes, increment `vfp_cycles_completed` and include in `.auto-signal`. Append to cumulative-green.jsonl
+2. **Per-step tracking**: After each exec step, check for VH→HS transition. If yes, increment in-memory `vfp_cycles_completed`. Append to cumulative-green.jsonl
 3. **Anomaly detection**: If 3+ steps without VH→HS transition, trigger `check --checkpoint mid-exec` with note: "VFP anomaly: N steps without VH→HS transition — verify test discipline"
 4. **Progress display**: Daemon can display VFP progress as `vfp_cycles_completed / vh_stubs_total`
 
@@ -644,20 +648,20 @@ When `type` contains `software`, the auto loop tracks VH→HS cycle progress dur
 ## Cleanup (agent-side)
 
 At loop exit:
-1. Delete `.auto-signal` file if exists
-2. Delete `.auto-stop` file if exists
+1. Delete `.auto-stop` file if exists
 
 Daemon-side cleanup details in `references/backend-api.md`.
 
 ## Git
 
-Auto mode inherits git behavior from each sub-command. No additional git commits by auto itself — each plan, check, exec, merge, report handles its own commits on the task branch.
+Auto mode inherits git behavior from each sub-command. No additional git commits by auto itself — each plan, check, exec, highlight, report handles its own commits on the task branch. Rollback uses `git reset --hard` to revert to the previous stage commit.
 
 ## Notes
 
 - Auto mode starts by entering `/task-ai:auto` in the prompt input window (notebook is auto-detected from CWD or git branch context)
 - Daemon's only active intervention is writing `.auto-stop`; all other activity is passive monitoring
-- `.auto-signal` and `.auto-stop` are transient files — should be in `.gitignore`
+- `.auto-stop` is a transient file — should be in `.gitignore`
 - **Known trade-off**: First entry on `executing` status always runs verify → check (post-exec). If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration
 - **Plugin delegation**: External plugin delegation works naturally. Skills invoke plugins via Task tool, creating isolated subagents
 - **Self-service bias**: check evaluates its own LLM output — structural bias toward high scores. v1 mitigates via three-file anchored review. Future: external verification signals (coverage, lint, user feedback) as score calibration
+- **No merge in Phase 4**: v2 removes merge from the auto loop. Phase 4 uses D1-D6 acceptance + convergence gate instead. Rollback replaces merge conflict handling

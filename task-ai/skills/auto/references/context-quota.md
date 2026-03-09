@@ -18,7 +18,7 @@ All sub-commands MUST prepend this header when writing `.summary.md`:
 ```markdown
 <!-- TASK-AI RECOVERY CONTEXT -->
 <!-- If you see this after context compaction, execute recovery protocol: -->
-<!-- 1. Read .auto-signal for loop position -->
+<!-- 1. Read .status.json for loop position -->
 <!-- 2. Read .status.json for status -->
 <!-- 3. Resume from `next` step -->
 
@@ -36,7 +36,7 @@ This ensures the agent can self-recover after any compaction event.
 ### Post-compaction Recovery
 
 After compaction (either active or system), the agent re-reads:
-- `.auto-signal` — iteration + step position
+- `.status.json` — iteration + step position
 - `.status.json` — status
 - `.summary.md` — task context (Recovery Header provides quick orientation)
 
@@ -70,7 +70,7 @@ When compaction is detected, the daemon sends:
 ```json
 {
   "type": "human",
-  "message": "Context compacted by system. Execute recovery protocol:\n\n1. Read {workingDir}/.auto-signal — get iteration, step, next\n2. Read {workingDir}/.status.json — confirm status\n3. Read {workingDir}/.summary.md — restore task context\n4. Resume auto loop from `next` step\n\nDo NOT ask for confirmation. Execute recovery and continue."
+  "message": "Context compacted by system. Execute recovery protocol:\n\n1. Read {workingDir}/.status.json — get iteration, step, next\n2. Read {workingDir}/.status.json — confirm status\n3. Read {workingDir}/.summary.md — restore task context\n4. Resume auto loop from `next` step\n\nDo NOT ask for confirmation. Execute recovery and continue."
 }
 ```
 

@@ -208,17 +208,7 @@ if [[ "$CALLER" == "audit" ]]; then
         echo "[research:audit] Extracted $NEGATIVE_COUNT negative samples (skipped $SKIPPED_COUNT)"
     fi
 
-    # D1: audit mode does not participate in task automation loop
-    # .auto-signal is only written when WORK_DIR is set (notebook context)
     echo "[research:audit] Intelligence collection complete"
-    if [[ -n "$WORK_DIR" ]] && [[ -d "$WORK_DIR" ]]; then
-        cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
-{ "step": "research", "result": "(intel-collected)", "next": "(stop)", "timestamp": "$(date -Iseconds)" }
-SIGNAL_EOF
-    else
-        echo "[research:audit] No notebook context - skipping .auto-signal"
-    fi
-
     exit 0
 fi
 
@@ -348,11 +338,6 @@ if [[ "$CALLER" == "target" && "$PHASE" == "requirements" ]]; then
     printf '\n### Proposed Requirements · %s\n\n#### [PROPOSED] Error Handling Strategy\n- TODO: Agent fills in requirements\n\n#### [PROPOSED] Performance Constraints\n- TODO: Agent fills in requirements\n\n#### [PROPOSED] Security Requirements\n- TODO: Agent fills in requirements\n' "$DATE" >> "$TARGET_MD"
     echo "Updated .target.md with proposed requirements."
 
-    # D1: Write .auto-signal per SKILL.md specification
-    cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
-{ "step": "research", "result": "(collected)", "next": "plan", "checkpoint": "post-research", "timestamp": "$(date -Iseconds)" }
-SIGNAL_EOF
-
     post_write_maintain
 
 elif [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
@@ -375,10 +360,6 @@ elif [[ "$CALLER" == "target" && "$PHASE" == "objective" ]]; then
         exit 0
     elif [[ "$STAGE" == "COMPLETE" ]]; then
         echo "All objective stages complete. Run with --phase requirements to continue."
-        # D1: Write .auto-signal for objective-complete per SKILL.md
-        cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
-{ "step": "research", "result": "(objective-complete)", "next": "(stop)", "timestamp": "$(date -Iseconds)" }
-SIGNAL_EOF
         exit 0
     fi
 
@@ -390,12 +371,6 @@ SIGNAL_EOF
     # D1/D2: Use printf instead of echo -e to avoid interpreting escape sequences in STAGE
     printf '\n### %s: Insights · %s\n\n#### [PROPOSED] Refinement\n- Data for %s...\n' "$STAGE" "$DATE" "$STAGE" >> "$TARGET_MD"
     echo "Updated .target.md with $STAGE insights."
-
-    # D1: Write .auto-signal per SKILL.md specification
-    STAGE_LOWER=$(echo "$STAGE" | tr '[:upper:]' '[:lower:]')
-    cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
-{ "step": "research", "result": "(${STAGE_LOWER}-collected)", "next": "(stop)", "checkpoint": "post-${STAGE_LOWER}", "timestamp": "$(date -Iseconds)" }
-SIGNAL_EOF
 
     # Trigger quick maintenance (research may have written to library)
     post_write_maintain
@@ -418,25 +393,4 @@ else
     # Trigger maintenance (agent may have written to library during research)
     post_write_maintain
 
-    # D1: Write .auto-signal per SKILL.md — route back to calling phase
-    NEXT_PHASE="${CALLER:-plan}"
-    # Normalize: empty or unknown callers default to plan
-    case "$NEXT_PHASE" in
-        plan|verify|check|exec|library) ;; # valid direct-route callers
-        test)
-            # D1: --caller test routes based on current task status per SKILL.md Test-S2a/S2b
-            TASK_STATUS=""
-            if [[ -f "$WORK_DIR/.status.json" ]]; then
-                TASK_STATUS=$(python3 "$TASK_AI_ROOT/core/state.py" get "$WORK_DIR/.status.json" status 2>/dev/null || echo "")
-            fi
-            case "$TASK_STATUS" in
-                executing|review) NEXT_PHASE="verify" ;;
-                *)                NEXT_PHASE="plan" ;;   # planning/draft/unknown → plan
-            esac
-            ;;
-        *) NEXT_PHASE="plan" ;;
-    esac
-    cat > "$WORK_DIR/.auto-signal" <<SIGNAL_EOF
-{ "step": "research", "result": "(collected)", "next": "$NEXT_PHASE", "checkpoint": "post-research", "timestamp": "$(date -Iseconds)" }
-SIGNAL_EOF
 fi

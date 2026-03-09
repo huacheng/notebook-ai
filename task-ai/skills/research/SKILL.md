@@ -177,11 +177,11 @@ Callable independently for preparatory research before any phase, or to suppleme
     - Compare against existing references from step 7
     - Produce a list of **uncovered topics** that need research
     - If `--scope gap` and no uncovered topics → log `"references sufficient, skipping collection"` → skip to step 18
-    - **Batch limit**: research at most **10 topics** per invocation. If more than 10 uncovered topics are identified, prioritize by relevance to the calling phase's immediate needs, collect the top 10, and note remaining topics in `.auto-signal` result (e.g., `"(collected, 3 deferred)"`). Subsequent `--scope gap` invocations will pick up deferred topics
+    - **Batch limit**: research at most **10 topics** per invocation. If more than 10 uncovered topics are identified, prioritize by relevance to the calling phase's immediate needs, collect the top 10, and note remaining topics in the report output (e.g., `"(collected, 3 deferred)"`). Subsequent `--scope gap` invocations will pick up deferred topics
 14. **Acquire** `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock` (see Concurrency Protection in `commands/task-ai.md`)
 15. **Active research** — for each uncovered topic:
     - Use shell commands to gather domain knowledge: `curl --max-time 30` official docs/APIs, `npm info` / `pip show` for package details, web search for best practices, GitHub issues for known pitfalls, `man` pages for CLI tools, read project `node_modules` or local source for API details. Always set request timeout (`--max-time 30` for curl, equivalent for other tools) to prevent hangs on slow/malicious servers
-    - **Failure degradation**: If 3 consecutive topics fail to fetch (timeout, connection refused, empty response), skip remaining topics and proceed with collected results. Log skipped topics in `.auto-signal` result (e.g., `"(collected, 2 skipped-unreachable)"`)
+    - **Failure degradation**: If 3 consecutive topics fail to fetch (timeout, connection refused, empty response), skip remaining topics and proceed with collected results. Log skipped topics in the report output (e.g., `"(collected, 2 skipped-unreachable)"`)
     - **Phase-directed focus**: collection content must align with the calling phase's needs from step 12 (e.g., verify-phase calls should collect testing tools/frameworks/thresholds, not architecture patterns)
     - For hybrid types: collect from **both** primary and secondary domain sources
     - Write findings to `$NB_WORKSPACES_LIBRARY/.memory/.references/<topic>.md` (kebab-case filename, e.g., `express-middleware.md`, `ffmpeg-filters.md`)
@@ -204,8 +204,7 @@ Callable independently for preparatory research before any phase, or to suppleme
 18. **Release** `$NB_WORKSPACES_LIBRARY/.memory/.references/.lock`
 19. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture technology selection and feasibility reasoning from research process. Inline call failure MUST NOT block research's main flow
 20. **Git commit**: `task-ai(<notebook>):research collect references` (skip if no files written; include `.type-profile.md` and `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/` if updated)
-21. **Write** `.auto-signal`: `{ "step": "research", "result": "(collected)" or "(sufficient)", "next": "<caller>", "checkpoint": "post-research", "timestamp": "..." }` — `next` field routes back to the calling phase (default: `plan`; if `--caller verify` → `verify`; if `--caller check` → `check`; if `--caller exec` → `exec`; if `--caller library` → `library`)
-22. **Report** research summary. Then output next step prompt based on caller:
+21. **Report** research summary. Then output next step prompt based on caller:
     - `--caller target` (O1/O2/O3) → "Research stage complete. Please review the insights above and confirm or revise before continuing."
     - `--caller target` (objective-complete) → "All research stages confirmed. Next: `/task-ai:plan` to generate the implementation plan."
     - `--caller plan` or default → "References collected. Next: `/task-ai:plan` to generate/revise the plan."
@@ -274,7 +273,6 @@ Output appended to `.target.md`:
 <!-- Initial clarification suggestions for current Objective based on background research -->
 ```
 
-`.auto-signal`: `result: "(o1-collected)"`, `next: "(stop)"`, `checkpoint: "post-o1"`
 Git commit: `task-ai(<notebook>):research deepen target background`
 Output message: "O1 background research complete. Research stage complete — please review the insights above and confirm or revise before continuing."
 
@@ -303,7 +301,6 @@ Output appended to `.target.md` (within `## Research Insights`):
 <!-- Comprehensive feasibility assessment, recommended technical route -->
 ```
 
-`.auto-signal`: `result: "(o2-collected)"`, `next: "(stop)"`, `checkpoint: "post-o2"`
 Git commit: `task-ai(<notebook>):research deepen target feasibility`
 Output message: "O2 feasibility analysis complete. Research stage complete — please review the insights above and confirm or revise before continuing."
 
@@ -326,12 +323,10 @@ Output appended to `.target.md` (within `## Research Insights`):
 <!-- Acceptance criteria checklist -->
 ```
 
-`.auto-signal`: `result: "(o3-collected)"`, `next: "(stop)"`, `checkpoint: "post-o3"`
 Git commit: `task-ai(<notebook>):research deepen target objective`
 Output message: "O3 refined objective complete. Research stage complete — please review the insights above and confirm or revise before continuing."
 
 **Objective Complete**: When T0 detects all stages done (no `[PROPOSED]` residuals):
-`.auto-signal`: `result: "(objective-complete)"`, `next: "(stop)"`
 No git commit (nothing written). Output message: "Objective Complete — All research stages confirmed. Next: `/task-ai:research --caller target --phase requirements` to propose requirements, or `/task-ai:plan` to generate the implementation plan."
 
 ### --phase requirements: Requirements Deepening
@@ -399,8 +394,6 @@ Write to `.test/<YYYY-MM-DD>-research-methodology.md`:
 <!-- Domain-unique testing challenges -->
 ```
 
-→ `.auto-signal` next: `plan`
-
 **Test-S2b. If status = `executing` or `review` → Tools collection**
 
 Collect specific testing tools and benchmarks for verify phase:
@@ -425,8 +418,6 @@ Write to `.test/<YYYY-MM-DD>-research-tools.md`:
 ## CI Integration
 <!-- How to run these tests in CI pipeline -->
 ```
-
-→ `.auto-signal` next: `verify`
 
 **Test-S3. Write shared reference**
 
@@ -474,33 +465,6 @@ Research writes to shared directories (`$NB_WORKSPACES_LIBRARY/.memory/.referenc
 | Target O2 (feasibility) | `task-ai(<notebook>):research deepen target feasibility` |
 | Target O3 (objective) | `task-ai(<notebook>):research deepen target objective` |
 | Target requirements | `task-ai(<notebook>):research deepen target requirements` |
-
-## .auto-signal
-
-| caller | phase / status | result | next | checkpoint |
-|--------|---------------|--------|------|------------|
-| `target` | `objective` | `(o1-collected)` | `(stop)` | `post-o1` |
-| `target` | `objective` | `(o2-collected)` | `(stop)` | `post-o2` |
-| `target` | `objective` | `(o3-collected)` | `(stop)` | `post-o3` |
-| `target` | `objective` | `(objective-complete)` | `(stop)` | — |
-| `target` | `requirements` | `(collected)` | `plan` | `post-research` |
-| `plan` | — | `(collected)` | `plan` | `post-research` |
-| `plan` | — | `(sufficient)` | `plan` | `post-research` |
-| `test` | status=`planning`/`draft` | `(collected)` | `plan` | `post-research` |
-| `test` | status=`planning`/`draft` | `(sufficient)` | `plan` | `post-research` |
-| `test` | status=`executing`/`review` | `(collected)` | `verify` | `post-research` |
-| `test` | status=`executing`/`review` | `(sufficient)` | `verify` | `post-research` |
-| `verify` | — | `(collected)` | `verify` | `post-research` |
-| `verify` | — | `(sufficient)` | `verify` | `post-research` |
-| `check` | — | `(collected)` | `check` | `post-research` |
-| `check` | — | `(sufficient)` | `check` | `post-research` |
-| `exec` | — | `(collected)` | `exec` | `post-research` |
-| `exec` | — | `(sufficient)` | `exec` | `post-research` |
-| `library` | — | `(collected)` | `library` | `post-research` |
-| `library` | — | `(sufficient)` | `library` | `post-research` |
-| `audit` | — | `(intel-collected)` | `(stop)` | — |
-
-**`next: "(stop)"` for `--caller target --phase objective`**: Each O-stage stops after writing its Insights. Task status remains `draft` — no state transition. User reviews `[PROPOSED]` items, confirms/modifies, then re-runs research to advance to the next stage.
 
 ## Reference File Guidelines
 

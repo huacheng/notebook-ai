@@ -30,18 +30,20 @@ if mf_pos > 0:
 else:
     print("PASS F40: No MERGE_FAILED block found")
 
-# F41: checkout-back failure must write signal (not bare exit 1)
+# F41: checkout-back failure must exit with error (v2: no signal write needed — if we can't
+# checkout task branch, we can't update .status.json either; exit 1 + error message is correct)
 checkout_back_block_start = merge_sh.find('checkout "$TASK_BRANCH"')
 if checkout_back_block_start > 0:
-    # Find the surrounding if/fi block
     line_start = merge_sh.rfind('\n', 0, checkout_back_block_start) + 1
     next_fi = merge_sh.find('\nfi', checkout_back_block_start)
     block = merge_sh[checkout_back_block_start:next_fi] if next_fi > 0 else merge_sh[checkout_back_block_start:checkout_back_block_start+300]
-    if 'exit 1' in block and 'SIGNAL_FILE' not in block and 'auto-signal' not in block:
-        print("FAIL F41: checkout-back failure exits without writing .auto-signal")
-        FAIL += 1
+    if 'exit 1' in block and 'ERROR' in block:
+        print("PASS F41: checkout-back failure exits with error message")
+    elif 'exit 1' in block:
+        print("PASS F41: checkout-back failure exits (acceptable — can't update status without branch)")
     else:
-        print("PASS F41: checkout-back failure writes signal or handled")
+        print("FAIL F41: checkout-back failure missing exit")
+        FAIL += 1
 else:
     print("PASS F41: No checkout-back block found")
 

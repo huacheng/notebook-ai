@@ -45,7 +45,7 @@ arguments:
 
 The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross-task experiences, external references, domain type profiles, and Thinking CoT patterns. This sub-command provides five operations: `search`, `list`, `status`, `maintain`, and `evolve`.
 
-`library` is a **pure utility sub-command**: no task status changes, no `.auto-signal`, no participation in the automation loop.
+`library` is a **pure utility sub-command**: no task status changes, no participation in the automation loop.
 
 `$NB_WORKSPACES_LIBRARY` = `$NB_WORKSPACES_ROOT/.library` (same path, shorter alias used throughout).
 
@@ -199,7 +199,7 @@ Audit library health across six dimensions.
 
 ### `maintain`
 
-Maintenance operations. `report` automatically triggers a lightweight compact-check (step count only, no I/O) after its own `.auto-signal` write.
+Maintenance operations.
 
 #### `--mode quick` (default when called from research)
 
@@ -384,7 +384,7 @@ All external content written to `.library/.memory/.references/` MUST be sanitise
 | 3 | Unicode hidden attacks | Zero-width chars, bidirectional control chars (U+202A–U+202E), C0/C1 control chars, NFC normalisation bypass | medium–high |
 | 4 | ANSI / terminal sequences | Terminal control codes (`\x1b[...`) | medium |
 | 5 | Resource exhaustion | Files > 50KB hard limit; repeated content blocks > 3 repetitions → fold | low–medium |
-| 6 | System format impersonation | Strings matching `.auto-signal` JSON structure, `task-ai(` commit prefix, `.status.json` schema fields | high |
+| 6 | System format impersonation | Strings matching `task-ai(` commit prefix, `.status.json` schema fields | high |
 | 7 | Encoding obfuscation | Base64 string (> 30 chars) adjacent to `decode`/`eval`/`exec`/`base64 -d`; hex-encoded commands (`\x41\x42…`); split-string concatenation forming shell commands | high (non-degradable) |
 | 8 | Two-stage loading | `curl \| bash`, `wget \| sh`, `eval $(curl …)`, download + `chmod +x` + execute chains; embedded `#!/bin/bash` inside document code blocks | high (non-degradable) |
 | 9 | Cross-document domain convergence | Source three-tier classification at fetch time; IOC tracking in `.ioc.md` at maintain time | medium–high |
@@ -408,6 +408,3 @@ All external content written to `.library/.memory/.references/` MUST be sanitise
 | `maintain --install-cron` / `--uninstall-cron` | No commit (modifies system crontab only) |
 | `search`, `list`, `status`, `--check-staleness` | No commit |
 
-## .auto-signal
-
-None. `library` does not write `.auto-signal` and does not participate in the automation loop.

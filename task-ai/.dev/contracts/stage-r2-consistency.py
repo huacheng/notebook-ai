@@ -38,15 +38,13 @@ if ('complete' in target_steps and 'cancelled' in target_steps and
 else:
     emit_fail('target: execution steps missing explicit complete/cancelled rejection guard')
 
-# --- #6: merge Phase 3 unified evolving path (progressive evolution) ---
+# --- #6: merge unified evolving path (progressive evolution) ---
 merge_text = (TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md').read_text()
-# In progressive evolution, Phase 3 is a unified path — always transitions to evolving.
-# No stage.total branching exists. Check that Phase 3 mentions evolving and .summary.md.
-phase3 = extract_section(TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md', '### Phase 3: Post-Merge Finalization')
-if 'evolving' in phase3 and '.summary.md' in phase3:
-    emit_pass('merge: Phase 3 unified evolving path with .summary.md')
+# In progressive evolution, merge is a unified path — always transitions to evolving.
+if 'evolving' in merge_text and '.summary.md' in merge_text:
+    emit_pass('merge: unified evolving path with .summary.md')
 else:
-    emit_fail('merge: Phase 3 missing evolving or .summary.md')
+    emit_fail('merge: missing evolving or .summary.md')
 
 # --- #7: auto v2 annotation clearly marked as not implemented ---
 auto_text = (TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md').read_text()
@@ -57,13 +55,12 @@ if evolving_lines:
 else:
     emit_fail('auto: evolving entry missing from routing')
 
-# --- #8: merge Phase 3 mentions history push (progressive evolution) ---
-# In progressive evolution, Phase 3 pushes to stage.history instead of comparing stage.total.
-phase3 = extract_section(TASK_AI_ROOT / 'skills' / 'merge' / 'SKILL.md', '### Phase 3: Post-Merge Finalization')
-if 'history' in phase3 or 'stage.current' in phase3:
-    emit_pass('merge: Phase 3 mentions stage.current/history (progressive evolution)')
+# --- #8: merge mentions history push (progressive evolution) ---
+# In progressive evolution, merge pushes to stage.history instead of comparing stage.total.
+if 'stage.history' in merge_text:
+    emit_pass('merge: mentions stage.history (progressive evolution)')
 else:
-    emit_fail('merge: Phase 3 missing stage.current/history mention')
+    emit_fail('merge: missing stage.history mention')
 
 # --- #13: report/SKILL.md draft handling ---
 report_text = (TASK_AI_ROOT / 'skills' / 'report' / 'SKILL.md').read_text()

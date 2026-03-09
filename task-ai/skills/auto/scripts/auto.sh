@@ -17,7 +17,7 @@ derive_phase() {
         planning|re-planning) echo "planning" ;;
         review|executing) echo "execution" ;;
         blocked) echo "execution" ;;
-        evolving|satisfied) echo "finalization" ;;
+        evolving|satisfied) echo "acceptance" ;;
         cancelled) echo "terminal" ;;  # Not in signal validation whitelist; auto exits before writing signal
         *) echo "unknown" ;;
     esac
@@ -33,7 +33,6 @@ done
 
 resolve_workdir ""
 STATUS_JSON="$WORK_DIR/.status.json"
-SIGNAL_FILE="$WORK_DIR/.auto-signal"
 STOP_FILE="$WORK_DIR/.auto-stop"
 # D6: Use SCRIPT_DIR for consistent path construction
 STATE_PY="$SCRIPT_DIR/../../../core/state.py"
@@ -64,7 +63,7 @@ with open(tmp, 'w') as f:
     json.dump({'reason': 'user_stop', 'timestamp': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}, f, indent=2)
 os.rename(tmp, sys.argv[1])
 PYEOF
-        # D3: Do NOT delete .auto-signal here — let the running loop detect .auto-stop and clean up
+        # D3: Let the running loop detect .auto-stop and clean up
         echo "Auto loop stop requested."
         exit 0
         ;;
@@ -80,33 +79,9 @@ PHASE=$(derive_phase "$STATUS")
 echo "Auto-mode: Starting loop from status: $STATUS (phase: $PHASE)"
 
 # 3. Determine next step based on status (D1-1: handle all statuses per SKILL.md)
-# D3: Recover iteration/compaction from existing signal if resuming
-# D4: Single python3 call to parse both fields (avoid reading file twice)
+# v2: iteration/compaction are in-memory counters, no signal recovery needed
 ITERATION=1
 COMPACTION=0
-if [[ -f "$SIGNAL_FILE" ]]; then
-    SIGNAL_RECOVERY=$(python3 -c "
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        d = json.load(f)
-    print(d.get('iteration', 1), d.get('compaction_count', 0))
-except Exception:
-    print('1 0')
-" "$SIGNAL_FILE" 2>/dev/null || echo "1 0")
-    ITERATION=$(echo "$SIGNAL_RECOVERY" | awk '{print $1}')
-    COMPACTION=$(echo "$SIGNAL_RECOVERY" | awk '{print $2}')
-    # D3: Validate recovered values are integers, fall back to defaults
-    [[ "$ITERATION" =~ ^[0-9]+$ ]] || ITERATION=1
-    [[ "$COMPACTION" =~ ^[0-9]+$ ]] || COMPACTION=0
-    # D3: Increment compaction count on recovery (per SKILL.md: "On compaction recovery, incremented by 1")
-    COMPACTION=$((COMPACTION + 1))
-    # D3: Enforce compaction frequency limit (>= 3 within same auto session → stop)
-    if [[ "$COMPACTION" -ge 3 ]]; then
-        echo "[ERROR] Compaction frequency limit reached ($COMPACTION compactions). Context may be too large for this task." >&2
-        echo '{"stop_reason":"compaction_frequency_limit","compaction_count":'"$COMPACTION"'}' > "$WORK_DIR/.auto-stop"
-        exit 1
-    fi
 fi
 
 case "$STATUS" in

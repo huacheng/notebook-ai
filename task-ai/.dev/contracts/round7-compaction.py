@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
-"""Round 7: auto.sh compaction_count must be incremented on signal recovery.
+"""Round 7: Signal abolition verification (v2).
 
-F19: auto.sh should increment COMPACTION when recovering from existing signal
-F20: auto.sh should enforce compaction frequency limit (>= 3 → stop)
+F19: auto.sh should NOT have signal recovery block (v2: signal abolished, compaction is in-memory)
+F20: auto/SKILL.md should document compaction frequency limit (in-memory, not in signal)
 """
 import sys
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
 from lib import emit_pass, emit_fail, summary, TASK_AI_ROOT
 
 auto_sh = (TASK_AI_ROOT / 'skills' / 'auto' / 'scripts' / 'auto.sh').read_text()
+auto_skill = (TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md').read_text()
 
-# F19: compaction increment on recovery
-# Look for COMPACTION being incremented in the recovery block
-recovery_block = auto_sh[auto_sh.find('SIGNAL_RECOVERY'):auto_sh.find('case "$STATUS"')]
-if 'COMPACTION=$((' in recovery_block or '((COMPACTION' in recovery_block:
-    emit_pass('F19: auto.sh increments COMPACTION on signal recovery')
+# F19: No signal recovery block (v2: signal abolished)
+if 'SIGNAL_RECOVERY' not in auto_sh and '.auto-signal' not in auto_sh:
+    emit_pass('F19: auto.sh has no signal recovery (v2: signal abolished)')
 else:
-    emit_fail('F19: auto.sh does not increment COMPACTION on signal recovery')
+    emit_fail('F19: auto.sh still has signal recovery — should be removed in v2')
 
-# F20: compaction frequency limit
-if 'COMPACTION" -ge' in auto_sh or 'COMPACTION" -gt' in auto_sh or 'compaction_frequency_limit' in auto_sh:
-    emit_pass('F20: auto.sh has compaction frequency limit')
+# F20: Compaction frequency limit documented in SKILL.md
+if 'compaction' in auto_skill.lower() and ('3' in auto_skill or 'limit' in auto_skill.lower()):
+    emit_pass('F20: auto/SKILL.md documents compaction frequency limit')
 else:
-    emit_fail('F20: auto.sh missing compaction frequency limit')
+    emit_fail('F20: auto/SKILL.md missing compaction frequency limit documentation')
 
 sys.exit(summary())

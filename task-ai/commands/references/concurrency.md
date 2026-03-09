@@ -32,7 +32,7 @@ The following VFP (Verification-First Protocol) file patterns reside under `$NB_
 | `vh-baseline.md` | `$NB_TASK_WORKING/vh-baseline.md` | `plan` | Initial VH failure state baseline |
 | `cumulative-green.jsonl` | `$NB_TASK_WORKING/.test/<date>-cumulative-green.jsonl` | `exec` | CGG cumulative pass records (append) |
 | `hil-snapshots/` | `$NB_TASK_WORKING/.test/hil-snapshots/` | `exec` | HIL approval snapshot artifacts |
-| `vfp_cycles_completed` | `$NB_TASK_WORKING/.auto-signal` (field) | `auto`, `exec` | VFP cycle counter in auto-signal JSON |
+| `vfp_cycles_completed` | In-memory (auto session) | `auto`, `exec` | VFP cycle counter tracked in-memory |
 
 All VFP files are scoped to a single notebook's `.working/` directory. Since the task module lock already serializes all sub-command access to `.working/`, these files inherit that protection automatically.
 

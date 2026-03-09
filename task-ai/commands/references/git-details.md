@@ -33,6 +33,8 @@ task-ai(<module>):<type> <description>
 | `report` | Report generation | $NB_WORKSPACES_ROOT/ directory files |
 | `cancel` | Task cancellation | $NB_WORKSPACES_ROOT/ directory files |
 | `highlight` | Experience distillation and ad-hoc capture | $NB_WORKSPACES_LIBRARY/ files |
+| `rollback` | Convergence rollback (revert to previous stage commit) | $NB_WORKSPACES_ROOT/ directory files |
+| `auto` | Buffer refinement (pending refinements captured during auto) | $NB_WORKSPACES_ROOT/ directory files |
 | `maintain` | Library maintenance (rebuild index, compact) | $NB_WORKSPACES_LIBRARY/ files |
 
 Commit scope: $NB_WORKSPACES_ROOT/ directory files (state/plan) or project files (feat/fix).
@@ -57,6 +59,8 @@ task-ai(auth-refactor):cancel user cancelled
 task-ai(auth-refactor):highlight complete distillation
 task-ai(auth-refactor):highlight adhoc experience captured
 task-ai(auth-refactor):merge stage 1 completed
+task-ai(auth-refactor):rollback convergence rollback stage 2
+task-ai(auth-refactor):auto buffer refinement
 task-ai(auth-refactor):target stage 2 defined
 ```
 
@@ -103,8 +107,6 @@ git reset --hard <commit>          # in the task's worktree
 Add to project `.gitignore`:
 ```
 .worktrees/
-**/.working/.auto-signal
-**/.working/.auto-signal.tmp
 **/.working/.auto-stop
 **/.working/.lock
 .library/.changelog

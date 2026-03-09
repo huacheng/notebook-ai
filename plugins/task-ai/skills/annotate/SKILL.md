@@ -86,9 +86,8 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 13. **Write `.summary.md`** (atomic write via `.summary.md.tmp` + rename) with condensed context reflecting annotation changes
 14. **Execute highlight** protocol `scope=thinking-raw` — see `highlight/SKILL.md` §3.3. Optional (medium-value). Captures cross-impact assessment reasoning. Inline call failure MUST NOT block annotate's main flow
 15. **Git commit** (skip if all annotations were unresolvable and no files changed): `task-ai(<notebook>):annotate annotations processed`
-16. **Write `.auto-signal`** (route `next` by file layer — see §.auto-signal Routing)
-17. **Generate execution report** (print to screen)
-18. **Release `.working/.lock`**
+16. **Generate execution report** (print to screen)
+17. **Release `.working/.lock`**
 
 ## State Transitions — Three-Dimensional
 
@@ -187,39 +186,6 @@ Comment annotations have **identical behavior across all file layers** — they 
 |-----------|--------|
 | Contains `?` or interrogative words | Research selected content → write `> 💬 ...` blockquote |
 | Declarative sentence | Insert `> 📝 ...` blockquote below selected content |
-
-## .auto-signal Routing
-
-The `next` field routes by **(file layer, pre-transition status)**. The routing table uses the status **before** the transition to determine `next`, even though `.auto-signal` is written after `.status.json` is updated (step 16 follows step 12). Comment-only annotations always set `next` to `(none)`.
-
-```json
-{ "step": "annotate", "result": "(processed)", "next": "<by-layer>", "checkpoint": "post-annotate", "timestamp": "..." }
-```
-
-Terminal states (`cancelled`) are rejected at step 5 and never reach this table.
-
-| Annotation target layer | Current status | `next` | Reason |
-|------------------------|----------------|--------|--------|
-| Requirement `.target.md` | `draft` | `(none)` | Still defining requirements |
-| Requirement `.target.md` | `planning` | `plan` | Requirements changed, plan regenerates (reads new target) |
-| Requirement `.target.md` | `review`/`executing` | `check` | Reviewed plan needs re-checking against changed requirements |
-| Requirement `.target.md` | `re-planning` | `check` | Requirements changed during re-planning, re-check needed |
-| Requirement `.target.md` | `blocked` | `plan` | Unblocking via requirement change, needs planning |
-| Requirement `.target.md` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
-| Planning `.plan.md` | `draft` | `plan` | Plan annotation triggers planning phase |
-| Planning `.plan.md` | `planning` | `check` | Plan modified, needs review |
-| Planning `.plan.md` | `review`/`executing` | `check` | Plan modified after review/during execution, needs re-check |
-| Planning `.plan.md` | `re-planning` | `check` | Plan revised during re-planning, re-check needed |
-| Planning `.plan.md` | `blocked` | `plan` | Unblocking via plan change, needs planning |
-| Planning `.plan.md` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
-| Evaluation `.analysis/*` | any non-terminal (except `evolving`) | `check` | Evaluation conclusion challenged |
-| Evaluation `.analysis/*` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
-| Evaluation `.test/*` | any non-terminal (except `evolving`) | `verify` | Test criteria/results changed |
-| Evaluation `.test/*` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
-| Methodology `.type-profile.md` | any non-terminal (except `evolving`) | `verify` | Methodology change affects verification |
-| Methodology `.type-profile.md` | `evolving` | `(none)` | Stage complete; annotations stored for next stage |
-| Information (`.summary.md` etc.) | any | `(none)` | Pure context improvement |
-| Comment-only (any file) | any | `(none)` | Comments don't trigger downstream |
 
 ## Git
 

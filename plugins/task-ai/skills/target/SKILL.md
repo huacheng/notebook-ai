@@ -120,6 +120,36 @@ Build a JWT authentication system
       - Atomic write to `.working/.target.md` + update `.status.json` + Git commit: `task-ai(<notebook>):target update objective`
       - Execute highlight protocol scope=thinking-raw (optional, high-value). Inline call failure MUST NOT block target's main flow.
 
+   3e. **Convergence Baseline Generation** (after `.target.md` write, before Git commit):
+
+      Generate or update `.convergence-baseline.md` — a structured file containing atomized requirements from `.target.md` with weights. Format:
+
+      ```markdown
+      # Convergence Baseline
+
+      Generated from: .target.md Overall Objective + Requirements
+      Updated: <ISO-8601 timestamp>
+
+      | # | Requirement | Weight | Source |
+      |---|------------|--------|--------|
+      | R1 | JWT 认证登录 | 3 | Objective |
+      | R2 | Refresh token 刷新 | 2 | Requirements §1 |
+      ```
+
+      Weight levels: **critical = 3** (core functionality, must-have), **important = 2** (main feature, can degrade), **optional = 1** (nice-to-have).
+
+      **Trigger-based behavior:**
+
+      | Trigger | Baseline action |
+      |---------|----------------|
+      | First write (stage 1, from draft) | Extract atomic requirements from `.target.md` → generate `.convergence-baseline.md` |
+      | `--refine` | Incremental update — add/modify R# entries |
+      | Stage advance (evolving → planning, step 3a) | Baseline unchanged (Overall Objective unchanged) |
+      | Modify Overall Objective | Regenerate baseline (preserve existing score records) |
+      | Re-enter from satisfied (step 3c) | Regenerate baseline (new Overall Objective) |
+
+      Include `.convergence-baseline.md` in the Git commit scope alongside `.target.md` and `.status.json`.
+
 4. **If `objective` is omitted (Read Mode)**:
    - **Read**: Read the content of `.working/.target.md`.
    - **Display**: Output the structured objective to the conversation window.
@@ -167,8 +197,11 @@ After write mode completes, output the exact next step based on the resulting st
 | `target --satisfy` | `task-ai(<notebook>):target mark satisfied` |
 | `target` (re-enter from satisfied) | `task-ai(<notebook>):target re-enter evolution` |
 
+Files committed: `.target.md`, `.status.json` (if changed), `.convergence-baseline.md` (if generated/updated).
+
 ## Notes
 
 - **Read-only in frontend**: `.target.md` is displayed as read-only in the frontend. Users submit change requests via annotations, which are processed by the `target` sub-command to regenerate the document. This prevents format corruption in multi-stage targets.
 - **Context Loading**: If the agent's context is compressed, `/task-ai:target` without arguments is the standard way to reload the task's mission into memory.
 - **Accepted risk (evolving trust)**: In the progressive evolution model, `--satisfy` relies on user judgment — the system accepts the risk that "satisfied" may be premature. This is by design: `satisfied` is non-terminal, so users can re-enter evolution at any time.
+- **Baseline upper limit**: `.convergence-baseline.md` MUST contain ≤ 30 R# items. If the objective decomposes into more, merge fine-grained items to maintain a manageable convergence surface.

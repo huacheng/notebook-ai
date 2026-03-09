@@ -77,13 +77,9 @@ Regenerate `.summary.md` files for a task module. Used to recover lost context o
 task-ai(<notebook>):summarize regenerate context summary
 ```
 
-## .auto-signal
-
-None — `summarize` does not write `.auto-signal`. It is a recovery/maintenance tool that does not participate in the automation loop.
-
 ## Notes
 
-- **Utility, not lifecycle**: `summarize` is a maintenance tool for context recovery. It does not participate in the auto loop and does not write `.auto-signal`
+- **Utility, not lifecycle**: `summarize` is a maintenance tool for context recovery. It does not participate in the auto loop
 - **Non-destructive**: Only writes `.summary.md` files — never modifies source files (`.target.md`, `.plan.md`, etc.) or `.status.json`
 - **Graceful degradation**: If any source file (steps 3–8) exists but cannot be read (I/O error, encoding issue), skip it with a warning note in the generated summary — do not abort. Generate the best summary possible from available data
 - **Format compliance**: Generated `.summary.md` follows the format specified in `commands/task-ai.md` (Status/Phase/Progress header, Plan Overview, Current State, Key Decisions, Known Issues, Lessons Learned sections). Keep under ~200 lines

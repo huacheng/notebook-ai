@@ -42,7 +42,7 @@ When the auto loop reaches step 2c (execute current step), it reads the target s
   1. Subagent receives: SKILL.md content + `.summary.md` + `.status.json` + relevant input files per skill's "Reads" specification
   2. Subagent executes the numbered steps from SKILL.md, writes output files to the task module
   3. Subagent returns a <=500 char structured summary (same format as plugin delegation output contract)
-  4. Main session reads the subagent summary + output files (`.auto-signal`, `.summary.md`, result files) to restore context
+  4. Main session reads the subagent summary + output files (`.status.json`, `.summary.md`, result files) to restore context
   5. Main session continues the auto loop from the result routing
 
 **Context transfer**: Delegated skills communicate results through files, not session memory. This is safe because `auto_delegatable: true` skills are those whose outputs are fully captured in files (`.references/`, `.test/`, `.report.md`, `.summary.md`). The main session's context is preserved for heavy skills that need it.

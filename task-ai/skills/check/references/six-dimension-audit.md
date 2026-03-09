@@ -98,7 +98,7 @@ This is the L3 (deep audit) application of the unified six-dimension framework. 
 |------------|---------------|
 | **Cross-file terminology** | Same concept uses identical wording across all files (e.g., dependency validation language) |
 | **State machine alignment** | Every (state, command) cell in the matrix matches the skill's State Transitions section |
-| **Signal routing match** | Every skill's `.auto-signal` definition matches the auto routing table |
+| **Signal routing match** | Every skill's status transitions match the auto routing table |
 | **Step numbering** | Execution steps are sequential with no gaps or duplicates |
 | **Shared protocol references** | All files that use a shared protocol (locks, atomic writes) reference the canonical definition |
 | **Field usage symmetry** | Fields written by one skill are correctly read by all consumers (phase, completed_steps, type) |

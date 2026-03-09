@@ -161,8 +161,8 @@ Deeply nested: Markdown heading depth > 6 levels, or list nesting > 5 levels
 **Detection patterns:**
 
 ```
-auto-signal:   JSON with keys "step", "result", "next", "timestamp" appearing in body text
-               (matches .auto-signal schema from skills/task-ai/SKILL.md)
+status-json:   JSON with keys "status", "phase", "completed_steps", "type" appearing in body text
+               (matches .status.json schema)
 commit prefix: lines matching "task-ai(<...>):<type> ..." — could be mistaken for authoritative commits
 index.json:    JSON with keys "title","type","status","phase","completed_steps" in body text
 index.md table: markdown table with headers matching library .index.md schemas
