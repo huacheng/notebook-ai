@@ -76,6 +76,7 @@ describe('interruptCell with dead process', () => {
       _autoIntervalMs: 300000,
       _autoIterationCount: 0,
       _autoExecuting: false,
+      _autoPausedUntil: 0,
       _lastCellId: 'cell-1',
       _pendingPostComplete: Promise.resolve(),
       eventBuffer: {
@@ -137,6 +138,7 @@ describe('interruptCell with dead process', () => {
       _autoIntervalMs: 300000,
       _autoIterationCount: 0,
       _autoExecuting: false,
+      _autoPausedUntil: 0,
       _lastCellId: 'cell-2',
       _pendingPostComplete: Promise.resolve(),
       eventBuffer: { push: vi.fn(), slice: vi.fn().mockReturnValue([]) },

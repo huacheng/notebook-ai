@@ -43,6 +43,28 @@ export const CONTINUE_PROMPT = '继续';
 /** Threshold for notifying user about long-running tool (5 minutes) */
 export const TOOL_LONG_RUNNING_MS = 5 * 60 * 1000;
 
+/**
+ * If agent output was received within this many ms, autoTick skips sending
+ * CONTINUE — the agent is actively working and doesn't need prompting.
+ * Defaults to half of DEFAULT_AUTO_INTERVAL_MS (2.5 min).
+ */
+export const AUTO_OUTPUT_QUIET_MS = Math.floor(DEFAULT_AUTO_INTERVAL_MS / 2);
+
+/**
+ * Default cooldown when a rate-limit / usage-limit error is detected.
+ * Auto mode pauses for this duration before resuming.  (5 minutes)
+ */
+export const AUTO_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
+
+/** Patterns that indicate a rate/usage limit error in result.result text. */
+const RATE_LIMIT_PATTERNS = [
+  /rate.?limit/i,
+  /too many requests/i,
+  /overloaded/i,
+  /usage.?limit/i,
+  /resource.?exhausted/i,
+];
+
 // ── Claude settings model helper ─────────────────────────────────────────────
 
 /**
@@ -152,6 +174,8 @@ interface NotebookSession {
   _autoIterationCount: number;
   /** Auto mode: true while an auto-created executeCell is pending (prevents cascade). */
   _autoExecuting: boolean;
+  /** Auto mode: timestamp until which auto mode is paused (rate limit cooldown). 0 = not paused. */
+  _autoPausedUntil: number;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -269,6 +293,7 @@ export class SessionManager {
       _autoIntervalMs: DEFAULT_AUTO_INTERVAL_MS,
       _autoIterationCount: 0,
       _autoExecuting: false,
+      _autoPausedUntil: 0,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -890,6 +915,7 @@ export class SessionManager {
     session._autoIntervalMs = Math.max(MIN_AUTO_INTERVAL_MS, Math.min(MAX_AUTO_INTERVAL_MS, rawInterval));
     session._autoIterationCount = 0;
     session._autoExecuting = false;
+    session._autoPausedUntil = 0;
 
     session._autoTimer = setInterval(() => {
       this.autoTick(session);
@@ -940,6 +966,26 @@ export class SessionManager {
     if (!session.agentProcess.isAlive()) {
       console.warn(`[session ${session.id}] Auto tick: agent process not alive, stopping auto mode`);
       this.stopAutoMode(session.id);
+      return;
+    }
+
+    // Rate limit cooldown: skip tick if paused, broadcast resume when cooldown expires
+    if (session._autoPausedUntil > 0) {
+      if (Date.now() < session._autoPausedUntil) {
+        const remainMs = session._autoPausedUntil - Date.now();
+        console.log(`[session ${session.id}] Auto tick: paused for rate limit cooldown (${Math.ceil(remainMs / 1000)}s remaining)`);
+        return;
+      }
+      // Cooldown expired — resume
+      session._autoPausedUntil = 0;
+      console.log(`[session ${session.id}] Auto tick: rate limit cooldown expired, resuming`);
+      this.broadcast(session, { type: 'auto_resumed' });
+    }
+
+    // Active output check: skip if agent produced output recently (still working)
+    const outputAge = Date.now() - session._lastOutputTime;
+    if (outputAge < AUTO_OUTPUT_QUIET_MS) {
+      console.log(`[session ${session.id}] Auto tick: agent active (output ${Math.floor(outputAge / 1000)}s ago), skipping`);
       return;
     }
 
@@ -1166,6 +1212,21 @@ export class SessionManager {
             });
           }
           // If cell already has output, result.result duplicates content from 'assistant' messages.
+        }
+
+        // Auto mode: detect rate/usage limit errors and pause to avoid spamming
+        if (result.is_error && result.result && session._autoMode) {
+          const isRateLimit = RATE_LIMIT_PATTERNS.some((p) => p.test(result.result));
+          if (isRateLimit) {
+            session._autoPausedUntil = Date.now() + AUTO_RATE_LIMIT_COOLDOWN_MS;
+            console.warn(`[session ${session.id}] Rate limit detected, pausing auto mode for ${AUTO_RATE_LIMIT_COOLDOWN_MS / 1000}s`);
+            this.broadcast(session, {
+              type: 'auto_paused',
+              reason: 'rate_limit',
+              resume_at: session._autoPausedUntil,
+              cooldown_ms: AUTO_RATE_LIMIT_COOLDOWN_MS,
+            });
+          }
         }
 
         // 'result' is the definitive completion signal — no idle timer needed.

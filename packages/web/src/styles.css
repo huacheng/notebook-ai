@@ -1058,6 +1058,11 @@ textarea.cell-input {
   background: var(--color-primary-light);
 }
 
+.auto-beat-badge.paused {
+  color: var(--color-error);
+  background: var(--bg-error);
+}
+
 .notebook-statusbar-slide-btn.active {
   background: var(--color-primary-light);
   color: var(--color-primary);

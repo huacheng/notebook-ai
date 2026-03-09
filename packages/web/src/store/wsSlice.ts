@@ -151,7 +151,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (get().ws === ws) {
         stopPing();
         // D3: Clear loadingCellIds on disconnect to avoid stuck loading states
-        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), autoMode: false, autoIterationCount: 0 });
+        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), autoMode: false, autoIterationCount: 0, autoPaused: false, autoPausedResumeAt: 0 });
       }
     };
 
@@ -623,14 +623,31 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           // Auto mode was stopped (by Esc, explicit stop, or process death)
           const asSid2 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid2 || asSid2 === get().sessionId) {
-            set({ autoMode: false, autoIterationCount: 0 });
+            set({ autoMode: false, autoIterationCount: 0, autoPaused: false, autoPausedResumeAt: 0 });
           }
           break;
         }
         case 'auto_started': {
           const asSid3 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid3 || asSid3 === get().sessionId) {
-            set({ autoMode: true });
+            set({ autoMode: true, autoPaused: false, autoPausedResumeAt: 0 });
+          }
+          break;
+        }
+        case 'auto_paused': {
+          const apSid = (parsed as any).session_id ?? msgSessionId;
+          if (!apSid || apSid === get().sessionId) {
+            set({
+              autoPaused: true,
+              autoPausedResumeAt: (parsed as any).resume_at ?? 0,
+            });
+          }
+          break;
+        }
+        case 'auto_resumed': {
+          const arSid = (parsed as any).session_id ?? msgSessionId;
+          if (!arSid || arSid === get().sessionId) {
+            set({ autoPaused: false, autoPausedResumeAt: 0 });
           }
           break;
         }
@@ -866,7 +883,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       // Also stop auto mode if active — Esc stops everything
       if (get().autoMode) {
         ws.send(JSON.stringify({ type: 'auto_stop', session_id: sessionId }));
-        set({ autoMode: false, autoIterationCount: 0 });
+        set({ autoMode: false, autoIterationCount: 0, autoPaused: false, autoPausedResumeAt: 0 });
       }
     }
   },

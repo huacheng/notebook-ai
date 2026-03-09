@@ -1023,6 +1023,17 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
     session_id: z.string(),
   }),
   z.object({
+    type: z.literal('auto_paused'),
+    session_id: z.string().optional(),
+    reason: z.string(),
+    resume_at: z.number(),
+    cooldown_ms: z.number(),
+  }),
+  z.object({
+    type: z.literal('auto_resumed'),
+    session_id: z.string().optional(),
+  }),
+  z.object({
     type: z.literal('notebook_digest'),
     session_id: z.string(),
     cell_count: z.number(),

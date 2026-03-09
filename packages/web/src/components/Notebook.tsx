@@ -422,6 +422,7 @@ export function Notebook() {
   const taskStatus = useStore((s) => s.taskStatus);
   const autoMode = useStore((s) => s.autoMode);
   const autoIterationCount = useStore((s) => s.autoIterationCount);
+  const autoPaused = useStore((s) => s.autoPaused);
   const autoStatus = useStore((s) => s.autoStatus);
   const [scoreExpanded, setScoreExpanded] = useState(false);
   const cells = notebook?.cells ?? [];
@@ -492,8 +493,11 @@ export function Notebook() {
             />
           )}
           {autoMode && (
-            <span className="auto-beat-badge" title="Auto heartbeat active">
-              beat:{autoIterationCount}
+            <span
+              className={`auto-beat-badge${autoPaused ? ' paused' : ''}`}
+              title={autoPaused ? 'Auto paused (rate limit cooldown)' : 'Auto heartbeat active'}
+            >
+              {autoPaused ? 'paused' : `beat:${autoIterationCount}`}
             </span>
           )}
         </div>

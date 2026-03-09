@@ -108,6 +108,8 @@ export interface NotebookStore {
   // ── Auto heartbeat mode ──────────────────────────────────────────────
   autoMode: boolean;
   autoIterationCount: number;
+  autoPaused: boolean;
+  autoPausedResumeAt: number;
 
   // ── WebSocket state ────────────────────────────────────────────────────
   ws: WebSocket | null;
