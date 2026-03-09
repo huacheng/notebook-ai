@@ -243,6 +243,21 @@ describe('PATCH /api/projects/:projectId (rename)', () => {
     expect(memoryContent).not.toContain(projectDir);
   });
 
+  it('returns 409 when both slug and slug+id paths exist', async () => {
+    const conflictDir1 = path.join(tmpDir, 'renamed-project');
+    const conflictDir2 = path.join(tmpDir, `renamed-project-${PROJECT_ID.slice(0, 6)}`);
+    await mkdir(conflictDir1, { recursive: true });
+    await mkdir(conflictDir2, { recursive: true });
+
+    await request(app)
+      .patch(`/api/projects/${PROJECT_ID}`)
+      .send({ title: 'Renamed Project' })
+      .expect(409);
+
+    // Original directory should still exist (no rename happened)
+    expect(existsSync(projectDir)).toBe(true);
+  });
+
   it('skips directory rename when title change produces same slug', async () => {
     await request(app)
       .patch(`/api/projects/${PROJECT_ID}`)

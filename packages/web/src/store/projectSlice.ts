@@ -36,7 +36,16 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const projects = await res.json();
-      set({ projects, projectsLoading: false });
+      const updates: Record<string, unknown> = { projects, projectsLoading: false };
+      // Sync activeProjectPath if the active project was renamed (path changed)
+      const activeId = get().activeProjectId;
+      if (activeId) {
+        const active = (projects as ProjectListItem[]).find(p => p.id === activeId);
+        if (active && active.path !== get().activeProjectPath) {
+          updates.activeProjectPath = active.path;
+        }
+      }
+      set(updates);
     } catch {
       set({ projectsLoading: false });
     }

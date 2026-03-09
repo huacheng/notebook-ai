@@ -138,6 +138,9 @@ export function createProjectsRouter(
     // Resolve slug conflict by appending project ID prefix
     if (existsSync(newPath)) {
       newPath = path.join(workspacesRoot, `${newSlug}-${req.params.projectId.slice(0, 6)}`);
+      if (existsSync(newPath)) {
+        return res.status(409).json({ error: `Project directory "${newSlug}" already exists` });
+      }
     }
 
     try {
@@ -178,6 +181,15 @@ export function createProjectsRouter(
       res.json(updated);
     } catch (err: unknown) {
       console.error('[projects] Error renaming project:', err);
+      // Rollback: if directory was already moved, move it back
+      if (existsSync(newPath) && !existsSync(oldPath)) {
+        try {
+          const { rename: fsRename } = await import('fs/promises');
+          await fsRename(newPath, oldPath);
+        } catch (rollbackErr) {
+          console.error('[projects] Rollback failed:', rollbackErr);
+        }
+      }
       res.status(500).json({ error: 'Failed to rename project directory' });
     }
   });
