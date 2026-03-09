@@ -5,8 +5,11 @@ export const PHASES = ['target', 'plan', 'exec', 'merge'] as const;
 export const PHASE_MAP: Record<string, typeof PHASES[number]> = {
   target: 'target',
   planning: 'plan',
+  planned: 'plan',
   execution: 'exec',
+  executing: 'exec',
   finalization: 'merge',
+  merging: 'merge',
 };
 
 export function getPhaseIndex(phase: string | null): number {

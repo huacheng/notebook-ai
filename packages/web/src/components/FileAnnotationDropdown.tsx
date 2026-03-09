@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useStore } from '../store';
 import type { FileAnnotations } from '../types/fileAnnotations';
 
 interface FileAnnotationDropdownProps {
@@ -17,6 +18,8 @@ const TYPE_SYMBOL: Record<string, string> = {
 };
 
 export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, onRemove, onCancelAll, onScrollTo, isSent, sendableCount }: FileAnnotationDropdownProps) {
+  const sessionId = useStore((s) => s.sessionId);
+  const hasNotebook = !!sessionId;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const count = annotations.items.length;
@@ -40,7 +43,7 @@ export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, o
       {open && (
         <div className="fv-ann-dropdown__panel">
           <div className="fv-ann-dropdown__header">
-            <button className="fv-ann-dropdown__send-all" onClick={onSendAll} disabled={sendableCount === 0}>
+            <button className="fv-ann-dropdown__send-all" onClick={onSendAll} disabled={sendableCount === 0 || !hasNotebook} title={!hasNotebook ? 'Open a notebook to send annotations' : undefined}>
               {sendableCount === 0 ? 'All Sent' : `Send All (${sendableCount})`}
             </button>
             {onCancelAll && (
@@ -59,7 +62,7 @@ export function FileAnnotationDropdown({ annotations, onSendAll, onSendSingle, o
                 >
                   {(a.content ?? a.selected_text).slice(0, 60)}
                 </span>
-                <button className="fv-ann-dropdown__btn" onClick={() => onSendSingle(a.id)} disabled={isSent(a.id)}>
+                <button className="fv-ann-dropdown__btn" onClick={() => onSendSingle(a.id)} disabled={isSent(a.id) || !hasNotebook} title={!hasNotebook ? 'Open a notebook to send' : undefined}>
                   {isSent(a.id) ? '✓' : 'Send'}
                 </button>
                 <button className="fv-ann-dropdown__btn fv-ann-dropdown__btn--danger" onClick={() => onRemove(a.id)}>×</button>

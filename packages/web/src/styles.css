@@ -1686,7 +1686,33 @@ textarea.cell-input {
 
 .notebook-input-row {
   display: flex;
+  flex-direction: row;
+}
+
+.nb-line-numbers {
+  display: flex;
   flex-direction: column;
+  min-height: 80px;
+  max-height: 200px;
+  padding: var(--space-sm) 0 var(--space-sm) var(--space-sm);
+  background: #ffffff;
+  border: 1.5px solid var(--border-default);
+  border-right: none;
+  border-bottom: none;
+  border-radius: var(--radius-md) 0 0 0;
+  overflow: hidden;
+  user-select: none;
+  line-height: 1.75;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: right;
+  min-width: 28px;
+}
+.nb-line-number {
+  display: block;
+  padding: 0 6px 0 4px;
+  opacity: 0.5;
 }
 
 .nb-input-textarea {
@@ -1698,7 +1724,7 @@ textarea.cell-input {
   background: #ffffff;
   border: 1.5px solid var(--border-default);
   border-bottom: none;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: 0 var(--radius-md) 0 0;
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
@@ -1713,6 +1739,10 @@ textarea.cell-input {
 .nb-input-textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-ring);
+}
+.nb-input-textarea:focus ~ .nb-line-numbers,
+.notebook-input-row:focus-within .nb-line-numbers {
+  border-color: var(--color-primary);
 }
 
 .nb-input-textarea::placeholder {

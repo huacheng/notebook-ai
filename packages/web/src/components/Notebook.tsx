@@ -6,6 +6,7 @@ import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
 import { PhaseProgressBar, ScorePanel } from './TimerStatusBar';
+import { TimerStartDialog } from './TimerStartDialog';
 
 // ── Timer toggle button ─────────────────────────────────────────────────────
 
@@ -16,27 +17,43 @@ function TimerToggleButton() {
   const timerMode = useStore((s) => s.timerMode);
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
+  const [showDialog, setShowDialog] = useState(false);
 
-  const handleToggle = () => {
+  const handleClick = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
     if (timerMode) {
       ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
       useStore.setState({ timerMode: false, timerIterationCount: 0 });
     } else {
-      ws.send(JSON.stringify({ type: 'timer_start', session_id: sessionId }));
-      useStore.setState({ timerMode: true, timerIterationCount: 0 });
+      setShowDialog(true);
     }
   };
 
+  const handleStart = ({ intervalSeconds }: { maxIterations: number; timeoutMinutes: number; intervalSeconds: number }) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    const interval_ms = intervalSeconds * 1000;
+    ws.send(JSON.stringify({ type: 'timer_start', session_id: sessionId, interval_ms }));
+    useStore.setState({ timerMode: true, timerIterationCount: 0 });
+    setShowDialog(false);
+  };
+
   return (
-    <button
-      className={`notebook-statusbar-btn notebook-statusbar-timer-btn${timerMode ? ' active' : ''}`}
-      onClick={handleToggle}
-      disabled={!connected}
-      title={timerMode ? t('status.timerStopTitle') : t('status.timerStartTitle')}
-    >
-      {t('status.timer')}
-    </button>
+    <>
+      <button
+        className={`notebook-statusbar-btn notebook-statusbar-timer-btn${timerMode ? ' active' : ''}`}
+        onClick={handleClick}
+        disabled={!connected}
+        title={timerMode ? t('status.timerStopTitle') : t('status.timerStartTitle')}
+      >
+        {t('status.timer')}
+      </button>
+      {showDialog && (
+        <TimerStartDialog
+          onStart={handleStart}
+          onCancel={() => setShowDialog(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -424,7 +441,6 @@ export function Notebook() {
   const timerMode = useStore((s) => s.timerMode);
   const timerIterationCount = useStore((s) => s.timerIterationCount);
   const timerPaused = useStore((s) => s.timerPaused);
-  const autoStatus = useStore((s) => s.autoStatus);
   const [scoreExpanded, setScoreExpanded] = useState(false);
   const cells = notebook?.cells ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -479,16 +495,16 @@ export function Notebook() {
   return (
     <div className="notebook-container">
       <NotebookStatusBar />
-      {/* Task lifecycle status bar — always visible when .status.json exists */}
-      {(taskStatus || autoStatus.phase) && (
+      {/* Task lifecycle status bar — driven by .status.json via task_status WS */}
+      {taskStatus && (
         <div className="timer-status-container">
           <PhaseProgressBar
-            phase={(taskStatus as any)?.step ?? autoStatus.phase}
-            phaseProgress={autoStatus.phaseProgress}
+            phase={(taskStatus as any)?.status ?? null}
+            phaseProgress={(taskStatus as any)?.phase_progress ?? null}
           />
-          {autoStatus.checkScore && (
+          {(taskStatus as any)?.check_score && (
             <ScorePanel
-              checkScore={autoStatus.checkScore}
+              checkScore={(taskStatus as any).check_score}
               expanded={scoreExpanded}
               onToggle={() => setScoreExpanded(!scoreExpanded)}
             />

@@ -30,6 +30,7 @@ export function wireDaemonToSession(
       sendToAgent(action.message);
     }
   });
+
 }
 
 // Stored reference for wiring daemons to sessions

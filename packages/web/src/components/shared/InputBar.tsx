@@ -34,6 +34,7 @@ interface InputBarProps {
 export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const t = useT();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lineNumRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cmdBtnsRef = useRef<HTMLDivElement>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -246,6 +247,15 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     textareaRef.current?.focus();
   };
 
+  const directSubmitCommand = (cmd: string) => {
+    const source = `/${cmd} `;
+    saveToHistory(source);
+    submitPrompt(source);
+  };
+
+  // Line numbers derived from text content
+  const lineNumbers = text.split('\n').length;
+
   // Convert vertical scroll to horizontal scroll on command toolbar
   // Must use native event listener with { passive: false } to allow preventDefault
   useEffect(() => {
@@ -331,6 +341,11 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
             <span>❌ {voiceError}</span>
           </div>
         )}
+        <div className="nb-line-numbers" ref={lineNumRef} aria-hidden="true">
+          {Array.from({ length: lineNumbers }, (_, i) => (
+            <span key={i} className="nb-line-number">{i + 1}</span>
+          ))}
+        </div>
         <textarea
           ref={textareaRef}
           className="nb-input-textarea"
@@ -338,6 +353,11 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onScroll={() => {
+            if (textareaRef.current && lineNumRef.current) {
+              lineNumRef.current.scrollTop = textareaRef.current.scrollTop;
+            }
+          }}
           onDrop={(e) => {
             const MAX_DROP = 10000;
             const dropped = e.dataTransfer.getData('text/plain').slice(0, MAX_DROP);
@@ -380,7 +400,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
               className="nb-cmd-btn"
               title={t(`cmd.${cmd}`)}
               disabled={disabled}
-              onClick={() => insertCommand(cmd)}
+              onClick={() => cmd === 'task-ai:auto' ? directSubmitCommand(cmd) : insertCommand(cmd)}
             >
               {icon} <span className="nb-cmd-name">/{cmd.split(':')[1]}</span>
             </button>
