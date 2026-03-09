@@ -1,6 +1,6 @@
 {
   "name": "notebook-ai",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "private": true,
   "scripts": {
     "dev": "pnpm -r --parallel run dev",

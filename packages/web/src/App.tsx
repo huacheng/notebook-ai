@@ -358,6 +358,8 @@ function AuthenticatedApp() {
               <PluginManager />
             ) : modelPanelOpen ? (
               <ModelManager />
+            ) : gitTabOpen && activeProjectId ? (
+              null  /* GitHistoryPanel rendered below as keep-alive */
             ) : hasActiveFile ? (
               <>
                 <FileViewer />
@@ -370,8 +372,6 @@ function AuthenticatedApp() {
                   </>
                 )}
               </>
-            ) : gitTabOpen && activeProjectId ? (
-              null  /* GitHistoryPanel rendered below as keep-alive */
             ) : notebookLoading ? (
               <NotebookLoadingScreen />
             ) : creatingNotebook ? (
@@ -383,7 +383,7 @@ function AuthenticatedApp() {
             )}
             {/* Keep-alive: GitHistoryPanel stays mounted once activated, hidden via CSS */}
             {activeProjectId && (
-              <div style={{ display: gitTabOpen && !pluginPanelOpen && !modelPanelOpen && !hasActiveFile ? undefined : 'none' }}>
+              <div style={{ display: gitTabOpen && !pluginPanelOpen && !modelPanelOpen ? undefined : 'none' }}>
                 <GitHistoryPanel projectId={activeProjectId} />
               </div>
             )}

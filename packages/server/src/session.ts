@@ -155,6 +155,8 @@ interface NotebookSession {
   _heartbeatTimer: ReturnType<typeof setInterval> | null;
   /** Heartbeat: tool_use IDs awaiting tool_result (tool execution in progress). */
   _pendingToolUseIds: Set<string>;
+  /** Count of appended prompts sent to stdin but not yet consumed by a result. */
+  _pendingAppends: number;
   /** Heartbeat: flag to prevent repeated tool_long_running notifications. */
   _toolLongRunningNotified: boolean;
   /** Timer mode: whether auto heartbeat is active. */
@@ -280,6 +282,7 @@ export class SessionManager {
       _lastOutputTime: Date.now(),
       _heartbeatTimer: null,
       _pendingToolUseIds: new Set(),
+      _pendingAppends: 0,
       _toolLongRunningNotified: false,
       _timerMode: false,
       _timerHandle: null,
@@ -718,6 +721,9 @@ export class SessionManager {
       ),
     };
 
+    // Track pending append — completeCell will defer until Claude consumes it
+    session._pendingAppends++;
+
     // Send to Claude stdin immediately
     if (images && images.length > 0) {
       session.agentProcess.sendPrompt(source, images);
@@ -732,7 +738,7 @@ export class SessionManager {
       segment,
     });
 
-    console.log(`[session ${sessionId}] Appended prompt to cell "${cellId}": "${source.slice(0, 50)}..."`);
+    console.log(`[session ${sessionId}] Appended prompt to cell "${cellId}" (_pendingAppends=${session._pendingAppends}): "${source.slice(0, 50)}..."`);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
@@ -768,6 +774,16 @@ export class SessionManager {
     // Guard: only complete if the cell is still running.
     const cell = session.notebook.cells.find((c) => c.id === cellId);
     if (!cell || cell.status !== 'running') return;
+
+    // Defer completion if there are appended prompts waiting for Claude to consume.
+    // Each append sends a user message to stdin; Claude will produce a new result for each.
+    if (session._pendingAppends > 0 && !isError) {
+      session._pendingAppends--;
+      console.log(`[session ${session.id}] completeCell deferred: _pendingAppends=${session._pendingAppends} remaining`);
+      return;
+    }
+    // Reset counter on final completion
+    session._pendingAppends = 0;
 
     // Determine final status: interrupted > error > completed
     let status: 'completed' | 'error' | 'interrupted';
