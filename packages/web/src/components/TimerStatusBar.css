@@ -1,5 +1,5 @@
-/* Auto Status Container */
-.auto-status-container {
+/* Timer Status Container */
+.timer-status-container {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -8,8 +8,8 @@
   background: var(--bg-page);
 }
 
-/* Auto Status Bar — Phase Progress */
-.auto-phase-bar {
+/* Timer Status Bar — Phase Progress */
+.timer-phase-bar {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -19,45 +19,45 @@
   padding: 4px 8px;
 }
 
-.auto-phase-step {
+.timer-phase-step {
   padding: 2px 6px;
   border-radius: 3px;
   background: var(--bg-cell-hover);
 }
 
-.auto-phase-complete {
+.timer-phase-complete {
   color: var(--color-completed);
   background: rgba(21, 128, 61, 0.08);
 }
 
-.auto-phase-current {
+.timer-phase-current {
   color: var(--color-primary);
   background: var(--color-primary-light);
   font-weight: 600;
 }
 
-.auto-phase-arrow {
+.timer-phase-arrow {
   color: var(--text-secondary);
   margin: 0 2px;
   opacity: 0.5;
 }
 
-.auto-phase-check {
+.timer-phase-check {
   margin-right: 2px;
 }
 
-.auto-phase-progress {
+.timer-phase-progress {
   margin-left: 4px;
   font-weight: 400;
   opacity: 0.8;
 }
 
 /* Score Panel */
-.auto-score-panel {
+.timer-score-panel {
   position: relative;
 }
 
-.auto-score-toggle {
+.timer-score-toggle {
   background: none;
   border: 1px solid var(--border-default);
   border-radius: 4px;
@@ -68,16 +68,16 @@
   cursor: pointer;
 }
 
-.auto-score-toggle:hover {
+.timer-score-toggle:hover {
   background: var(--bg-cell-hover);
 }
 
-.auto-score-caret {
+.timer-score-caret {
   margin-left: 4px;
   font-size: 10px;
 }
 
-.auto-score-details {
+.timer-score-details {
   position: absolute;
   top: 100%;
   right: 0;
@@ -91,7 +91,7 @@
   margin-top: 4px;
 }
 
-.auto-score-row {
+.timer-score-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -100,12 +100,12 @@
   font-family: var(--font-mono);
 }
 
-.auto-score-label {
+.timer-score-label {
   min-width: 120px;
   color: var(--text-secondary);
 }
 
-.auto-score-bar-bg {
+.timer-score-bar-bg {
   flex: 1;
   height: 6px;
   background: var(--bg-cell-hover);
@@ -113,21 +113,21 @@
   overflow: hidden;
 }
 
-.auto-score-bar-fill {
+.timer-score-bar-fill {
   height: 100%;
   background: var(--color-primary);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
 
-.auto-score-value {
+.timer-score-value {
   min-width: 36px;
   text-align: right;
   color: var(--text-primary);
 }
 
-/* Auto Stop Button */
-.auto-stop-btn {
+/* Timer Stop Button */
+.timer-stop-btn {
   background: none;
   border: 1px solid var(--color-error);
   border-radius: 4px;
@@ -140,18 +140,18 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.auto-stop-btn:hover:not(:disabled) {
+.timer-stop-btn:hover:not(:disabled) {
   background: var(--color-error);
   color: #fff;
 }
 
-.auto-stop-btn:disabled {
+.timer-stop-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
 /* Iteration Badge */
-.auto-iteration-badge {
+.timer-iteration-badge {
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--text-secondary);
@@ -161,7 +161,7 @@
 }
 
 /* Retry Badge */
-.auto-retry-badge {
+.timer-retry-badge {
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--color-error);
@@ -171,14 +171,14 @@
 }
 
 /* Multi-Stage View */
-.auto-multistage {
+.timer-multistage {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 4px 0;
 }
 
-.auto-ms-card {
+.timer-ms-card {
   border: 1px solid var(--border-default);
   border-radius: 6px;
   padding: 6px 10px;
@@ -186,72 +186,72 @@
   font-family: var(--font-mono);
 }
 
-.auto-ms-complete {
+.timer-ms-complete {
   border-color: rgba(21, 128, 61, 0.3);
   background: rgba(21, 128, 61, 0.04);
 }
 
-.auto-ms-current {
+.timer-ms-current {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
 }
 
-.auto-ms-pending {
+.timer-ms-pending {
   opacity: 0.5;
 }
 
-.auto-ms-header {
+.timer-ms-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
 }
 
-.auto-ms-title {
+.timer-ms-title {
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.auto-ms-status {
+.timer-ms-status {
   color: var(--text-secondary);
   font-size: 11px;
 }
 
-.auto-ms-score {
+.timer-ms-score {
   margin-left: auto;
   color: var(--color-completed);
   font-weight: 600;
 }
 
-.auto-ms-phases {
+.timer-ms-phases {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.auto-ms-phase {
+.timer-ms-phase {
   padding: 1px 4px;
   border-radius: 2px;
   color: var(--text-secondary);
 }
 
-.auto-ms-phase-done {
+.timer-ms-phase-done {
   color: var(--color-completed);
 }
 
-.auto-ms-phase-active {
+.timer-ms-phase-active {
   color: var(--color-primary);
   font-weight: 600;
 }
 
-.auto-ms-arrow {
+.timer-ms-arrow {
   color: var(--text-secondary);
   opacity: 0.4;
   margin: 0 1px;
 }
 
 /* Stage Indicator */
-.auto-stage-indicator {
+.timer-stage-indicator {
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--text-secondary);

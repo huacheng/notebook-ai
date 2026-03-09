@@ -28,16 +28,16 @@ import { getDaemon } from './routes/task-auto.js';
 /** Heartbeat check interval for process health monitoring (30 seconds) */
 export const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 
-/** Default Auto mode interval (5 minutes) */
-export const DEFAULT_AUTO_INTERVAL_MS = 5 * 60 * 1000;
+/** Default Timer mode interval (5 minutes) */
+export const DEFAULT_TIMER_INTERVAL_MS = 5 * 60 * 1000;
 
-/** Minimum Auto mode interval (10 seconds) — prevents DoS via tiny intervals */
-export const MIN_AUTO_INTERVAL_MS = 10 * 1000;
+/** Minimum Timer mode interval (10 seconds) — prevents DoS via tiny intervals */
+export const MIN_TIMER_INTERVAL_MS = 10 * 1000;
 
-/** Maximum Auto mode interval (30 minutes) */
-export const MAX_AUTO_INTERVAL_MS = 30 * 60 * 1000;
+/** Maximum Timer mode interval (30 minutes) */
+export const MAX_TIMER_INTERVAL_MS = 30 * 60 * 1000;
 
-/** Prompt sent by Auto mode heartbeat to drive continuous progress */
+/** Prompt sent by Timer mode heartbeat to drive continuous progress */
 export const CONTINUE_PROMPT = '继续';
 
 /** Threshold for notifying user about long-running tool (5 minutes) */
@@ -45,7 +45,7 @@ export const TOOL_LONG_RUNNING_MS = 5 * 60 * 1000;
 
 /**
  * Default cooldown when a rate-limit / usage-limit error is detected.
- * Auto mode pauses for this duration before resuming.  (5 minutes)
+ * Timer mode pauses for this duration before resuming.  (5 minutes)
  */
 export const AUTO_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
 
@@ -157,18 +157,18 @@ interface NotebookSession {
   _pendingToolUseIds: Set<string>;
   /** Heartbeat: flag to prevent repeated tool_long_running notifications. */
   _toolLongRunningNotified: boolean;
-  /** Auto mode: whether auto heartbeat is active. */
-  _autoMode: boolean;
-  /** Auto mode: interval timer reference for CONTINUE prompts. */
-  _autoTimer: ReturnType<typeof setInterval> | null;
-  /** Auto mode: interval in ms between CONTINUE prompts. */
-  _autoIntervalMs: number;
-  /** Auto mode: number of CONTINUE prompts sent in this auto session. */
-  _autoIterationCount: number;
-  /** Auto mode: true while an auto-created executeCell is pending (prevents cascade). */
-  _autoExecuting: boolean;
-  /** Auto mode: timestamp until which auto mode is paused (rate limit cooldown). 0 = not paused. */
-  _autoPausedUntil: number;
+  /** Timer mode: whether auto heartbeat is active. */
+  _timerMode: boolean;
+  /** Timer mode: interval timer reference for CONTINUE prompts. */
+  _timerHandle: ReturnType<typeof setInterval> | null;
+  /** Timer mode: interval in ms between CONTINUE prompts. */
+  _timerIntervalMs: number;
+  /** Timer mode: number of CONTINUE prompts sent in this auto session. */
+  _timerIterationCount: number;
+  /** Timer mode: true while an auto-created executeCell is pending (prevents cascade). */
+  _timerExecuting: boolean;
+  /** Timer mode: timestamp until which timer mode is paused (rate limit cooldown). 0 = not paused. */
+  _timerPausedUntil: number;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -281,12 +281,12 @@ export class SessionManager {
       _heartbeatTimer: null,
       _pendingToolUseIds: new Set(),
       _toolLongRunningNotified: false,
-      _autoMode: false,
-      _autoTimer: null,
-      _autoIntervalMs: DEFAULT_AUTO_INTERVAL_MS,
-      _autoIterationCount: 0,
-      _autoExecuting: false,
-      _autoPausedUntil: 0,
+      _timerMode: false,
+      _timerHandle: null,
+      _timerIntervalMs: DEFAULT_TIMER_INTERVAL_MS,
+      _timerIterationCount: 0,
+      _timerExecuting: false,
+      _timerPausedUntil: 0,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -420,8 +420,8 @@ export class SessionManager {
     // Stop old process
     session.agentProcess.stop();
 
-    // Stop auto mode before restarting to prevent stale timer on new process
-    this.stopAutoMode(sessionId);
+    // Stop timer mode before restarting to prevent stale timer on new process
+    this.stopTimerMode(sessionId);
 
     // Clear pending tool IDs (old process won't send tool_result)
     session._pendingToolUseIds.clear();
@@ -458,8 +458,8 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
-    // Stop auto mode before rerunning to prevent timer interference
-    this.stopAutoMode(sessionId);
+    // Stop timer mode before rerunning to prevent timer interference
+    this.stopTimerMode(sessionId);
 
     // 1. Clear all cells' outputs and reset status to pending
     session.notebook = {
@@ -545,8 +545,8 @@ export class SessionManager {
       metadata: { ...session.notebook.metadata, model },
     };
 
-    // Stop auto mode before changing model to prevent timer on stale process
-    this.stopAutoMode(sessionId);
+    // Stop timer mode before changing model to prevent timer on stale process
+    this.stopTimerMode(sessionId);
 
     // Stop old process
     session.agentProcess.stop();
@@ -596,8 +596,8 @@ export class SessionManager {
     // Clear rerun queue so no more cells auto-execute after interrupt
     delete session._rerunQueue;
 
-    // Stop auto mode if active — Esc stops everything
-    this.stopAutoMode(sessionId);
+    // Stop timer mode if active — Esc stops everything
+    this.stopTimerMode(sessionId);
 
     session._interrupted = true;
 
@@ -617,9 +617,9 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Stop heartbeat and auto mode timers
+    // Stop heartbeat and timer mode timers
     this.stopHeartbeat(session);
-    this.stopAutoMode(sessionId);
+    this.stopTimerMode(sessionId);
 
     // D3: Await any pending post-completion work (git commit + autoSave) before closing
     await session._pendingPostComplete.catch(() => {});
@@ -890,75 +890,75 @@ export class SessionManager {
     }
   }
 
-  // ── Auto Mode ──────────────────────────────────────────────────────────────
+  // ── Timer Mode ──────────────────────────────────────────────────────────────
 
   /**
-   * Start Auto mode for a session. Periodically sends CONTINUE prompts
+   * Start Timer mode for a session. Periodically sends CONTINUE prompts
    * to the Claude process to drive continuous progress.
    */
-  startAutoMode(sessionId: string, intervalMs?: number): void {
+  startTimerMode(sessionId: string, intervalMs?: number): void {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
-    // Stop existing auto mode if any
-    this.stopAutoMode(sessionId);
+    // Stop existing timer mode if any
+    this.stopTimerMode(sessionId);
 
-    session._autoMode = true;
-    const rawInterval = intervalMs ?? DEFAULT_AUTO_INTERVAL_MS;
-    session._autoIntervalMs = Math.max(MIN_AUTO_INTERVAL_MS, Math.min(MAX_AUTO_INTERVAL_MS, rawInterval));
-    session._autoIterationCount = 0;
-    session._autoExecuting = false;
-    session._autoPausedUntil = 0;
+    session._timerMode = true;
+    const rawInterval = intervalMs ?? DEFAULT_TIMER_INTERVAL_MS;
+    session._timerIntervalMs = Math.max(MIN_TIMER_INTERVAL_MS, Math.min(MAX_TIMER_INTERVAL_MS, rawInterval));
+    session._timerIterationCount = 0;
+    session._timerExecuting = false;
+    session._timerPausedUntil = 0;
 
-    session._autoTimer = setInterval(() => {
-      this.autoTick(session);
-    }, session._autoIntervalMs);
+    session._timerHandle = setInterval(() => {
+      this.timerTick(session);
+    }, session._timerIntervalMs);
 
-    console.log(`[session ${sessionId}] Auto mode started (${session._autoIntervalMs / 1000}s interval)`);
+    console.log(`[session ${sessionId}] Timer mode started (${session._timerIntervalMs / 1000}s interval)`);
   }
 
   /**
-   * Stop Auto mode for a session. Clears the auto timer and broadcasts auto_stopped.
+   * Stop Timer mode for a session. Clears the timer handle and broadcasts timer_stopped.
    */
-  stopAutoMode(sessionId: string): void {
+  stopTimerMode(sessionId: string): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    if (session._autoTimer) {
-      clearInterval(session._autoTimer);
-      session._autoTimer = null;
+    if (session._timerHandle) {
+      clearInterval(session._timerHandle);
+      session._timerHandle = null;
     }
 
-    if (session._autoMode) {
-      session._autoMode = false;
+    if (session._timerMode) {
+      session._timerMode = false;
       this.broadcast(session, {
-        type: 'auto_stopped',
-        iteration_count: session._autoIterationCount,
+        type: 'timer_stopped',
+        iteration_count: session._timerIterationCount,
       });
-      console.log(`[session ${sessionId}] Auto mode stopped after ${session._autoIterationCount} iterations`);
+      console.log(`[session ${sessionId}] Timer mode stopped after ${session._timerIterationCount} iterations`);
     }
   }
 
-  /** Get auto mode status for a session. */
-  getAutoStatus(sessionId: string): { active: boolean; intervalMs: number; iterationCount: number } | null {
+  /** Get timer mode status for a session. */
+  getTimerStatus(sessionId: string): { active: boolean; intervalMs: number; iterationCount: number } | null {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     return {
-      active: session._autoMode,
-      intervalMs: session._autoIntervalMs,
-      iterationCount: session._autoIterationCount,
+      active: session._timerMode,
+      intervalMs: session._timerIntervalMs,
+      iterationCount: session._timerIterationCount,
     };
   }
 
   /**
-   * Auto mode tick: send CONTINUE prompt to drive LLM progress.
+   * Timer mode tick: send CONTINUE prompt to drive LLM progress.
    * Appends CONTINUE to the running cell; creates a new cell if none is running.
    */
-  private autoTick(session: NotebookSession): void {
-    if (!session._autoMode) return;
+  private timerTick(session: NotebookSession): void {
+    if (!session._timerMode) return;
     if (!session.agentProcess.isAlive()) {
-      console.warn(`[session ${session.id}] Auto tick: agent process not alive, stopping auto mode`);
-      this.stopAutoMode(session.id);
+      console.warn(`[session ${session.id}] Timer tick: agent process not alive, stopping timer mode`);
+      this.stopTimerMode(session.id);
       return;
     }
 
@@ -966,15 +966,15 @@ export class SessionManager {
     let skipReason: string | null = null;
 
     // Rate limit cooldown: skip tick if paused, broadcast resume when cooldown expires
-    if (session._autoPausedUntil > 0) {
-      if (Date.now() < session._autoPausedUntil) {
-        const remainMs = session._autoPausedUntil - Date.now();
+    if (session._timerPausedUntil > 0) {
+      if (Date.now() < session._timerPausedUntil) {
+        const remainMs = session._timerPausedUntil - Date.now();
         skipReason = `rate limit cooldown (${Math.ceil(remainMs / 1000)}s remaining)`;
       } else {
         // Cooldown expired — resume
-        session._autoPausedUntil = 0;
-        console.log(`[session ${session.id}] Auto tick: rate limit cooldown expired, resuming`);
-        this.broadcast(session, { type: 'auto_resumed' });
+        session._timerPausedUntil = 0;
+        console.log(`[session ${session.id}] Timer tick: rate limit cooldown expired, resuming`);
+        this.broadcast(session, { type: 'timer_resumed' });
       }
     }
 
@@ -986,7 +986,7 @@ export class SessionManager {
     // Active output check: skip if agent produced output recently (still working)
     // Quiet threshold = half the session's interval (dynamic, not global constant)
     if (!skipReason) {
-      const quietMs = Math.floor(session._autoIntervalMs / 2);
+      const quietMs = Math.floor(session._timerIntervalMs / 2);
       const outputAge = Date.now() - session._lastOutputTime;
       if (outputAge < quietMs) {
         skipReason = `agent active (output ${Math.floor(outputAge / 1000)}s ago, quiet=${Math.floor(quietMs / 1000)}s)`;
@@ -995,38 +995,38 @@ export class SessionManager {
 
     if (!skipReason) {
       // All checks passed — send CONTINUE
-      session._autoIterationCount++;
+      session._timerIterationCount++;
 
       const runningCellId = findRunningCellId(session.notebook);
       if (runningCellId) {
         try {
           this.appendPrompt(session.id, runningCellId, CONTINUE_PROMPT);
         } catch (err) {
-          console.error(`[session ${session.id}] Auto tick: appendPrompt failed:`, err);
+          console.error(`[session ${session.id}] Timer tick: appendPrompt failed:`, err);
         }
-      } else if (!session._autoExecuting) {
+      } else if (!session._timerExecuting) {
         // No running cell — create a new cell and execute CONTINUE to drive progress
-        // Guard: _autoExecuting prevents cascade when previous executeCell is still pending
-        session._autoExecuting = true;
+        // Guard: _timerExecuting prevents cascade when previous executeCell is still pending
+        session._timerExecuting = true;
         const newCellId = crypto.randomUUID();
-        console.log(`[session ${session.id}] Auto tick #${session._autoIterationCount}: no running cell, creating new cell ${newCellId}`);
+        console.log(`[session ${session.id}] Timer tick #${session._timerIterationCount}: no running cell, creating new cell ${newCellId}`);
         this.executeCell(session.id, newCellId, CONTINUE_PROMPT)
           .catch((err) => {
-            console.error(`[session ${session.id}] Auto tick: executeCell failed:`, err);
+            console.error(`[session ${session.id}] Timer tick: executeCell failed:`, err);
           })
           .finally(() => {
-            session._autoExecuting = false;
+            session._timerExecuting = false;
           });
       }
     } else {
-      console.log(`[session ${session.id}] Auto tick: skipped (${skipReason})`);
+      console.log(`[session ${session.id}] Timer tick: skipped (${skipReason})`);
     }
 
     // Always broadcast heartbeat — lets frontend distinguish "skipped" from "timer dead"
     this.broadcast(session, {
-      type: 'auto_heartbeat',
-      iteration: session._autoIterationCount,
-      interval_ms: session._autoIntervalMs,
+      type: 'timer_heartbeat',
+      iteration: session._timerIterationCount,
+      interval_ms: session._timerIntervalMs,
       skipped: skipReason ?? undefined,
     });
   }
@@ -1221,16 +1221,16 @@ export class SessionManager {
           // If cell already has output, result.result duplicates content from 'assistant' messages.
         }
 
-        // Auto mode: detect rate/usage limit errors and pause to avoid spamming
-        if (result.is_error && result.result && session._autoMode) {
+        // Timer mode: detect rate/usage limit errors and pause to avoid spamming
+        if (result.is_error && result.result && session._timerMode) {
           const isRateLimit = RATE_LIMIT_PATTERNS.some((p) => p.test(result.result));
           if (isRateLimit) {
-            session._autoPausedUntil = Date.now() + AUTO_RATE_LIMIT_COOLDOWN_MS;
-            console.warn(`[session ${session.id}] Rate limit detected, pausing auto mode for ${AUTO_RATE_LIMIT_COOLDOWN_MS / 1000}s`);
+            session._timerPausedUntil = Date.now() + AUTO_RATE_LIMIT_COOLDOWN_MS;
+            console.warn(`[session ${session.id}] Rate limit detected, pausing timer mode for ${AUTO_RATE_LIMIT_COOLDOWN_MS / 1000}s`);
             this.broadcast(session, {
-              type: 'auto_paused',
+              type: 'timer_paused',
               reason: 'rate_limit',
-              resume_at: session._autoPausedUntil,
+              resume_at: session._timerPausedUntil,
               cooldown_ms: AUTO_RATE_LIMIT_COOLDOWN_MS,
             });
           }

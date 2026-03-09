@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 
-describe('AutoStopButton', () => {
-  it('exports AutoStopButton component', async () => {
-    const { AutoStopButton } = await import('../components/AutoStatusBar');
-    expect(AutoStopButton).toBeDefined();
-    expect(typeof AutoStopButton).toBe('function');
+describe('TimerStopButton', () => {
+  it('exports TimerStopButton component', async () => {
+    const { TimerStopButton } = await import('../components/TimerStatusBar');
+    expect(TimerStopButton).toBeDefined();
+    expect(typeof TimerStopButton).toBe('function');
   });
 
   it('exports phase utilities', async () => {
-    const { getPhaseIndex, PHASES, PHASE_MAP } = await import('../components/AutoStatusBar');
+    const { getPhaseIndex, PHASES, PHASE_MAP } = await import('../components/TimerStatusBar');
     expect(PHASES).toEqual(['target', 'plan', 'exec', 'merge']);
     expect(PHASE_MAP['execution']).toBe('exec');
     expect(getPhaseIndex('planning')).toBe(1);
@@ -18,7 +18,7 @@ describe('AutoStopButton', () => {
 
 describe('IterationBadge', () => {
   it('exports IterationBadge component', async () => {
-    const { IterationBadge } = await import('../components/AutoStatusBar');
+    const { IterationBadge } = await import('../components/TimerStatusBar');
     expect(IterationBadge).toBeDefined();
     expect(typeof IterationBadge).toBe('function');
   });
@@ -26,7 +26,7 @@ describe('IterationBadge', () => {
 
 describe('RetryBadge', () => {
   it('exports RetryBadge component', async () => {
-    const { RetryBadge } = await import('../components/AutoStatusBar');
+    const { RetryBadge } = await import('../components/TimerStatusBar');
     expect(RetryBadge).toBeDefined();
     expect(typeof RetryBadge).toBe('function');
   });

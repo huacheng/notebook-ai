@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 describe('autoStatusSlice', () => {
-  it('initializes with null auto status', async () => {
+  it('initializes with null timer status', async () => {
     const { initialAutoStatus } = await import('../store/autoStatusSlice');
     expect(initialAutoStatus.phase).toBeNull();
     expect(initialAutoStatus.phaseProgress).toBeNull();
@@ -13,7 +13,7 @@ describe('autoStatusSlice', () => {
     expect(initialAutoStatus.iteration).toBe(0);
   });
 
-  it('updates auto status from WebSocket message', async () => {
+  it('updates timer status from WebSocket message', async () => {
     const { applyAutoStatus, initialAutoStatus } = await import('../store/autoStatusSlice');
 
     const msg = {
@@ -49,7 +49,7 @@ describe('autoStatusSlice', () => {
     expect(updated.iteration).toBe(5);
   });
 
-  it('clears auto status when phase is null', async () => {
+  it('clears timer status when phase is null', async () => {
     const { applyAutoStatus } = await import('../store/autoStatusSlice');
     const prev = {
       phase: 'execution' as const,

@@ -1,4 +1,4 @@
-import './AutoStatusBar.css';
+import './TimerStatusBar.css';
 import type { CheckScore } from '../store/autoStatusSlice';
 
 export const PHASES = ['target', 'plan', 'exec', 'merge'] as const;
@@ -36,24 +36,24 @@ export function PhaseProgressBar({ phase, phaseProgress }: PhaseProgressBarProps
   const currentPhaseIndex = getPhaseIndex(phase);
 
   return (
-    <div className="auto-phase-bar">
+    <div className="timer-phase-bar">
       {PHASES.map((p, i) => {
         const isComplete = i < currentPhaseIndex;
         const isCurrent = i === currentPhaseIndex;
         const className = [
-          'auto-phase-step',
-          isComplete ? 'auto-phase-complete' : '',
-          isCurrent ? 'auto-phase-current' : '',
+          'timer-phase-step',
+          isComplete ? 'timer-phase-complete' : '',
+          isCurrent ? 'timer-phase-current' : '',
         ].filter(Boolean).join(' ');
 
         return (
           <span key={p}>
-            {i > 0 && <span className="auto-phase-arrow">&rarr;</span>}
+            {i > 0 && <span className="timer-phase-arrow">&rarr;</span>}
             <span className={className}>
-              {isComplete && <span className="auto-phase-check">&#x2713;</span>}
+              {isComplete && <span className="timer-phase-check">&#x2713;</span>}
               {p}
               {isCurrent && phaseProgress != null && (
-                <span className="auto-phase-progress">
+                <span className="timer-phase-progress">
                   {Math.round(phaseProgress * 100)}%
                 </span>
               )}
@@ -75,25 +75,25 @@ export function ScorePanel({ checkScore, expanded, onToggle }: ScorePanelProps) 
   if (!checkScore) return null;
 
   return (
-    <div className="auto-score-panel">
-      <button className="auto-score-toggle" onClick={onToggle}>
+    <div className="timer-score-panel">
+      <button className="timer-score-toggle" onClick={onToggle}>
         {checkScore.overall.toFixed(2)}
-        <span className="auto-score-caret">{expanded ? '\u25B2' : '\u25BC'}</span>
+        <span className="timer-score-caret">{expanded ? '\u25B2' : '\u25BC'}</span>
       </button>
       {expanded && (
-        <div className="auto-score-details">
+        <div className="timer-score-details">
           {Object.entries(D_LABELS).map(([key, label]) => {
             const score = checkScore[key as keyof CheckScore];
             return (
-              <div key={key} className="auto-score-row">
-                <span className="auto-score-label">{label}</span>
-                <div className="auto-score-bar-bg">
+              <div key={key} className="timer-score-row">
+                <span className="timer-score-label">{label}</span>
+                <div className="timer-score-bar-bg">
                   <div
-                    className="auto-score-bar-fill"
+                    className="timer-score-bar-fill"
                     style={{ width: `${score * 100}%` }}
                   />
                 </div>
-                <span className="auto-score-value">{score.toFixed(2)}</span>
+                <span className="timer-score-value">{score.toFixed(2)}</span>
               </div>
             );
           })}
@@ -111,7 +111,7 @@ export function StageIndicator({ stage }: StageIndicatorProps) {
   if (!stage || stage.total <= 1) return null;
 
   return (
-    <span className="auto-stage-indicator">
+    <span className="timer-stage-indicator">
       Stage {stage.current}/{stage.total}
     </span>
   );
@@ -124,7 +124,7 @@ interface IterationBadgeProps {
 export function IterationBadge({ iteration }: IterationBadgeProps) {
   if (iteration <= 0) return null;
   return (
-    <span className="auto-iteration-badge" title="Current iteration">
+    <span className="timer-iteration-badge" title="Current iteration">
       iter {iteration}
     </span>
   );
@@ -137,7 +137,7 @@ interface RetryBadgeProps {
 export function RetryBadge({ retryCount }: RetryBadgeProps) {
   if (retryCount <= 0) return null;
   return (
-    <span className="auto-retry-badge" title="Retry count at current checkpoint">
+    <span className="timer-retry-badge" title="Retry count at current checkpoint">
       retry {retryCount}
     </span>
   );
@@ -154,35 +154,35 @@ export function MultiStageView({ stage, phase, phaseProgress, checkScore }: Mult
   const currentPhaseIndex = getPhaseIndex(phase);
 
   return (
-    <div className="auto-multistage">
+    <div className="timer-multistage">
       {Array.from({ length: stage.total }, (_, i) => {
         const stageNum = i + 1;
         const isCurrent = stageNum === stage.current;
         const isComplete = stageNum < stage.current;
         const statusLabel = isComplete ? 'complete' : isCurrent ? (phase ?? 'pending') : 'pending';
-        const statusClass = isComplete ? 'auto-ms-complete' : isCurrent ? 'auto-ms-current' : 'auto-ms-pending';
+        const statusClass = isComplete ? 'timer-ms-complete' : isCurrent ? 'timer-ms-current' : 'timer-ms-pending';
 
         return (
-          <div key={stageNum} className={`auto-ms-card ${statusClass}`}>
-            <div className="auto-ms-header">
-              <span className="auto-ms-title">Stage {stageNum}/{stage.total}</span>
-              <span className="auto-ms-status">{statusLabel}</span>
+          <div key={stageNum} className={`timer-ms-card ${statusClass}`}>
+            <div className="timer-ms-header">
+              <span className="timer-ms-title">Stage {stageNum}/{stage.total}</span>
+              <span className="timer-ms-status">{statusLabel}</span>
               {isComplete && checkScore && (
-                <span className="auto-ms-score">{checkScore.overall.toFixed(2)}</span>
+                <span className="timer-ms-score">{checkScore.overall.toFixed(2)}</span>
               )}
             </div>
-            <div className="auto-ms-phases">
+            <div className="timer-ms-phases">
               {PHASES.map((p, pi) => {
-                let cls = 'auto-ms-phase';
+                let cls = 'timer-ms-phase';
                 if (isCurrent) {
-                  if (pi < currentPhaseIndex) cls += ' auto-ms-phase-done';
-                  else if (pi === currentPhaseIndex) cls += ' auto-ms-phase-active';
+                  if (pi < currentPhaseIndex) cls += ' timer-ms-phase-done';
+                  else if (pi === currentPhaseIndex) cls += ' timer-ms-phase-active';
                 } else if (isComplete) {
-                  cls += ' auto-ms-phase-done';
+                  cls += ' timer-ms-phase-done';
                 }
                 return (
                   <span key={p}>
-                    {pi > 0 && <span className="auto-ms-arrow">&rarr;</span>}
+                    {pi > 0 && <span className="timer-ms-arrow">&rarr;</span>}
                     <span className={cls}>
                       {((isComplete) || (isCurrent && pi < currentPhaseIndex)) && '\u2713'}
                       {isCurrent && pi === currentPhaseIndex && phaseProgress != null
@@ -200,18 +200,18 @@ export function MultiStageView({ stage, phase, phaseProgress, checkScore }: Mult
   );
 }
 
-interface AutoStopButtonProps {
+interface TimerStopButtonProps {
   onStop: () => void;
   disabled?: boolean;
 }
 
-export function AutoStopButton({ onStop, disabled }: AutoStopButtonProps) {
+export function TimerStopButton({ onStop, disabled }: TimerStopButtonProps) {
   return (
     <button
-      className="auto-stop-btn"
+      className="timer-stop-btn"
       onClick={onStop}
       disabled={disabled}
-      title="Stop auto mode"
+      title="Stop timer mode"
     >
       Stop
     </button>

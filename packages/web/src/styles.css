@@ -1036,20 +1036,20 @@ textarea.cell-input {
   border-color: var(--color-error);
 }
 
-.notebook-statusbar-auto-btn {
+.notebook-statusbar-timer-btn {
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
-.notebook-statusbar-auto-btn.active {
+.notebook-statusbar-timer-btn.active {
   background: var(--color-primary);
   color: #fff;
   font-weight: 600;
 }
-.notebook-statusbar-auto-btn:hover:not(:disabled):not(.active) {
+.notebook-statusbar-timer-btn:hover:not(:disabled):not(.active) {
   background: var(--color-primary-light);
 }
 
-.auto-beat-badge {
+.timer-beat-badge {
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--color-primary);
@@ -1058,7 +1058,7 @@ textarea.cell-input {
   background: var(--color-primary-light);
 }
 
-.auto-beat-badge.paused {
+.timer-beat-badge.paused {
   color: var(--color-error);
   background: var(--bg-error);
 }

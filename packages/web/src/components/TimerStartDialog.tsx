@@ -1,28 +1,28 @@
 import { useState } from 'react';
-import './AutoStartDialog.css';
+import './TimerStartDialog.css';
 
 export const DEFAULT_MAX_ITERATIONS = 20;
 export const DEFAULT_TIMEOUT_MINUTES = 30;
 
-interface AutoStartDialogProps {
+interface TimerStartDialogProps {
   onStart: (opts: { maxIterations: number; timeoutMinutes: number }) => void;
   onCancel: () => void;
 }
 
-export function AutoStartDialog({ onStart, onCancel }: AutoStartDialogProps) {
+export function TimerStartDialog({ onStart, onCancel }: TimerStartDialogProps) {
   const [maxIterations, setMaxIterations] = useState(DEFAULT_MAX_ITERATIONS);
   const [timeoutMinutes, setTimeoutMinutes] = useState(DEFAULT_TIMEOUT_MINUTES);
 
   return (
-    <div className="auto-start-overlay" onClick={onCancel}>
-      <div className="auto-start-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="auto-start-title">Start Auto Mode</h3>
+    <div className="timer-start-overlay" onClick={onCancel}>
+      <div className="timer-start-dialog" onClick={(e) => e.stopPropagation()}>
+        <h3 className="timer-start-title">Start Timer Mode</h3>
 
-        <label className="auto-start-field">
-          <span className="auto-start-label">Max Iterations</span>
+        <label className="timer-start-field">
+          <span className="timer-start-label">Max Iterations</span>
           <input
             type="number"
-            className="auto-start-input"
+            className="timer-start-input"
             value={maxIterations}
             min={1}
             max={100}
@@ -30,11 +30,11 @@ export function AutoStartDialog({ onStart, onCancel }: AutoStartDialogProps) {
           />
         </label>
 
-        <label className="auto-start-field">
-          <span className="auto-start-label">Timeout (minutes)</span>
+        <label className="timer-start-field">
+          <span className="timer-start-label">Timeout (minutes)</span>
           <input
             type="number"
-            className="auto-start-input"
+            className="timer-start-input"
             value={timeoutMinutes}
             min={1}
             max={180}
@@ -42,10 +42,10 @@ export function AutoStartDialog({ onStart, onCancel }: AutoStartDialogProps) {
           />
         </label>
 
-        <div className="auto-start-actions">
-          <button className="auto-start-cancel" onClick={onCancel}>Cancel</button>
+        <div className="timer-start-actions">
+          <button className="timer-start-cancel" onClick={onCancel}>Cancel</button>
           <button
-            className="auto-start-confirm"
+            className="timer-start-confirm"
             onClick={() => onStart({ maxIterations, timeoutMinutes })}
           >
             Start

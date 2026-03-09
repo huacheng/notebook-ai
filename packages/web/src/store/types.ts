@@ -105,11 +105,11 @@ export interface NotebookStore {
   taskStatus: Record<string, unknown> | null;
   taskStatuses: Record<string, Record<string, unknown> | null>;
 
-  // ── Auto heartbeat mode ──────────────────────────────────────────────
-  autoMode: boolean;
-  autoIterationCount: number;
-  autoPaused: boolean;
-  autoPausedResumeAt: number;
+  // ── Timer mode (heartbeat) ───────────────────────────────────────────
+  timerMode: boolean;
+  timerIterationCount: number;
+  timerPaused: boolean;
+  timerPausedResumeAt: number;
 
   // ── WebSocket state ────────────────────────────────────────────────────
   ws: WebSocket | null;

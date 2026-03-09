@@ -944,24 +944,24 @@ export function setupWebSocket(
           break;
         }
 
-        case 'auto_start': {
+        case 'timer_start': {
           const { session_id, interval_ms } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
-            sessionManager.startAutoMode(session_id, interval_ms);
-            sessionManager.broadcastToSession(session_id, { type: 'auto_started', session_id, interval_ms: interval_ms ?? null });
+            sessionManager.startTimerMode(session_id, interval_ms);
+            sessionManager.broadcastToSession(session_id, { type: 'timer_started', session_id, interval_ms: interval_ms ?? null });
           } catch (err) {
             sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }
 
-        case 'auto_stop': {
+        case 'timer_stop': {
           const { session_id } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
-            sessionManager.stopAutoMode(session_id);
-            sendToClient(ws, { type: 'auto_stopped_ack', session_id });
+            sessionManager.stopTimerMode(session_id);
+            sendToClient(ws, { type: 'timer_stopped_ack', session_id });
           } catch (err) {
             sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }

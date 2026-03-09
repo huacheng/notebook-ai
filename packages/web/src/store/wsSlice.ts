@@ -151,7 +151,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (get().ws === ws) {
         stopPing();
         // D3: Clear loadingCellIds on disconnect to avoid stuck loading states
-        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), autoMode: false, autoIterationCount: 0, autoPaused: false, autoPausedResumeAt: 0 });
+        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
       }
     };
 
@@ -609,45 +609,45 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           });
           break;
         }
-        case 'auto_heartbeat': {
-          // Auto mode heartbeat tick — update iteration count
+        case 'timer_heartbeat': {
+          // Timer mode heartbeat tick — update iteration count
           const hbSid = (parsed as any).session_id ?? msgSessionId;
           if (!hbSid || hbSid === get().sessionId) {
             set({
-              autoIterationCount: (parsed as any).iteration ?? 0,
+              timerIterationCount: (parsed as any).iteration ?? 0,
             });
           }
           break;
         }
-        case 'auto_stopped': {
-          // Auto mode was stopped (by Esc, explicit stop, or process death)
+        case 'timer_stopped': {
+          // Timer mode was stopped (by Esc, explicit stop, or process death)
           const asSid2 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid2 || asSid2 === get().sessionId) {
-            set({ autoMode: false, autoIterationCount: 0, autoPaused: false, autoPausedResumeAt: 0 });
+            set({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
           }
           break;
         }
-        case 'auto_started': {
+        case 'timer_started': {
           const asSid3 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid3 || asSid3 === get().sessionId) {
-            set({ autoMode: true, autoPaused: false, autoPausedResumeAt: 0 });
+            set({ timerMode: true, timerPaused: false, timerPausedResumeAt: 0 });
           }
           break;
         }
-        case 'auto_paused': {
+        case 'timer_paused': {
           const apSid = (parsed as any).session_id ?? msgSessionId;
           if (!apSid || apSid === get().sessionId) {
             set({
-              autoPaused: true,
-              autoPausedResumeAt: (parsed as any).resume_at ?? 0,
+              timerPaused: true,
+              timerPausedResumeAt: (parsed as any).resume_at ?? 0,
             });
           }
           break;
         }
-        case 'auto_resumed': {
+        case 'timer_resumed': {
           const arSid = (parsed as any).session_id ?? msgSessionId;
           if (!arSid || arSid === get().sessionId) {
-            set({ autoPaused: false, autoPausedResumeAt: 0 });
+            set({ timerPaused: false, timerPausedResumeAt: 0 });
           }
           break;
         }
@@ -880,10 +880,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, sessionId } = get();
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
       ws.send(JSON.stringify({ type: 'interrupt_cell', session_id: sessionId }));
-      // Also stop auto mode if active — Esc stops everything
-      if (get().autoMode) {
-        ws.send(JSON.stringify({ type: 'auto_stop', session_id: sessionId }));
-        set({ autoMode: false, autoIterationCount: 0, autoPaused: false, autoPausedResumeAt: 0 });
+      // Also stop timer mode if active — Esc stops everything
+      if (get().timerMode) {
+        ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
+        set({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
       }
     }
   },

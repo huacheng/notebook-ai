@@ -5,36 +5,37 @@ import { Cell } from './Cell';
 import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
-import { PhaseProgressBar, ScorePanel } from './AutoStatusBar';
+import { PhaseProgressBar, ScorePanel } from './TimerStatusBar';
 
-// ── Auto toggle button ──────────────────────────────────────────────────────
+// ── Timer toggle button ─────────────────────────────────────────────────────
 
-function AutoToggleButton() {
+function TimerToggleButton() {
+  const t = useT();
   const ws = useStore((s) => s.ws);
   const sessionId = useStore((s) => s.sessionId);
-  const autoMode = useStore((s) => s.autoMode);
+  const timerMode = useStore((s) => s.timerMode);
   const wsStatus = useStore((s) => s.wsStatus);
   const connected = wsStatus === 'connected';
 
   const handleToggle = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    if (autoMode) {
-      ws.send(JSON.stringify({ type: 'auto_stop', session_id: sessionId }));
-      useStore.setState({ autoMode: false, autoIterationCount: 0 });
+    if (timerMode) {
+      ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
+      useStore.setState({ timerMode: false, timerIterationCount: 0 });
     } else {
-      ws.send(JSON.stringify({ type: 'auto_start', session_id: sessionId }));
-      useStore.setState({ autoMode: true, autoIterationCount: 0 });
+      ws.send(JSON.stringify({ type: 'timer_start', session_id: sessionId }));
+      useStore.setState({ timerMode: true, timerIterationCount: 0 });
     }
   };
 
   return (
     <button
-      className={`notebook-statusbar-btn notebook-statusbar-auto-btn${autoMode ? ' active' : ''}`}
+      className={`notebook-statusbar-btn notebook-statusbar-timer-btn${timerMode ? ' active' : ''}`}
       onClick={handleToggle}
       disabled={!connected}
-      title={autoMode ? 'Stop Auto mode' : 'Start Auto mode'}
+      title={timerMode ? t('status.timerStopTitle') : t('status.timerStartTitle')}
     >
-      Auto
+      {t('status.timer')}
     </button>
   );
 }
@@ -148,7 +149,7 @@ function NotebookStatusBar() {
             {t('status.esc')}
           </button>
         )}
-        <AutoToggleButton />
+        <TimerToggleButton />
         <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}
@@ -420,9 +421,9 @@ export function Notebook() {
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
   const taskStatus = useStore((s) => s.taskStatus);
-  const autoMode = useStore((s) => s.autoMode);
-  const autoIterationCount = useStore((s) => s.autoIterationCount);
-  const autoPaused = useStore((s) => s.autoPaused);
+  const timerMode = useStore((s) => s.timerMode);
+  const timerIterationCount = useStore((s) => s.timerIterationCount);
+  const timerPaused = useStore((s) => s.timerPaused);
   const autoStatus = useStore((s) => s.autoStatus);
   const [scoreExpanded, setScoreExpanded] = useState(false);
   const cells = notebook?.cells ?? [];
@@ -480,7 +481,7 @@ export function Notebook() {
       <NotebookStatusBar />
       {/* Task lifecycle status bar — always visible when .status.json exists */}
       {(taskStatus || autoStatus.phase) && (
-        <div className="auto-status-container">
+        <div className="timer-status-container">
           <PhaseProgressBar
             phase={(taskStatus as any)?.step ?? autoStatus.phase}
             phaseProgress={autoStatus.phaseProgress}
@@ -492,12 +493,12 @@ export function Notebook() {
               onToggle={() => setScoreExpanded(!scoreExpanded)}
             />
           )}
-          {autoMode && (
+          {timerMode && (
             <span
-              className={`auto-beat-badge${autoPaused ? ' paused' : ''}`}
-              title={autoPaused ? 'Auto paused (rate limit cooldown)' : 'Auto heartbeat active'}
+              className={`timer-beat-badge${timerPaused ? ' paused' : ''}`}
+              title={timerPaused ? 'Timer paused (rate limit cooldown)' : 'Timer heartbeat active'}
             >
-              {autoPaused ? 'paused' : `beat:${autoIterationCount}`}
+              {timerPaused ? 'paused' : `beat:${timerIterationCount}`}
             </span>
           )}
         </div>

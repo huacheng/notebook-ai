@@ -46,60 +46,60 @@ describe('Session Heartbeat & Auto Mode', () => {
     });
   });
 
-  describe('Auto mode', () => {
-    it('should have DEFAULT_AUTO_INTERVAL_MS constant', () => {
+  describe('Timer mode', () => {
+    it('should have DEFAULT_TIMER_INTERVAL_MS constant', () => {
       const src = sessionSrc();
-      expect(src).toMatch(/DEFAULT_AUTO_INTERVAL_MS\s*=/);
+      expect(src).toMatch(/DEFAULT_TIMER_INTERVAL_MS\s*=/);
     });
 
-    it('should have _autoMode field in session', () => {
+    it('should have _timerMode field in session', () => {
       const src = sessionSrc();
-      expect(src).toContain('_autoMode');
+      expect(src).toContain('_timerMode');
     });
 
-    it('should have _autoTimer field in session', () => {
+    it('should have _timerHandle field in session', () => {
       const src = sessionSrc();
-      expect(src).toContain('_autoTimer');
+      expect(src).toContain('_timerHandle');
     });
 
-    it('should have _autoIntervalMs field in session', () => {
+    it('should have _timerIntervalMs field in session', () => {
       const src = sessionSrc();
-      expect(src).toContain('_autoIntervalMs');
+      expect(src).toContain('_timerIntervalMs');
     });
 
-    it('should have _autoIterationCount field in session', () => {
+    it('should have _timerIterationCount field in session', () => {
       const src = sessionSrc();
-      expect(src).toContain('_autoIterationCount');
+      expect(src).toContain('_timerIterationCount');
     });
 
-    it('should have startAutoMode method', () => {
+    it('should have startTimerMode method', () => {
       const src = sessionSrc();
-      expect(src).toMatch(/startAutoMode\s*\(/);
+      expect(src).toMatch(/startTimerMode\s*\(/);
     });
 
-    it('should have stopAutoMode method', () => {
+    it('should have stopTimerMode method', () => {
       const src = sessionSrc();
-      expect(src).toMatch(/stopAutoMode\s*\(/);
+      expect(src).toMatch(/stopTimerMode\s*\(/);
     });
 
-    it('should broadcast auto_heartbeat on each tick', () => {
+    it('should broadcast timer_heartbeat on each tick', () => {
       const src = sessionSrc();
-      expect(src).toContain('auto_heartbeat');
+      expect(src).toContain('timer_heartbeat');
     });
 
-    it('should broadcast auto_stopped when stopping', () => {
+    it('should broadcast timer_stopped when stopping', () => {
       const src = sessionSrc();
-      expect(src).toContain('auto_stopped');
+      expect(src).toContain('timer_stopped');
     });
 
-    it('should use CONTINUE_PROMPT in autoTick', () => {
+    it('should use CONTINUE_PROMPT in timerTick', () => {
       const src = sessionSrc();
-      expect(src).toMatch(/autoTick[\s\S]*?CONTINUE_PROMPT/);
+      expect(src).toMatch(/timerTick[\s\S]*?CONTINUE_PROMPT/);
     });
 
-    it('interruptCell should stop auto mode', () => {
+    it('interruptCell should stop timer mode', () => {
       const src = sessionSrc();
-      const match = src.match(/interruptCell[\s\S]*?stopAutoMode/);
+      const match = src.match(/interruptCell[\s\S]*?stopTimerMode/);
       expect(match).toBeTruthy();
     });
   });
@@ -139,9 +139,9 @@ describe('Session Heartbeat & Auto Mode', () => {
       expect(match).toBeTruthy();
     });
 
-    it('should stop auto mode on session close', () => {
+    it('should stop timer mode on session close', () => {
       const src = sessionSrc();
-      const match = src.match(/closeSession[\s\S]*?stopAutoMode/);
+      const match = src.match(/closeSession[\s\S]*?stopTimerMode/);
       expect(match).toBeTruthy();
     });
   });

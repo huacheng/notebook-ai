@@ -461,14 +461,14 @@ export const AppendPromptSchema = z.object({
   images: z.array(PromptImageSchema).optional(),
 });
 
-export const AutoStartSchema = z.object({
-  type: z.literal('auto_start'),
+export const TimerStartSchema = z.object({
+  type: z.literal('timer_start'),
   session_id: z.string(),
   interval_ms: z.number().min(10000).max(1800000).optional(),
 });
 
-export const AutoStopSchema = z.object({
-  type: z.literal('auto_stop'),
+export const TimerStopSchema = z.object({
+  type: z.literal('timer_stop'),
   session_id: z.string(),
 });
 
@@ -504,8 +504,8 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   GitDiffRequestSchema,
   UrlCaptureRequestSchema,
   AppendPromptSchema,
-  AutoStartSchema,
-  AutoStopSchema,
+  TimerStartSchema,
+  TimerStopSchema,
   TaskStatusSubscribeSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
@@ -1003,34 +1003,34 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
     status: z.unknown(),
   }),
   z.object({
-    type: z.literal('auto_heartbeat'),
+    type: z.literal('timer_heartbeat'),
     session_id: z.string(),
     iteration: z.number(),
     interval_ms: z.number(),
   }),
   z.object({
-    type: z.literal('auto_stopped'),
+    type: z.literal('timer_stopped'),
     session_id: z.string(),
     iteration_count: z.number().optional(),
   }),
   z.object({
-    type: z.literal('auto_started'),
+    type: z.literal('timer_started'),
     session_id: z.string(),
     interval_ms: z.number().nullable().optional(),
   }),
   z.object({
-    type: z.literal('auto_stopped_ack'),
+    type: z.literal('timer_stopped_ack'),
     session_id: z.string(),
   }),
   z.object({
-    type: z.literal('auto_paused'),
+    type: z.literal('timer_paused'),
     session_id: z.string().optional(),
     reason: z.string(),
     resume_at: z.number(),
     cooldown_ms: z.number(),
   }),
   z.object({
-    type: z.literal('auto_resumed'),
+    type: z.literal('timer_resumed'),
     session_id: z.string().optional(),
   }),
   z.object({

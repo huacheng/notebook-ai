@@ -44,6 +44,9 @@ export const messages: Record<Language, Record<string, string>> = {
     'status.slideBack': '◂ Notebook',
     'status.slideOpenTitle': 'Open Slide view',
     'status.slideBackTitle': 'Back to Notebook',
+    'status.timer': 'Timer',
+    'status.timerStartTitle': 'Start Timer',
+    'status.timerStopTitle': 'Stop Timer',
 
     // ── Modals ───────────────────────────────────────────────────────────
     'modal.deleteCells': 'Delete {0} cell(s)?',
@@ -326,6 +329,9 @@ export const messages: Record<Language, Record<string, string>> = {
     'status.slideBack': '◂ Notebook',
     'status.slideOpenTitle': '打开幻灯片视图',
     'status.slideBackTitle': '返回 Notebook',
+    'status.timer': '定时器',
+    'status.timerStartTitle': '启动定时器',
+    'status.timerStopTitle': '停止定时器',
 
     // ── Modals ───────────────────────────────────────────────────────────
     'modal.deleteCells': '删除 {0} 个 cell？',

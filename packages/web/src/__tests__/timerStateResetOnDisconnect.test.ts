@@ -1,5 +1,5 @@
 /**
- * Tests that auto mode state is reset when WebSocket disconnects,
+ * Tests that timer mode state is reset when WebSocket disconnects,
  * preventing stale UI (iteration count, active toggle) on reconnect.
  */
 import { describe, it, expect } from 'vitest';
@@ -9,19 +9,19 @@ import * as path from 'path';
 const wsSliceSrc = () =>
   fs.readFileSync(path.resolve(__dirname, '../store/wsSlice.ts'), 'utf-8');
 
-describe('Auto state reset on disconnect', () => {
-  it('should reset autoMode on ws disconnect', () => {
+describe('Timer state reset on disconnect', () => {
+  it('should reset timerMode on ws disconnect', () => {
     const src = wsSliceSrc();
     // Find the onclose handler that sets wsStatus: 'disconnected' with ws: null (the real close handler)
     const oncloseBlock = src.match(/wsStatus:\s*'disconnected',\s*ws:\s*null[\s\S]*?\}/);
     expect(oncloseBlock).toBeTruthy();
-    expect(oncloseBlock![0]).toContain('autoMode');
+    expect(oncloseBlock![0]).toContain('timerMode');
   });
 
-  it('should reset autoIterationCount on ws disconnect', () => {
+  it('should reset timerIterationCount on ws disconnect', () => {
     const src = wsSliceSrc();
     const oncloseBlock = src.match(/wsStatus:\s*'disconnected',\s*ws:\s*null[\s\S]*?\}/);
     expect(oncloseBlock).toBeTruthy();
-    expect(oncloseBlock![0]).toContain('autoIterationCount');
+    expect(oncloseBlock![0]).toContain('timerIterationCount');
   });
 });

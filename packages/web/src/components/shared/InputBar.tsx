@@ -263,6 +263,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
 
   // Command shortcuts
   const commands = [
+    { cmd: 'task-ai:auto', icon: '🤖' },
     { cmd: 'task-ai:research', icon: '🔍' },
     { cmd: 'task-ai:target', icon: '🎯' },
     { cmd: 'task-ai:plan', icon: '📝' },
