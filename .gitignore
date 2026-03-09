@@ -5,6 +5,7 @@ certs/
 .env
 *.db
 .worktrees/
+.claude/worktrees/
 AiTasks/**/.tmp-annotations.json
 AiTasks/**/.auto-signal
 AiTasks/**/.auto-signal.tmp

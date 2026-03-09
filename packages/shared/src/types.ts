@@ -72,25 +72,19 @@ export const PromptImageSchema = z.object({
 });
 export type PromptImage = z.infer<typeof PromptImageSchema>;
 
-// ── Prompt Queue ────────────────────────────────────────────────────────────
-export const QueuedPromptSchema = z.object({
-  id: z.string(),
-  source: z.string(),
+// ── Prompt Segment (append-to-running-cell model) ───────────────────────────
+export const PromptSegmentSchema = z.object({
+  text: z.string(),
   images: z.array(PromptImageSchema).optional(),
-  createdAt: z.string(),
+  addedAt: z.string(),
 });
-export type QueuedPrompt = z.infer<typeof QueuedPromptSchema>;
-
-export const PromptQueueFileSchema = z.object({
-  version: z.number().int().nonnegative(),
-  items: z.array(QueuedPromptSchema),
-});
-export type PromptQueueFile = z.infer<typeof PromptQueueFileSchema>;
+export type PromptSegment = z.infer<typeof PromptSegmentSchema>;
 
 export const PromptCellSchema = BaseCellSchema.extend({
   type: z.literal('prompt'),
   source: z.string(),
   images: z.array(PromptImageSchema).optional(),
+  segments: z.array(PromptSegmentSchema).optional(),
   outputs: z.array(CellOutputSchema).default([]),
   git_diff: z.string().optional(),
   duration_ms: z.number().optional(),
@@ -457,33 +451,30 @@ export const SuggestNextStepSchema = z.object({
   context: z.string().optional(),
 });
 
-// ─── Prompt Queue Messages ───
+// ─── Prompt Append Message ───
 
-export const QueuePromptSchema = z.object({
-  type: z.literal('queue_prompt'),
+export const AppendPromptSchema = z.object({
+  type: z.literal('append_prompt'),
   session_id: z.string(),
-  prompt: QueuedPromptSchema,
-  version: z.number().int().nonnegative(),
+  cell_id: z.string(),
+  source: z.string(),
+  images: z.array(PromptImageSchema).optional(),
 });
 
-export const QueueRemoveSchema = z.object({
-  type: z.literal('queue_remove'),
+export const AutoStartSchema = z.object({
+  type: z.literal('auto_start'),
   session_id: z.string(),
-  id: z.string(),
-  version: z.number().int().nonnegative(),
+  interval_ms: z.number().min(10000).max(1800000).optional(),
 });
 
-export const QueueReorderSchema = z.object({
-  type: z.literal('queue_reorder'),
+export const AutoStopSchema = z.object({
+  type: z.literal('auto_stop'),
   session_id: z.string(),
-  order: z.array(z.string()),
-  version: z.number().int().nonnegative(),
 });
 
-export const AutoSubscribeSchema = z.object({
-  type: z.literal('auto_subscribe'),
+export const TaskStatusSubscribeSchema = z.object({
+  type: z.literal('task_status_subscribe'),
   session_id: z.string(),
-  task_dir: z.string().optional(),
 });
 
 export const WSClientMessageSchema = z.discriminatedUnion('type', [
@@ -512,10 +503,10 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   GitCommitFilesRequestSchema,
   GitDiffRequestSchema,
   UrlCaptureRequestSchema,
-  QueuePromptSchema,
-  QueueRemoveSchema,
-  QueueReorderSchema,
-  AutoSubscribeSchema,
+  AppendPromptSchema,
+  AutoStartSchema,
+  AutoStopSchema,
+  TaskStatusSubscribeSchema,
   z.object({ type: z.literal('rerun_notebook'), session_id: z.string() }),
   z.object({ type: z.literal('interrupt_cell'), session_id: z.string() }),
   z.object({
@@ -873,20 +864,13 @@ export const FilesChangedSchema = z.object({
   }).optional(),
 });
 
-// ─── Prompt Queue Server Messages ───
+// ─── Prompt Append Server Message ───
 
-export const QueueStateSchema = z.object({
-  type: z.literal('queue_state'),
+export const CellAppendedSchema = z.object({
+  type: z.literal('cell_appended'),
   session_id: z.string(),
-  items: z.array(QueuedPromptSchema),
-  version: z.number().int().nonnegative(),
-});
-
-export const QueueErrorSchema = z.object({
-  type: z.literal('queue_error'),
-  session_id: z.string(),
-  error: z.string(),
-  code: z.string(),
+  cell_id: z.string(),
+  segment: PromptSegmentSchema,
 });
 
 // ─── Heartbeat Events ───
@@ -1008,12 +992,36 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   GitDiffErrorSchema,
   UrlCaptureResultSchema,
   AutosaveErrorSchema,
-  QueueStateSchema,
-  QueueErrorSchema,
+  CellAppendedSchema,
   ProcessDeadSchema,
   StuckExhaustedSchema,
   ToolLongRunningSchema,
   AutoStatusMessageSchema,
+  z.object({
+    type: z.literal('task_status'),
+    session_id: z.string(),
+    status: z.unknown(),
+  }),
+  z.object({
+    type: z.literal('auto_heartbeat'),
+    session_id: z.string(),
+    iteration: z.number(),
+    interval_ms: z.number(),
+  }),
+  z.object({
+    type: z.literal('auto_stopped'),
+    session_id: z.string(),
+    iteration_count: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal('auto_started'),
+    session_id: z.string(),
+    interval_ms: z.number().nullable().optional(),
+  }),
+  z.object({
+    type: z.literal('auto_stopped_ack'),
+    session_id: z.string(),
+  }),
   z.object({
     type: z.literal('notebook_digest'),
     session_id: z.string(),

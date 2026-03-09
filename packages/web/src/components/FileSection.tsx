@@ -33,6 +33,7 @@ interface ListResult {
   dirPath: string;
   files: FileEntry[];
   truncated: boolean;
+  exists?: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -224,6 +225,8 @@ export interface FileSectionProps {
   onSubPathChange?: (subPath: string) => void;
   /** Optional callback for directory clicks. Return true (or resolve true) to prevent default navigateInto. */
   onDirClick?: (subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => boolean | void | Promise<boolean | void>;
+  /** Called when the directory existence is determined from API response. */
+  onExists?: (exists: boolean) => void;
 }
 
 export function FileSection({
@@ -241,6 +244,7 @@ export function FileSection({
   onSubPathChange,
   refreshKey,
   onDirClick,
+  onExists,
 }: FileSectionProps) {
   const t = useT();
   const [subPath, setSubPath] = useState(initialPath);
@@ -276,6 +280,7 @@ export function FileSection({
       if (cached) {
         setFiles(cached.files);
         setCurrentDirPath(cached.dirPath);
+        onExists?.(cached.exists !== false);
         return; // Skip REST — WS already pushed fresh data
       }
     }
@@ -286,6 +291,12 @@ export function FileSection({
       if (cached) {
         setFiles(cached.files);
         setCurrentDirPath(cached.dirPath);
+        // If cached response says directory doesn't exist, skip the background refetch
+        // entirely — only a watcher refreshKey can re-trigger the check.
+        if (cached.exists === false) {
+          onExists?.(false);
+          return;
+        }
         // Don't set loading — render cached data immediately, fetch in background
       } else {
         setLoading(true);
@@ -306,6 +317,7 @@ export function FileSection({
       setFiles(result.files);
       setCurrentDirPath(result.dirPath);
       cacheSet(cacheKey, result);
+      onExists?.(result.exists !== false);
     } catch (err) {
       if (!fetchGuard.isCurrent(id)) return;
       if (!silent) setError(String(err));

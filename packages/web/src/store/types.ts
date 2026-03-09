@@ -7,7 +7,6 @@ import type {
   SlideSection,
   NotebookListItem,
   PromptImage,
-  QueuedPrompt,
 } from '@notebook-ai/shared';
 import type { ProjectListItem } from './projectSlice';
 import type { PluginStatusResponse } from '../api/plugin';
@@ -101,6 +100,14 @@ export interface NotebookStore {
   autoStatus: AutoStatusState;
   autoStatuses: Record<string, AutoStatusState>;
   setAutoStatus: (msg: AutoStatusMessage) => void;
+
+  // ── Task lifecycle state ──────────────────────────────────────────────
+  taskStatus: Record<string, unknown> | null;
+  taskStatuses: Record<string, Record<string, unknown> | null>;
+
+  // ── Auto heartbeat mode ──────────────────────────────────────────────
+  autoMode: boolean;
+  autoIterationCount: number;
 
   // ── WebSocket state ────────────────────────────────────────────────────
   ws: WebSocket | null;
@@ -245,13 +252,8 @@ export interface NotebookStore {
   setPendingSuggestions(s: { cellId: string; suggestions: string[] }): void;
   clearPendingSuggestions(): void;
 
-  // ── Prompt Queue (per-session isolated) ────────────────────────────────
-  promptQueue: QueuedPrompt[];
-  queueVersion: number;
-  promptQueues: Record<string, { items: QueuedPrompt[]; version: number }>;
-  queuePrompt(source: string, images?: PromptImage[]): void;
-  removeQueueItem(id: string): void;
-  reorderQueue(newOrder: string[]): void;
+  // ── Prompt Append ────────────────────────────────────────────────────
+  appendPrompt(cellId: string, source: string, images?: PromptImage[]): void;
 
   // ── WebSocket actions ──────────────────────────────────────────────────
   connectWebSocket(): Promise<void>;

@@ -5,9 +5,39 @@ import { Cell } from './Cell';
 import { SlideView } from './SlideView';
 import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
-import { PromptQueue } from './PromptQueue';
-import { PhaseProgressBar, ScorePanel, StageIndicator, IterationBadge, RetryBadge, MultiStageView, AutoStopButton } from './AutoStatusBar';
-import { stopAutoMode } from '../api/task-auto';
+import { PhaseProgressBar, ScorePanel } from './AutoStatusBar';
+
+// ── Auto toggle button ──────────────────────────────────────────────────────
+
+function AutoToggleButton() {
+  const ws = useStore((s) => s.ws);
+  const sessionId = useStore((s) => s.sessionId);
+  const autoMode = useStore((s) => s.autoMode);
+  const wsStatus = useStore((s) => s.wsStatus);
+  const connected = wsStatus === 'connected';
+
+  const handleToggle = () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
+    if (autoMode) {
+      ws.send(JSON.stringify({ type: 'auto_stop', session_id: sessionId }));
+      useStore.setState({ autoMode: false, autoIterationCount: 0 });
+    } else {
+      ws.send(JSON.stringify({ type: 'auto_start', session_id: sessionId }));
+      useStore.setState({ autoMode: true, autoIterationCount: 0 });
+    }
+  };
+
+  return (
+    <button
+      className={`notebook-statusbar-btn notebook-statusbar-auto-btn${autoMode ? ' active' : ''}`}
+      onClick={handleToggle}
+      disabled={!connected}
+      title={autoMode ? 'Stop Auto mode' : 'Start Auto mode'}
+    >
+      Auto
+    </button>
+  );
+}
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -118,6 +148,7 @@ function NotebookStatusBar() {
             {t('status.esc')}
           </button>
         )}
+        <AutoToggleButton />
         <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}
@@ -388,11 +419,11 @@ export function Notebook() {
   const clearSessionNotice = useStore((s) => s.clearSessionNotice);
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
-  const sessionId = useStore((s) => s.sessionId);
+  const taskStatus = useStore((s) => s.taskStatus);
+  const autoMode = useStore((s) => s.autoMode);
+  const autoIterationCount = useStore((s) => s.autoIterationCount);
   const autoStatus = useStore((s) => s.autoStatus);
-  const authToken = useStore((s) => s.authToken);
   const [scoreExpanded, setScoreExpanded] = useState(false);
-  const [stoppingAuto, setStoppingAuto] = useState(false);
   const cells = notebook?.cells ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
   const cellsContainerRef = useRef<HTMLDivElement>(null);
@@ -446,43 +477,25 @@ export function Notebook() {
   return (
     <div className="notebook-container">
       <NotebookStatusBar />
-      {autoStatus.phase && (
+      {/* Task lifecycle status bar — always visible when .status.json exists */}
+      {(taskStatus || autoStatus.phase) && (
         <div className="auto-status-container">
-          {autoStatus.stage && autoStatus.stage.total > 1 ? (
-            <MultiStageView
-              stage={autoStatus.stage}
-              phase={autoStatus.phase}
-              phaseProgress={autoStatus.phaseProgress}
+          <PhaseProgressBar
+            phase={(taskStatus as any)?.step ?? autoStatus.phase}
+            phaseProgress={autoStatus.phaseProgress}
+          />
+          {autoStatus.checkScore && (
+            <ScorePanel
               checkScore={autoStatus.checkScore}
+              expanded={scoreExpanded}
+              onToggle={() => setScoreExpanded(!scoreExpanded)}
             />
-          ) : (
-            <>
-              <StageIndicator stage={autoStatus.stage} />
-              <PhaseProgressBar
-                phase={autoStatus.phase}
-                phaseProgress={autoStatus.phaseProgress}
-              />
-            </>
           )}
-          <IterationBadge iteration={autoStatus.iteration} />
-          <RetryBadge retryCount={autoStatus.retryCount} />
-          <ScorePanel
-            checkScore={autoStatus.checkScore}
-            expanded={scoreExpanded}
-            onToggle={() => setScoreExpanded(!scoreExpanded)}
-          />
-          <AutoStopButton
-            disabled={stoppingAuto}
-            onStop={async () => {
-              if (!sessionId) return;
-              setStoppingAuto(true);
-              try {
-                await stopAutoMode(sessionId, authToken);
-              } finally {
-                setStoppingAuto(false);
-              }
-            }}
-          />
+          {autoMode && (
+            <span className="auto-beat-badge" title="Auto heartbeat active">
+              beat:{autoIterationCount}
+            </span>
+          )}
         </div>
       )}
       {sessionNotice && (
@@ -520,7 +533,6 @@ export function Notebook() {
             <div ref={bottomRef} />
           </div>
 
-          <PromptQueue />
           <NotebookInputBar />
           <ScrollToBottomButton bottomRef={bottomRef} />
         </>

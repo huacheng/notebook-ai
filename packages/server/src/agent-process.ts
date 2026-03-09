@@ -177,10 +177,10 @@ export class AgentProcess {
     this.proc.stdin.write(line + '\n');
   }
 
-  /** Send SIGINT to interrupt current generation without killing the process. */
+  /** Send Escape character to stdin to interrupt current generation without killing the process. */
   interrupt(): void {
-    if (!this.isAlive()) return;
-    this.proc!.kill('SIGINT');
+    if (!this.isAlive() || !this.proc?.stdin) return;
+    this.proc.stdin.write('\x1b');
   }
 
   /** Terminates the persistent agent process. */

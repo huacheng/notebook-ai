@@ -20,6 +20,8 @@ export interface ListResult {
   dirPath: string;
   files: FileEntry[];
   truncated: boolean;
+  /** Whether the target directory actually exists on disk. */
+  exists?: boolean;
 }
 
 const MAX_ENTRIES = 1000;
@@ -37,7 +39,19 @@ export async function listWorkspaceFiles(
 
   // Security: verify the resolved target is inside baseDir.
   const realBase = await realpath(baseDir);
-  const realTarget = await realpath(target);
+  let realTarget: string;
+  try {
+    realTarget = await realpath(target);
+  } catch (err: unknown) {
+    // Directory doesn't exist — verify it would still be inside workspace
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (target !== realBase && !target.startsWith(realBase + '/')) {
+        throw new Error('Path outside workspace');
+      }
+      return { dirPath: target, files: [], truncated: false, exists: false };
+    }
+    throw err;
+  }
   if (realTarget !== realBase && !realTarget.startsWith(realBase + '/')) {
     throw new Error('Path outside workspace');
   }
@@ -73,6 +87,7 @@ export async function listWorkspaceFiles(
     dirPath: realTarget,
     files: results,
     truncated: entries.length > MAX_ENTRIES,
+    exists: true,
   };
 }
 

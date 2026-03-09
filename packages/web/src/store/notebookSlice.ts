@@ -380,8 +380,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         [notebookId]: { notebook, sessionId, scrollY: 0, workspaceDir: workspaceDir ?? null },
       };
       _persistNotebookTabs(newOpen, notebookId);
-      // Restore per-session prompt queue and auto status
-      const savedQueue = sessionId ? state.promptQueues?.[sessionId] : null;
+      // Restore per-session auto status
       const savedAutoStatus = sessionId ? state.autoStatuses?.[sessionId] : null;
       return {
         openNotebooks: newOpen,
@@ -391,8 +390,6 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         workspaceDir: workspaceDir ?? state.workspaceDir,
         gitTabOpen: false,
         activeTab: 'notebook' as const,
-        promptQueue: savedQueue?.items ?? [],
-        queueVersion: savedQueue?.version ?? 0,
         autoStatus: savedAutoStatus ?? { ...initialAutoStatus },
       };
     });
@@ -468,8 +465,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     set(state => {
       _persistNotebookTabs(state.openNotebooks, notebookId);
       const newSessionId = state.openNotebooks[notebookId]?.sessionId ?? null;
-      // Restore per-session prompt queue and auto status
-      const savedQueue = newSessionId ? state.promptQueues?.[newSessionId] : null;
+      // Restore per-session auto status
       const savedAutoStatus = newSessionId ? state.autoStatuses?.[newSessionId] : null;
       return {
         openNotebooks: state.openNotebooks,
@@ -480,8 +476,6 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         openFile: null, // C3: clear FileViewer when switching tabs
         editMode: false,
         pendingDeletes: new Set<string>(),
-        promptQueue: savedQueue?.items ?? [],
-        queueVersion: savedQueue?.version ?? 0,
         autoStatus: savedAutoStatus ?? { ...initialAutoStatus },
       };
     });

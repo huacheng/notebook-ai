@@ -1,9 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { FileSection } from './FileSection';
 import { getDeliverablesPath } from '../utils/deliverablesPath';
 import { useWatcher } from '../hooks/useWatcher';
+
+/**
+ * Compute parent directory path for watcher fallback.
+ * e.g. ".worktrees/task-x/.deliverables" → ".worktrees/task-x"
+ *      ".deliverables" → "."
+ */
+function parentDir(p: string): string {
+  const i = p.lastIndexOf('/');
+  return i > 0 ? p.slice(0, i) : '.';
+}
 
 export function RightPanel() {
   const t = useT();
@@ -19,9 +29,22 @@ export function RightPanel() {
 
   const delivPath = getDeliverablesPath(workspaceDir, activeProjectPath);
   const [refreshKey, setRefreshKey] = useState(0);
+  // null = unknown (first load), true/false = API confirmed
+  const [delivExists, setDelivExists] = useState<boolean | null>(null);
 
-  // WS-based deliverables change detection
-  useWatcher('files', { projectId: activeProjectId, dirPath: delivPath });
+  // Reset existence state when deliverables path changes (tab switch)
+  useEffect(() => {
+    setDelivExists(null);
+  }, [delivPath]);
+
+  const handleExists = useCallback((exists: boolean) => {
+    setDelivExists(exists);
+  }, []);
+
+  // Watch deliverables dir if it exists; otherwise watch parent dir
+  // to detect when .deliverables is created.
+  const watchPath = delivExists === false ? parentDir(delivPath) : delivPath;
+  useWatcher('files', { projectId: activeProjectId, dirPath: watchPath });
 
   useEffect(() => {
     const handler = () => setRefreshKey(k => k + 1);
@@ -51,6 +74,7 @@ export function RightPanel() {
           showDownloadAll
           initialPath={delivPath}
           refreshKey={refreshKey}
+          onExists={handleExists}
           onFileClick={(subPath, name) => {
             const relPath = subPath === '.' ? name : `${subPath}/${name}`;
             openFileTab({ path: relPath, source: 'deliverables', sessionId: sessionId ?? '', projectId: activeProjectId ?? undefined });

@@ -53,7 +53,6 @@ import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import {
   WSClientMessageSchema,
-  AutoSignalSchema,
   type Notebook,
 } from '@notebook-ai/shared';
 import type { SessionManager } from './session.js';
@@ -497,16 +496,6 @@ export function setupWebSocket(
               last_cell_id: cells.length > 0 ? cells[cells.length - 1].id : null,
             });
 
-            // Send current queue state on subscribe/reconnect
-            const queueState = sessionManager.getQueueState(session_id);
-            if (queueState) {
-              sendToClient(ws, {
-                type: 'queue_state',
-                session_id,
-                items: queueState.items,
-                version: queueState.version,
-              });
-            }
           }
           break;
         }
@@ -955,6 +944,30 @@ export function setupWebSocket(
           break;
         }
 
+        case 'auto_start': {
+          const { session_id, interval_ms } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          try {
+            sessionManager.startAutoMode(session_id, interval_ms);
+            sessionManager.broadcastToSession(session_id, { type: 'auto_started', session_id, interval_ms: interval_ms ?? null });
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
+          }
+          break;
+        }
+
+        case 'auto_stop': {
+          const { session_id } = msg;
+          if (!checkSessionPermission(session_id)) break;
+          try {
+            sessionManager.stopAutoMode(session_id);
+            sendToClient(ws, { type: 'auto_stopped_ack', session_id });
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
+          }
+          break;
+        }
+
         case 'tool_result_response': {
           const { session_id, tool_use_id, content } = msg;
           if (!checkSessionPermission(session_id)) break;
@@ -1153,91 +1166,71 @@ export function setupWebSocket(
           break;
         }
 
-        case 'auto_subscribe': {
+        // Task lifecycle status: watch .status.json for changes and push updates
+        case 'task_status_subscribe': {
           const sessionId = msg.session_id;
+          if (!checkSessionPermission(sessionId)) break;
           const session = sessionManager.getSession(sessionId);
           if (!session) break;
+          if (!fileWatcher) break;
 
-          // D1-4: Accept task_dir from message, fall back to session.cwd/.working/
-          const taskDir: string | undefined = msg.task_dir;
-          let signalDir: string;
-          let signalPath: string;
-          if (taskDir && existsSync(taskDir)) {
-            signalDir = taskDir;
-            signalPath = path.join(taskDir, '.auto-signal');
+          // Resolve .status.json path: cwd/.working/.status.json or cwd/.status.json
+          const cwd = session.cwd;
+          let statusDir: string;
+          let statusPath: string;
+          if (path.basename(cwd) === '.working') {
+            statusDir = cwd;
+            statusPath = path.join(cwd, '.status.json');
           } else {
-            // Fallback: if cwd already ends with .working, use it directly;
-            // otherwise check .working/ subdirectory, then cwd
-            const cwd = session.cwd;
-            if (path.basename(cwd) === '.working') {
-              signalDir = cwd;
-              signalPath = path.join(cwd, '.auto-signal');
+            const workingDir = path.join(cwd, '.working');
+            if (existsSync(workingDir)) {
+              statusDir = workingDir;
+              statusPath = path.join(workingDir, '.status.json');
             } else {
-              const workingDir = path.join(cwd, '.working');
-              if (existsSync(workingDir)) {
-                signalDir = workingDir;
-                signalPath = path.join(workingDir, '.auto-signal');
-              } else {
-                signalDir = cwd;
-                signalPath = path.join(cwd, '.auto-signal');
-              }
+              statusDir = cwd;
+              statusPath = path.join(cwd, '.status.json');
             }
           }
 
-          if (!fileWatcher) break;
+          // Prevent duplicate subscriptions
+          const prevStatusUnsub = watchSubscriptions.get(`task_status:${sessionId}`);
+          if (prevStatusUnsub) prevStatusUnsub();
 
-          // D3-4: Prevent duplicate subscriptions — unsubscribe previous auto watcher
-          const prevAutoUnsub = watchSubscriptions.get(`auto:${sessionId}`);
-          if (prevAutoUnsub) prevAutoUnsub();
-
-          // Watch the directory containing .auto-signal for changes
-          const autoUnsub = fileWatcher.subscribe(signalDir, () => {
+          // Watch the directory for .status.json changes
+          const statusUnsub = fileWatcher.subscribe(statusDir, () => {
             try {
-              if (!existsSync(signalPath)) {
-                // Signal file deleted = auto loop ended
+              if (!existsSync(statusPath)) {
                 sendToClient(ws, {
-                  type: 'auto_status',
+                  type: 'task_status',
                   session_id: sessionId,
-                  phase: null,
-                  phase_progress: null,
-                  step: null,
-                  next: null,
-                  stage: null,
-                  check_score: null,
-                  retry_count: 0,
-                  iteration: 0,
+                  status: null,
                 });
                 return;
               }
-              const raw = JSON.parse(readFileSync(signalPath, 'utf-8'));
-              const signal = AutoSignalSchema.parse(raw);
-
+              const raw = JSON.parse(readFileSync(statusPath, 'utf-8'));
               sendToClient(ws, {
-                type: 'auto_status',
+                type: 'task_status',
                 session_id: sessionId,
-                phase: signal.phase ?? null,
-                phase_progress: signal.phase_progress ?? null,
-                step: signal.step ?? null,
-                next: signal.next ?? null,
-                stage: signal.stage ?? null,
-                check_score: signal.check_score ?? null,
-                retry_count: signal.retry_count ?? 0,
-                iteration: signal.iteration ?? 0,
+                status: raw,
               });
             } catch {
               // Ignore parse errors (partial writes)
             }
           });
-          watchSubscriptions.set(`auto:${sessionId}`, autoUnsub);
+          watchSubscriptions.set(`task_status:${sessionId}`, statusUnsub);
 
-          // Clean up on disconnect
-          ws.on('close', () => {
-            const unsub = watchSubscriptions.get(`auto:${sessionId}`);
-            if (unsub) {
-              unsub();
-              watchSubscriptions.delete(`auto:${sessionId}`);
+          // Send initial status if file exists
+          try {
+            if (existsSync(statusPath)) {
+              const raw = JSON.parse(readFileSync(statusPath, 'utf-8'));
+              sendToClient(ws, {
+                type: 'task_status',
+                session_id: sessionId,
+                status: raw,
+              });
             }
-          });
+          } catch { /* ignore */ }
+          // Cleanup handled by global ws close handler (watchSubscriptions.clear)
           break;
         }
 
@@ -1433,47 +1426,13 @@ export function setupWebSocket(
 
         // ─── Prompt Queue ───────────────────────────────────────────────────────
 
-        case 'queue_prompt': {
-          const { session_id, prompt, version } = msg;
+        case 'append_prompt': {
+          const { session_id, cell_id, source, images } = msg;
           if (!checkSessionPermission(session_id)) break;
-          const result = sessionManager.addToQueue(session_id, prompt, version);
-          if (!result.success) {
-            sendToClient(ws, {
-              type: 'queue_error',
-              session_id,
-              error: result.error,
-              code: result.code,
-            });
-          }
-          break;
-        }
-
-        case 'queue_remove': {
-          const { session_id, id, version } = msg;
-          if (!checkSessionPermission(session_id)) break;
-          const result = sessionManager.removeFromQueue(session_id, id, version);
-          if (!result.success) {
-            sendToClient(ws, {
-              type: 'queue_error',
-              session_id,
-              error: result.error,
-              code: result.code,
-            });
-          }
-          break;
-        }
-
-        case 'queue_reorder': {
-          const { session_id, order, version } = msg;
-          if (!checkSessionPermission(session_id)) break;
-          const result = sessionManager.reorderQueue(session_id, order, version);
-          if (!result.success) {
-            sendToClient(ws, {
-              type: 'queue_error',
-              session_id,
-              error: result.error,
-              code: result.code,
-            });
+          try {
+            sessionManager.appendPrompt(session_id, cell_id, source, images);
+          } catch (err) {
+            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;
         }

@@ -2,47 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-describe('Session Heartbeat Mechanism', () => {
+describe('Session Heartbeat & Auto Mode', () => {
   const sessionSrc = () => readFileSync(
     path.resolve(__dirname, '../session.ts'),
     'utf-8'
   );
 
-  describe('Heartbeat constants', () => {
+  describe('Health-check heartbeat', () => {
     it('should have HEARTBEAT_INTERVAL_MS constant (30s)', () => {
       const src = sessionSrc();
       expect(src).toMatch(/HEARTBEAT_INTERVAL_MS\s*=\s*30\s*\*\s*1000/);
     });
 
-    it('should have STUCK_THRESHOLD_MS constant (120s)', () => {
-      const src = sessionSrc();
-      expect(src).toMatch(/STUCK_THRESHOLD_MS\s*=\s*120\s*\*\s*1000/);
-    });
-
-    it('should have MAX_STUCK_RETRIES constant (3)', () => {
-      const src = sessionSrc();
-      expect(src).toMatch(/MAX_STUCK_RETRIES\s*=\s*3/);
-    });
-  });
-
-  describe('Session state tracking', () => {
-    it('should track lastOutputTime in session', () => {
-      const src = sessionSrc();
-      expect(src).toContain('_lastOutputTime');
-    });
-
-    it('should track stuckRetryCount in session', () => {
-      const src = sessionSrc();
-      expect(src).toContain('_stuckRetryCount');
-    });
-
-    it('should have heartbeat timer in session', () => {
-      const src = sessionSrc();
-      expect(src).toContain('_heartbeatTimer');
-    });
-  });
-
-  describe('Heartbeat logic', () => {
     it('should have startHeartbeat method', () => {
       const src = sessionSrc();
       expect(src).toMatch(/startHeartbeat\s*\(/);
@@ -58,193 +29,120 @@ describe('Session Heartbeat Mechanism', () => {
       expect(src).toMatch(/heartbeatCheck\s*\(/);
     });
 
-    it('should check for stuck cells (running + no output)', () => {
+    it('should check agentProcess.isAlive() in heartbeat', () => {
       const src = sessionSrc();
-      // Should check if cell is running and lastOutputTime exceeded threshold
-      expect(src).toContain('STUCK_THRESHOLD_MS');
-      expect(src).toContain('_lastOutputTime');
-    });
-
-    it('should send continue prompt when stuck', () => {
-      const src = sessionSrc();
-      // Should call executeCell or similar with "继续" when stuck
-      expect(src).toMatch(/继续|continue/i);
-    });
-
-    it('should check queue in heartbeat', () => {
-      const src = sessionSrc();
-      // heartbeatCheck should call processNextQueueItem
-      const heartbeatMatch = src.match(/heartbeatCheck[\s\S]*?processNextQueueItem/);
-      expect(heartbeatMatch).toBeTruthy();
-    });
-  });
-
-  describe('Output time tracking', () => {
-    it('should update lastOutputTime on cell output', () => {
-      const src = sessionSrc();
-      // handleJsonlMessage or appendOutput should update _lastOutputTime
-      expect(src).toMatch(/_lastOutputTime\s*=\s*Date\.now\(\)/);
-    });
-  });
-
-  describe('Retry limiting', () => {
-    it('should increment stuckRetryCount when sending continue', () => {
-      const src = sessionSrc();
-      expect(src).toMatch(/_stuckRetryCount\s*\+\+|\+\+\s*_stuckRetryCount/);
-    });
-
-    it('should check MAX_STUCK_RETRIES before sending continue', () => {
-      const src = sessionSrc();
-      expect(src).toContain('MAX_STUCK_RETRIES');
-    });
-
-    it('should reset stuckRetryCount on successful completion', () => {
-      const src = sessionSrc();
-      // In completeCell, should reset retry count
-      expect(src).toMatch(/_stuckRetryCount\s*=\s*0/);
-    });
-  });
-
-  describe('Tool execution awareness', () => {
-    it('should track pending tool_use IDs in session', () => {
-      const src = sessionSrc();
-      expect(src).toContain('_pendingToolUseIds');
-    });
-
-    it('should add tool_use_id to pending set when tool_use received', () => {
-      const src = sessionSrc();
-      // When processing tool_use block, should add to pending set
-      expect(src).toMatch(/_pendingToolUseIds\.add\(/);
-    });
-
-    it('should remove tool_use_id from pending set when tool_result received', () => {
-      const src = sessionSrc();
-      // When processing tool_result, should remove from pending set
-      expect(src).toMatch(/_pendingToolUseIds\.delete\(/);
-    });
-
-    it('should skip stuck detection when tool is pending', () => {
-      const src = sessionSrc();
-      // heartbeatCheck should check _pendingToolUseIds.size before stuck detection
-      expect(src).toMatch(/_pendingToolUseIds\.size\s*[><=]/);
-    });
-
-    it('should clear pendingToolUseIds on restartSession (P1: D1-2)', () => {
-      const src = sessionSrc();
-      // restartSession should clear pending tool IDs to avoid stuck detection bypass
-      const restartMatch = src.match(/restartSession[\s\S]*?_pendingToolUseIds\.clear\(\)/);
-      expect(restartMatch).toBeTruthy();
-    });
-
-    it('should clear pendingToolUseIds on rerunNotebook (P1: D1-2)', () => {
-      const src = sessionSrc();
-      // rerunNotebook should clear pending tool IDs
-      const rerunMatch = src.match(/rerunNotebook[\s\S]*?_pendingToolUseIds\.clear\(\)/);
-      expect(rerunMatch).toBeTruthy();
-    });
-  });
-
-  describe('Retry exhaustion handling (P2: D3-1)', () => {
-    it('should complete cell as error when retries exhausted', () => {
-      const src = sessionSrc();
-      // After MAX_STUCK_RETRIES, should call completeCell with error
-      expect(src).toMatch(/completeCell\s*\(\s*session\s*,\s*runningCellId\s*,\s*true/);
-    });
-
-    it('should broadcast stuck_exhausted event to notify frontend', () => {
-      const src = sessionSrc();
-      // Should notify frontend when stuck retries exhausted
-      expect(src).toContain('stuck_exhausted');
-    });
-  });
-
-  describe('Configuration (P3: D5-1)', () => {
-    it('should have CONTINUE_PROMPT constant', () => {
-      const src = sessionSrc();
-      // Continue prompt should be a constant, not hardcoded
-      expect(src).toMatch(/CONTINUE_PROMPT\s*=/);
-    });
-
-    it('should use CONTINUE_PROMPT constant in log messages (D1-2)', () => {
-      const src = sessionSrc();
-      // Log message should interpolate the constant, not hardcode the string
-      expect(src).toMatch(/sending.*\$\{CONTINUE_PROMPT\}/);
-    });
-  });
-
-  describe('Cell completion cleanup (P1: D1-1)', () => {
-    it('should clear pendingToolUseIds in completeCell', () => {
-      const src = sessionSrc();
-      // completeCell should clear pending tool IDs to prevent stuck detection bypass
-      const completeCellMatch = src.match(/completeCell[\s\S]*?_pendingToolUseIds\.clear\(\)/);
-      expect(completeCellMatch).toBeTruthy();
-    });
-  });
-
-  describe('Process death handling (D3-1)', () => {
-    it('should check agentProcess.isAlive() before sending continue prompt', () => {
-      const src = sessionSrc();
-      // heartbeatCheck should verify process is alive before sending continue
       expect(src).toMatch(/heartbeatCheck[\s\S]*?agentProcess\.isAlive\(\)/);
     });
 
-    it('should skip continue prompt when process is dead', () => {
-      const src = sessionSrc();
-      // Should have early return or guard when process is dead
-      expect(src).toMatch(/!session\.agentProcess\.isAlive\(\)/);
-    });
-
-    it('should broadcast process_dead event when process dies during heartbeat', () => {
+    it('should broadcast process_dead event when process dies', () => {
       const src = sessionSrc();
       expect(src).toContain('process_dead');
     });
 
     it('should complete running cell as error when process is dead', () => {
       const src = sessionSrc();
-      // When process is dead and cell is running, should complete as error
-      const heartbeatMatch = src.match(/heartbeatCheck[\s\S]*?!session\.agentProcess\.isAlive\(\)[\s\S]*?completeCell/);
-      expect(heartbeatMatch).toBeTruthy();
+      const match = src.match(/heartbeatCheck[\s\S]*?!session\.agentProcess\.isAlive\(\)[\s\S]*?completeCell/);
+      expect(match).toBeTruthy();
     });
   });
 
-  describe('Timer cleanup guarantee (D3-2)', () => {
-    it('should clear heartbeat timer when session is deleted from map', () => {
+  describe('Auto mode', () => {
+    it('should have DEFAULT_AUTO_INTERVAL_MS constant', () => {
       const src = sessionSrc();
-      // sessions.delete should be preceded by stopHeartbeat or timer cleanup
-      const deleteMatch = src.match(/stopHeartbeat[\s\S]*?sessions\.delete|_heartbeatTimer[\s\S]*?sessions\.delete/);
-      expect(deleteMatch).toBeTruthy();
+      expect(src).toMatch(/DEFAULT_AUTO_INTERVAL_MS\s*=/);
+    });
+
+    it('should have _autoMode field in session', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_autoMode');
+    });
+
+    it('should have _autoTimer field in session', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_autoTimer');
+    });
+
+    it('should have _autoIntervalMs field in session', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_autoIntervalMs');
+    });
+
+    it('should have _autoIterationCount field in session', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_autoIterationCount');
+    });
+
+    it('should have startAutoMode method', () => {
+      const src = sessionSrc();
+      expect(src).toMatch(/startAutoMode\s*\(/);
+    });
+
+    it('should have stopAutoMode method', () => {
+      const src = sessionSrc();
+      expect(src).toMatch(/stopAutoMode\s*\(/);
+    });
+
+    it('should broadcast auto_heartbeat on each tick', () => {
+      const src = sessionSrc();
+      expect(src).toContain('auto_heartbeat');
+    });
+
+    it('should broadcast auto_stopped when stopping', () => {
+      const src = sessionSrc();
+      expect(src).toContain('auto_stopped');
+    });
+
+    it('should use CONTINUE_PROMPT in autoTick', () => {
+      const src = sessionSrc();
+      expect(src).toMatch(/autoTick[\s\S]*?CONTINUE_PROMPT/);
+    });
+
+    it('interruptCell should stop auto mode', () => {
+      const src = sessionSrc();
+      const match = src.match(/interruptCell[\s\S]*?stopAutoMode/);
+      expect(match).toBeTruthy();
     });
   });
 
-  describe('Tool execution timeout feedback (P3: D3-1)', () => {
+  describe('Tool execution awareness', () => {
+    it('should track pending tool_use IDs', () => {
+      const src = sessionSrc();
+      expect(src).toContain('_pendingToolUseIds');
+    });
+
     it('should have TOOL_LONG_RUNNING_MS constant', () => {
       const src = sessionSrc();
       expect(src).toMatch(/TOOL_LONG_RUNNING_MS\s*=/);
     });
 
-    it('should broadcast tool_long_running event when tool takes too long', () => {
+    it('should broadcast tool_long_running event', () => {
       const src = sessionSrc();
       expect(src).toContain('tool_long_running');
     });
 
-    it('should track _toolLongRunningNotified to prevent spam (D3-1 round 3)', () => {
+    it('should track _toolLongRunningNotified to prevent spam', () => {
       const src = sessionSrc();
       expect(src).toContain('_toolLongRunningNotified');
     });
 
-    it('should only broadcast tool_long_running once per tool execution', () => {
+    it('should clear pendingToolUseIds in completeCell', () => {
       const src = sessionSrc();
-      // Should check the flag before broadcasting
-      expect(src).toMatch(/!session\._toolLongRunningNotified/);
-      // Should set the flag after broadcasting
-      expect(src).toMatch(/_toolLongRunningNotified\s*=\s*true/);
+      const match = src.match(/completeCell[\s\S]*?_pendingToolUseIds\.clear\(\)/);
+      expect(match).toBeTruthy();
+    });
+  });
+
+  describe('Timer cleanup', () => {
+    it('should clear heartbeat timer on session close', () => {
+      const src = sessionSrc();
+      const match = src.match(/stopHeartbeat[\s\S]*?sessions\.delete|_heartbeatTimer[\s\S]*?sessions\.delete/);
+      expect(match).toBeTruthy();
     });
 
-    it('should reset _toolLongRunningNotified on tool_result', () => {
+    it('should stop auto mode on session close', () => {
       const src = sessionSrc();
-      // When tool_result arrives, reset the flag
-      const toolResultMatch = src.match(/tool_result[\s\S]*?_toolLongRunningNotified\s*=\s*false/);
-      expect(toolResultMatch).toBeTruthy();
+      const match = src.match(/closeSession[\s\S]*?stopAutoMode/);
+      expect(match).toBeTruthy();
     });
   });
 });

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { Cell as CellData } from '@notebook-ai/shared';
+import type { Cell as CellData, PromptCell } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
 import { MarkdownBody } from './MarkdownBody';
 import { useT } from '../i18n';
@@ -62,6 +62,18 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
         <span className="cell-index">[{execNum}]</span>
         <MarkdownBody content={cell.source} className="cell-prompt-source" />
       </div>
+
+      {/* ── Appended segments (frozen, greyed) ── */}
+      {('segments' in cell) && (cell as PromptCell).segments && (cell as PromptCell).segments!.length > 0 && (
+        <div className="cell-appended-segments">
+          {(cell as PromptCell).segments!.map((seg, i) => (
+            <div key={i} className="cell-segment-row">
+              <span className="cell-segment-label">+</span>
+              <MarkdownBody content={seg.text} className="cell-prompt-source cell-segment-frozen" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Stub loading indicator ── */}
       {isStub && (

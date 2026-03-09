@@ -4,7 +4,6 @@ import { useT } from '../../i18n';
 import { MobileHeader } from './MobileHeader';
 import { MobileDrawer } from './MobileDrawer';
 import { MobileInputBar } from './MobileInputBar';
-import { MobilePromptQueue } from './MobilePromptQueue';
 import { MobileFileViewer } from './MobileFileViewer';
 import { MobileSplitView } from './MobileSplitView';
 import { MobileModelSheet } from './MobileModelSheet';
@@ -36,12 +35,10 @@ export function MobileNotebookView() {
   const notebook = useStore((s) => s.notebook);
   const cellsOffset = useStore((s) => s.cellsOffset);
   const loadingOlderCells = useStore((s) => s.loadingOlderCells);
-  const promptQueue = useStore((s) => s.promptQueue);
   const editMode = useStore((s) => s.editMode);
   const pendingDeletes = useStore((s) => s.pendingDeletes);
   const togglePendingDelete = useStore((s) => s.togglePendingDelete);
   const cells = notebook?.cells ?? [];
-  const hasQueuedPrompts = promptQueue.length > 0;
 
   // File section state (same as desktop for consistency)
   const activeProjectId = useStore((s) => s.activeProjectId);
@@ -206,7 +203,7 @@ export function MobileNotebookView() {
   const title = notebook.metadata?.title || 'Notebook';
 
   return (
-    <div className={`mobile-view mobile-notebook-view${hasQueuedPrompts ? ' has-queue' : ''}`}>
+    <div className="mobile-view mobile-notebook-view">
       <MobileHeader
         title={title}
         showBack
@@ -279,7 +276,7 @@ export function MobileNotebookView() {
       </MobileDrawer>
 
       {/* Notebook content */}
-      <main className={`mobile-content mobile-notebook-content${hasQueuedPrompts ? ' has-queue' : ''}`} ref={contentRef}>
+      <main className="mobile-content mobile-notebook-content" ref={contentRef}>
         <div className="mobile-cells">
           {/* Invisible sentinel for scroll-triggered lazy loading */}
           {cellsOffset > 0 && (
@@ -311,9 +308,6 @@ export function MobileNotebookView() {
           ↓
         </button>
       )}
-
-      {/* Prompt queue */}
-      <MobilePromptQueue />
 
       {/* Input bar */}
       <MobileInputBar />

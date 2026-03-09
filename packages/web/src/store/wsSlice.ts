@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { WSServerMessage, QueuedPrompt, Cell, Notebook } from '@notebook-ai/shared';
+import type { WSServerMessage, Cell, Notebook, PromptSegment } from '@notebook-ai/shared';
 import type { NotebookStore } from './types';
 import type { Command } from '../mention/types';
 import DOMPurify from 'dompurify';
@@ -28,7 +28,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'submitToolResult' | 'updateToolResultLocal'
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
   | 'commands' | 'commandsLoaded' | 'setCommands'
-  | 'promptQueue' | 'queueVersion' | 'promptQueues' | 'queuePrompt' | 'removeQueueItem' | 'reorderQueue'
+  | 'appendPrompt'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -151,7 +151,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (get().ws === ws) {
         stopPing();
         // D3: Clear loadingCellIds on disconnect to avoid stuck loading states
-        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>() });
+        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), autoMode: false, autoIterationCount: 0 });
       }
     };
 
@@ -540,33 +540,18 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           set({ sessionNotice: `⚠️ ${errorMsg}` });
           break;
         }
-        case 'queue_state': {
-          const queueMsg = parsed as { items: QueuedPrompt[]; version: number; session_id?: string };
-          const qSid = queueMsg.session_id ?? msgSessionId;
-          if (qSid) {
-            set((state) => {
-              const updates: Record<string, unknown> = {
-                promptQueues: { ...state.promptQueues, [qSid]: { items: queueMsg.items, version: queueMsg.version } },
-              };
-              // Only update flat state if this is the active session
-              if (qSid === state.sessionId) {
-                updates.promptQueue = queueMsg.items;
-                updates.queueVersion = queueMsg.version;
-              }
-              return updates;
-            });
-          } else {
-            set({ promptQueue: queueMsg.items, queueVersion: queueMsg.version });
-          }
-          break;
-        }
-        case 'queue_error': {
-          const queueErr = parsed as { error?: string; code?: string; session_id?: string };
-          if (queueErr.code === 'VERSION_MISMATCH' && queueErr.session_id) {
-            // Auto-recover: re-subscribe to get fresh queue_state
-            ws.send(JSON.stringify({ type: 'subscribe', session_id: queueErr.session_id }));
-          } else {
-            set({ sessionNotice: `⚠️ Queue error: ${queueErr.error ?? 'Unknown error'}` });
+        case 'cell_appended': {
+          const appendMsg = parsed as { session_id?: string; cell_id: string; segment: PromptSegment };
+          const appendSid = appendMsg.session_id ?? msgSessionId;
+          if (appendSid) {
+            set((state) => applyToSession(state, appendSid, (nb) => ({
+              ...nb,
+              cells: nb.cells.map((c) =>
+                c.id === appendMsg.cell_id && c.type === 'prompt'
+                  ? { ...c, segments: [...(('segments' in c && c.segments) || []), appendMsg.segment] }
+                  : c
+              ),
+            })));
           }
           break;
         }
@@ -605,6 +590,48 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
             return updates;
           });
+          break;
+        }
+        case 'task_status': {
+          const tsSid = (parsed as any).session_id ?? msgSessionId;
+          const status = (parsed as any).status;
+          set((state) => {
+            const updates: Record<string, unknown> = {};
+            // Store per-session task status
+            if (tsSid) {
+              updates.taskStatuses = { ...state.taskStatuses, [tsSid]: status };
+            }
+            // Update flat state if this is the active session
+            if (!tsSid || tsSid === state.sessionId) {
+              updates.taskStatus = status;
+            }
+            return updates;
+          });
+          break;
+        }
+        case 'auto_heartbeat': {
+          // Auto mode heartbeat tick — update iteration count
+          const hbSid = (parsed as any).session_id ?? msgSessionId;
+          if (!hbSid || hbSid === get().sessionId) {
+            set({
+              autoIterationCount: (parsed as any).iteration ?? 0,
+            });
+          }
+          break;
+        }
+        case 'auto_stopped': {
+          // Auto mode was stopped (by Esc, explicit stop, or process death)
+          const asSid2 = (parsed as any).session_id ?? msgSessionId;
+          if (!asSid2 || asSid2 === get().sessionId) {
+            set({ autoMode: false, autoIterationCount: 0 });
+          }
+          break;
+        }
+        case 'auto_started': {
+          const asSid3 = (parsed as any).session_id ?? msgSessionId;
+          if (!asSid3 || asSid3 === get().sessionId) {
+            set({ autoMode: true });
+          }
           break;
         }
         case 'notebook_digest': {
@@ -718,7 +745,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         msg.resume_after = lastEventIndex[sessionId];
       }
       ws.send(JSON.stringify(msg));
-      ws.send(JSON.stringify({ type: 'auto_subscribe', session_id: sessionId }));
+      ws.send(JSON.stringify({ type: 'task_status_subscribe', session_id: sessionId }));
     }
   },
 
@@ -836,6 +863,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     const { ws, sessionId } = get();
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
       ws.send(JSON.stringify({ type: 'interrupt_cell', session_id: sessionId }));
+      // Also stop auto mode if active — Esc stops everything
+      if (get().autoMode) {
+        ws.send(JSON.stringify({ type: 'auto_stop', session_id: sessionId }));
+        set({ autoMode: false, autoIterationCount: 0 });
+      }
     }
   },
 
@@ -880,76 +912,20 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   // ── Commands (slash command caching) ────────────────────────────────
   setCommands: (commands: Command[]) => set({ commands, commandsLoaded: true }),
 
-  // ── Prompt Queue ───────────────────────────────────────────────────────
-  promptQueue: [] as QueuedPrompt[],
-  queueVersion: 0,
-  promptQueues: {} as Record<string, { items: QueuedPrompt[]; version: number }>,
+  // ── Prompt Append ───────────────────────────────────────────────────────
+  appendPrompt(cellId: string, source: string, images?) {
+    const { ws, sessionId } = get();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) {
+      set({ sessionNotice: '⚠️ Not connected — prompt not sent' });
+      return;
+    }
 
-  queuePrompt(source: string, images?) {
-    const { ws, sessionId, queueVersion, promptQueue } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-
-    const prompt: QueuedPrompt = {
-      id: crypto.randomUUID(),
+    ws.send(JSON.stringify({
+      type: 'append_prompt',
+      session_id: sessionId,
+      cell_id: cellId,
       source,
-      images,
-      createdAt: new Date().toISOString(),
-    };
-
-    const newItems = [...promptQueue, prompt];
-    const newVersion = queueVersion + 1;
-    set((state) => ({
-      promptQueue: newItems,
-      queueVersion: newVersion,
-      promptQueues: { ...state.promptQueues, [sessionId]: { items: newItems, version: newVersion } },
-    }));
-
-    ws.send(JSON.stringify({
-      type: 'queue_prompt',
-      session_id: sessionId,
-      prompt,
-      version: queueVersion,
-    }));
-  },
-
-  removeQueueItem(id: string) {
-    const { ws, sessionId, queueVersion, promptQueue } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-
-    const newItems = promptQueue.filter((p) => p.id !== id);
-    const newVersion = queueVersion + 1;
-    set((state) => ({
-      promptQueue: newItems,
-      queueVersion: newVersion,
-      promptQueues: { ...state.promptQueues, [sessionId]: { items: newItems, version: newVersion } },
-    }));
-
-    ws.send(JSON.stringify({
-      type: 'queue_remove',
-      session_id: sessionId,
-      id,
-      version: queueVersion,
-    }));
-  },
-
-  reorderQueue(newOrder: string[]) {
-    const { ws, sessionId, queueVersion, promptQueue } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-
-    const idToPrompt = new Map(promptQueue.map((p) => [p.id, p]));
-    const reordered = newOrder.map((id) => idToPrompt.get(id)).filter(Boolean) as QueuedPrompt[];
-    const newVersion = queueVersion + 1;
-    set((state) => ({
-      promptQueue: reordered,
-      queueVersion: newVersion,
-      promptQueues: { ...state.promptQueues, [sessionId!]: { items: reordered, version: newVersion } },
-    }));
-
-    ws.send(JSON.stringify({
-      type: 'queue_reorder',
-      session_id: sessionId,
-      order: newOrder,
-      version: queueVersion,
+      ...(images ? { images } : {}),
     }));
   },
 });

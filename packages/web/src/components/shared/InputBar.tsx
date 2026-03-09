@@ -40,7 +40,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const dropCaretRef = useRef<number | null>(null);
 
   const submitPrompt = useStore((s) => s.submitPrompt);
-  const queuePrompt = useStore((s) => s.queuePrompt);
+  const appendPrompt = useStore((s) => s.appendPrompt);
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
   const sessionId = useStore((s) => s.sessionId);
   const notebook = useStore((s) => s.notebook);
@@ -89,7 +89,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     (c) => c.status === 'running' || c.status === 'pending'
   );
 
-  // Don't disable input when running - allow queueing prompts
+  // Don't disable input when running - allow appending prompts to running cell
   const disabled = uploading || editMode;
 
   // Auto-resize textarea
@@ -157,9 +157,12 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     const imgs = images.length > 0
       ? images.map(({ media_type, data }) => ({ media_type, data }))
       : undefined;
-    // If running, queue the prompt instead of submitting immediately
+    // If running, append to the running cell instead of creating a new one
     if (isRunning) {
-      queuePrompt(source || '(image)', imgs);
+      const runningCell = notebook?.cells.find((c) => c.status === 'running' || c.status === 'pending');
+      if (runningCell) {
+        appendPrompt(runningCell.id, source || '(image)', imgs);
+      }
     } else {
       submitPrompt(source || '(image)', imgs);
     }

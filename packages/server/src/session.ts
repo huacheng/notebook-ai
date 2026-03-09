@@ -10,9 +10,8 @@ import {
   type WSServerMessage,
   type CellOutput,
   type PromptImage,
-  type QueuedPrompt,
+  type PromptSegment,
 } from '@notebook-ai/shared';
-import { loadQueueFromFile, saveQueueToFile, createDebouncedSaver } from './queue-file.js';
 import { EventBuffer } from './event-buffer.js';
 import {
   updateCellStatus,
@@ -24,35 +23,21 @@ import {
 } from './notebook-mutations.js';
 import { getDaemon } from './routes/task-auto.js';
 
-// ── Prompt Queue Limits ───────────────────────────────────────────────────────
-
-/** Maximum number of prompts in the queue */
-export const MAX_QUEUE_LENGTH = 30;
-
-/** Maximum size for a single image (5 MB) */
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-
-/** Maximum number of images across all queued prompts */
-export const MAX_QUEUE_IMAGES = 10;
-
-/** Maximum total size of images across all queued prompts (30 MB) */
-export const MAX_QUEUE_IMAGES_SIZE = 30 * 1024 * 1024;
-
-/** Base64 to bytes conversion ratio (base64 encoding adds ~33% overhead) */
-export const BASE64_TO_BYTES_RATIO = 0.75;
-
 // ── Heartbeat Constants ───────────────────────────────────────────────────────
 
-/** Heartbeat check interval (30 seconds) */
+/** Heartbeat check interval for process health monitoring (30 seconds) */
 export const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 
-/** Threshold for detecting stuck cells (120 seconds without output) */
-export const STUCK_THRESHOLD_MS = 120 * 1000;
+/** Default Auto mode interval (5 minutes) */
+export const DEFAULT_AUTO_INTERVAL_MS = 5 * 60 * 1000;
 
-/** Maximum retry attempts for stuck cells before giving up */
-export const MAX_STUCK_RETRIES = 3;
+/** Minimum Auto mode interval (10 seconds) — prevents DoS via tiny intervals */
+export const MIN_AUTO_INTERVAL_MS = 10 * 1000;
 
-/** Prompt sent to unstick a stuck cell */
+/** Maximum Auto mode interval (30 minutes) */
+export const MAX_AUTO_INTERVAL_MS = 30 * 60 * 1000;
+
+/** Prompt sent by Auto mode heartbeat to drive continuous progress */
 export const CONTINUE_PROMPT = '继续';
 
 /** Threshold for notifying user about long-running tool (5 minutes) */
@@ -149,22 +134,24 @@ interface NotebookSession {
   _lastCellId?: string;
   /** D1: Track tool_use_ids that should be persisted (AskUserQuestion only). */
   _persistedToolUseIds: Set<string>;
-  /** Prompt queue: pending prompts waiting for execution. */
-  _promptQueue: QueuedPrompt[];
-  /** Prompt queue version for optimistic locking (concurrency control). */
-  _queueVersion: number;
-  /** Debounced queue file saver. */
-  _saveQueue: ((items: QueuedPrompt[], version: number) => void) & { flush: () => Promise<void> };
   /** Heartbeat: last time output was received from agent (ms timestamp). */
   _lastOutputTime: number;
-  /** Heartbeat: number of "继续" retries sent for current stuck cell. */
-  _stuckRetryCount: number;
-  /** Heartbeat: interval timer reference. */
+  /** Heartbeat: interval timer reference for process health monitoring. */
   _heartbeatTimer: ReturnType<typeof setInterval> | null;
   /** Heartbeat: tool_use IDs awaiting tool_result (tool execution in progress). */
   _pendingToolUseIds: Set<string>;
   /** Heartbeat: flag to prevent repeated tool_long_running notifications. */
   _toolLongRunningNotified: boolean;
+  /** Auto mode: whether auto heartbeat is active. */
+  _autoMode: boolean;
+  /** Auto mode: interval timer reference for CONTINUE prompts. */
+  _autoTimer: ReturnType<typeof setInterval> | null;
+  /** Auto mode: interval in ms between CONTINUE prompts. */
+  _autoIntervalMs: number;
+  /** Auto mode: number of CONTINUE prompts sent in this auto session. */
+  _autoIterationCount: number;
+  /** Auto mode: true while an auto-created executeCell is pending (prevents cascade). */
+  _autoExecuting: boolean;
 }
 
 // ── SessionManager ───────────────────────────────────────────────────────────
@@ -259,18 +246,6 @@ export class SessionManager {
       allowedDirs = resolved.length > 0 ? resolved : undefined;
     } catch (_err: unknown) { /* parent doesn't exist or not readable — skip */ }
 
-    // Load prompt queue from independent file
-    const queuePath = path.join(cwd, '.prompt-queue.json');
-    const queueData = await loadQueueFromFile(queuePath);
-
-    // Create debounced queue saver (500ms debounce)
-    const saveQueue = createDebouncedSaver(
-      async (items: QueuedPrompt[], version: number) => {
-        await saveQueueToFile(queuePath, items, version);
-      },
-      500,
-    );
-
     const session: NotebookSession = {
       id: sessionName,
       cwd,
@@ -285,14 +260,15 @@ export class SessionManager {
       eventBuffer: new EventBuffer(),
       allowedDirs,
       _persistedToolUseIds: new Set(),
-      _promptQueue: queueData.items,
-      _queueVersion: queueData.version,
-      _saveQueue: saveQueue,
       _lastOutputTime: Date.now(),
-      _stuckRetryCount: 0,
       _heartbeatTimer: null,
       _pendingToolUseIds: new Set(),
       _toolLongRunningNotified: false,
+      _autoMode: false,
+      _autoTimer: null,
+      _autoIntervalMs: DEFAULT_AUTO_INTERVAL_MS,
+      _autoIterationCount: 0,
+      _autoExecuting: false,
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -426,6 +402,9 @@ export class SessionManager {
     // Stop old process
     session.agentProcess.stop();
 
+    // Stop auto mode before restarting to prevent stale timer on new process
+    this.stopAutoMode(sessionId);
+
     // Clear pending tool IDs (old process won't send tool_result)
     session._pendingToolUseIds.clear();
 
@@ -460,6 +439,9 @@ export class SessionManager {
   async rerunNotebook(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
+
+    // Stop auto mode before rerunning to prevent timer interference
+    this.stopAutoMode(sessionId);
 
     // 1. Clear all cells' outputs and reset status to pending
     session.notebook = {
@@ -545,6 +527,9 @@ export class SessionManager {
       metadata: { ...session.notebook.metadata, model },
     };
 
+    // Stop auto mode before changing model to prevent timer on stale process
+    this.stopAutoMode(sessionId);
+
     // Stop old process
     session.agentProcess.stop();
 
@@ -593,6 +578,9 @@ export class SessionManager {
     // Clear rerun queue so no more cells auto-execute after interrupt
     delete session._rerunQueue;
 
+    // Stop auto mode if active — Esc stops everything
+    this.stopAutoMode(sessionId);
+
     session._interrupted = true;
 
     if (session.agentProcess.isAlive()) {
@@ -611,14 +599,12 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Stop heartbeat timer
+    // Stop heartbeat and auto mode timers
     this.stopHeartbeat(session);
+    this.stopAutoMode(sessionId);
 
     // D3: Await any pending post-completion work (git commit + autoSave) before closing
     await session._pendingPostComplete.catch(() => {});
-
-    // D3-5: Flush pending queue writes before closing
-    await session._saveQueue.flush();
 
     session.agentProcess.stop();
     session.listeners.clear();
@@ -684,149 +670,51 @@ export class SessionManager {
     this.broadcast(session, msg);
   }
 
-  // ── Prompt Queue Management ─────────────────────────────────────────────────
+  // ── Prompt Append (running cell) ────────────────────────────────────────────
 
   /**
-   * Get current queue state for a session.
+   * Append a prompt to the currently running cell and send it to Claude stdin immediately.
+   * Used when user submits while a cell is already executing.
    */
-  getQueueState(sessionId: string): { items: QueuedPrompt[]; version: number } | null {
+  appendPrompt(sessionId: string, cellId: string, source: string, images?: PromptImage[]): void {
     const session = this.sessions.get(sessionId);
-    if (!session) return null;
-    return { items: session._promptQueue, version: session._queueVersion };
-  }
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
-  /**
-   * Add a prompt to the queue. Returns error string if version mismatch or other failure.
-   */
-  addToQueue(
-    sessionId: string,
-    prompt: QueuedPrompt,
-    clientVersion: number,
-  ): { success: true } | { success: false; error: string; code: string } {
-    const session = this.sessions.get(sessionId);
-    if (!session) return { success: false, error: 'Session not found', code: 'SESSION_NOT_FOUND' };
-
-    // Version check for optimistic locking
-    if (clientVersion !== session._queueVersion) {
-      return { success: false, error: 'Version mismatch', code: 'VERSION_MISMATCH' };
+    const cell = session.notebook.cells.find((c) => c.id === cellId);
+    if (!cell || cell.status !== 'running') {
+      throw new Error(`Cell "${cellId}" is not running.`);
     }
 
-    // Queue length limit
-    if (session._promptQueue.length >= MAX_QUEUE_LENGTH) {
-      return { success: false, error: `Queue is full (max ${MAX_QUEUE_LENGTH} items)`, code: 'QUEUE_FULL' };
+    // Append segment to cell
+    const segment: PromptSegment = {
+      text: source,
+      images,
+      addedAt: new Date().toISOString(),
+    };
+    const existing = ('segments' in cell && Array.isArray(cell.segments)) ? cell.segments as PromptSegment[] : [];
+    const segments = [...existing, segment];
+    session.notebook = {
+      ...session.notebook,
+      cells: session.notebook.cells.map((c) =>
+        c.id === cellId ? { ...c, segments } : c,
+      ),
+    };
+
+    // Send to Claude stdin immediately
+    if (images && images.length > 0) {
+      session.agentProcess.sendPrompt(source, images);
+    } else {
+      session.agentProcess.sendPrompt(source);
     }
 
-    // Image limits
-    if (prompt.images && prompt.images.length > 0) {
-      // Check individual image sizes
-      for (const img of prompt.images) {
-        const imgSize = img.data.length * BASE64_TO_BYTES_RATIO; // base64 to bytes approximation
-        if (imgSize > MAX_IMAGE_SIZE) {
-          return { success: false, error: `Image exceeds ${MAX_IMAGE_SIZE / 1024 / 1024}MB limit`, code: 'IMAGE_TOO_LARGE' };
-        }
-      }
-
-      // Count total images in queue
-      let totalImages = prompt.images.length;
-      let totalImagesSize = prompt.images.reduce((sum, img) => sum + img.data.length * BASE64_TO_BYTES_RATIO, 0);
-      for (const p of session._promptQueue) {
-        if (p.images) {
-          totalImages += p.images.length;
-          totalImagesSize += p.images.reduce((sum, img) => sum + img.data.length * BASE64_TO_BYTES_RATIO, 0);
-        }
-      }
-
-      if (totalImages > MAX_QUEUE_IMAGES) {
-        return { success: false, error: `Too many images in queue (max ${MAX_QUEUE_IMAGES})`, code: 'TOO_MANY_IMAGES' };
-      }
-
-      if (totalImagesSize > MAX_QUEUE_IMAGES_SIZE) {
-        return { success: false, error: `Total images size exceeds ${MAX_QUEUE_IMAGES_SIZE / 1024 / 1024}MB limit`, code: 'IMAGES_SIZE_EXCEEDED' };
-      }
-    }
-
-    session._promptQueue.push(prompt);
-    session._queueVersion++;
-    session._saveQueue(session._promptQueue, session._queueVersion);
-
-    // Broadcast updated queue state
+    // Broadcast to all clients
     this.broadcast(session, {
-      type: 'queue_state',
-      items: session._promptQueue,
-      version: session._queueVersion,
+      type: 'cell_appended',
+      cell_id: cellId,
+      segment,
     });
 
-    return { success: true };
-  }
-
-  /**
-   * Remove a prompt from the queue by ID.
-   */
-  removeFromQueue(
-    sessionId: string,
-    promptId: string,
-    clientVersion: number,
-  ): { success: true } | { success: false; error: string; code: string } {
-    const session = this.sessions.get(sessionId);
-    if (!session) return { success: false, error: 'Session not found', code: 'SESSION_NOT_FOUND' };
-
-    if (clientVersion !== session._queueVersion) {
-      return { success: false, error: 'Version mismatch', code: 'VERSION_MISMATCH' };
-    }
-
-    const index = session._promptQueue.findIndex((p) => p.id === promptId);
-    if (index === -1) {
-      return { success: false, error: 'Prompt not found in queue', code: 'PROMPT_NOT_FOUND' };
-    }
-
-    session._promptQueue.splice(index, 1);
-    session._queueVersion++;
-    session._saveQueue(session._promptQueue, session._queueVersion);
-
-    this.broadcast(session, {
-      type: 'queue_state',
-      items: session._promptQueue,
-      version: session._queueVersion,
-    });
-
-    return { success: true };
-  }
-
-  /**
-   * Reorder the queue by providing new order of IDs.
-   */
-  reorderQueue(
-    sessionId: string,
-    newOrder: string[],
-    clientVersion: number,
-  ): { success: true } | { success: false; error: string; code: string } {
-    const session = this.sessions.get(sessionId);
-    if (!session) return { success: false, error: 'Session not found', code: 'SESSION_NOT_FOUND' };
-
-    if (clientVersion !== session._queueVersion) {
-      return { success: false, error: 'Version mismatch', code: 'VERSION_MISMATCH' };
-    }
-
-    // Validate that newOrder contains exactly the same IDs
-    const currentIds = new Set(session._promptQueue.map((p) => p.id));
-    const newIds = new Set(newOrder);
-    if (currentIds.size !== newIds.size || ![...currentIds].every((id) => newIds.has(id))) {
-      return { success: false, error: 'Invalid order: IDs do not match', code: 'INVALID_ORDER' };
-    }
-
-    // Reorder
-    const idToPrompt = new Map(session._promptQueue.map((p) => [p.id, p]));
-    session._promptQueue = newOrder.map((id) => idToPrompt.get(id)!);
-    session._queueVersion++;
-    session._saveQueue(session._promptQueue, session._queueVersion);
-
-    this.broadcast(session, {
-      type: 'queue_state',
-      items: session._promptQueue,
-      version: session._queueVersion,
-    });
-
-    return { success: true };
+    console.log(`[session ${sessionId}] Appended prompt to cell "${cellId}": "${source.slice(0, 50)}..."`);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
@@ -873,8 +761,7 @@ export class SessionManager {
     }
     session.notebook = updateCellStatus(session.notebook, cellId, status);
 
-    // Heartbeat: reset stuck retry count and clear pending tools on completion
-    session._stuckRetryCount = 0;
+    // Heartbeat: clear pending tools on completion
     session._pendingToolUseIds.clear();
 
     const startMs = session._execStartTimes.get(cellId);
@@ -917,84 +804,13 @@ export class SessionManager {
       delete session._rerunQueue;
     }
 
-    // Process prompt queue: if not interrupted and queue has items, execute next
-    if (status !== 'interrupted') {
-      console.log(`[session ${session.id}] completeCell: scheduling processNextQueueItem (status=${status})`);
-      setTimeout(() => this.processNextQueueItem(session), 0);
-    } else {
-      console.log(`[session ${session.id}] completeCell: skipping queue (status=${status})`);
-    }
-  }
-
-  /**
-   * Process the next item in the prompt queue.
-   * Dequeues and executes the first prompt if no cell is currently running.
-   */
-  private processNextQueueItem(session: NotebookSession): void {
-    console.log(`[session ${session.id}] processNextQueueItem called, queue length: ${session._promptQueue.length}`);
-
-    // Skip if a cell is already running
-    const runningId = findRunningCellId(session.notebook);
-    if (runningId) {
-      console.log(`[session ${session.id}] processNextQueueItem: cell ${runningId} still running, skipping`);
-      return;
-    }
-
-    // Skip if queue is empty
-    if (session._promptQueue.length === 0) {
-      console.log(`[session ${session.id}] processNextQueueItem: queue empty, skipping`);
-      return;
-    }
-
-    // Dequeue first item
-    const prompt = session._promptQueue.shift()!;
-    session._queueVersion++;
-    session._saveQueue(session._promptQueue, session._queueVersion);
-
-    // Broadcast updated queue state
-    this.broadcast(session, {
-      type: 'queue_state',
-      items: session._promptQueue,
-      version: session._queueVersion,
-    });
-
-    // Create new cell
-    const cellId = crypto.randomUUID();
-    const newCell = {
-      id: cellId,
-      type: 'prompt' as const,
-      source: prompt.source,
-      images: prompt.images,
-      status: 'idle' as const,
-      execution_count: 0,
-      outputs: [] as CellOutput[],
-      created_at: new Date().toISOString(),
-    };
-    session.notebook = {
-      ...session.notebook,
-      cells: [...session.notebook.cells, newCell],
-    };
-
-    // Broadcast cell_created to all subscribers (same as normal executeCell flow)
-    this.broadcast(session, {
-      type: 'cell_created',
-      cell_id: cellId,
-      source: prompt.source,
-      images: prompt.images,
-    });
-
-    // Execute the cell
-    console.log(`[session ${session.id}] processNextQueueItem: executing queued prompt "${prompt.source.slice(0, 50)}..." as cell ${cellId}`);
-    this.executeCell(session.id, cellId, prompt.source, prompt.images).catch((err) => {
-      console.error(`[session ${session.id}] Queue execute failed:`, err);
-    });
   }
 
   // ── Heartbeat Mechanism ─────────────────────────────────────────────────────
 
   /**
-   * Start heartbeat timer for a session.
-   * Checks for stuck cells and processes queue periodically.
+   * Start health-check heartbeat timer for a session.
+   * Monitors agent process liveness and tool execution status.
    */
   startHeartbeat(sessionId: string): void {
     const session = this.sessions.get(sessionId);
@@ -1011,7 +827,7 @@ export class SessionManager {
   }
 
   /**
-   * Stop heartbeat timer for a session.
+   * Stop health-check heartbeat timer for a session.
    */
   stopHeartbeat(session: NotebookSession): void {
     if (session._heartbeatTimer) {
@@ -1021,33 +837,28 @@ export class SessionManager {
   }
 
   /**
-   * Heartbeat check: detect stuck cells and process queue.
+   * Health-check heartbeat: detect dead process and long-running tools.
    */
   private heartbeatCheck(session: NotebookSession): void {
     const runningCellId = findRunningCellId(session.notebook);
 
     if (runningCellId) {
-      // D3-1: Check if agent process is still alive before any stuck detection
+      // D3-1: Check if agent process is still alive
       if (!session.agentProcess.isAlive()) {
         console.error(`[session ${session.id}] Agent process died while cell "${runningCellId}" was running`);
 
-        // Notify frontend of process death
         this.broadcast(session, {
           type: 'process_dead',
           cell_id: runningCellId,
         });
 
-        // Complete the running cell as error
         this.completeCell(session, runningCellId, true);
         return;
       }
 
-      const now = Date.now();
-      const elapsed = now - session._lastOutputTime;
-
-      // Skip stuck detection if tools are executing (waiting for tool_result)
+      // Notify user once if tool is taking unusually long
       if (session._pendingToolUseIds.size > 0) {
-        // Notify user once if tool is taking unusually long (prevent spam)
+        const elapsed = Date.now() - session._lastOutputTime;
         if (elapsed > TOOL_LONG_RUNNING_MS && !session._toolLongRunningNotified) {
           session._toolLongRunningNotified = true;
           this.broadcast(session, {
@@ -1057,50 +868,114 @@ export class SessionManager {
             pending_tools: session._pendingToolUseIds.size,
           });
         }
-        return;
       }
-
-      // Check if cell is stuck (no output for STUCK_THRESHOLD_MS)
-
-      if (elapsed > STUCK_THRESHOLD_MS) {
-        // Cell appears stuck
-        if (session._stuckRetryCount < MAX_STUCK_RETRIES) {
-          session._stuckRetryCount++;
-          console.log(
-            `[session ${session.id}] Cell "${runningCellId}" stuck (${Math.round(elapsed / 1000)}s), ` +
-            `sending "${CONTINUE_PROMPT}" (retry ${session._stuckRetryCount}/${MAX_STUCK_RETRIES})`
-          );
-
-          // Send continue prompt to unstick
-          try {
-            session.agentProcess.sendPrompt(CONTINUE_PROMPT);
-          } catch (err) {
-            console.error(`[session ${session.id}] Failed to send continue prompt:`, err);
-          }
-
-          // Reset output time to avoid immediate re-trigger
-          session._lastOutputTime = Date.now();
-        } else {
-          // Retries exhausted — complete cell as error and notify frontend
-          console.error(
-            `[session ${session.id}] Cell "${runningCellId}" stuck after ${MAX_STUCK_RETRIES} retries, marking as error`
-          );
-
-          // Notify frontend of stuck exhaustion
-          this.broadcast(session, {
-            type: 'stuck_exhausted',
-            cell_id: runningCellId,
-            retries: MAX_STUCK_RETRIES,
-          });
-
-          // Complete the cell as error
-          this.completeCell(session, runningCellId, true);
-        }
-      }
-    } else {
-      // No running cell — check if queue needs processing
-      this.processNextQueueItem(session);
     }
+  }
+
+  // ── Auto Mode ──────────────────────────────────────────────────────────────
+
+  /**
+   * Start Auto mode for a session. Periodically sends CONTINUE prompts
+   * to the Claude process to drive continuous progress.
+   */
+  startAutoMode(sessionId: string, intervalMs?: number): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Session "${sessionId}" not found.`);
+
+    // Stop existing auto mode if any
+    this.stopAutoMode(sessionId);
+
+    session._autoMode = true;
+    const rawInterval = intervalMs ?? DEFAULT_AUTO_INTERVAL_MS;
+    session._autoIntervalMs = Math.max(MIN_AUTO_INTERVAL_MS, Math.min(MAX_AUTO_INTERVAL_MS, rawInterval));
+    session._autoIterationCount = 0;
+    session._autoExecuting = false;
+
+    session._autoTimer = setInterval(() => {
+      this.autoTick(session);
+    }, session._autoIntervalMs);
+
+    console.log(`[session ${sessionId}] Auto mode started (${session._autoIntervalMs / 1000}s interval)`);
+  }
+
+  /**
+   * Stop Auto mode for a session. Clears the auto timer and broadcasts auto_stopped.
+   */
+  stopAutoMode(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    if (session._autoTimer) {
+      clearInterval(session._autoTimer);
+      session._autoTimer = null;
+    }
+
+    if (session._autoMode) {
+      session._autoMode = false;
+      this.broadcast(session, {
+        type: 'auto_stopped',
+        iteration_count: session._autoIterationCount,
+      });
+      console.log(`[session ${sessionId}] Auto mode stopped after ${session._autoIterationCount} iterations`);
+    }
+  }
+
+  /** Get auto mode status for a session. */
+  getAutoStatus(sessionId: string): { active: boolean; intervalMs: number; iterationCount: number } | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return {
+      active: session._autoMode,
+      intervalMs: session._autoIntervalMs,
+      iterationCount: session._autoIterationCount,
+    };
+  }
+
+  /**
+   * Auto mode tick: send CONTINUE prompt to drive LLM progress.
+   * Appends CONTINUE to the running cell; creates a new cell if none is running.
+   */
+  private autoTick(session: NotebookSession): void {
+    if (!session._autoMode) return;
+    if (!session.agentProcess.isAlive()) {
+      console.warn(`[session ${session.id}] Auto tick: agent process not alive, stopping auto mode`);
+      this.stopAutoMode(session.id);
+      return;
+    }
+
+    session._autoIterationCount++;
+
+    const runningCellId = findRunningCellId(session.notebook);
+    if (runningCellId) {
+      // Append CONTINUE to the running cell
+      try {
+        this.appendPrompt(session.id, runningCellId, CONTINUE_PROMPT);
+      } catch (err) {
+        console.error(`[session ${session.id}] Auto tick: appendPrompt failed:`, err);
+      }
+    } else if (!session._autoExecuting) {
+      // No running cell — create a new cell and execute CONTINUE to drive progress
+      // Guard: _autoExecuting prevents cascade when previous executeCell is still pending
+      session._autoExecuting = true;
+      const newCellId = crypto.randomUUID();
+      console.log(`[session ${session.id}] Auto tick #${session._autoIterationCount}: no running cell, creating new cell ${newCellId}`);
+      this.executeCell(session.id, newCellId, CONTINUE_PROMPT)
+        .catch((err) => {
+          console.error(`[session ${session.id}] Auto tick: executeCell failed:`, err);
+        })
+        .finally(() => {
+          session._autoExecuting = false;
+        });
+    }
+
+    // Broadcast heartbeat tick to frontend
+    this.broadcast(session, {
+      type: 'auto_heartbeat',
+      iteration: session._autoIterationCount,
+      interval_ms: session._autoIntervalMs,
+    });
+
+    console.log(`[session ${session.id}] Auto tick #${session._autoIterationCount}`);
   }
 
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */

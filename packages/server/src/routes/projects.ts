@@ -380,14 +380,9 @@ export function createProjectsRouter(
       if (err instanceof Error && err.message === 'Path outside workspace') {
         return res.status(403).json({ error: 'path traversal' });
       }
-      // realpath may throw ENOENT for non-existent traversal targets — fallback prefix check
+      // Unexpected error — return empty listing
       const resolved = path.resolve(project.path, subPath);
-      const projectRoot = path.resolve(project.path);
-      if (resolved !== projectRoot && !resolved.startsWith(projectRoot + path.sep)) {
-        return res.status(403).json({ error: 'path traversal' });
-      }
-      // Non-existent directory → empty listing
-      res.json({ dirPath: resolved, files: [], truncated: false });
+      res.json({ dirPath: resolved, files: [], truncated: false, exists: false });
     }
   });
 

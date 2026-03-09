@@ -67,11 +67,11 @@ function compareSemver(a: string, b: string): number {
  * Fix installed_plugins.json after `claude plugin update` to point to the latest cached version.
  * Workaround for Claude CLI bug that downloads new version but doesn't update version/installPath.
  */
-async function fixInstalledPluginVersion(pluginKey: string): Promise<void> {
+export async function fixInstalledPluginVersion(pluginKey: string, baseOverride?: string): Promise<void> {
   const [pluginName, marketplace] = pluginKey.split('@');
   if (!pluginName || !marketplace) return;
 
-  const base = pluginsDir();
+  const base = baseOverride ?? pluginsDir();
   const cacheDir = path.join(base, 'cache', marketplace, pluginName);
   const installedPath = path.join(base, 'installed_plugins.json');
 
@@ -123,6 +123,63 @@ async function fixInstalledPluginVersion(pluginKey: string): Promise<void> {
   entry.installPath = path.join(cacheDir, latestVersion);
 
   await writeFile(installedPath, JSON.stringify(installedRaw, null, 2));
+}
+
+/**
+ * Git-based fallback for plugin update.
+ * When `claude plugin update` succeeds but doesn't download the new version,
+ * this clones the marketplace repo, reads the latest plugin version from
+ * .claude-plugin/marketplace.json, and copies the plugin source to the cache.
+ */
+export async function gitFallbackUpdate(pluginKey: string, baseOverride?: string): Promise<boolean> {
+  const [pluginName, marketplace] = pluginKey.split('@');
+  if (!pluginName || !marketplace) return false;
+
+  const base = baseOverride ?? pluginsDir();
+
+  // Read marketplace source URL from known_marketplaces.json
+  const knownPath = path.join(base, 'known_marketplaces.json');
+  const known = await readJson<Record<string, { source?: string }>>(knownPath);
+  if (!known?.[marketplace]?.source) return false;
+
+  const repoUrl = known[marketplace].source as string;
+  const tmpClone = path.join(os.tmpdir(), `plugin-update-${marketplace}-${Date.now()}`);
+
+  try {
+    // Shallow clone for speed
+    await execFile('git', ['clone', '--depth', '1', repoUrl, tmpClone], { timeout: 30_000 });
+
+    // Read marketplace.json to find plugin version and source path
+    const mpJson = await readJson<{ plugins?: { name: string; version?: string; source?: string }[] }>(
+      path.join(tmpClone, '.claude-plugin', 'marketplace.json'),
+    );
+    const pluginMeta = mpJson?.plugins?.find(p => p.name === pluginName);
+    if (!pluginMeta?.version || !pluginMeta?.source) return false;
+
+    const remoteVersion = pluginMeta.version;
+
+    // Check if this version already exists in cache
+    const cacheDir = path.join(base, 'cache', marketplace, pluginName);
+    const targetDir = path.join(cacheDir, remoteVersion);
+    const existingPlugin = await readJson<{ version?: string }>(path.join(targetDir, 'plugin.json'));
+    if (existingPlugin?.version === remoteVersion) return false; // Already have it
+
+    // Copy plugin source to cache
+    const sourcePath = path.join(tmpClone, pluginMeta.source);
+    await execFile('mkdir', ['-p', targetDir]);
+    // Use cp -r to copy all files
+    await execFile('cp', ['-r', `${sourcePath}/.`, targetDir], { timeout: 10_000 });
+
+    // Now fix installed_plugins.json to point to new version
+    await fixInstalledPluginVersion(pluginKey, baseOverride);
+
+    return true;
+  } catch {
+    return false;
+  } finally {
+    // Cleanup temp clone
+    await execFile('rm', ['-rf', tmpClone]).catch(() => {});
+  }
 }
 
 export function createPluginRouter(): IRouter {
@@ -287,12 +344,18 @@ export function createPluginRouter(): IRouter {
     }
     try {
       await execClaude(['plugin', 'update', pluginKey]);
-      // Workaround: Claude CLI downloads new version but doesn't update version/installPath
-      await fixInstalledPluginVersion(pluginKey);
-      res.json({ ok: true });
-    } catch (err: unknown) {
-      res.status(500).json({ ok: false, error: 'Update plugin failed.' });
+    } catch {
+      // CLI update failed — continue to fallback
     }
+    // Workaround: Claude CLI may not download new version — try fix first
+    await fixInstalledPluginVersion(pluginKey);
+
+    // If cache still doesn't have latest, use git-based fallback
+    const didFallback = await gitFallbackUpdate(pluginKey);
+    if (didFallback) {
+      console.log(`[plugin] Git fallback update succeeded for ${pluginKey}`);
+    }
+    res.json({ ok: true });
   });
 
   return router;

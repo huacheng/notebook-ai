@@ -1036,6 +1036,28 @@ textarea.cell-input {
   border-color: var(--color-error);
 }
 
+.notebook-statusbar-auto-btn {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.notebook-statusbar-auto-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}
+.notebook-statusbar-auto-btn:hover:not(:disabled):not(.active) {
+  background: var(--color-primary-light);
+}
+
+.auto-beat-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--color-primary-light);
+}
+
 .notebook-statusbar-slide-btn.active {
   background: var(--color-primary-light);
   color: var(--color-primary);
@@ -1309,6 +1331,33 @@ textarea.cell-input {
   border: 1px solid var(--color-primary-ring);
   border-radius: 14px 14px 4px 14px;
   padding: var(--space-sm) var(--space-md);
+}
+
+/* ── Appended segments (frozen/greyed) ─────────────────── */
+.cell-appended-segments {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.cell-segment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  max-width: 82%;
+}
+.cell-segment-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+.cell-segment-frozen {
+  background: var(--bg-cell-hover) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-secondary) !important;
+  opacity: 0.85;
 }
 
 /* ── Divider between prompt and AI response ─────────────── */

@@ -34,6 +34,8 @@ describe('computeProjectFileList', () => {
   beforeAll(() => {
     mkdirSync(path.join(tmpDir, '.git'), { recursive: true });
     mkdirSync(path.join(tmpDir, '.deliverables'), { recursive: true });
+    mkdirSync(path.join(tmpDir, '.working'), { recursive: true });
+    mkdirSync(path.join(tmpDir, '.claude'), { recursive: true });
     writeFileSync(path.join(tmpDir, '.target.md'), 'target');
     writeFileSync(path.join(tmpDir, '.lock'), 'lock');
     writeFileSync(path.join(tmpDir, 'readme.txt'), 'hello');
@@ -54,6 +56,8 @@ describe('computeProjectFileList', () => {
     expect(names).not.toContain('.git');
     expect(names).not.toContain('.deliverables');
     expect(names).not.toContain('.lock');
+    expect(names).not.toContain('.working');
+    expect(names).not.toContain('.claude');
     expect(names).toContain('.target.md');
     expect(names).toContain('readme.txt');
   });
