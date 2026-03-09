@@ -340,8 +340,8 @@ export class NotebookDb {
     `).get(id) as ProjectRow | undefined;
   }
 
-  updateProject(id: string, updates: Partial<Pick<ProjectRow, 'title' | 'status' | 'notebook_count'>>): ProjectRow | undefined {
-    const ALLOWED = new Set(['title', 'status', 'notebook_count']);
+  updateProject(id: string, updates: Partial<Pick<ProjectRow, 'title' | 'slug' | 'path' | 'status' | 'notebook_count'>>): ProjectRow | undefined {
+    const ALLOWED = new Set(['title', 'slug', 'path', 'status', 'notebook_count']);
     const fields: string[] = [];
     const values: unknown[] = [];
     for (const [k, v] of Object.entries(updates)) {

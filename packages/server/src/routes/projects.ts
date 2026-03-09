@@ -85,8 +85,8 @@ export function createProjectsRouter(
     res.json(project);
   });
 
-  // Rename project
-  router.patch('/:projectId', (req, res) => {
+  // Rename project (title + directory + notebook paths + settings.json)
+  router.patch('/:projectId', async (req, res) => {
     const { title } = req.body;
     if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ error: 'title required' });
@@ -95,12 +95,66 @@ export function createProjectsRouter(
     const project = db.getProject(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project not found' });
 
-    const updated = db.updateProject(req.params.projectId, { title: title.trim() });
-    if (!updated) {
-      return res.status(500).json({ error: 'Failed to update project' });
+    const trimmedTitle = title.trim();
+    const newSlug = titleToSlug(trimmedTitle);
+    const oldPath = project.path;
+    let newPath = path.join(workspacesRoot, newSlug);
+
+    // If slug hasn't changed, just update the title
+    if (newPath === oldPath) {
+      const updated = db.updateProject(req.params.projectId, { title: trimmedTitle });
+      if (!updated) return res.status(500).json({ error: 'Failed to update project' });
+      return res.json(updated);
     }
 
-    res.json(updated);
+    // Resolve slug conflict by appending project ID prefix
+    if (existsSync(newPath)) {
+      newPath = path.join(workspacesRoot, `${newSlug}-${req.params.projectId.slice(0, 6)}`);
+    }
+
+    try {
+      // 1. Rename directory on disk
+      const { rename: fsRename } = await import('fs/promises');
+      await fsRename(oldPath, newPath);
+
+      // 2. Update project record in DB (title + slug + path)
+      const updated = db.updateProject(req.params.projectId, {
+        title: trimmedTitle,
+        slug: newSlug,
+        path: newPath,
+      });
+      if (!updated) return res.status(500).json({ error: 'Failed to update project' });
+
+      // 3. Update notebook records and regenerate .claude/settings.json
+      const notebooks = db.listProjectNotebooks(req.params.projectId);
+      for (const nb of notebooks) {
+        if (!nb.workspace_dir) continue;
+        const relDir = path.relative(oldPath, nb.workspace_dir);
+        const newWorkspaceDir = path.join(newPath, relDir);
+
+        const nbUpdates: Record<string, string> = { workspace_dir: newWorkspaceDir };
+        // Derive notebook_path from the .notebook.json file in the new directory
+        if (existsSync(newWorkspaceDir)) {
+          const { readdirSync } = await import('fs');
+          const notebookFiles = readdirSync(newWorkspaceDir).filter((f: string) => f.endsWith('.notebook.json'));
+          if (notebookFiles.length > 0) {
+            nbUpdates.notebook_path = path.join(newWorkspaceDir, notebookFiles[0]);
+          }
+        }
+
+        db.updateNotebook(nb.id, nbUpdates);
+
+        // 4. Regenerate .claude/settings.json with new absolute paths
+        if (existsSync(newWorkspaceDir)) {
+          await initWorkspaceMemory(newWorkspaceDir, newPath);
+        }
+      }
+
+      res.json(updated);
+    } catch (err: unknown) {
+      console.error('[projects] Error renaming project:', err);
+      res.status(500).json({ error: 'Failed to rename project directory' });
+    }
   });
 
   // List notebooks within project
