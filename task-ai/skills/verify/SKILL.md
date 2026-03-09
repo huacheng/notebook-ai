@@ -61,7 +61,7 @@ When `--generate-skill-tests` is passed with `--target <path-to-SKILL.md>`, veri
 4. **Read** `.target.md` — extract acceptance criteria
 5. **Read** `.summary.md` if exists — condensed context for understanding verification scope
 6. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
-7. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — keyword match against task domain → read matched `.memory/.references/<topic>.md` files for domain verification guidance (testing frameworks, tools, best practices)
+7. **Library search**: invoke `/task-ai:library search "<keywords>"` with verification-relevant keywords (testing frameworks, tools, domain standards). Library search handles index reading, scoring, and ranked results — read high-scoring matches for domain verification guidance
 8. **Gap check**: if `.type-profile.md` lacks verification standards OR `.references/` lacks testing/verification knowledge for the task `type`, trigger `research --scope gap --caller verify` to collect missing references before proceeding
 9. **Determine** verification strategy: use `.type-profile.md` "Verification Standards" first, supplement with per-type seed file `init/references/seed-types/<type>.md` (verify section), combine with `.references/` domain knowledge. If verification reveals that `.type-profile.md` standards are inadequate, update its "Verification Standards" section with findings. For hybrid types (`A|B`), read seed files and experience for all segments
    > **See `commands/references/test-strategy-by-type.md`** §VFP Applicability for per-type VH mode defaults and compliance thresholds.

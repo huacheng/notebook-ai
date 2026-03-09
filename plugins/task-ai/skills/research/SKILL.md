@@ -98,7 +98,7 @@ Plan invokes research internally before generating the implementation plan. See 
 | check | Missing domain standards/benchmarks for evaluation | `gap` |
 | exec | Encountering unfamiliar technology/API during implementation | `gap` |
 
-Each phase reads `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` at entry. If the existing references lack coverage for the current phase's needs (testing tools, evaluation criteria, implementation details), the phase triggers research with `--scope gap` and `--caller <phase>` before proceeding.
+Each phase invokes `/task-ai:library search` at entry to check existing coverage. If the search results lack coverage for the current phase's needs (testing tools, evaluation criteria, implementation details), the phase triggers research with `--scope gap` and `--caller <phase>` before proceeding.
 
 ### 3. From target deepening (default, multi-stage)
 
@@ -147,7 +147,7 @@ Callable independently for preparatory research before any phase, or to suppleme
 4. **Read** `.plan.md` if exists — understand current approach (for re-plan context)
 5. **Read** `.bugfix/` latest file if exists — understand what went wrong (for re-plan gap targeting)
 6. **Read** `.analysis/` latest file if exists — understand evaluation feedback (for re-plan gap targeting)
-7. **Read** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — inventory of existing references
+7. **Library search**: invoke `/task-ai:library search "<keywords>"` using topic keywords extracted from steps 2-6 (technologies, libraries, APIs, domain concepts). Library search reads all `.index.md` and `.summary.md` files internally, scores candidates, and returns a ranked results table with file paths and match rationale — this replaces manual `.summary.md` reading and provides better keyword matching and relevance scoring. Save the results for gap analysis in step 13
 8. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`). This ensures type-profile and experience updates from concurrent tasks are visible before type discovery begins
 9. **Acquire `.working/.lock`** if type discovery will write to `.status.json` or `.type-profile.md` (i.e., `--caller plan` with missing/low-confidence type, or `--caller verify|check|exec` with type reclassification). Follow the lock protocol in `commands/task-ai.md` Concurrency Protection. Released in step 11 after type discovery completes. Skip lock if step 10 is read-only (type already settled and no updates needed)
 10. **Type discovery & refinement** (see `plan/references/type-profiling.md`):
@@ -170,11 +170,11 @@ Callable independently for preparatory research before any phase, or to suppleme
      - **Sync to shared**: if profile was significantly updated → merge changes to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (apply directory-safe transform for `:` in type, acquire `.memory/.type-profiles/.lock`, release after write)
 11. **Release `.working/.lock`** if acquired in step 9 (type discovery complete, `.status.json` and `.type-profile.md` updated)
 12. **Determine research direction**: Read `.type-profile.md` "Phase Intelligence" section first. If it has direction for the calling phase, use it. Otherwise fall back to per-type seed file `init/references/seed-types/<type>.md` for the calling phase's methodology. For types not in seed files, use `.type-profile.md` as sole direction source
-13. **Gap analysis**:
-    - Extract topic keywords from steps 2-6 (technologies, libraries, APIs, patterns, methodologies, domain concepts)
-    - Cross-reference with intelligence matrix from step 12 — ensure collection targets match the calling phase's needs
+13. **Gap analysis** (based on library search results from step 7):
+    - Cross-reference library search results with intelligence matrix from step 12 — ensure collection targets match the calling phase's needs
     - For hybrid types: include keywords from **both** primary and secondary domains
-    - Compare against existing references from step 7
+    - Topics with high-scoring library matches (score ≥ 8) are considered **covered** — read the matched files (Layer 3) for content confirmation if needed
+    - Topics with no matches or low scores are **uncovered** and need research
     - Produce a list of **uncovered topics** that need research
     - If `--scope gap` and no uncovered topics → log `"references sufficient, skipping collection"` → skip to step 18
     - **Batch limit**: research at most **10 topics** per invocation. If more than 10 uncovered topics are identified, prioritize by relevance to the calling phase's immediate needs, collect the top 10, and note remaining topics in the report output (e.g., `"(collected, 3 deferred)"`). Subsequent `--scope gap` invocations will pick up deferred topics

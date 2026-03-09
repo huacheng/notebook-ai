@@ -53,7 +53,7 @@ Execute the implementation plan for a task module that has passed evaluation.
 7. **Read** `.bugfix/` latest file only if exists for most recent issue and fix guidance
 8. **Read** `.notes/` latest file only if exists for most recent research findings
 9. **Load library context** via Changelog Consumption Protocol (`commands/references/changelog-consumption-protocol.md`)
-10. **Scan** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — find relevant external reference files by keyword matching. Read matched `.memory/.references/<topic>.md` files for domain-specific implementation guidance
+10. **Library search**: invoke `/task-ai:library search "<keywords>"` with implementation keywords from the current step's technologies and APIs. Library search handles index reading, scoring, and ranked results — read high-scoring matches for domain-specific implementation guidance
 11. **Gap check** (intelligence support): if `.type-profile.md` lacks implementation guidance OR `.references/` lacks knowledge for the current step's technologies/APIs, trigger `research --scope gap --caller exec` to collect missing references before proceeding. When encountering technical obstacles during execution, the agent may also invoke `research --scope gap --caller exec` for targeted research
 12. **Extract** implementation steps from `.plan.md` (ordered by heading structure)
 13. **Build** execution order respecting any noted dependencies
