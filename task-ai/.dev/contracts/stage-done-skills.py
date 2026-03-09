@@ -77,14 +77,14 @@ if 'evolving' in auto_entry:
 else:
     emit_fail('auto: Entry Point missing evolving')
 
-# Test 7: Result-Based Routing — merge | evolving | highlight
+# Test 7: Result-Based Routing — check ACCEPT → highlight (v2: no merge in auto flow)
 auto_routing = extract_section(
     TASK_AI_ROOT / 'skills' / 'auto' / 'SKILL.md', '### Result-Based Routing'
 )
-if 'evolving' in auto_routing and 'highlight' in auto_routing:
-    emit_pass('auto: Result-Based Routing includes merge evolving -> highlight')
+if 'ACCEPT' in auto_routing and 'highlight' in auto_routing:
+    emit_pass('auto: Result-Based Routing includes ACCEPT -> highlight')
 else:
-    emit_fail('auto: Result-Based Routing missing merge evolving -> highlight')
+    emit_fail('auto: Result-Based Routing missing ACCEPT -> highlight')
 
 # Test 8: Signal Validation section absent (v2: signal abolished)
 auto_validation = extract_section(

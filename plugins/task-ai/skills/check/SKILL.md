@@ -259,6 +259,36 @@ Every lifecycle checkpoint outputs D1-D6 numeric scores (0.0 - 1.0). Scores are 
 | post-exec | 0.75 | 3 fix/replan | Stop, notify user |
 | pre-merge | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0) |
 
+## Adaptive Audit Round Budget
+
+The D1-D6 evaluation can run multiple rounds to progressively find and fix issues. The number of rounds adapts to change scope using `core/audit_budget.py`:
+
+### Budget Formula
+
+```
+max_rounds = clamp(ceil(files/5) + ceil(lines/200) + ceil(dirs/3) + type_bonus, 2, 10)
+```
+
+Where `files`, `lines`, `dirs` come from `git diff --stat`, and `type_bonus` is +1 for `software` types, +1 for hybrid types (`A|B`).
+
+### Early Termination
+
+| Condition | Action |
+|-----------|--------|
+| 2 consecutive PASS (zero fixes in a round) | Stop — diminishing returns |
+| All gates PASS on round 1 AND files ≤ 3 | Stop after round 1 — trivial change |
+| `max_rounds` reached | Stop |
+
+### Integration with Lifecycle Checks
+
+When auto mode invokes check, it passes `max_rounds` computed by `audit_budget.py`. Each check round:
+1. Evaluate D1-D6 dimensions
+2. If issues found → apply fixes (per RED→GREEN protocol) → next round
+3. After each round, call `audit_budget.py should-stop` to check termination
+4. When stopped → render final verdict based on cumulative results
+
+For standalone check invocations (no auto context), default to `max_rounds = 3`.
+
 ## Convergence Evaluation
 
 Convergence measures whether deliverables are moving toward the task's target requirements. Used by the post-exec dual gate to distinguish "quality OK but wrong direction" (ROLLBACK) from "quality OK and progressing" (ACCEPT).
@@ -494,7 +524,8 @@ Before step 1, determine scope from invocation:
 7. **Scan** `$NB_WORKSPACES_LIBRARY/.memory/.references/.summary.md` if exists — find relevant external reference files to inform evaluation criteria and domain best practices
 8. **Gap check** (intelligence support): if `.type-profile.md` lacks evaluation criteria OR `.references/` lacks domain evaluation standards/benchmarks for the task `type`, trigger `research --scope gap --caller check` to collect missing references before proceeding
 9. **Incorporate verify results**: If fresh verification results exist in `.test/` (from a prior `verify` run, same day and matching checkpoint), read and incorporate them. Otherwise, run verification procedures inline as part of evaluation — inline scope is limited to the criteria in the latest `.test/` criteria file only (build + test + acceptance). For comprehensive domain-adapted verification, invoke `verify` explicitly before `check`
-10. **Evaluate** against criteria
+10. **Evaluate** against criteria (multi-round, budget-controlled)
+    - **Audit round budget**: Use `max_rounds` from auto context (step 1b) or default 3. Each evaluation round covers D1-D6. After each round, check early termination via `audit_budget.py should-stop`. Track `consecutive_pass` count (rounds with zero fixes). When stopped, render final verdict
     - **Security Audit (Pre-hook)** (post-plan checkpoint only): MUST invoke `/task-ai:security audit-plan`. If verdict is `BLOCKED` or `HIGH_RISK`, evaluation MUST immediately render a `REPLAN` verdict with the security report attached.
     - **Optional delegation — code-review** (post-exec checkpoint only): Follow `auto/references/plugin-delegation.md` to attempt matching the `code-review` capability slot. If matched, invoke via Task subagent with a git diff summary as input — review results serve as supplementary evaluation evidence. No match or failure → continue standard inline evaluation
     - **Regression Test Protocol (HARD GATE)**: When check directly applies fixes (not just rendering a verdict), every non-exempt fix MUST follow the RED→GREEN protocol from `commands/references/test-strategy-by-type.md`:
