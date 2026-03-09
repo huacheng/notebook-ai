@@ -342,20 +342,46 @@ export function createPluginRouter(): IRouter {
     if (!validatePluginKey(pluginKey)) {
       return res.status(400).json({ error: 'Invalid plugin key format. Expected: name@marketplace' });
     }
-    try {
-      await execClaude(['plugin', 'update', pluginKey]);
-    } catch {
-      // CLI update failed — continue to fallback
-    }
-    // Workaround: Claude CLI may not download new version — try fix first
-    await fixInstalledPluginVersion(pluginKey);
 
-    // If cache still doesn't have latest, use git-based fallback
-    const didFallback = await gitFallbackUpdate(pluginKey);
-    if (didFallback) {
-      console.log(`[plugin] Git fallback update succeeded for ${pluginKey}`);
+    const steps: string[] = [];
+    let cliOk = false;
+
+    // Step 1: Try CLI update
+    try {
+      const { stdout, stderr } = await execClaude(['plugin', 'update', pluginKey]);
+      cliOk = true;
+      steps.push(`CLI update succeeded${stdout ? ': ' + stdout.trim().slice(0, 200) : ''}`);
+      if (stderr) steps.push(`CLI stderr: ${stderr.trim().slice(0, 200)}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      steps.push(`CLI update failed: ${msg.slice(0, 300)}`);
     }
-    res.json({ ok: true });
+
+    // Step 2: Fix installed version pointer
+    try {
+      await fixInstalledPluginVersion(pluginKey);
+      steps.push('fixInstalledPluginVersion completed');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      steps.push(`fixInstalledPluginVersion failed: ${msg.slice(0, 300)}`);
+    }
+
+    // Step 3: Git fallback if needed
+    try {
+      const didFallback = await gitFallbackUpdate(pluginKey);
+      if (didFallback) {
+        cliOk = true;
+        steps.push('Git fallback update succeeded');
+      } else {
+        steps.push('Git fallback skipped (already up-to-date or not needed)');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      steps.push(`Git fallback failed: ${msg.slice(0, 300)}`);
+    }
+
+    console.log(`[plugin] Update ${pluginKey}: ${steps.join(' | ')}`);
+    res.json({ ok: cliOk, steps });
   });
 
   return router;

@@ -349,12 +349,27 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     set({ pluginActionKey: key, pluginOverlay: `plugin.updatingPlugin|${key.split('@')[0]}` });
     try {
       const { authToken } = get();
-      await apiUpdatePlugin(authToken, key);
-      restartAllNotebooks(get);
-      const status = await fetchPluginStatus(authToken);
-      set({ pluginStatus: status, pluginActionKey: null, pluginOverlay: null });
-    } catch {
-      set({ pluginActionKey: null, pluginOverlay: null });
+      const result = await apiUpdatePlugin(authToken, key);
+      const stepsLog = result.steps?.join('\n') ?? '';
+      if (result.ok) {
+        restartAllNotebooks(get);
+        const status = await fetchPluginStatus(authToken);
+        set({
+          pluginStatus: status,
+          pluginActionKey: null,
+          pluginOverlay: null,
+          sessionNotice: `Plugin update ${key}:\n${stepsLog}`,
+        });
+      } else {
+        set({
+          pluginActionKey: null,
+          pluginOverlay: null,
+          sessionNotice: `Plugin update failed (${key}):\n${stepsLog}`,
+        });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      set({ pluginActionKey: null, pluginOverlay: null, sessionNotice: `Plugin update error: ${msg}` });
     }
   },
 

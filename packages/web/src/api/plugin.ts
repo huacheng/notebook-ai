@@ -96,7 +96,12 @@ export async function updateMarketplace(token: string | null, name?: string): Pr
   }
 }
 
-export async function updatePlugin(token: string | null, key: string): Promise<void> {
+export interface UpdateResult {
+  ok: boolean;
+  steps: string[];
+}
+
+export async function updatePlugin(token: string | null, key: string): Promise<UpdateResult> {
   const res = await fetch('/api/plugin/update', {
     method: 'POST',
     headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
@@ -106,4 +111,5 @@ export async function updatePlugin(token: string | null, key: string): Promise<v
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? `Update plugin failed: ${res.status}`);
   }
+  return res.json();
 }
