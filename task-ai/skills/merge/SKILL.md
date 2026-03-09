@@ -101,3 +101,4 @@ After deliverables are copied and committed on main, checkout back to task branc
 - Refactoring is exec's per-step responsibility (exec Per-Step step 6 Refactor window) — merge does not refactor
 - Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
 - **Concurrency**: Lock acquisition/release is handled by the caller (auto mode or CLI dispatcher). `merge.sh` assumes `.working/.lock` is already held (see Concurrency Protection in `commands/task-ai.md`)
+- **Note:** 阶段间不执行 merge — 交付物累积在 task 分支上。仅在 post-exec ACCEPT（单阶段结束后状态转 evolving）或 `--satisfy` 后执行最终 merge 到 main。
