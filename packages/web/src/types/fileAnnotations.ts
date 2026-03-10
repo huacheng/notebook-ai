@@ -66,7 +66,12 @@ export function resolveAbsolutePath(
   activeProjectPath: string | null,
 ): string {
   if (source === 'workspace') {
-    return workspaceDir ? `${workspaceDir}/${filePath}` : '';
+    // Use activeProjectPath (project root) as base when available,
+    // because filePath is relative to project root (from the file list API).
+    // Using workspaceDir (notebook cwd, may be a worktree subdirectory)
+    // would cause duplicate path segments.
+    const base = activeProjectPath ?? workspaceDir;
+    return base ? `${base}/${filePath}` : '';
   }
   if (source === 'deliverables') {
     return workspaceDir ? `${workspaceDir}/.deliverables/${filePath}` : '';
