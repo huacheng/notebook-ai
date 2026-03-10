@@ -5,7 +5,7 @@ import type { PromptImage } from '@notebook-ai/shared';
 export type AgentEngine = 'claude' | 'gemini';
 
 /** D6: Timeout in ms waiting for agent process to start */
-export const AGENT_START_TIMEOUT_MS = 20_000;
+export const AGENT_START_TIMEOUT_MS = 60_000;
 
 /**
  * AgentProcess wraps a persistent agent subprocess (Claude Code or Gemini CLI).

@@ -206,6 +206,43 @@ export class NotebookDb {
         last_signal_at      TEXT
       );
     `);
+
+    // ── Session tokens (persist across server restarts) ────────────────
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_tokens (
+        token       TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        email       TEXT NOT NULL,
+        expires_at  INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_session_tokens_expires ON session_tokens(expires_at);
+    `);
+  }
+
+  // ── Session Token CRUD ─────────────────────────────────────────────────
+
+  upsertSessionToken(token: string, userId: string, email: string, expiresAt: number): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO session_tokens (token, user_id, email, expires_at)
+      VALUES (?, ?, ?, ?)
+    `).run(token, userId, email, expiresAt);
+  }
+
+  getSessionToken(token: string): { userId: string; email: string; expiresAt: number } | null {
+    const row = this.db.prepare(
+      `SELECT user_id, email, expires_at FROM session_tokens WHERE token = ?`
+    ).get(token) as { user_id: string; email: string; expires_at: number } | undefined;
+    if (!row) return null;
+    return { userId: row.user_id, email: row.email, expiresAt: row.expires_at };
+  }
+
+  deleteSessionToken(token: string): void {
+    this.db.prepare(`DELETE FROM session_tokens WHERE token = ?`).run(token);
+  }
+
+  deleteExpiredSessionTokens(): number {
+    const result = this.db.prepare(`DELETE FROM session_tokens WHERE expires_at <= ?`).run(Date.now());
+    return result.changes;
   }
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────

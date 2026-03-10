@@ -94,26 +94,44 @@ const sessionTokens = new Map<string, SessionToken>();
 
 export function createSessionToken(userId: string, email: string): string {
   const token = crypto.randomBytes(32).toString('hex');
-  sessionTokens.set(token, {
-    userId,
-    email,
-    expiresAt: Date.now() + SESSION_TOKEN_TTL_MS,
-  });
+  const expiresAt = Date.now() + SESSION_TOKEN_TTL_MS;
+  sessionTokens.set(token, { userId, email, expiresAt });
+  // Persist to database so token survives server restarts
+  try { getDb().upsertSessionToken(token, userId, email, expiresAt); } catch { /* db not ready */ }
   return token;
 }
 
 export function validateSessionToken(token: string): SessionToken | null {
-  const session = sessionTokens.get(token);
-  if (!session) return null;
-  if (Date.now() >= session.expiresAt) {
-    sessionTokens.delete(token);
+  // Check in-memory cache first
+  const cached = sessionTokens.get(token);
+  if (cached) {
+    if (Date.now() >= cached.expiresAt) {
+      sessionTokens.delete(token);
+      try { getDb().deleteSessionToken(token); } catch { /* ignore */ }
+      return null;
+    }
+    return cached;
+  }
+  // Fall back to database lookup (token created before restart)
+  try {
+    const row = getDb().getSessionToken(token);
+    if (!row) return null;
+    if (Date.now() >= row.expiresAt) {
+      getDb().deleteSessionToken(token);
+      return null;
+    }
+    // Re-hydrate into in-memory cache
+    const session: SessionToken = { userId: row.userId, email: row.email, expiresAt: row.expiresAt };
+    sessionTokens.set(token, session);
+    return session;
+  } catch {
     return null;
   }
-  return session;
 }
 
 export function revokeSessionToken(token: string): void {
   sessionTokens.delete(token);
+  try { getDb().deleteSessionToken(token); } catch { /* ignore */ }
 }
 
 // Cleanup expired sessions every 30 minutes
@@ -122,6 +140,7 @@ setInterval(() => {
   for (const [token, session] of sessionTokens) {
     if (now >= session.expiresAt) sessionTokens.delete(token);
   }
+  try { getDb().deleteExpiredSessionTokens(); } catch { /* ignore */ }
 }, 30 * 60_000);
 
 // ── WS one-time ticket ──────────────────────────────────────────────────────
