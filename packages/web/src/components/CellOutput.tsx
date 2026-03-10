@@ -268,6 +268,7 @@ function RunningStatus({ cellId, outputs, source }: { cellId: string; outputs: C
 
   const isThinking = hasThinkingStream;
   const hasAnyOutput = (buf && (buf.text.length > 0 || buf.thinking.length > 0)) || outputs.length > 0;
+  const accepted = useStore((s) => s.acceptedCellIds.has(cellId));
 
   // Build metrics string
   const parts: string[] = [];
@@ -276,7 +277,7 @@ function RunningStatus({ cellId, outputs, source }: { cellId: string; outputs: C
   if (toolCount > 0) parts.push(`${toolCount} tool use${toolCount > 1 ? 's' : ''}`);
   if (thinkSec > 0 && !isThinking) parts.push(`thought for ${formatTime(thinkSec)}`);
 
-  const label = t(getStatusLabelKey(isThinking, hasAnyOutput, elapsed));
+  const label = t(getStatusLabelKey(isThinking, hasAnyOutput, elapsed, accepted));
   const metrics = parts.length > 0 ? ` (${formatTime(elapsed)} · ${parts.join(' · ')})` : ` (${formatTime(elapsed)})`;
 
   return (

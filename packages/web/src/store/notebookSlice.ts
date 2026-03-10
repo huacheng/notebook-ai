@@ -110,7 +110,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
   | 'openNotebookTab' | 'closeNotebookTab' | 'closeNotebookTabByPath' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab' | 'restoreOpenNotebookTabs'
   | 'appendStreamDelta' | 'flushStreamBuffer'
-  | 'loadingCellIds' | 'requestCellLoad' | 'replaceCellStub'
+  | 'loadingCellIds' | 'acceptedCellIds' | 'requestCellLoad' | 'replaceCellStub'
 >> = (set, get) => ({
   notebook: null,
   slideLoading: false,
@@ -121,6 +121,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   activeNotebookTabId: null,
   streamBuffer: {},
   loadingCellIds: new Set<string>(),
+  acceptedCellIds: new Set<string>(),
 
   setNotebook(nb) {
     set({ notebook: nb });

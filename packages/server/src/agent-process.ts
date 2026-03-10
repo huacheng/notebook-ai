@@ -227,10 +227,21 @@ export class AgentProcess {
     this.proc.stdin.write(line + '\n');
   }
 
-  /** Send Escape character to stdin to interrupt current generation without killing the process. */
+  /**
+   * Interrupt the agent process.
+   * In stream-json mode, \x1b (Esc) is ignored during tool execution.
+   * We use SIGTERM to kill the process; the onExit callback will
+   * complete the running cell as 'interrupted', and the next executeCell()
+   * call will auto-restart a fresh process.
+   */
   interrupt(): void {
-    if (!this.isAlive() || !this.proc?.stdin) return;
-    this.proc.stdin.write('\x1b');
+    if (!this.isAlive()) {
+      console.log('[ESC-DEBUG][BE][7-agent] interrupt() skipped: not alive');
+      return;
+    }
+    console.log('[ESC-DEBUG][BE][7-agent] Killing Claude process pid=', this.proc!.pid);
+    try { this.proc!.stdin?.end(); } catch { /* ignore */ }
+    try { this.proc!.kill('SIGTERM'); } catch { /* ignore */ }
   }
 
   /** Terminates the persistent agent process. */
@@ -245,10 +256,7 @@ export class AgentProcess {
   }
 
   isAlive(): boolean {
-    // Note: proc.killed becomes true after any kill signal (including SIGINT),
-    // but SIGINT doesn't terminate the process—it just interrupts current generation.
-    // We should only check exitCode to determine if the process is truly dead.
-    return this.proc !== null && this.proc.exitCode === null;
+    return this.proc !== null && this.proc.exitCode === null && !this.proc.killed;
   }
 
   private _waitForFirstOutput(timeoutMs = AGENT_START_TIMEOUT_MS): Promise<void> {

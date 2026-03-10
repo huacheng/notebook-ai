@@ -79,18 +79,16 @@ describe('interrupt (Esc)', () => {
     expect(typeof ap.interrupt).toBe('function');
   });
 
-  it('isAlive() returns true after SIGINT (proc.killed is true but exitCode is null)', async () => {
-    // This test verifies the bug fix: SIGINT sets proc.killed=true but doesn't
-    // terminate the process. isAlive() should still return true.
+  it('isAlive() returns false after kill signal (proc.killed is true)', async () => {
+    // After interrupt() sends SIGTERM, proc.killed=true → process is not alive.
+    // Next executeCell() will auto-restart the process.
     const { AgentProcess } = await import('../agent-process.js');
     const ap = new AgentProcess('claude', '/tmp');
 
-    // Mock a process that received SIGINT but is still running
     const mockProc = { exitCode: null, killed: true } as any;
     (ap as any).proc = mockProc;
 
-    // isAlive() should return true because exitCode is still null
-    expect(ap.isAlive()).toBe(true);
+    expect(ap.isAlive()).toBe(false);
   });
 
   it('isAlive() returns false only when exitCode is set', async () => {
@@ -106,17 +104,18 @@ describe('interrupt (Esc)', () => {
 
   // ── SessionManager.interruptCell() ──────────────────────────────────────
 
-  it('interruptCell() calls agent interrupt() and sets _interrupted flag', async () => {
+  it('interruptCell() stops process and completes cell as interrupted', async () => {
     const session = await createSessionWithRunningCell();
-    // Mock isAlive to return true (mocked start() doesn't set proc)
-    const isAliveSpy = vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(true);
 
     await sm.interruptCell(session.id);
 
-    expect(interruptSpy).toHaveBeenCalledTimes(1);
-    expect((session as any)._interrupted).toBe(true);
-
-    isAliveSpy.mockRestore();
+    // Cell should be synchronously completed as 'interrupted'
+    expect(session.notebook.cells[0].status).toBe('interrupted');
+    // _interrupted flag should be consumed by completeCell
+    expect((session as any)._interrupted).toBeUndefined();
+    // Process should be stopped and a new one spawned (start called again)
+    expect(stopSpy).toHaveBeenCalled();
+    expect(startSpy).toHaveBeenCalledTimes(2); // 1st: createSession, 2nd: respawn
   });
 
   it('interruptCell() clears _rerunQueue', async () => {

@@ -202,6 +202,8 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── CellOutput / RunningStatus ───────────────────────────────────────
     'running.thinking': 'Status: Thinking…',
+    'running.sending': 'Status: Sending…',
+    'running.waiting': 'Status: Waiting…',
     'running.processing': 'Status: Processing…',
     'running.running': 'Status: Running…',
 
@@ -488,6 +490,8 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── CellOutput / RunningStatus ───────────────────────────────────────
     'running.thinking': '状态: 思考中…',
+    'running.sending': '状态: 发送中…',
+    'running.waiting': '状态: 等待中…',
     'running.processing': '状态: 处理中…',
     'running.running': '状态: 运行中…',
 

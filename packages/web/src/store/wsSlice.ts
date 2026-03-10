@@ -296,7 +296,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             set({ sessionNotice: null });
           }
           break;
-        case 'execution_complete':
+        case 'prompt_accepted': {
+          const accepted = get().acceptedCellIds;
+          set({ acceptedCellIds: new Set([...accepted, parsed.cell_id]) });
+          break;
+        }
+        case 'execution_complete': {
+          console.log('[ESC-DEBUG][FE][13] Received execution_complete, cell_id=', parsed.cell_id, 'status=', parsed.status);
           store.flushStreamBuffer(parsed.cell_id);
           if (msgSessionId) {
             set((state) => applyToSession(state, msgSessionId, (nb) =>
@@ -304,9 +310,17 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           } else {
             store.setCellStatus(parsed.cell_id, parsed.status ?? 'completed');
           }
-          // Set lastCompletedCellId for notification system
-          set({ lastCompletedCellId: parsed.cell_id });
+          // Set lastCompletedCellId for notification system + clear acceptance tracking
+          const acc = get().acceptedCellIds;
+          if (acc.has(parsed.cell_id)) {
+            const next = new Set(acc);
+            next.delete(parsed.cell_id);
+            set({ lastCompletedCellId: parsed.cell_id, acceptedCellIds: next });
+          } else {
+            set({ lastCompletedCellId: parsed.cell_id });
+          }
           break;
+        }
         case 'git_diff':
           if (msgSessionId) {
             set((state) => applyToSession(state, msgSessionId, (nb) =>
@@ -442,6 +456,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           set({ restartPhase: 'error', restartError: parsed.error ?? 'Rerun failed' });
           break;
         case 'cell_interrupted':
+          console.log('[ESC-DEBUG][FE][8] Received cell_interrupted from backend');
           // No-op: the actual cell completion comes via execution_complete
           break;
         case 'model_changed': {
@@ -979,10 +994,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   interruptCell() {
     const { ws, sessionId } = get();
+    console.log('[ESC-DEBUG][FE][1] interruptCell() called, ws=', ws?.readyState, 'sessionId=', sessionId);
     if (ws && ws.readyState === WebSocket.OPEN && sessionId) {
+      console.log('[ESC-DEBUG][FE][2] Sending interrupt_cell to backend');
       ws.send(JSON.stringify({ type: 'interrupt_cell', session_id: sessionId }));
       // Also stop timer mode if active — Esc stops everything
       if (get().timerMode) {
+        console.log('[ESC-DEBUG][FE][2b] Sending timer_stop (timer was active)');
         ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
         set({ timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
         cacheRemove('nb-timer-mode');

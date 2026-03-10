@@ -12,9 +12,12 @@ const sessionSrc = () =>
 describe('restartSession stops Timer mode', () => {
   it('should call stopTimerMode in restartSession', () => {
     const src = sessionSrc();
-    // Match the restartSession method definition specifically
-    const restartMethod = src.match(/async restartSession\(sessionId[\s\S]*?(?=\n  \/\*\*|\n  async [a-z]|\n  \/\/ ──)/);
-    expect(restartMethod).toBeTruthy();
-    expect(restartMethod![0]).toContain('stopTimerMode');
+    // Find the restartSession method body (between its signature and _spawnAgent)
+    const start = src.indexOf('restartSession(sessionId: string');
+    const end = src.indexOf('_spawnAgent', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const body = src.slice(start, end);
+    expect(body).toContain('stopTimerMode');
   });
 });

@@ -65,9 +65,19 @@ export function estimateTokens(
 }
 
 /** Determine the i18n key for RunningStatus label. */
-export function getStatusLabelKey(isThinking: boolean, hasAnyOutput: boolean, elapsedSec: number): string {
+export function getStatusLabelKey(isThinking: boolean, hasAnyOutput: boolean, elapsedSec: number, accepted?: boolean): string {
   if (isThinking) return 'running.thinking';
-  if (!hasAnyOutput && elapsedSec >= 5) return 'running.processing';
+  if (!hasAnyOutput) {
+    if (accepted === undefined) {
+      // Legacy: no acceptance tracking
+      if (elapsedSec >= 5) return 'running.processing';
+      return 'running.running';
+    }
+    // Three-phase: Sending → Waiting → Processing
+    if (!accepted) return 'running.sending';
+    if (elapsedSec >= 5) return 'running.processing';
+    return 'running.waiting';
+  }
   return 'running.running';
 }
 

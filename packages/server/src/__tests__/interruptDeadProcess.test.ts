@@ -1,162 +1,83 @@
 /**
  * @vitest-environment node
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { SessionManager } from '../session.js';
+import { NotebookStore } from '../notebook-store.js';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 /**
- * Tests that interruptCell() force-completes a stale running cell
- * when the agent process is dead (e.g., after server restart).
- *
- * Bug: interruptCell() sets _interrupted=true and calls agentProcess.interrupt(),
- * but if the process is dead, interrupt() silently no-ops and no 'result' message
- * ever arrives, leaving the cell stuck in 'running' forever.
+ * Tests that interruptCell() force-completes a running cell synchronously,
+ * stops the old process, and pre-spawns a new one.
  */
+describe('interruptCell with dead/alive process', () => {
+  let sm: SessionManager;
+  let ns: NotebookStore;
+  let tempDir: string;
+  let startSpy: ReturnType<typeof vi.spyOn>;
+  let stopSpy: ReturnType<typeof vi.spyOn>;
 
-// Minimal mock types matching session.ts internals
-interface MockCell {
-  id: string;
-  type: 'prompt';
-  source: string;
-  outputs: unknown[];
-  status: string;
-  execution_count: number;
-}
+  beforeEach(async () => {
+    sm = new SessionManager();
+    ns = new NotebookStore();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'interrupt-dead-'));
 
-interface MockNotebook {
-  cells: MockCell[];
-  metadata: { title: string; created: string; git_repo: boolean; agent: 'claude' };
-  version: number;
-  slide: { generated: boolean; sections: unknown[] };
-  annotations: unknown[];
-  assets: { intermediate_files: unknown[] };
-}
+    const { AgentProcess } = await import('../agent-process.js');
+    startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
+      onMsg({ type: 'system', subtype: 'hook_started' });
+    });
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    vi.spyOn(AgentProcess.prototype, 'sendPrompt').mockImplementation(() => {});
+  });
 
-function makeNotebook(cells: MockCell[]): MockNotebook {
-  return {
-    cells,
-    metadata: { title: 'test', created: '', git_repo: false, agent: 'claude' },
-    version: 1,
-    slide: { generated: false, sections: [] },
-    annotations: [],
-    assets: { intermediate_files: [] },
-  };
-}
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-function makeRunningCell(id: string): MockCell {
-  return { id, type: 'prompt', source: 'test', outputs: [], status: 'running', execution_count: 1 };
-}
-
-describe('interruptCell with dead process', () => {
-  it('should force-complete the running cell when agent process is dead', async () => {
-    // We import SessionManager dynamically to allow mocking
-    const { SessionManager } = await import('../session.js');
-    const mgr = new SessionManager();
-
-    // Inject a fake session with a dead agent process
-    const fakeSession = {
-      id: 'test-session',
-      notebook: makeNotebook([makeRunningCell('cell-1')]),
-      notebookPath: '/tmp/test.notebook.json',
-      cwd: '/tmp',
-      agentProcess: {
-        isAlive: () => false,
-        interrupt: vi.fn(),
-        engine: 'claude',
-        model: undefined,
-      },
-      listeners: new Set<(msg: any) => void>(),
-      _interrupted: false,
-      _rerunQueue: undefined,
-      _executeLock: Promise.resolve(),
-      _execStartTimes: new Map(),
-      _pendingToolUseIds: new Set(),
-      _toolLongRunningNotified: false,
-      _autoMode: false,
-      _autoTimer: null,
-      _autoIntervalMs: 300000,
-      _autoIterationCount: 0,
-      _autoExecuting: false,
-      _autoPausedUntil: 0,
-      _lastCellId: 'cell-1',
-      _pendingPostComplete: Promise.resolve(),
-      eventBuffer: {
-        push: vi.fn().mockImplementation((msg: any) => ({ ...msg, event_index: 0 })),
-        slice: vi.fn().mockReturnValue([]),
-      },
-      notebookDbId: undefined,
-      claudeSessionId: undefined,
-      gitManager: { tryCommit: vi.fn() },
-      allowedDirs: undefined,
+  async function createSessionWithRunningCell() {
+    const nbPath = path.join(tempDir, 'test.notebook.json');
+    await ns.save(nbPath, ns.createNew('Test', tempDir));
+    const session = await sm.createSession(nbPath, tempDir);
+    session.notebook = {
+      ...session.notebook,
+      cells: [
+        { id: 'c1', type: 'prompt' as const, source: 'hello', outputs: [], execution_count: 1, status: 'running' as const },
+      ],
     };
-    (mgr as any).sessions.set('test-session', fakeSession);
+    return session;
+  }
 
-    // Capture broadcast messages
+  it('should force-complete running cell when agent process is dead', async () => {
+    const session = await createSessionWithRunningCell();
+    vi.spyOn(session.agentProcess, 'isAlive').mockReturnValue(false);
+
     const broadcasts: any[] = [];
-    fakeSession.listeners.add((msg: any) => broadcasts.push(msg));
+    session.listeners.add((msg: any) => broadcasts.push(msg));
 
-    // Act: interrupt the cell
-    await mgr.interruptCell('test-session');
+    await sm.interruptCell(session.id);
 
-    // Assert: cell should be force-completed (not stuck in 'running')
-    const cell = fakeSession.notebook.cells.find((c: any) => c.id === 'cell-1');
-    expect(cell?.status).not.toBe('running');
-    // Should be 'interrupted' since _interrupted was set
-    expect(cell?.status).toBe('interrupted');
+    // Cell should be synchronously completed as 'interrupted'
+    expect(session.notebook.cells[0].status).toBe('interrupted');
 
-    // Assert: execution_complete should have been broadcast
+    // execution_complete should have been broadcast
     const completeMsg = broadcasts.find((m: any) => m.type === 'execution_complete');
     expect(completeMsg).toBeDefined();
-    expect(completeMsg.cell_id).toBe('cell-1');
+    expect(completeMsg.cell_id).toBe('c1');
     expect(completeMsg.status).toBe('interrupted');
   });
 
-  it('should still send SIGINT when agent process is alive', async () => {
-    const { SessionManager } = await import('../session.js');
-    const mgr = new SessionManager();
+  it('should stop process and pre-spawn new one when alive', async () => {
+    const session = await createSessionWithRunningCell();
 
-    const interruptFn = vi.fn();
-    const fakeSession = {
-      id: 'test-session-2',
-      notebook: makeNotebook([makeRunningCell('cell-2')]),
-      notebookPath: '/tmp/test2.notebook.json',
-      cwd: '/tmp',
-      agentProcess: {
-        isAlive: () => true,
-        interrupt: interruptFn,
-        engine: 'claude',
-        model: undefined,
-      },
-      listeners: new Set<(msg: any) => void>(),
-      _interrupted: false,
-      _rerunQueue: undefined,
-      _executeLock: Promise.resolve(),
-      _execStartTimes: new Map(),
-      _pendingToolUseIds: new Set(),
-      _toolLongRunningNotified: false,
-      _autoMode: false,
-      _autoTimer: null,
-      _autoIntervalMs: 300000,
-      _autoIterationCount: 0,
-      _autoExecuting: false,
-      _autoPausedUntil: 0,
-      _lastCellId: 'cell-2',
-      _pendingPostComplete: Promise.resolve(),
-      eventBuffer: { push: vi.fn(), slice: vi.fn().mockReturnValue([]) },
-      notebookDbId: undefined,
-      claudeSessionId: undefined,
-      gitManager: { tryCommit: vi.fn() },
-      allowedDirs: undefined,
-    };
-    (mgr as any).sessions.set('test-session-2', fakeSession);
+    await sm.interruptCell(session.id);
 
-    await mgr.interruptCell('test-session-2');
-
-    // Should call interrupt on the agent process
-    expect(interruptFn).toHaveBeenCalled();
-    // Cell should still be 'running' (waiting for result message from Claude)
-    const cell = fakeSession.notebook.cells.find((c: any) => c.id === 'cell-2');
-    expect(cell?.status).toBe('running');
-    // _interrupted flag should be set for when result arrives
-    expect(fakeSession._interrupted).toBe(true);
+    // Cell should be force-completed synchronously
+    expect(session.notebook.cells[0].status).toBe('interrupted');
+    // Old process should be stopped
+    expect(stopSpy).toHaveBeenCalled();
+    // New process should be spawned (start called twice: createSession + respawn)
+    expect(startSpy).toHaveBeenCalledTimes(2);
   });
 });

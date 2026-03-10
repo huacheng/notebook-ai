@@ -331,7 +331,7 @@ export function setupWebSocket(
       const result = WSClientMessageSchema.safeParse(parsed);
       if (!result.success) {
         // D2: Do not leak Zod schema details (field names, regex) to client
-        console.warn('[ws] Invalid message:', result.error.issues.length, 'validation error(s)');
+        console.warn('[ws] Invalid message:', result.error.issues.length, 'validation error(s)', JSON.stringify(result.error.issues), 'raw type:', (parsed as any)?.type);
         sendToClient(ws, {
           type: 'error',
           message: `Invalid message format.`,
@@ -549,10 +549,13 @@ export function setupWebSocket(
 
         case 'execute_request': {
           const { session_id, cell_id, source, images } = msg;
+          console.log('[ESC-DEBUG][BE] execute_request received, session_id=', session_id, 'cell_id=', cell_id);
           if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.executeCell(session_id, cell_id, source, images);
+            console.log('[ESC-DEBUG][BE] executeCell completed successfully');
           } catch (err) {
+            console.log('[ESC-DEBUG][BE] executeCell threw:', (err as Error).message);
             sendToClient(ws, {
               type: 'error',
               session_id,
@@ -923,9 +926,13 @@ export function setupWebSocket(
           const { session_id, clear } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
-            // clear: true → skipResume: true (truly clears Claude context)
-            await sessionManager.restartSession(session_id, clear ? { skipResume: true } : undefined);
+            // Synchronous cleanup (force-complete cell, kill process) happens immediately.
+            // Process startup is fire-and-forget — don't block the WS response.
+            const startPromise = sessionManager.restartSession(session_id, clear ? { skipResume: true } : undefined);
             sendToClient(ws, { type: 'session_restarted', session_id, cleared: !!clear });
+            startPromise.catch((err) => {
+              console.error(`[ws] restart_session spawn failed for ${session_id}:`, (err as Error).message);
+            });
           } catch (err) {
             sendToClient(ws, { type: 'session_restart_failed', session_id, error: sanitizeErrorForClient(err) });
           }
@@ -948,9 +955,12 @@ export function setupWebSocket(
           const { session_id } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
+            console.log('[ESC-DEBUG][BE][3] ws-handler received interrupt_cell, session_id=', session_id);
             await sessionManager.interruptCell(session_id);
+            console.log('[ESC-DEBUG][BE][8] interruptCell() returned, sending cell_interrupted to frontend');
             sendToClient(ws, { type: 'cell_interrupted', session_id });
           } catch (err) {
+            console.log('[ESC-DEBUG][BE][ERR] interruptCell() threw:', err);
             sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }
           break;

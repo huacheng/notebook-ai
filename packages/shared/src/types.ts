@@ -559,6 +559,12 @@ export const ExecutionCompleteSchema = z.object({
   status: z.enum(['completed', 'error', 'interrupted']).optional(),
 });
 
+export const PromptAcceptedSchema = z.object({
+  type: z.literal('prompt_accepted'),
+  session_id: z.string().optional(),
+  cell_id: z.string(),
+});
+
 export const GitDiffMessageSchema = z.object({
   type: z.literal('git_diff'),
   session_id: z.string(),
@@ -950,6 +956,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   CellStatusMessageSchema,
   CellStreamMessageSchema,
   ExecutionCompleteSchema,
+  PromptAcceptedSchema,
   GitDiffMessageSchema,
   ExportCompleteSchema,
   ErrorMessageSchema,

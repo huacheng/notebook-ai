@@ -134,15 +134,14 @@ function NotebookStatusBar() {
         >
           {t('status.rerun')}
         </button>
-        {isRunning && (
-          <button
-            className="notebook-statusbar-btn notebook-statusbar-esc-btn"
-            onClick={interruptCell}
-            title={t('status.escTitle')}
-          >
-            {t('status.esc')}
-          </button>
-        )}
+        <button
+          className="notebook-statusbar-btn notebook-statusbar-esc-btn"
+          onClick={interruptCell}
+          disabled={!isRunning}
+          title={t('status.escTitle')}
+        >
+          {t('status.esc')}
+        </button>
         {timerMode ? (
           <button
             className="notebook-statusbar-btn notebook-statusbar-timer-btn active"

@@ -168,8 +168,8 @@ describe('SessionManager.restartSession()', () => {
     expect(modelArgs).toContain(siblingDir);
   });
 
-  it('should throw when restarting a non-existent session', async () => {
-    await expect(sm.restartSession('non-existent')).rejects.toThrow(
+  it('should throw when restarting a non-existent session', () => {
+    expect(() => sm.restartSession('non-existent')).toThrow(
       'Session "non-existent" not found',
     );
   });

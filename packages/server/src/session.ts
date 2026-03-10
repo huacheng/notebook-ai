@@ -161,6 +161,8 @@ interface NotebookSession {
   _toolLongRunningNotified: boolean;
   /** Debounced auto-save timer — persists running cell output to disk periodically. */
   _autoSaveTimer: ReturnType<typeof setTimeout> | null;
+  /** Promise that resolves when the agent process is ready after a background spawn. */
+  _spawnReady: Promise<void>;
   /** Timer mode: whether auto heartbeat is active. */
   _timerMode: boolean;
   /** Timer mode: interval timer reference for CONTINUE prompts. */
@@ -293,6 +295,7 @@ export class SessionManager {
       _timerIterationCount: 0,
       _timerExecuting: false,
       _timerPausedUntil: 0,
+      _spawnReady: Promise.resolve(),
     };
 
     // Start the agent process.  Messages arrive asynchronously via stdout.
@@ -341,16 +344,22 @@ export class SessionManager {
     await prev;
 
     try {
-    // If the agent process died (e.g. SIGINT during interrupt), force-complete any
-    // stale running cell and restart the process before the concurrency check.
+    // If the agent process is not alive, either a background spawn is in progress
+    // (from interruptCell/restartSession) or the process truly died unexpectedly.
     if (!session.agentProcess.isAlive()) {
       const staleRunningId = findRunningCellId(session.notebook);
       if (staleRunningId) {
         console.log(`[session ${sessionId}] Force-completing stale cell "${staleRunningId}" (process dead).`);
         this.completeCell(session, staleRunningId, true);
       }
-      console.log(`[session ${sessionId}] Agent process dead — auto-restarting (clean) before execute.`);
-      await this.restartSession(sessionId, { skipResume: true });
+      // Wait for any in-flight spawn to complete
+      console.log(`[session ${sessionId}] Agent process not alive — waiting for spawn or restarting.`);
+      await session._spawnReady.catch(() => {});
+      // If still not alive after spawn completed (spawn failed or no spawn was pending), restart
+      if (!session.agentProcess.isAlive()) {
+        console.log(`[session ${sessionId}] Spawn didn't recover — restarting (clean).`);
+        await this.restartSession(sessionId, { skipResume: true });
+      }
     }
 
     // Reject concurrent execution: only one cell may run at a time per session.
@@ -399,6 +408,12 @@ export class SessionManager {
     } else {
       session.agentProcess.sendPrompt(source);
     }
+    // Signal that prompt was written to stdin — frontend uses this to
+    // distinguish "sending" (WS in-flight) from "waiting" (stdin written).
+    this.broadcast(session, {
+      type: 'prompt_accepted',
+      cell_id: cellId,
+    });
     } finally {
       unlock!();
     }
@@ -412,33 +427,58 @@ export class SessionManager {
    * Restarts the agent process for an existing session.
    * Preserves the session ID, notebook state, and listeners.
    */
-  async restartSession(sessionId: string, opts?: { skipResume?: boolean }): Promise<void> {
+  /**
+   * Restart the agent process. Synchronous cleanup happens immediately;
+   * process startup runs in background. Returns a Promise that resolves
+   * when the new process is ready (callers can await or fire-and-forget).
+   */
+  restartSession(sessionId: string, opts?: { skipResume?: boolean }): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
     // Capture Claude session ID for --resume before stopping.
-    // Skip resume when the process crashed (SIGINT death) — the session is unrecoverable.
     const resumeSessionId = opts?.skipResume ? undefined : session.claudeSessionId;
 
     // Reset claudeSessionId so the new process's session_id will be captured
     session.claudeSessionId = undefined;
 
-    // Stop old process
-    session.agentProcess.stop();
+    // Force-complete any running cell synchronously (same pattern as interruptCell)
+    const runningCellId = findRunningCellId(session.notebook);
+    if (runningCellId) {
+      console.log(`[session ${sessionId}] Force-completing cell "${runningCellId}" before restart.`);
+      this.completeCell(session, runningCellId, true);
+    }
+
+    // Clear interrupted flag (restart is a clean slate)
+    delete session._interrupted;
 
     // Stop timer mode before restarting to prevent stale timer on new process
     this.stopTimerMode(sessionId);
 
+    // Clear rerun queue
+    delete session._rerunQueue;
+
+    // Stop old process
+    session.agentProcess.stop();
+
     // Clear pending tool IDs (old process won't send tool_result)
     session._pendingToolUseIds.clear();
 
-    // Create new AgentProcess with same config (preserve model + allowedDirs)
+    // Start new process — caller decides whether to await or fire-and-forget
+    return this._spawnAgent(session, sessionId, resumeSessionId);
+  }
+
+  /**
+   * Spawn a fresh AgentProcess. Returns a Promise that resolves when the
+   * process is ready. Callers can await it (executeCell) or fire-and-forget
+   * (interruptCell, restartSession).
+   */
+  private _spawnAgent(session: NotebookSession, sessionId: string, resumeSessionId?: string): Promise<void> {
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
     session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
 
-    // Start new process with same handlers — pass resumeSessionId for context recovery
-    await session.agentProcess.start(
+    const ready = session.agentProcess.start(
       (raw: unknown) => this.handleJsonlMessage(session, raw),
       (code) => {
         const cellId = findRunningCellId(session.notebook);
@@ -451,9 +491,11 @@ export class SessionManager {
         }
       },
       resumeSessionId,
-    );
-
-    console.log(`[session] Restarted session "${sessionId}"${resumeSessionId ? ` (resumed ${resumeSessionId})` : ''}`);
+    ).then(() => {
+      console.log(`[session] Restarted session "${sessionId}"${resumeSessionId ? ` (resumed ${resumeSessionId})` : ''}`);
+    });
+    session._spawnReady = ready;
+    return ready;
   }
 
   /**
@@ -479,32 +521,10 @@ export class SessionManager {
 
     // 2. Stop old agent process
     session.agentProcess.stop();
-
-    // Clear pending tool IDs (old process won't send tool_result)
     session._pendingToolUseIds.clear();
 
-    // 3. Create new AgentProcess WITHOUT resumeSessionId (clean context)
-    const engine = session.agentProcess.engine;
-    const model = session.agentProcess.model;
-    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
-
-    // 4. Start new process — no resume
-    await session.agentProcess.start(
-      (raw: unknown) => this.handleJsonlMessage(session, raw),
-      (code) => {
-        const cellId = findRunningCellId(session.notebook);
-        if (cellId) {
-          console.error(
-            `[session ${sessionId}] Agent process exited (code ${String(code)}) ` +
-            `while cell "${cellId}" was running during rerun.`,
-          );
-          this.completeCell(session, cellId, true);
-        }
-      },
-      // No resumeSessionId — intentionally undefined for clean context
-    );
-
-    console.log(`[session] Rerun initiated for session "${sessionId}" (clean context)`);
+    // 3. Start new process without resume (clean context) — must await for rerun
+    await this._spawnAgent(session, sessionId, undefined);
 
     // 5. Build rerun queue from all prompt cells and kick off execution
     session._rerunQueue = session.notebook.cells
@@ -564,7 +584,7 @@ export class SessionManager {
     // Start new process (clean — no resume)
     await session.agentProcess.start(
       (raw: unknown) => this.handleJsonlMessage(session, raw),
-      (code) => {
+      (_code) => {
         const cellId = findRunningCellId(session.notebook);
         if (cellId) {
           this.completeCell(session, cellId, true);
@@ -599,24 +619,42 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
+    const runningCellId = findRunningCellId(session.notebook);
+    console.log('[ESC-DEBUG][BE][4] interruptCell() start, sessionId=', sessionId, 'runningCell=', runningCellId);
+
+    // Nothing to interrupt — no cell is running
+    if (!runningCellId) {
+      console.log('[ESC-DEBUG][BE][4-skip] No running cell, skipping interrupt');
+      return;
+    }
+
     // Clear rerun queue so no more cells auto-execute after interrupt
+    console.log('[ESC-DEBUG][BE][4a] clearing _rerunQueue:', !!session._rerunQueue);
     delete session._rerunQueue;
 
     // Stop timer mode if active — Esc stops everything
+    console.log('[ESC-DEBUG][BE][5] stopTimerMode');
     this.stopTimerMode(sessionId);
 
+    console.log('[ESC-DEBUG][BE][6] setting _interrupted = true');
     session._interrupted = true;
 
-    if (session.agentProcess.isAlive()) {
-      session.agentProcess.interrupt();
-      // Claude CLI will emit a 'result' message → completeCell() handles the rest
-    } else {
-      // Process is dead (e.g., after server restart) — force-complete any stale running cell
-      const cellId = findRunningCellId(session.notebook);
-      if (cellId) {
-        this.completeCell(session, cellId, true);
-      }
-    }
+    // Force-complete the running cell synchronously (don't wait for async onExit)
+    this.completeCell(session, runningCellId, true);
+
+    // Capture resume ID before killing — interrupt preserves conversation context
+    const resumeSessionId = session.claudeSessionId;
+    session.claudeSessionId = undefined;
+
+    // Kill old process
+    session.agentProcess.stop();
+    session._pendingToolUseIds.clear();
+
+    // Pre-start process with --resume so next prompt is instant
+    console.log('[ESC-DEBUG][BE][7b] Pre-starting process with --resume after interrupt');
+    this._spawnAgent(session, sessionId, resumeSessionId ?? undefined).catch((err) => {
+      console.error(`[session ${sessionId}] Pre-restart after interrupt failed:`, (err as Error).message);
+    });
   }
 
   async closeSession(sessionId: string): Promise<void> {
@@ -806,6 +844,7 @@ export class SessionManager {
     } else {
       status = isError ? 'error' : 'completed';
     }
+    console.log('[ESC-DEBUG][BE][10] completeCell status=', status, 'cellId=', cellId, '_interrupted was=', status === 'interrupted');
     session.notebook = updateCellStatus(session.notebook, cellId, status);
 
     // Heartbeat: clear pending tools on completion
@@ -816,6 +855,7 @@ export class SessionManager {
     session._execStartTimes.delete(cellId);
     session.notebook = updateCellDuration(session.notebook, cellId, duration_ms);
 
+    console.log('[ESC-DEBUG][BE][11] Broadcasting execution_complete, status=', status, 'duration_ms=', duration_ms);
     this.broadcast(session, {
       type: 'execution_complete',
       cell_id: cellId,
@@ -1168,6 +1208,11 @@ export class SessionManager {
   private handleJsonlMessage(session: NotebookSession, raw: unknown): void {
     const msg = raw as ClaudeJsonlMessage;
 
+    // Debug: log all messages when _interrupted is set to catch what Claude sends after Esc
+    if (session._interrupted) {
+      console.log('[ESC-DEBUG][BE][raw] _interrupted=true, msg.type=', msg.type, 'raw=', JSON.stringify(raw).substring(0, 500));
+    }
+
     switch (msg.type) {
       case 'assistant': {
         const assistant = msg as ClaudeTextMessage;
@@ -1262,6 +1307,7 @@ export class SessionManager {
       case 'result': {
         const result = msg as ClaudeResultMessage;
         const cellId = findRunningCellId(session.notebook);
+        console.log('[ESC-DEBUG][BE][9] handleJsonlMessage type=result, is_error=', result.is_error, '_interrupted=', session._interrupted, 'cellId=', cellId, 'raw_keys=', Object.keys(msg as object));
         if (!cellId) break;
 
         if (result.is_error && result.result) {

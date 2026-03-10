@@ -82,6 +82,7 @@ export interface NotebookStore {
 
   // ── Cell lazy loading state ────────────────────────────────────────────
   loadingCellIds: Set<string>;  // cells currently being loaded
+  acceptedCellIds: Set<string>; // cells whose prompt was written to Claude stdin
 
   // ── Mobile state ─────────────────────────────────────────────────────
   mobileView: 'projects' | 'notebooks' | 'notebook';
