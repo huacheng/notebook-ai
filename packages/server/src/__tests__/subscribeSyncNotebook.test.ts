@@ -39,8 +39,8 @@ describe('session_state frontend handler merges cells (preserves pagination)', (
     // session_state handler should NOT call syncFullNotebook (which replaces all cells)
     // Instead it should merge running cell content into existing local cells
     const startIdx = src.indexOf("case 'session_state':");
-    const caseBlock = src.slice(startIdx, startIdx + 800);
+    const caseBlock = src.slice(startIdx, startIdx + 1200);
     expect(caseBlock).not.toContain('syncFullNotebook');
-    expect(caseBlock).toContain('mergeCells');
+    expect(caseBlock).toContain('mergeServerCells');
   });
 });

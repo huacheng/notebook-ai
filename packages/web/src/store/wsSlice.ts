@@ -163,6 +163,37 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       }
     };
 
+    /**
+     * Merge server cells into a local (possibly paginated) notebook.
+     * - Updates existing local cells with server content (running cell outputs).
+     * - Appends only cells that come AFTER the local tail in server order
+     *   (truly new cells), ignoring older history cells not yet loaded.
+     */
+    const mergeServerCells = (
+      localNb: Notebook, serverCells: Cell[], metadata?: Notebook['metadata'],
+    ): Notebook => {
+      const serverCellMap = new Map(serverCells.map((c) => [c.id, c]));
+      // Update existing local cells with latest server content
+      const merged = localNb.cells.map((c) => serverCellMap.get(c.id) ?? c);
+      // Find where the local tail sits in the server array
+      const localLastId = localNb.cells.length > 0
+        ? localNb.cells[localNb.cells.length - 1].id : null;
+      if (localLastId) {
+        const tailIdx = serverCells.findIndex((c) => c.id === localLastId);
+        if (tailIdx >= 0) {
+          // Append only cells after the local tail (new cells created on other device)
+          for (let i = tailIdx + 1; i < serverCells.length; i++) {
+            merged.push(serverCells[i]);
+          }
+        }
+        // If localLastId not found in server (deleted?), don't append anything
+      } else if (serverCells.length > 0) {
+        // Local is empty — take all server cells
+        merged.push(...serverCells);
+      }
+      return { ...localNb, cells: merged, ...(metadata ? { metadata } : {}) };
+    };
+
     ws.onmessage = (event: MessageEvent) => {
       // D2: guard against non-string data (e.g. Blob/ArrayBuffer from binary frames)
       if (typeof event.data !== 'string') return;
@@ -689,21 +720,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
           }
           if (syncMsg.session_id && syncMsg.notebook) {
-            // Merge instead of full replace to preserve paginated cell state.
-            // notebook_sync is triggered when last_cell_id diverges (new cell
-            // created on another device), so we merge new/updated cells in.
-            const sCells = syncMsg.notebook.cells;
-            const sCellMap = new Map(sCells.map((c) => [c.id, c]));
             set((state) => {
               const updates: Partial<typeof state> = {};
-              const mergeInto = (localNb: Notebook): Notebook => {
-                const merged = localNb.cells.map((c) => sCellMap.get(c.id) ?? c);
-                const localIds = new Set(localNb.cells.map((c) => c.id));
-                for (const sc of sCells) {
-                  if (!localIds.has(sc.id)) merged.push(sc);
-                }
-                return { ...localNb, metadata: syncMsg.notebook!.metadata, cells: merged };
-              };
+              const mergeInto = (localNb: Notebook): Notebook =>
+                mergeServerCells(localNb, syncMsg.notebook!.cells, syncMsg.notebook!.metadata);
               const updatedOpen = { ...state.openNotebooks };
               for (const [nbId, entry] of Object.entries(updatedOpen)) {
                 if (entry.sessionId === syncMsg.session_id) {
@@ -722,34 +742,32 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'session_state': {
           // Full notebook state sent on subscribe — merge running cell content
           // without replacing the paginated cells array (preserves lazy-load tail)
-          const stateMsg = parsed as unknown as { session_id: string; notebook?: Notebook };
+          const stateMsg = parsed as unknown as { session_id: string; notebook?: Notebook; notebook_compressed?: string; compression?: string };
+          // Decompress LZ4 if needed
+          if (stateMsg.notebook_compressed && stateMsg.compression === 'lz4') {
+            try {
+              const compressed = Uint8Array.from(atob(stateMsg.notebook_compressed), c => c.charCodeAt(0));
+              const decompressed = lz4.decompress(compressed);
+              stateMsg.notebook = JSON.parse(new TextDecoder().decode(decompressed));
+            } catch (e) {
+              console.error('[ws] Failed to decompress session_state:', e);
+              break;
+            }
+          }
           if (stateMsg.session_id && stateMsg.notebook) {
-            const serverCells = stateMsg.notebook.cells;
-            const serverCellMap = new Map(serverCells.map((c) => [c.id, c]));
-            const mergeCells = (localNb: Notebook): Notebook => {
-              // Update existing local cells with server content (running cell outputs)
-              const merged = localNb.cells.map((c) => {
-                const serverCell = serverCellMap.get(c.id);
-                return serverCell ?? c;
-              });
-              // Append any new cells not yet in local (created while we were away)
-              const localIds = new Set(localNb.cells.map((c) => c.id));
-              for (const sc of serverCells) {
-                if (!localIds.has(sc.id)) merged.push(sc);
-              }
-              return { ...localNb, cells: merged };
-            };
             set((state) => {
               const updates: Partial<typeof state> = {};
+              const mergeInto = (localNb: Notebook): Notebook =>
+                mergeServerCells(localNb, stateMsg.notebook!.cells);
               const updatedOpen = { ...state.openNotebooks };
               for (const [nbId, entry] of Object.entries(updatedOpen)) {
                 if (entry.sessionId === stateMsg.session_id) {
-                  updatedOpen[nbId] = { ...entry, notebook: mergeCells(entry.notebook) };
+                  updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
                 }
               }
               updates.openNotebooks = updatedOpen;
               if (state.sessionId === stateMsg.session_id && state.notebook) {
-                updates.notebook = mergeCells(state.notebook);
+                updates.notebook = mergeInto(state.notebook);
               }
               return updates;
             });

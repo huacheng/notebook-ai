@@ -498,10 +498,14 @@ export function setupWebSocket(
 
             // Send full notebook state so new device has complete cell content
             // (including running cell's accumulated outputs from mid-stream)
+            // Use LZ4 compression consistent with notebook_sync
+            const stateJson = JSON.stringify(session.notebook);
+            const stateCompressed = Buffer.from(lz4.compress(Buffer.from(stateJson, 'utf-8')));
             sendToClient(ws, {
               type: 'session_state',
               session_id,
-              notebook: session.notebook,
+              notebook_compressed: stateCompressed.toString('base64'),
+              compression: 'lz4',
             });
 
           }
