@@ -159,6 +159,8 @@ interface NotebookSession {
   _pendingAppends: number;
   /** Heartbeat: flag to prevent repeated tool_long_running notifications. */
   _toolLongRunningNotified: boolean;
+  /** Debounced auto-save timer — persists running cell output to disk periodically. */
+  _autoSaveTimer: ReturnType<typeof setTimeout> | null;
   /** Timer mode: whether auto heartbeat is active. */
   _timerMode: boolean;
   /** Timer mode: interval timer reference for CONTINUE prompts. */
@@ -280,6 +282,7 @@ export class SessionManager {
       allowedDirs,
       _persistedToolUseIds: new Set(),
       _lastOutputTime: Date.now(),
+      _autoSaveTimer: null,
       _heartbeatTimer: null,
       _pendingToolUseIds: new Set(),
       _pendingAppends: 0,
@@ -620,9 +623,13 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Stop heartbeat and timer mode timers
+    // Stop heartbeat, timer mode, and debounced auto-save timers
     this.stopHeartbeat(session);
     this.stopTimerMode(sessionId);
+    if (session._autoSaveTimer) {
+      clearTimeout(session._autoSaveTimer);
+      session._autoSaveTimer = null;
+    }
 
     // D3: Await any pending post-completion work (git commit + autoSave) before closing
     await session._pendingPostComplete.catch(() => {});
@@ -784,6 +791,12 @@ export class SessionManager {
     }
     // Reset counter on final completion
     session._pendingAppends = 0;
+
+    // Cancel debounced running-cell auto-save (completion will do its own save)
+    if (session._autoSaveTimer) {
+      clearTimeout(session._autoSaveTimer);
+      session._autoSaveTimer = null;
+    }
 
     // Determine final status: interrupted > error > completed
     let status: 'completed' | 'error' | 'interrupted';
@@ -1083,6 +1096,17 @@ export class SessionManager {
     });
   }
 
+  /** Schedule a debounced auto-save for running cell output (1s interval). */
+  private _scheduleAutoSave(session: NotebookSession): void {
+    if (session._autoSaveTimer) return; // already scheduled
+    session._autoSaveTimer = setTimeout(() => {
+      session._autoSaveTimer = null;
+      this.autoSave(session).catch((err) => {
+        console.error(`[session ${session.id}] running cell auto-save failed:`, err);
+      });
+    }, 1000);
+  }
+
   /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */
   private async autoSave(session: NotebookSession): Promise<void> {
     try {
@@ -1198,6 +1222,7 @@ export class SessionManager {
               (output.type === 'tool_use' && output.name === 'AskUserQuestion');
             if (shouldPersist) {
               session.notebook = appendCellOutput(session.notebook, cellId, output);
+              this._scheduleAutoSave(session);
             }
             // D1: Track persisted tool_use_ids for tool_result matching
             if (output.type === 'tool_use' && shouldPersist) {
