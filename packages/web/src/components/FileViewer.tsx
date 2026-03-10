@@ -103,7 +103,7 @@ export function FileViewer() {
         onZoomIn={showZoom ? handleZoomIn : undefined}
         onZoomOut={showZoom ? handleZoomOut : undefined}
       />
-      {(fileState.status === 'loading' || fileState.status === 'converting') && (
+      {(fileState.status === 'loading' || fileState.status === 'converting') && !fileState.content && (
         <div className="fv-loading">
           <div className="fv-loading-bar" />
           <div className="fv-loading-body">
@@ -115,7 +115,7 @@ export function FileViewer() {
         </div>
       )}
       {fileState.status === 'error' && <div className="fv-error">Error: {fileState.error}</div>}
-      {fileState.status === 'complete' && mode === 'render' && (
+      {(fileState.status === 'complete' || (fileState.status === 'loading' && fileState.content && fileState.format)) && mode === 'render' && (
         <FileViewerRender
           format={fileState.format!}
           content={fileState.content}

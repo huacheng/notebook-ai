@@ -46,28 +46,6 @@ export function useFileStream(
   const throttleRef = useRef<number | null>(null);
   const skipStreamRef = useRef(false);
 
-  // Synchronous cache check during render (before paint) to prevent flash.
-  // When filePath changes, immediately show cached content instead of waiting
-  // for useEffect (which runs after paint, causing a visible empty frame).
-  const prevFileRef = useRef<string | null>(null);
-  if (filePath !== prevFileRef.current) {
-    prevFileRef.current = filePath;
-    if (filePath) {
-      const effectiveSid = sessionId || (projectId ? `__project_${projectId}__` : '__library__');
-      const ck = `file-content-${notebookId ?? effectiveSid}-${filePath}`;
-      const ttl = filePath.match(/\.(pdf|docx|xlsx|pptx|png|jpg|jpeg|gif|webp)$/i) ? TTL.BINARY_CONTENT : TTL.FILE_CONTENT;
-      const c = cacheGet<{ content: string; mtime: number; format: FileFormat }>(ck, ttl);
-      if (c && !(c.format.endsWith('-binary') || c.format === 'image')) {
-        // Text/HTML: show cached content immediately (no flash)
-        setState({ status: 'complete', format: c.format, content: c.content, binaryBuffer: null, mtime: c.mtime, error: null });
-      } else {
-        setState({ ...INITIAL_STATE, status: filePath ? 'loading' : 'idle' });
-      }
-    } else {
-      setState(INITIAL_STATE);
-    }
-  }
-
   const flushState = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -112,21 +90,18 @@ export function useFileStream(
       formatRef.current = cached.format;
       if (!(cached.format.endsWith('-binary') || cached.format === 'image')) {
         contentChunksRef.current = [cached.content];
-        // Text/HTML cache already applied synchronously during render (prevFileRef).
-        // Don't reset to 'loading' — keep the 'complete' state set during render.
-      } else {
-        // Binary: need async decode, stay in loading until file-open-meta confirms cache
-        setState({
-          status: 'loading',
-          format: cached.format,
-          content: '',
-          binaryBuffer: null,
-          mtime: cached.mtime,
-          error: null,
-        });
       }
+      // Show cached content immediately — status stays 'loading' but content is
+      // available. FileViewer uses content presence to skip loading spinner.
+      setState({
+        status: 'loading',
+        format: cached.format,
+        content: cached.format.endsWith('-binary') || cached.format === 'image' ? '' : cached.content,
+        binaryBuffer: null,
+        mtime: cached.mtime,
+        error: null,
+      });
     } else {
-      // No cache — show loading (synchronous render already set this)
       setState({ ...INITIAL_STATE, status: 'loading' });
     }
 
