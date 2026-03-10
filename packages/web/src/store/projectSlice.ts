@@ -185,6 +185,7 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       sidebarLevel: 'L2' as const,
       fileBrowserPath: '',
     });
+    try { localStorage.setItem('nb-active-project', JSON.stringify({ id, path })); } catch { /* ignore */ }
   },
 
   goBackToProjectList: () => {
@@ -194,6 +195,7 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       sidebarLevel: 'L1' as const,
       fileBrowserPath: '',
     });
+    try { localStorage.removeItem('nb-active-project'); } catch { /* ignore */ }
   },
 
   navigateFileBrowser: (subPath: string) => {

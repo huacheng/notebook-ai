@@ -232,8 +232,19 @@ function AuthenticatedApp() {
     }
   }, [activeNotebookId]);
 
-  // On mount: restore open tabs from localStorage, then reopen the last notebook.
+  // On mount: restore active project, open tabs, and last notebook from localStorage.
   useEffect(() => {
+    // Restore active project context (sidebar L2 state)
+    try {
+      const saved = localStorage.getItem('nb-active-project');
+      if (saved) {
+        const { id, path } = JSON.parse(saved);
+        if (id && path) {
+          useStore.getState().setActiveProject(id, path);
+        }
+      }
+    } catch { /* ignore corrupt data */ }
+
     // Restore non-active notebook tabs and file tabs from cache
     useStore.getState().restoreOpenNotebookTabs();
     useStore.getState().restoreOpenFileTabs();

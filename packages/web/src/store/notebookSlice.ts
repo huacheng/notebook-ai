@@ -467,6 +467,13 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   },
 
   setActiveNotebookTab: (notebookId) => {
+    const entry = get().openNotebooks[notebookId];
+    // If the tab was restored from cache (no backend session), trigger a full
+    // restoreNotebook() to create a backend session instead of just switching state.
+    if (entry && entry.workspaceDir === null && typeof get().restoreNotebook === 'function') {
+      get().restoreNotebook(notebookId);
+      return;
+    }
     set(state => {
       _persistNotebookTabs(state.openNotebooks, notebookId);
       const newSessionId = state.openNotebooks[notebookId]?.sessionId ?? null;
@@ -493,7 +500,9 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     for (const tabId of saved.tabs) {
       const cached = _loadCachedNotebook(tabId);
       if (cached) {
-        openNotebooks[tabId] = { notebook: cached, sessionId: saved.sessionIds?.[tabId] ?? '', scrollY: 0, workspaceDir: null };
+        // sessionId is always '' after page refresh — old backend sessions are gone.
+        // workspaceDir: null signals setActiveNotebookTab to call restoreNotebook().
+        openNotebooks[tabId] = { notebook: cached, sessionId: '', scrollY: 0, workspaceDir: null };
       }
     }
     if (Object.keys(openNotebooks).length === 0) return;
