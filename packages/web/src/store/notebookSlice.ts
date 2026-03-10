@@ -26,10 +26,14 @@ const _sourceSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const _cellLoadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const CELL_LOAD_TIMEOUT = 30_000; // 30s timeout for cell load requests
 
-/** Persist open notebook tab IDs + active tab to localStorage */
-function _persistNotebookTabs(openNotebooks: Record<string, unknown>, activeId: string | null) {
+/** Persist open notebook tab IDs + active tab + sessionIds to localStorage */
+function _persistNotebookTabs(openNotebooks: Record<string, { sessionId?: string; [k: string]: unknown }>, activeId: string | null) {
   try {
-    cacheSet('nb-open-tabs', { tabs: Object.keys(openNotebooks), activeId }, TTL.LAST_NOTEBOOK);
+    const sessionIds: Record<string, string> = {};
+    for (const [tabId, entry] of Object.entries(openNotebooks)) {
+      if (entry.sessionId) sessionIds[tabId] = entry.sessionId;
+    }
+    cacheSet('nb-open-tabs', { tabs: Object.keys(openNotebooks), activeId, sessionIds }, TTL.LAST_NOTEBOOK);
   } catch { /* localStorage unavailable in test/SSR */ }
 }
 
@@ -482,20 +486,22 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   },
 
   restoreOpenNotebookTabs: () => {
-    const saved = cacheGet<{ tabs: string[]; activeId: string | null }>('nb-open-tabs', TTL.LAST_NOTEBOOK);
+    const saved = cacheGet<{ tabs: string[]; activeId: string | null; sessionIds?: Record<string, string> }>('nb-open-tabs', TTL.LAST_NOTEBOOK);
     if (!saved || saved.tabs.length === 0) return;
     const openNotebooks: Record<string, { notebook: any; sessionId: string; scrollY: number; workspaceDir: string | null }> = {};
     for (const tabId of saved.tabs) {
       const cached = _loadCachedNotebook(tabId);
       if (cached) {
-        openNotebooks[tabId] = { notebook: cached, sessionId: '', scrollY: 0, workspaceDir: null };
+        openNotebooks[tabId] = { notebook: cached, sessionId: saved.sessionIds?.[tabId] ?? '', scrollY: 0, workspaceDir: null };
       }
     }
     if (Object.keys(openNotebooks).length === 0) return;
     const activeId = saved.activeId && openNotebooks[saved.activeId] ? saved.activeId : Object.keys(openNotebooks)[0];
+    const restoredSessionId = openNotebooks[activeId]?.sessionId || null;
     set({
       openNotebooks,
       activeNotebookTabId: activeId,
+      sessionId: restoredSessionId,
     });
   },
 

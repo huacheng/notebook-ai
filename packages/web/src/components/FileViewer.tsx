@@ -17,7 +17,10 @@ export function FileViewer() {
   const toggleFileViewerMaximized = useStore((s) => s.toggleFileViewerMaximized);
   const setFileTabLoading = useStore((s) => s.setFileTabLoading);
   const activeNotebookId = useStore((s) => s.activeNotebookId);
-  const submitPrompt = useStore((s) => s.submitPrompt);
+  /** Send annotation text to the prompt textarea (nb:appendPrompt) instead of executing directly. */
+  const appendToPrompt = useCallback((text: string) => {
+    window.dispatchEvent(new CustomEvent('nb:appendPrompt', { detail: { text } }));
+  }, []);
   const workspaceDir = useStore((s) => s.workspaceDir);
   const activeProjectPath = useStore((s) => s.activeProjectPath);
 
@@ -121,7 +124,7 @@ export function FileViewer() {
           annotations={annotations}
           filePath={activeFile.path}
           onAnnotationsChange={setAnnotations}
-          onSendToPrompt={submitPrompt}
+          onSendToPrompt={appendToPrompt}
           absolutePath={absolutePath}
           pdfScale={contentScale}
           onPdfPagesLoaded={setPdfPages}

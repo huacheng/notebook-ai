@@ -802,6 +802,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               store.setCellStatus(parsed.cell_id, 'error');
               store.appendCellOutput(parsed.cell_id, errorOutput);
             }
+          } else {
+            // Non-cell error (e.g. "Not subscribed", permission denied)
+            // Surface via restartPhase overlay so user sees the failure
+            const { restartPhase } = get();
+            if (restartPhase === 'restarting' || !parsed.cell_id) {
+              set({ restartPhase: 'error', restartError: parsed.message ?? 'Operation failed' });
+            }
           }
           // Clear model switching overlay on any error (e.g. change_model failure)
           if (get().modelSwitching) set({ modelSwitching: false });
