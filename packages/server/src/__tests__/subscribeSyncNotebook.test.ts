@@ -29,3 +29,18 @@ describe('Subscribe session sends full notebook state', () => {
     expect(stateIdx).toBeGreaterThan(resumeIdx);
   });
 });
+
+describe('session_state frontend handler merges cells (preserves pagination)', () => {
+  const wsSliceSrc = () =>
+    fs.readFileSync(path.resolve(__dirname, '../../../web/src/store/wsSlice.ts'), 'utf-8');
+
+  it('should merge cells instead of replacing the entire array', () => {
+    const src = wsSliceSrc();
+    // session_state handler should NOT call syncFullNotebook (which replaces all cells)
+    // Instead it should merge running cell content into existing local cells
+    const startIdx = src.indexOf("case 'session_state':");
+    const caseBlock = src.slice(startIdx, startIdx + 800);
+    expect(caseBlock).not.toContain('syncFullNotebook');
+    expect(caseBlock).toContain('mergeCells');
+  });
+});

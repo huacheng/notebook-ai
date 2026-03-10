@@ -185,24 +185,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       const store = get();
       const msgSessionId = envelope.session_id;
 
-      /** Sync a full notebook into openNotebooks + active notebook for a given session. */
-      const syncFullNotebook = (sid: string, nb: Notebook) => {
-        set((state) => {
-          const updates: Partial<typeof state> = {};
-          const updatedOpen = { ...state.openNotebooks };
-          for (const [nbId, entry] of Object.entries(updatedOpen)) {
-            if (entry.sessionId === sid) {
-              updatedOpen[nbId] = { ...entry, notebook: nb };
-            }
-          }
-          updates.openNotebooks = updatedOpen;
-          if (state.sessionId === sid) {
-            updates.notebook = nb;
-          }
-          return updates;
-        });
-      };
-
       switch (parsed.type) {
         case 'cell_created':
           // Multi-device sync: another client created a new cell
@@ -672,16 +654,17 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         }
         case 'notebook_digest': {
           // Cross-device sync: compare server cell state with local
+          // Only compare last_cell_id — cell_count differs in paginated mode
+          // (local has last N cells, server has all cells)
           const digestMsg = parsed as unknown as { session_id: string; cell_count: number; last_cell_id: string | null };
           if (digestMsg.session_id) {
             const localNb = Object.values(get().openNotebooks).find(
               (e) => e.sessionId === digestMsg.session_id,
             )?.notebook ?? (get().sessionId === digestMsg.session_id ? get().notebook : null);
-            const localCount = localNb?.cells.length ?? 0;
             const localLastId = localNb && localNb.cells.length > 0
               ? localNb.cells[localNb.cells.length - 1].id
               : null;
-            if (localCount !== digestMsg.cell_count || localLastId !== digestMsg.last_cell_id) {
+            if (localLastId !== digestMsg.last_cell_id) {
               // Stale: request full notebook sync
               ws.send(JSON.stringify({
                 type: 'notebook_sync_request',
@@ -706,15 +689,70 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
           }
           if (syncMsg.session_id && syncMsg.notebook) {
-            syncFullNotebook(syncMsg.session_id, syncMsg.notebook);
+            // Merge instead of full replace to preserve paginated cell state.
+            // notebook_sync is triggered when last_cell_id diverges (new cell
+            // created on another device), so we merge new/updated cells in.
+            const sCells = syncMsg.notebook.cells;
+            const sCellMap = new Map(sCells.map((c) => [c.id, c]));
+            set((state) => {
+              const updates: Partial<typeof state> = {};
+              const mergeInto = (localNb: Notebook): Notebook => {
+                const merged = localNb.cells.map((c) => sCellMap.get(c.id) ?? c);
+                const localIds = new Set(localNb.cells.map((c) => c.id));
+                for (const sc of sCells) {
+                  if (!localIds.has(sc.id)) merged.push(sc);
+                }
+                return { ...localNb, metadata: syncMsg.notebook!.metadata, cells: merged };
+              };
+              const updatedOpen = { ...state.openNotebooks };
+              for (const [nbId, entry] of Object.entries(updatedOpen)) {
+                if (entry.sessionId === syncMsg.session_id) {
+                  updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
+                }
+              }
+              updates.openNotebooks = updatedOpen;
+              if (state.sessionId === syncMsg.session_id && state.notebook) {
+                updates.notebook = mergeInto(state.notebook);
+              }
+              return updates;
+            });
           }
           break;
         }
         case 'session_state': {
-          // Full notebook state sent on subscribe — sync running cell content
+          // Full notebook state sent on subscribe — merge running cell content
+          // without replacing the paginated cells array (preserves lazy-load tail)
           const stateMsg = parsed as unknown as { session_id: string; notebook?: Notebook };
           if (stateMsg.session_id && stateMsg.notebook) {
-            syncFullNotebook(stateMsg.session_id, stateMsg.notebook);
+            const serverCells = stateMsg.notebook.cells;
+            const serverCellMap = new Map(serverCells.map((c) => [c.id, c]));
+            const mergeCells = (localNb: Notebook): Notebook => {
+              // Update existing local cells with server content (running cell outputs)
+              const merged = localNb.cells.map((c) => {
+                const serverCell = serverCellMap.get(c.id);
+                return serverCell ?? c;
+              });
+              // Append any new cells not yet in local (created while we were away)
+              const localIds = new Set(localNb.cells.map((c) => c.id));
+              for (const sc of serverCells) {
+                if (!localIds.has(sc.id)) merged.push(sc);
+              }
+              return { ...localNb, cells: merged };
+            };
+            set((state) => {
+              const updates: Partial<typeof state> = {};
+              const updatedOpen = { ...state.openNotebooks };
+              for (const [nbId, entry] of Object.entries(updatedOpen)) {
+                if (entry.sessionId === stateMsg.session_id) {
+                  updatedOpen[nbId] = { ...entry, notebook: mergeCells(entry.notebook) };
+                }
+              }
+              updates.openNotebooks = updatedOpen;
+              if (state.sessionId === stateMsg.session_id && state.notebook) {
+                updates.notebook = mergeCells(state.notebook);
+              }
+              return updates;
+            });
           }
           break;
         }
