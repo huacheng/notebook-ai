@@ -8,11 +8,11 @@ describe('TimerStopButton', () => {
   });
 
   it('exports phase utilities', async () => {
-    const { getPhaseIndex, PHASES, PHASE_MAP } = await import('../components/TimerStatusBar');
+    const { getPhaseIndex, PHASES, isPhaseComplete } = await import('../components/TimerStatusBar');
     expect(PHASES).toEqual(['target', 'plan', 'exec', 'merge']);
-    expect(PHASE_MAP['execution']).toBe('exec');
     expect(getPhaseIndex('planning')).toBe(1);
     expect(getPhaseIndex(null)).toBe(-1);
+    expect(typeof isPhaseComplete).toBe('function');
   });
 });
 

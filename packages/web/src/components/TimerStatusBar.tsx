@@ -2,21 +2,59 @@ import './TimerStatusBar.css';
 import type { CheckScore } from '../store/autoStatusSlice';
 
 export const PHASES = ['target', 'plan', 'exec', 'merge'] as const;
-export const PHASE_MAP: Record<string, typeof PHASES[number]> = {
-  target: 'target',
-  planning: 'plan',
-  planned: 'plan',
-  execution: 'exec',
-  executing: 'exec',
-  finalization: 'merge',
-  merging: 'merge',
-};
 
-export function getPhaseIndex(phase: string | null): number {
-  if (!phase) return -1;
-  const mapped = PHASE_MAP[phase];
-  if (!mapped) return -1;
-  return PHASES.indexOf(mapped);
+/**
+ * Derive the current phase index directly from .status.json `status` field.
+ * No mapping table — the status values map naturally to lifecycle positions.
+ */
+export function getPhaseIndex(status: string | null): number {
+  if (!status) return -1;
+  switch (status) {
+    case 'draft':
+      return 0; // at target phase
+    case 'planning':
+    case 're-planning':
+      return 1; // plan phase
+    case 'review':
+      return 1; // plan complete, review is end of plan phase
+    case 'executing':
+    case 'evolving':
+      return 2; // exec phase
+    case 'merging':
+    case 'satisfied':
+      return 3; // merge phase
+    case 'blocked':
+    case 'cancelled':
+      return -1; // no active phase
+    default:
+      return -1;
+  }
+}
+
+/**
+ * Check if a phase is fully completed based on the status.
+ * A phase is complete when the status has moved past it.
+ */
+export function isPhaseComplete(phaseIdx: number, status: string | null): boolean {
+  if (!status) return false;
+  switch (status) {
+    case 'draft':
+      return false; // nothing complete
+    case 'planning':
+    case 're-planning':
+      return phaseIdx < 1; // target complete
+    case 'review':
+      return phaseIdx <= 1; // target + plan complete
+    case 'executing':
+    case 'evolving':
+      return phaseIdx < 2; // target + plan complete
+    case 'merging':
+      return phaseIdx < 3; // target + plan + exec complete
+    case 'satisfied':
+      return true; // all complete
+    default:
+      return false;
+  }
 }
 
 export const D_LABELS: Record<string, string> = {
@@ -29,19 +67,21 @@ export const D_LABELS: Record<string, string> = {
 };
 
 interface PhaseProgressBarProps {
-  phase: string | null;
-  phaseProgress: number | null;
+  /** Raw status from .status.json */
+  status: string | null;
+  completedSteps: number;
+  totalSteps: number;
 }
 
-export function PhaseProgressBar({ phase, phaseProgress }: PhaseProgressBarProps) {
-  if (!phase) return null;
+export function PhaseProgressBar({ status, completedSteps, totalSteps }: PhaseProgressBarProps) {
+  if (!status) return null;
 
-  const currentPhaseIndex = getPhaseIndex(phase);
+  const currentPhaseIndex = getPhaseIndex(status);
 
   return (
     <div className="timer-phase-bar">
       {PHASES.map((p, i) => {
-        const isComplete = i < currentPhaseIndex;
+        const isComplete = isPhaseComplete(i, status);
         const isCurrent = i === currentPhaseIndex;
         const className = [
           'timer-phase-step',
@@ -55,15 +95,15 @@ export function PhaseProgressBar({ phase, phaseProgress }: PhaseProgressBarProps
             <span className={className}>
               {isComplete && <span className="timer-phase-check">&#x2713;</span>}
               {p}
-              {isCurrent && phaseProgress != null && (
-                <span className="timer-phase-progress">
-                  {Math.round(phaseProgress * 100)}%
-                </span>
-              )}
             </span>
           </span>
         );
       })}
+      {completedSteps > 0 && (
+        <span className="timer-phase-steps">
+          step {completedSteps}{totalSteps > 0 ? `/${totalSteps}` : ''}
+        </span>
+      )}
     </div>
   );
 }
@@ -148,29 +188,28 @@ export function RetryBadge({ retryCount }: RetryBadgeProps) {
 
 interface MultiStageViewProps {
   stage: { current: number; total: number };
-  phase: string | null;
-  phaseProgress: number | null;
+  status: string | null;
   checkScore: CheckScore | null;
 }
 
-export function MultiStageView({ stage, phase, phaseProgress, checkScore }: MultiStageViewProps) {
-  const currentPhaseIndex = getPhaseIndex(phase);
+export function MultiStageView({ stage, status, checkScore }: MultiStageViewProps) {
+  const currentPhaseIndex = getPhaseIndex(status);
 
   return (
     <div className="timer-multistage">
       {Array.from({ length: stage.total }, (_, i) => {
         const stageNum = i + 1;
         const isCurrent = stageNum === stage.current;
-        const isComplete = stageNum < stage.current;
-        const statusLabel = isComplete ? 'complete' : isCurrent ? (phase ?? 'pending') : 'pending';
-        const statusClass = isComplete ? 'timer-ms-complete' : isCurrent ? 'timer-ms-current' : 'timer-ms-pending';
+        const isStageComplete = stageNum < stage.current;
+        const statusLabel = isStageComplete ? 'complete' : isCurrent ? (status ?? 'pending') : 'pending';
+        const statusClass = isStageComplete ? 'timer-ms-complete' : isCurrent ? 'timer-ms-current' : 'timer-ms-pending';
 
         return (
           <div key={stageNum} className={`timer-ms-card ${statusClass}`}>
             <div className="timer-ms-header">
               <span className="timer-ms-title">Stage {stageNum}/{stage.total}</span>
               <span className="timer-ms-status">{statusLabel}</span>
-              {isComplete && checkScore && (
+              {isStageComplete && checkScore && (
                 <span className="timer-ms-score">{checkScore.overall.toFixed(2)}</span>
               )}
             </div>
@@ -178,19 +217,17 @@ export function MultiStageView({ stage, phase, phaseProgress, checkScore }: Mult
               {PHASES.map((p, pi) => {
                 let cls = 'timer-ms-phase';
                 if (isCurrent) {
-                  if (pi < currentPhaseIndex) cls += ' timer-ms-phase-done';
+                  if (isPhaseComplete(pi, status)) cls += ' timer-ms-phase-done';
                   else if (pi === currentPhaseIndex) cls += ' timer-ms-phase-active';
-                } else if (isComplete) {
+                } else if (isStageComplete) {
                   cls += ' timer-ms-phase-done';
                 }
                 return (
                   <span key={p}>
                     {pi > 0 && <span className="timer-ms-arrow">&rarr;</span>}
                     <span className={cls}>
-                      {((isComplete) || (isCurrent && pi < currentPhaseIndex)) && '\u2713'}
-                      {isCurrent && pi === currentPhaseIndex && phaseProgress != null
-                        ? `${p} ${Math.round(phaseProgress * 100)}%`
-                        : p}
+                      {((isStageComplete) || (isCurrent && isPhaseComplete(pi, status))) && '\u2713'}
+                      {p}
                     </span>
                   </span>
                 );

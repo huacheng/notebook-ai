@@ -511,8 +511,9 @@ export function Notebook() {
       {taskStatus && (
         <div className="timer-status-container">
           <PhaseProgressBar
-            phase={(taskStatus as any)?.status ?? null}
-            phaseProgress={(taskStatus as any)?.phase_progress ?? null}
+            status={(taskStatus as any)?.status ?? null}
+            completedSteps={(taskStatus as any)?.completed_steps ?? 0}
+            totalSteps={(taskStatus as any)?.total_steps ?? 0}
           />
           {(taskStatus as any)?.check_score && (
             <ScorePanel
