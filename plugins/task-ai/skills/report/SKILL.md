@@ -135,6 +135,16 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 | `cancelled` | `cancelled` | Document cancellation |
 | `evolving` | `evolving` | Interim report for completed stage |
 
+## Output Signal
+
+Report emits a single result signal for auto-loop routing:
+
+| Signal | Condition | Auto Routing |
+|--------|-----------|--------------|
+| `(generated)` | Report file written successfully | `(evolving-entry)` — re-enter Phase 4 evolving decision (see `auto/SKILL.md` §Phase 4) |
+
+> In standalone (non-auto) invocations, the signal is informational only — no automatic routing occurs.
+
 ## Git
 
 - `task-ai(<notebook>):report generate completion report`
