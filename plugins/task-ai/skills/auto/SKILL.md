@@ -519,6 +519,8 @@ The auto skill runs this loop within a single Claude session:
 | check | REPLAN | plan | — | Fundamental issues, revise plan |
 | check | BLOCKED | (stop) | — | Cannot continue |
 | check | CONTINUE | exec | mid-exec | Progress OK, resume execution |
+| target | (stage-advanced) | plan | — | New stage target written, generate plan |
+| target | (refined) | plan | — | Overall Objective refined, re-plan |
 | plan | (generated) | verify | post-plan | Plan ready, verify before assessment |
 | exec | (done) | verify | post-exec | All steps completed, verify before assessment |
 | exec | (mid-exec) | verify | mid-exec | Significant issue, verify before checkpoint |
@@ -534,7 +536,14 @@ The auto skill runs this loop within a single Claude session:
 | verify | (fail) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (partial) | check | (from trigger context) | Verification done, check renders verdict |
 | annotate | (processed) | `<by-layer>` | post-annotate | Layer-based: Requirement→plan/check, Planning→check, Eval-analysis→check, Eval-test→verify, Methodology→verify, Information/Comment-only→(none) |
-| report | (generated) | (stop) | — | Loop complete |
+| report | (generated) | (evolving-entry) | — | Phase 4 complete → re-enter evolving decision (convergence < 0.95 → target; ≥ 0.95 → stop and wait) |
+
+### evolving 入口决策（内部步骤）
+
+`(evolving-entry)` 是 auto 循环内部步骤，不是子命令。执行 Phase 4 "evolving 入口决策"（见上方 §Phase 4）：
+- 读取 convergence score
+- ≥ 0.95 → `(stop)` 等用户
+- < 0.95 → 调用 target（stage advance）→ result `(stage-advanced)` → plan → Phase 2 继续循环
 
 ### ROLLBACK 后重新生成
 
