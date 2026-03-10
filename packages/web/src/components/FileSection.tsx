@@ -291,12 +291,7 @@ export function FileSection({
       if (cached) {
         setFiles(cached.files);
         setCurrentDirPath(cached.dirPath);
-        // If cached response says directory doesn't exist, skip the background refetch
-        // entirely — only a watcher refreshKey can re-trigger the check.
-        if (cached.exists === false) {
-          onExists?.(false);
-          return;
-        }
+        onExists?.(cached.exists !== false);
         // Don't set loading — render cached data immediately, fetch in background
       } else {
         setLoading(true);

@@ -92,15 +92,29 @@ export function useFileStream(
       if (!(cached.format.endsWith('-binary') || cached.format === 'image')) {
         contentChunksRef.current = [cached.content];
       }
-      // Render cached content immediately while waiting for server mtime check
-      setState({
-        status: 'loading',
-        format: cached.format,
-        content: cached.format.endsWith('-binary') || cached.format === 'image' ? '' : cached.content,
-        binaryBuffer: null,
-        mtime: cached.mtime,
-        error: null,
-      });
+      // Render cached content as complete immediately — server will validate
+      // mtime in background. This prevents visible flash when switching files.
+      if (cached.format.endsWith('-binary') || cached.format === 'image') {
+        // Binary: need async decode, stay in loading until file-open-meta confirms cache
+        setState({
+          status: 'loading',
+          format: cached.format,
+          content: '',
+          binaryBuffer: null,
+          mtime: cached.mtime,
+          error: null,
+        });
+      } else {
+        // Text/HTML: render cached content immediately as complete
+        setState({
+          status: 'complete',
+          format: cached.format,
+          content: cached.content,
+          binaryBuffer: null,
+          mtime: cached.mtime,
+          error: null,
+        });
+      }
     }
 
     function handleMessage(event: MessageEvent) {
