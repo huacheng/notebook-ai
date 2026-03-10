@@ -1,6 +1,6 @@
 /**
- * Test: PhaseProgressBar should derive phase directly from .status.json status
- * without a PHASE_MAP lookup table.
+ * Test: PhaseProgressBar should display .status.json status directly
+ * as a simple label — no 4-step progress bar, no PHASE_MAP.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
@@ -9,27 +9,24 @@ import * as path from 'path';
 const timerSrc = () =>
   fs.readFileSync(path.resolve(__dirname, '../components/TimerStatusBar.tsx'), 'utf-8');
 
-describe('PhaseProgressBar uses .status.json status directly', () => {
-  it('should NOT have a PHASE_MAP lookup table', () => {
+describe('PhaseProgressBar displays status directly', () => {
+  it('should NOT render PHASES as a 4-step progress bar', () => {
     const src = timerSrc();
-    expect(src).not.toMatch(/PHASE_MAP/);
+    // PhaseProgressBar should not iterate over PHASES
+    const fnBody = src.slice(src.indexOf('function PhaseProgressBar'), src.indexOf('function PhaseProgressBar') + 600);
+    expect(fnBody).not.toMatch(/PHASES\.map/);
   });
 
-  it('getPhaseIndex should handle all lifecycle statuses via switch', () => {
+  it('should render the status string directly', () => {
     const src = timerSrc();
-    // Should handle: draft, planning, re-planning, review, executing, evolving, merging, satisfied, blocked, cancelled
-    expect(src).toContain("case 'draft':");
-    expect(src).toContain("case 'planning':");
-    expect(src).toContain("case 're-planning':");
-    expect(src).toContain("case 'review':");
-    expect(src).toContain("case 'executing':");
-    expect(src).toContain("case 'satisfied':");
-    expect(src).toContain("case 'blocked':");
-    expect(src).toContain("case 'cancelled':");
+    const fnBody = src.slice(src.indexOf('function PhaseProgressBar'), src.indexOf('function PhaseProgressBar') + 600);
+    // Should display {status} directly
+    expect(fnBody).toContain('{status}');
   });
 
-  it('PhaseProgressBar should accept completedSteps prop', () => {
+  it('should show completedSteps when available', () => {
     const src = timerSrc();
-    expect(src).toMatch(/completedSteps/);
+    const fnBody = src.slice(src.indexOf('function PhaseProgressBar'), src.indexOf('function PhaseProgressBar') + 600);
+    expect(fnBody).toMatch(/completedSteps/);
   });
 });

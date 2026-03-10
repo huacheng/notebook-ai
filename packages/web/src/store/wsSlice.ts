@@ -5,6 +5,7 @@ import type { Command } from '../mention/types';
 import DOMPurify from 'dompurify';
 import * as lz4 from 'lz4js';
 import { applyToSession } from './wsRouting';
+import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
 import {
   appendOutputToNotebook,
   setCellStatusInNotebook,
@@ -141,6 +142,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           msg.resume_after = lastEventIndex[sid];
         }
         ws.send(JSON.stringify(msg));
+      }
+      // Auto-restore timer mode if it was active before disconnect/restart
+      const savedTimer = cacheGet<{ sessionId: string; intervalMs: number }>('nb-timer-mode', TTL.LAST_NOTEBOOK);
+      if (savedTimer && subscribedIds.has(savedTimer.sessionId)) {
+        ws.send(JSON.stringify({ type: 'timer_start', session_id: savedTimer.sessionId, interval_ms: savedTimer.intervalMs }));
       }
       sendPing();
       pingTimer = setInterval(sendPing, PING_INTERVAL);
@@ -656,6 +662,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           const asSid2 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid2 || asSid2 === get().sessionId) {
             set({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+            cacheRemove('nb-timer-mode');
           }
           break;
         }
@@ -663,6 +670,9 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           const asSid3 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid3 || asSid3 === get().sessionId) {
             set({ timerMode: true, timerPaused: false, timerPausedResumeAt: 0 });
+            // Persist timer state so it survives server restart / page refresh
+            const intervalMs = (parsed as any).interval_ms;
+            cacheSet('nb-timer-mode', { sessionId: asSid3, intervalMs }, TTL.LAST_NOTEBOOK);
           }
           break;
         }
@@ -974,6 +984,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (get().timerMode) {
         ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
         set({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+        cacheRemove('nb-timer-mode');
       }
     }
   },

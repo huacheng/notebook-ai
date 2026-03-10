@@ -76,29 +76,9 @@ interface PhaseProgressBarProps {
 export function PhaseProgressBar({ status, completedSteps, totalSteps }: PhaseProgressBarProps) {
   if (!status) return null;
 
-  const currentPhaseIndex = getPhaseIndex(status);
-
   return (
     <div className="timer-phase-bar">
-      {PHASES.map((p, i) => {
-        const isComplete = isPhaseComplete(i, status);
-        const isCurrent = i === currentPhaseIndex;
-        const className = [
-          'timer-phase-step',
-          isComplete ? 'timer-phase-complete' : '',
-          isCurrent ? 'timer-phase-current' : '',
-        ].filter(Boolean).join(' ');
-
-        return (
-          <span key={p}>
-            {i > 0 && <span className="timer-phase-arrow">&rarr;</span>}
-            <span className={className}>
-              {isComplete && <span className="timer-phase-check">&#x2713;</span>}
-              {p}
-            </span>
-          </span>
-        );
-      })}
+      <span className="timer-phase-current">{status}</span>
       {completedSteps > 0 && (
         <span className="timer-phase-steps">
           step {completedSteps}{totalSteps > 0 ? `/${totalSteps}` : ''}
@@ -193,8 +173,6 @@ interface MultiStageViewProps {
 }
 
 export function MultiStageView({ stage, status, checkScore }: MultiStageViewProps) {
-  const currentPhaseIndex = getPhaseIndex(status);
-
   return (
     <div className="timer-multistage">
       {Array.from({ length: stage.total }, (_, i) => {
@@ -212,26 +190,6 @@ export function MultiStageView({ stage, status, checkScore }: MultiStageViewProp
               {isStageComplete && checkScore && (
                 <span className="timer-ms-score">{checkScore.overall.toFixed(2)}</span>
               )}
-            </div>
-            <div className="timer-ms-phases">
-              {PHASES.map((p, pi) => {
-                let cls = 'timer-ms-phase';
-                if (isCurrent) {
-                  if (isPhaseComplete(pi, status)) cls += ' timer-ms-phase-done';
-                  else if (pi === currentPhaseIndex) cls += ' timer-ms-phase-active';
-                } else if (isStageComplete) {
-                  cls += ' timer-ms-phase-done';
-                }
-                return (
-                  <span key={p}>
-                    {pi > 0 && <span className="timer-ms-arrow">&rarr;</span>}
-                    <span className={cls}>
-                      {((isStageComplete) || (isCurrent && isPhaseComplete(pi, status))) && '\u2713'}
-                      {p}
-                    </span>
-                  </span>
-                );
-              })}
             </div>
           </div>
         );
