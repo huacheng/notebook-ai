@@ -12,12 +12,6 @@ describe('TimerStartDialog', () => {
     expect(typeof TimerStartDialog).toBe('function');
   });
 
-  it('exports DEFAULT_MAX_ITERATIONS and DEFAULT_TIMEOUT_MINUTES', async () => {
-    const { DEFAULT_MAX_ITERATIONS, DEFAULT_TIMEOUT_MINUTES } = await import('../components/TimerStartDialog');
-    expect(DEFAULT_MAX_ITERATIONS).toBe(20);
-    expect(DEFAULT_TIMEOUT_MINUTES).toBe(30);
-  });
-
   it('exports DEFAULT_INTERVAL_SECONDS', async () => {
     const mod = await import('../components/TimerStartDialog');
     expect(mod.DEFAULT_INTERVAL_SECONDS).toBe(300);
@@ -32,8 +26,8 @@ describe('TimerStartDialog', () => {
   it('has an interval input field in the dialog', () => {
     const src = dialogSrc();
     // Should have an input for interval
-    expect(src).toContain('intervalSeconds');
-    expect(src).toContain('setIntervalSeconds');
+    expect(src).toContain('intervalMinutes');
+    expect(src).toContain('setIntervalMinutes');
   });
 });
 

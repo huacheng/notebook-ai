@@ -53,7 +53,6 @@ export interface NotebookStore {
   leftSidebarSplitRatio: number;
   fileViewerMaximized: boolean;
   sidebarWidth: number;
-  rightPanelWidth: number;
   editMode: boolean;
   pendingDeletes: Set<string>;
   editSavePhase: 'idle' | 'saving' | 'error';
@@ -83,10 +82,6 @@ export interface NotebookStore {
 
   // ── Cell lazy loading state ────────────────────────────────────────────
   loadingCellIds: Set<string>;  // cells currently being loaded
-
-  // ── Right panel state ─────────────────────────────────────────────────
-  rightPanelOpen: boolean;
-  rightPanelSplitRatio: number;
 
   // ── Mobile state ─────────────────────────────────────────────────────
   mobileView: 'projects' | 'notebooks' | 'notebook';
@@ -191,7 +186,6 @@ export interface NotebookStore {
   setLeftSidebarSplitRatio(ratio: number): void;
   toggleFileViewerMaximized(): void;
   setSidebarWidth(px: number): void;
-  setRightPanelWidth(px: number): void;
   setEditMode(on: boolean): void;
   togglePendingDelete(cellId: string): void;
   commitEdits(): void;
@@ -235,11 +229,6 @@ export interface NotebookStore {
   // ── Cell lazy loading actions ──────────────────────────────────────────
   requestCellLoad(cellId: string): void;
   replaceCellStub(cellId: string, fullCell: Cell): void;
-
-  // ── Right panel actions ───────────────────────────────────────────────
-  toggleRightPanel(): void;
-  setRightPanelOpen(open: boolean): void;
-  setRightPanelSplitRatio(ratio: number): void;
 
   // ── Mobile actions ───────────────────────────────────────────────────
   setMobileView(view: 'projects' | 'notebooks' | 'notebook'): void;

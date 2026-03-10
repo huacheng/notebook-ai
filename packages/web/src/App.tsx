@@ -3,7 +3,6 @@ import { Toolbar } from './components/Toolbar';
 import { Notebook } from './components/Notebook';
 import { ProjectSidebar } from './components/ProjectSidebar';
 import { NotebookTabs } from './components/NotebookTabs';
-import { RightPanel } from './components/RightPanel';
 import { FileViewer } from './components/FileViewer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { NotebookCreationPanel } from './components/NotebookCreationPanel';
@@ -123,9 +122,7 @@ function AuthenticatedApp() {
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
 
-  const rightPanelWidth = useStore((s) => s.rightPanelWidth);
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
-  const setRightPanelWidth = useStore((s) => s.setRightPanelWidth);
   const lastCompletedCellId = useStore((s) => s.lastCompletedCellId);
   const lastAskQuestionCellId = useStore((s) => s.lastAskQuestionCellId);
 
@@ -171,22 +168,14 @@ function AuthenticatedApp() {
 
   const contentRef = useRef<HTMLElement | null>(null);
   const savedScrollRef = useRef<number>(0);
-  const draggingRef = useRef<'left' | 'right' | 'split' | null>(null);
+  const draggingRef = useRef<'left' | 'split' | null>(null);
   const notebookSplitRef = useRef<HTMLDivElement | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
-
-  // Saved right panel width for split-view restore
-  const savedRightRef = useRef<number | null>(null);
 
   // ── Column divider drag ──────────────────────────────────────────────
   const startLeftDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     draggingRef.current = 'left';
-  }, []);
-
-  const startRightDrag = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    draggingRef.current = 'right';
   }, []);
 
   const startSplitDrag = useCallback((e: React.MouseEvent) => {
@@ -199,8 +188,6 @@ function AuthenticatedApp() {
       if (!draggingRef.current) return;
       if (draggingRef.current === 'left') {
         setSidebarWidth(e.clientX);
-      } else if (draggingRef.current === 'right') {
-        setRightPanelWidth(window.innerWidth - e.clientX);
       } else if (draggingRef.current === 'split' && contentRef.current) {
         const rect = contentRef.current.getBoundingClientRect();
         const ratio = (e.clientX - rect.left) / rect.width;
@@ -214,7 +201,7 @@ function AuthenticatedApp() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
-  }, [setSidebarWidth, setRightPanelWidth]);
+  }, [setSidebarWidth]);
 
   // Initiate WebSocket connection only when we have a sessionId.
   useWebSocket(sessionId);
@@ -223,24 +210,6 @@ function AuthenticatedApp() {
   const hasNotebook = notebook !== null;
   const inSplitView = hasActiveFile && hasNotebook
     && !pluginPanelOpen && !modelPanelOpen && !fileViewerMaximized;
-
-  // ── Auto-collapse right panel on split-view transition ────────────────────
-  // Left sidebar keeps its width; right panel fully collapses to 24px.
-  const prevSplitRef = useRef(false);
-  useEffect(() => {
-    if (inSplitView && !prevSplitRef.current) {
-      // Entering split view — save right panel width and collapse it
-      savedRightRef.current = rightPanelWidth;
-      setRightPanelWidth(24); // fully collapsed
-    } else if (!inSplitView && prevSplitRef.current) {
-      // Exiting split view — restore right panel width
-      if (savedRightRef.current !== null) {
-        setRightPanelWidth(savedRightRef.current);
-        savedRightRef.current = null;
-      }
-    }
-    prevSplitRef.current = inSplitView;
-  }); // intentionally no deps — runs every render but only acts on transitions
 
   // Persist and restore scroll position across notebook switches and browser tab switches.
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
@@ -389,8 +358,6 @@ function AuthenticatedApp() {
             )}
           </div>
         </main>
-        <div className="app-divider" onMouseDown={startRightDrag} />
-        <RightPanel />
       </div>
     </div>
     </I18nProvider>

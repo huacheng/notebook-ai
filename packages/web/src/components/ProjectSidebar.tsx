@@ -9,6 +9,7 @@ import { runCreateFlow, type CreatePhase } from './createFlow';
 import { validateTitle, MAX_TITLE_LENGTH } from '../utils/validateTitle';
 import { useWatcher } from '../hooks/useWatcher';
 import { NotebookDeleteModal } from './NotebookDeleteModal';
+import { getDeliverablesPath } from '../utils/deliverablesPath';
 
 function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   phase: 'creating' | 'done' | 'error';
@@ -560,6 +561,9 @@ function FileBrowser() {
 
   const projectTitle = useStore(s => s.projects.find(p => p.id === s.activeProjectId)?.title ?? 'Project');
 
+  const sessionId = useStore(s => s.sessionId);
+
+  const [l2Tab, setL2Tab] = useState<'files' | 'deliverables'>('files');
   const [showNbCreate, setShowNbCreate] = useState(false);
   const [nbTitle, setNbTitle] = useState('');
   const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
@@ -571,6 +575,27 @@ function FileBrowser() {
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
   const nbImportRef = useRef<HTMLInputElement>(null);
   const isInsideNotebook = currentSubPath !== '.';
+
+  // Deliverables tab state
+  const delivPath = getDeliverablesPath(workspaceDir, activeProjectPath);
+  const [delivRefreshKey, setDelivRefreshKey] = useState(0);
+  const [delivExists, setDelivExists] = useState<boolean | null>(null);
+
+  useEffect(() => { setDelivExists(null); }, [delivPath]);
+
+  const handleDelivExists = useCallback((exists: boolean) => { setDelivExists(exists); }, []);
+
+  // Watch deliverables dir (or parent if not yet created)
+  const delivWatchPath = delivExists === false
+    ? (delivPath.lastIndexOf('/') > 0 ? delivPath.slice(0, delivPath.lastIndexOf('/')) : '.')
+    : delivPath;
+  useWatcher('files', { projectId: activeProjectId, dirPath: delivWatchPath });
+
+  useEffect(() => {
+    const handler = () => setDelivRefreshKey(k => k + 1);
+    window.addEventListener('nb:files-changed', handler);
+    return () => window.removeEventListener('nb:files-changed', handler);
+  }, []);
 
   // WS-based file change detection (replaces 10s HTTP polling)
   useWatcher('files', { projectId: activeProjectId });
@@ -766,35 +791,62 @@ function FileBrowser() {
         <span className="file-browser-back">&larr;</span>
         <span className="file-browser-title">{projectTitle}</span>
       </div>
-      <FileSection
-        key={workspaceDir ?? 'root'}
-        baseUrl={`/api/projects/${activeProjectId}`}
-        authToken={authToken}
-        onFileClick={handleFileClick}
-        onDirClick={handleDirClick}
-        noDragFilter={(name) => name.endsWith('.notebook.json')}
-        renderItemActions={renderItemActions}
-        onSubPathChange={setCurrentSubPath}
-        refreshKey={fileRefreshKey}
-        noDeleteFilter={(name, subPath) => {
-          // Hide delete for protected system files:
-          // - .status.json (project metadata)
-          // - .working directory
-          // - .MEMORY.md (notebook environment config, read-only)
-          // - .claude directory (Claude settings, hooks)
-          return name === '.status.json'
-            || name === '.working'
-            || name === '.MEMORY.md'
-            || name === '.claude'
-            || subPath === '.working'
-            || subPath.startsWith('.working/')
-            || subPath.endsWith('/.working')
-            || subPath.includes('/.working/')
-            || subPath === '.claude'
-            || subPath.startsWith('.claude/');
-        }}
-      />
-      {!isInsideNotebook && (
+      <div className="sidebar-l2-tabs">
+        <button
+          className={`sidebar-l2-tab${l2Tab === 'files' ? ' sidebar-l2-tab--active' : ''}`}
+          onClick={() => setL2Tab('files')}
+        >
+          {t('sidebar.files')}
+        </button>
+        <button
+          className={`sidebar-l2-tab${l2Tab === 'deliverables' ? ' sidebar-l2-tab--active' : ''}`}
+          onClick={() => setL2Tab('deliverables')}
+        >
+          {t('deliverables.title')}
+        </button>
+      </div>
+      {l2Tab === 'files' ? (
+        <>
+          <FileSection
+            key={workspaceDir ?? 'root'}
+            baseUrl={`/api/projects/${activeProjectId}`}
+            authToken={authToken}
+            onFileClick={handleFileClick}
+            onDirClick={handleDirClick}
+            noDragFilter={(name) => name.endsWith('.notebook.json')}
+            renderItemActions={renderItemActions}
+            onSubPathChange={setCurrentSubPath}
+            refreshKey={fileRefreshKey}
+            noDeleteFilter={(name, subPath) => {
+              return name === '.status.json'
+                || name === '.working'
+                || name === '.MEMORY.md'
+                || name === '.claude'
+                || subPath === '.working'
+                || subPath.startsWith('.working/')
+                || subPath.endsWith('/.working')
+                || subPath.includes('/.working/')
+                || subPath === '.claude'
+                || subPath.startsWith('.claude/');
+            }}
+          />
+        </>
+      ) : (
+        <FileSection
+          key={delivPath}
+          baseUrl={`/api/projects/${activeProjectId}`}
+          authToken={authToken}
+          showDownloadAll
+          initialPath={delivPath}
+          refreshKey={delivRefreshKey}
+          onExists={handleDelivExists}
+          onFileClick={(subPath, name) => {
+            const relPath = subPath === '.' ? name : `${subPath}/${name}`;
+            openFileTab({ path: relPath, source: 'deliverables', sessionId: sessionId ?? '', projectId: activeProjectId ?? undefined });
+          }}
+        />
+      )}
+      {l2Tab === 'files' && !isInsideNotebook && (
         <>
           <input
             ref={nbImportRef}

@@ -5,7 +5,7 @@
  * - leftSidebarSplitRatio default and clamping
  * - openFileTab / closeFileTab / setActiveFileTab / deactivateFileTab / closeAllFileTabs
  * - fileViewerMaximized toggle
- * - rightPanelOpen toggle
+ * - sidebarWidth clamping
  */
 
 import { describe, it, expect } from 'vitest';
@@ -200,19 +200,6 @@ describe('interaction contract regression', () => {
     expect(state.fileViewerMaximized).toBe(false);
   });
 
-  it('rightPanelOpen defaults to false (closed at project list level)', () => {
-    const { state } = createTestSlice();
-    expect(state.rightPanelOpen).toBe(false);
-  });
-
-  it('toggleRightPanel flips rightPanelOpen', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('toggleRightPanel')();
-    expect(state.rightPanelOpen).toBe(true);
-    getAction('toggleRightPanel')();
-    expect(state.rightPanelOpen).toBe(false);
-  });
-
   it('openFiles defaults to empty and activeFileTabId defaults to null', () => {
     const { state } = createTestSlice();
     expect(state.openFiles).toEqual({});
@@ -260,7 +247,7 @@ describe('openFileTab with projectId', () => {
   });
 });
 
-// ── sidebarWidth / rightPanelWidth ──────────────────────────────────────
+// ── sidebarWidth ────────────────────────────────────────────────────────
 
 describe('sidebarWidth', () => {
   it('defaults to 272', () => {
@@ -295,63 +282,6 @@ describe('sidebarWidth', () => {
   });
 });
 
-describe('rightPanelWidth', () => {
-  it('defaults to 300', () => {
-    const { state } = createTestSlice();
-    expect(state.rightPanelWidth).toBe(300);
-  });
-
-  it('setRightPanelWidth sets to valid value', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('setRightPanelWidth')(400);
-    expect(state.rightPanelWidth).toBe(400);
-  });
-
-  it('clamps below 120 to 120', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('setRightPanelWidth')(50);
-    expect(state.rightPanelWidth).toBe(120);
-  });
-
-  it('clamps above 500 to 500', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('setRightPanelWidth')(999);
-    expect(state.rightPanelWidth).toBe(500);
-  });
-
-  it('accepts boundary values exactly', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('setRightPanelWidth')(180);
-    expect(state.rightPanelWidth).toBe(180);
-    getAction('setRightPanelWidth')(500);
-    expect(state.rightPanelWidth).toBe(500);
-  });
-});
-
-// ── setRightPanelOpen ──────────────────────────────────────────────────
-
-describe('setRightPanelOpen', () => {
-  it('explicitly sets rightPanelOpen to true', () => {
-    const { state, getAction } = createTestSlice();
-    expect(state.rightPanelOpen).toBe(false);
-    getAction('setRightPanelOpen')(true);
-    expect(state.rightPanelOpen).toBe(true);
-  });
-
-  it('explicitly sets rightPanelOpen to false', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('setRightPanelOpen')(true);
-    expect(state.rightPanelOpen).toBe(true);
-    getAction('setRightPanelOpen')(false);
-    expect(state.rightPanelOpen).toBe(false);
-  });
-
-  it('idempotent: setting true when already true', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('setRightPanelOpen')(true);
-    expect(state.rightPanelOpen).toBe(true);
-  });
-});
 
 // ── closeProjectFileTabs ──────────────────────────────────────────────
 

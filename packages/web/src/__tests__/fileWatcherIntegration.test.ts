@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 /**
  * Regression test: FileSection should NOT use setInterval for auto-refresh.
- * After the refactor, the consuming components (ProjectSidebar, RightPanel)
+ * After the refactor, the consuming components (ProjectSidebar)
  * listen to nb:files-changed events and increment refreshKey.
  */
 describe('FileSection polling removal', () => {

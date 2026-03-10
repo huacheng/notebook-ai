@@ -77,37 +77,20 @@ function createProjectTestSlice() {
   const get = () => state as any;
   const slice = createProjectSlice(set as any, get, {} as any);
   Object.assign(state, slice);
-  // Simulate initial rightPanelOpen = false (project list level)
-  state.rightPanelOpen = false;
   return { state, getAction: (name: string) => (state as any)[name].bind(state) };
 }
 
-describe('right panel auto open/close on project navigation', () => {
-  it('setActiveProject opens right panel', () => {
+describe('project navigation sets sidebar level', () => {
+  it('setActiveProject sets sidebarLevel to L2', () => {
     const { state, getAction } = createProjectTestSlice();
-    expect(state.rightPanelOpen).toBe(false);
     getAction('setActiveProject')('proj-1', '/ws/proj-1');
-    expect(state.rightPanelOpen).toBe(true);
+    expect(state.sidebarLevel).toBe('L2');
   });
 
-  it('goBackToProjectList closes right panel', () => {
+  it('goBackToProjectList sets sidebarLevel to L1', () => {
     const { state, getAction } = createProjectTestSlice();
     getAction('setActiveProject')('proj-1', '/ws/proj-1');
-    expect(state.rightPanelOpen).toBe(true);
     getAction('goBackToProjectList')();
-    expect(state.rightPanelOpen).toBe(false);
-  });
-
-  it('rightPanelOpen defaults to false in uiSlice initial state', async () => {
-    // This tests that the initial value is false (panel closed at app start)
-    const { createUiSlice } = await import('../store/uiSlice');
-    let state: Record<string, any> = {};
-    const set = (update: any) => {
-      if (typeof update === 'function') Object.assign(state, update(state));
-      else Object.assign(state, update);
-    };
-    const slice = createUiSlice(set as any, (() => state) as any, {} as any);
-    Object.assign(state, slice);
-    expect(state.rightPanelOpen).toBe(false);
+    expect(state.sidebarLevel).toBe('L1');
   });
 });

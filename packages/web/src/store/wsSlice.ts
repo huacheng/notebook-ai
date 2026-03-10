@@ -184,6 +184,25 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       }
       const store = get();
       const msgSessionId = envelope.session_id;
+
+      /** Sync a full notebook into openNotebooks + active notebook for a given session. */
+      const syncFullNotebook = (sid: string, nb: Notebook) => {
+        set((state) => {
+          const updates: Partial<typeof state> = {};
+          const updatedOpen = { ...state.openNotebooks };
+          for (const [nbId, entry] of Object.entries(updatedOpen)) {
+            if (entry.sessionId === sid) {
+              updatedOpen[nbId] = { ...entry, notebook: nb };
+            }
+          }
+          updates.openNotebooks = updatedOpen;
+          if (state.sessionId === sid) {
+            updates.notebook = nb;
+          }
+          return updates;
+        });
+      };
+
       switch (parsed.type) {
         case 'cell_created':
           // Multi-device sync: another client created a new cell
@@ -687,22 +706,30 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
           }
           if (syncMsg.session_id && syncMsg.notebook) {
-            const syncedNotebook = syncMsg.notebook;
+            syncFullNotebook(syncMsg.session_id, syncMsg.notebook);
+          }
+          break;
+        }
+        case 'session_state': {
+          // Full notebook state sent on subscribe — sync running cell content
+          const stateMsg = parsed as unknown as { session_id: string; notebook?: Notebook };
+          if (stateMsg.session_id && stateMsg.notebook) {
+            syncFullNotebook(stateMsg.session_id, stateMsg.notebook);
+          }
+          break;
+        }
+        case 'cell_removed': {
+          // Server pruned an empty cell (e.g. empty CONTINUE cell)
+          const rmCellId = (parsed as any).cell_id as string | undefined;
+          if (rmCellId && msgSessionId) {
+            set((state) => applyToSession(state, msgSessionId, (nb) => ({
+              ...nb,
+              cells: nb.cells.filter((c) => c.id !== rmCellId),
+            })));
+          } else if (rmCellId) {
             set((state) => {
-              const updates: Partial<typeof state> = {};
-              // Update openNotebooks entry matching this session
-              const updatedOpen = { ...state.openNotebooks };
-              for (const [nbId, entry] of Object.entries(updatedOpen)) {
-                if (entry.sessionId === syncMsg.session_id) {
-                  updatedOpen[nbId] = { ...entry, notebook: syncedNotebook };
-                }
-              }
-              updates.openNotebooks = updatedOpen;
-              // Update active notebook if it matches
-              if (state.sessionId === syncMsg.session_id) {
-                updates.notebook = syncedNotebook;
-              }
-              return updates;
+              if (!state.notebook) return state;
+              return { notebook: { ...state.notebook, cells: state.notebook.cells.filter((c) => c.id !== rmCellId) } };
             });
           }
           break;

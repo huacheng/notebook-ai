@@ -814,6 +814,9 @@ export class SessionManager {
       `[session ${session.id}] Cell "${cellId}" ${status} (${duration_ms}ms)`,
     );
 
+    // Prune empty CONTINUE cells — timer-generated '继续' cells with no output
+    this.pruneContinueCell(session, cellId);
+
     // Defer git commit and auto-save to the next tick so the
     // execution_complete WebSocket message is flushed first.
     // IMPORTANT: tryGitCommit must complete before autoSave so that git_diff
@@ -838,6 +841,39 @@ export class SessionManager {
       delete session._rerunQueue;
     }
 
+  }
+
+  /**
+   * Remove a completed CONTINUE cell if it produced no meaningful output.
+   * Timer-generated '继续' cells clutter the notebook when the LLM has nothing to add.
+   */
+  private pruneContinueCell(session: NotebookSession, cellId: string): void {
+    const cell = session.notebook.cells.find((c) => c.id === cellId);
+    if (!cell) return;
+
+    // Only prune cells whose source is the CONTINUE prompt
+    const src = (cell as any).source?.trim();
+    if (src !== CONTINUE_PROMPT && src !== 'CONTINUE') return;
+
+    // Check if outputs are empty or contain only whitespace text.
+    // Non-text outputs (tool_use, error, chart, thinking) are considered meaningful.
+    const outputs: Array<{ type?: string; text?: string }> = (cell as any).outputs ?? [];
+    const isEmptyContinue = outputs.length === 0 || outputs.every((o) => {
+      if (o.type !== undefined && o.type !== 'text') return false; // non-text output is meaningful
+      if (typeof o.text === 'string') return o.text.trim() === '';
+      return !o.text;
+    });
+    if (!isEmptyContinue) return;
+
+    // Remove the cell from the notebook
+    session.notebook = {
+      ...session.notebook,
+      cells: session.notebook.cells.filter((c) => c.id !== cellId),
+    };
+
+    // Notify clients to remove the cell
+    this.broadcast(session, { type: 'cell_removed', cell_id: cellId });
+    console.log(`[session ${session.id}] Pruned empty CONTINUE cell "${cellId}"`);
   }
 
   // ── Heartbeat Mechanism ─────────────────────────────────────────────────────

@@ -8,55 +8,6 @@ import { InputBar } from './shared/InputBar';
 import { PhaseProgressBar, ScorePanel } from './TimerStatusBar';
 import { TimerStartDialog } from './TimerStartDialog';
 
-// ── Timer toggle button ─────────────────────────────────────────────────────
-
-function TimerToggleButton() {
-  const t = useT();
-  const ws = useStore((s) => s.ws);
-  const sessionId = useStore((s) => s.sessionId);
-  const timerMode = useStore((s) => s.timerMode);
-  const wsStatus = useStore((s) => s.wsStatus);
-  const connected = wsStatus === 'connected';
-  const [showDialog, setShowDialog] = useState(false);
-
-  const handleClick = () => {
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    if (timerMode) {
-      ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
-      useStore.setState({ timerMode: false, timerIterationCount: 0 });
-    } else {
-      setShowDialog(true);
-    }
-  };
-
-  const handleStart = ({ intervalSeconds }: { maxIterations: number; timeoutMinutes: number; intervalSeconds: number }) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    const interval_ms = intervalSeconds * 1000;
-    ws.send(JSON.stringify({ type: 'timer_start', session_id: sessionId, interval_ms }));
-    useStore.setState({ timerMode: true, timerIterationCount: 0 });
-    setShowDialog(false);
-  };
-
-  return (
-    <>
-      <button
-        className={`notebook-statusbar-btn notebook-statusbar-timer-btn${timerMode ? ' active' : ''}`}
-        onClick={handleClick}
-        disabled={!connected}
-        title={timerMode ? t('status.timerStopTitle') : t('status.timerStartTitle')}
-      >
-        {t('status.timer')}
-      </button>
-      {showDialog && (
-        <TimerStartDialog
-          onStart={handleStart}
-          onCancel={() => setShowDialog(false)}
-        />
-      )}
-    </>
-  );
-}
-
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
 function NotebookStatusBar() {
@@ -90,6 +41,31 @@ function NotebookStatusBar() {
 
   const [showCommitModal, setShowCommitModal] = useState(false);
   const [showRerunModal, setShowRerunModal] = useState(false);
+  const [showTimerDialog, setShowTimerDialog] = useState(false);
+
+  const ws = useStore((s) => s.ws);
+  const timerMode = useStore((s) => s.timerMode);
+  const timerIterationCount = useStore((s) => s.timerIterationCount);
+
+  // ── Timer countdown ────────────────────────────────────────────────
+  const [timerCountdown, setTimerCountdown] = useState(0);
+  const timerIntervalRef = useRef(0); // stores interval in seconds
+
+  // Tick countdown every second while timer is active
+  useEffect(() => {
+    if (!timerMode) { setTimerCountdown(0); return; }
+    const id = window.setInterval(() => {
+      setTimerCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timerMode]);
+
+  // Reset countdown when backend heartbeat fires (iteration increments)
+  useEffect(() => {
+    if (timerMode && timerIntervalRef.current > 0) {
+      setTimerCountdown(timerIntervalRef.current);
+    }
+  }, [timerMode, timerIterationCount]);
 
   function handleExport() {
     if (!sessionId) return;
@@ -166,7 +142,29 @@ function NotebookStatusBar() {
             {t('status.esc')}
           </button>
         )}
-        <TimerToggleButton />
+        {timerMode ? (
+          <button
+            className="notebook-statusbar-btn notebook-statusbar-timer-btn active"
+            onClick={() => {
+              if (!ws || !sessionId) return;
+              ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
+              useStore.setState({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+              timerIntervalRef.current = 0;
+            }}
+            title={t('status.timerStopTitle')}
+          >
+            {`${String(Math.floor(timerCountdown / 60)).padStart(2, '0')}:${String(timerCountdown % 60).padStart(2, '0')}`}
+          </button>
+        ) : (
+          <button
+            className="notebook-statusbar-btn notebook-statusbar-timer-btn"
+            onClick={() => setShowTimerDialog(true)}
+            disabled={!connected || editMode}
+            title={t('status.timerStartTitle')}
+          >
+            {t('status.timer')}
+          </button>
+        )}
         <button
           className="notebook-statusbar-btn"
           onClick={() => saveNotebook()}
@@ -211,6 +209,20 @@ function NotebookStatusBar() {
             setShowRerunModal(false);
             rerunNotebook();
           }}
+        />
+      )}
+
+      {showTimerDialog && (
+        <TimerStartDialog
+          onStart={({ intervalSeconds }) => {
+            if (!ws || !sessionId) return;
+            ws.send(JSON.stringify({ type: 'timer_start', session_id: sessionId, interval_ms: intervalSeconds * 1000 }));
+            timerIntervalRef.current = intervalSeconds;
+            setTimerCountdown(intervalSeconds);
+            useStore.setState({ timerMode: true, timerIterationCount: 0 });
+            setShowTimerDialog(false);
+          }}
+          onCancel={() => setShowTimerDialog(false)}
         />
       )}
     </div>

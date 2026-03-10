@@ -47,10 +47,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'closeDeletedFileTabs' | 'setFileTabLoading' | 'restoreOpenFileTabs'
   | 'toggleFileViewerMaximized'
   | 'leftSidebarSplitRatio' | 'setLeftSidebarSplitRatio'
-  | 'rightPanelOpen' | 'rightPanelSplitRatio'
-  | 'toggleRightPanel' | 'setRightPanelOpen' | 'setRightPanelSplitRatio'
-  | 'sidebarWidth' | 'rightPanelWidth'
-  | 'setSidebarWidth' | 'setRightPanelWidth'
+  | 'sidebarWidth'
+  | 'setSidebarWidth'
   | 'editMode' | 'pendingDeletes' | 'editSavePhase' | 'editSaveError'
   | 'setEditMode' | 'togglePendingDelete' | 'commitEdits'
   | 'pluginStatus' | 'pluginLoading' | 'pluginActionKey' | 'pluginDismissed' | 'pluginPanelOpen' | 'pluginOverlay'
@@ -69,10 +67,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   openFiles: {},
   activeFileTabId: null,
   fileViewerMaximized: false,
-  rightPanelOpen: false,
-  rightPanelSplitRatio: 0.5,
   sidebarWidth: 272,
-  rightPanelWidth: 300,
   editMode: false,
   pendingDeletes: new Set<string>(),
   editSavePhase: 'idle',
@@ -213,28 +208,12 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     set((s) => ({ fileViewerMaximized: !s.fileViewerMaximized }));
   },
 
-  toggleRightPanel() {
-    set((state) => ({ rightPanelOpen: !state.rightPanelOpen }));
-  },
-
-  setRightPanelOpen(open) {
-    set({ rightPanelOpen: open });
-  },
-
   setLeftSidebarSplitRatio(ratio) {
     set({ leftSidebarSplitRatio: Math.min(0.8, Math.max(0.2, ratio)) });
   },
 
-  setRightPanelSplitRatio(ratio) {
-    set({ rightPanelSplitRatio: ratio });
-  },
-
   setSidebarWidth(px) {
     set({ sidebarWidth: Math.min(500, Math.max(120, px)) });
-  },
-
-  setRightPanelWidth(px) {
-    set({ rightPanelWidth: Math.min(500, Math.max(120, px)) });
   },
 
   setEditMode(on) {

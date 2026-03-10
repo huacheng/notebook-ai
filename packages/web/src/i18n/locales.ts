@@ -207,6 +207,7 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Sidebar / ProjectList ─────────────────────────────────────────────
     'sidebar.projects': 'Projects',
+    'sidebar.files': 'Files',
     'sidebar.workspace': 'Workspace',
     'sidebar.library': 'Library',
     'sidebar.dropToLibrary': 'Drop to add to Library',
@@ -238,7 +239,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'sidebar.renameFailed': 'Rename Failed',
     'sidebar.newName': 'New name',
 
-    // ── RightPanel / Deliverables ─────────────────────────────────────────
+    // ── Deliverables ──────────────────────────────────────────────────────
     'deliverables.title': 'Deliverables',
     'deliverables.noProject': 'No active project',
 
@@ -492,6 +493,7 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Sidebar / ProjectList ─────────────────────────────────────────────
     'sidebar.projects': '项目',
+    'sidebar.files': '文件',
     'sidebar.workspace': '工作区',
     'sidebar.library': '资料库',
     'sidebar.dropToLibrary': '拖放到资料库',
@@ -523,7 +525,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'sidebar.renameFailed': '重命名失败',
     'sidebar.newName': '新名称',
 
-    // ── RightPanel / Deliverables ─────────────────────────────────────────
+    // ── Deliverables ──────────────────────────────────────────────────────
     'deliverables.title': '交付物',
     'deliverables.noProject': '无活跃项目',
 

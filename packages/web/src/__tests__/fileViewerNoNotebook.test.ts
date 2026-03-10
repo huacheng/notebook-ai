@@ -18,16 +18,6 @@ describe('FileViewer without active notebook', () => {
     expect(src).not.toContain("if (!useStore.getState().activeNotebookTabId) return;");
   });
 
-  it('should NOT require activeNotebookTabId to open file in RightPanel (Deliverables)', () => {
-    const src = readFileSync(
-      path.resolve(__dirname, '../components/RightPanel.tsx'),
-      'utf-8'
-    );
-
-    // Deliverables panel should also allow opening files without active notebook
-    expect(src).not.toContain("if (!useStore.getState().activeNotebookTabId) return;");
-  });
-
   it('App.tsx should render FileViewer when hasActiveFile is true regardless of notebook', () => {
     const src = readFileSync(
       path.resolve(__dirname, '../App.tsx'),

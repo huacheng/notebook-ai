@@ -1043,7 +1043,11 @@ textarea.cell-input {
 .notebook-statusbar-timer-btn.active {
   background: var(--color-primary);
   color: #fff;
+  font-family: var(--font-mono);
   font-weight: 600;
+  letter-spacing: 0.05em;
+  min-width: 56px;
+  justify-content: center;
 }
 .notebook-statusbar-timer-btn:hover:not(:disabled):not(.active) {
   background: var(--color-primary-light);
@@ -4881,7 +4885,6 @@ button:focus-visible {
 
 /* ── FileViewer maximized — hide sidebars ──────────────────────────── */
 .app-body--fv-maximized .sidebar,
-.app-body--fv-maximized .right-panel,
 .app-body--fv-maximized .app-divider {
   display: none;
 }
@@ -6289,71 +6292,37 @@ button:focus-visible {
 }
 
 /* ============================================================
-   Right Panel
+   Sidebar L2 Tabs (Files / Deliverables)
    ============================================================ */
 
-.right-panel {
-  flex-shrink: 0;
+.sidebar-l2-tabs {
   display: flex;
-  flex-direction: column;
-  background: var(--bg-page);
-}
-
-.right-panel--collapsed {
-  width: 24px;
-  align-items: center;
-  justify-content: flex-start;
-  padding-top: var(--space-sm);
-}
-
-.right-panel-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-sm) var(--space-md);
   border-bottom: 1px solid var(--border-default);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
+  padding: 0 var(--space-sm);
+  gap: 2px;
 }
 
-.right-panel-collapse-btn,
-.right-panel-expand-btn {
+.sidebar-l2-tab {
+  flex: 1;
+  padding: 6px 0;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
   background: none;
   border: none;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
-  font-size: 16px;
-  color: var(--text-secondary);
-  padding: 2px 4px;
+  text-align: center;
+  transition: color 0.15s, border-color 0.15s;
 }
 
-.right-panel-section {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
+.sidebar-l2-tab:hover {
+  color: var(--text-primary);
 }
 
-.right-panel-divider {
-  height: 3px;
-  cursor: row-resize;
-  background: var(--border-default);
-  flex-shrink: 0;
-}
-
-.right-panel-divider:hover {
-  background: var(--color-primary);
-}
-
-.right-panel-section-header {
-  padding: var(--space-xs) var(--space-md);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-default);
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
+.sidebar-l2-tab--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 

@@ -1046,6 +1046,16 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
     notebook_compressed: z.string().optional(),
     compression: z.string().optional(),
   }),
+  z.object({
+    type: z.literal('session_state'),
+    session_id: z.string(),
+    notebook: NotebookSchema,
+  }),
+  z.object({
+    type: z.literal('cell_removed'),
+    session_id: z.string().optional(),
+    cell_id: z.string(),
+  }),
 ]);
 
 // ─── Notebook List / Workspace Types ───

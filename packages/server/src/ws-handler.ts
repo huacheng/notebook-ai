@@ -496,6 +496,14 @@ export function setupWebSocket(
               last_cell_id: cells.length > 0 ? cells[cells.length - 1].id : null,
             });
 
+            // Send full notebook state so new device has complete cell content
+            // (including running cell's accumulated outputs from mid-stream)
+            sendToClient(ws, {
+              type: 'session_state',
+              session_id,
+              notebook: session.notebook,
+            });
+
           }
           break;
         }
