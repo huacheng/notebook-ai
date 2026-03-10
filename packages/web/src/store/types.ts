@@ -102,6 +102,7 @@ export interface NotebookStore {
 
   // ── Timer mode (heartbeat) ───────────────────────────────────────────
   timerMode: boolean;
+  timerIntervalSec: number;
   timerIterationCount: number;
   timerPaused: boolean;
   timerPausedResumeAt: number;

@@ -157,7 +157,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (get().ws === ws) {
         stopPing();
         // D3: Clear loadingCellIds on disconnect to avoid stuck loading states
-        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
       }
     };
 
@@ -661,7 +661,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           // Timer mode was stopped (by Esc, explicit stop, or process death)
           const asSid2 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid2 || asSid2 === get().sessionId) {
-            set({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+            set({ timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
             cacheRemove('nb-timer-mode');
           }
           break;
@@ -669,9 +669,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'timer_started': {
           const asSid3 = (parsed as any).session_id ?? msgSessionId;
           if (!asSid3 || asSid3 === get().sessionId) {
-            set({ timerMode: true, timerPaused: false, timerPausedResumeAt: 0 });
+            const intervalMs = (parsed as any).interval_ms ?? 0;
+            const timerIntervalSec = Math.round(intervalMs / 1000);
+            set({ timerMode: true, timerIntervalSec, timerPaused: false, timerPausedResumeAt: 0 });
             // Persist timer state so it survives server restart / page refresh
-            const intervalMs = (parsed as any).interval_ms;
             cacheSet('nb-timer-mode', { sessionId: asSid3, intervalMs }, TTL.LAST_NOTEBOOK);
           }
           break;
@@ -983,7 +984,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       // Also stop timer mode if active — Esc stops everything
       if (get().timerMode) {
         ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
-        set({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+        set({ timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
         cacheRemove('nb-timer-mode');
       }
     }

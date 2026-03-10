@@ -46,7 +46,7 @@ export function applyAutoStatus(
 export const createAutoStatusSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'autoStatus' | 'autoStatuses' | 'setAutoStatus'
   | 'taskStatus' | 'taskStatuses'
-  | 'timerMode' | 'timerIterationCount' | 'timerPaused' | 'timerPausedResumeAt'
+  | 'timerMode' | 'timerIntervalSec' | 'timerIterationCount' | 'timerPaused' | 'timerPausedResumeAt'
 >> = (set) => ({
   autoStatus: { ...initialAutoStatus },
   autoStatuses: {} as Record<string, AutoStatusState>,
@@ -58,6 +58,7 @@ export const createAutoStatusSlice: StateCreator<NotebookStore, [], [], Pick<Not
   taskStatus: null,
   taskStatuses: {} as Record<string, Record<string, unknown> | null>,
   timerMode: false,
+  timerIntervalSec: 0,
   timerIterationCount: 0,
   timerPaused: false,
   timerPausedResumeAt: 0,

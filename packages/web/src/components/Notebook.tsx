@@ -45,27 +45,28 @@ function NotebookStatusBar() {
 
   const ws = useStore((s) => s.ws);
   const timerMode = useStore((s) => s.timerMode);
+  const timerIntervalSec = useStore((s) => s.timerIntervalSec);
   const timerIterationCount = useStore((s) => s.timerIterationCount);
 
   // ── Timer countdown ────────────────────────────────────────────────
   const [timerCountdown, setTimerCountdown] = useState(0);
-  const timerIntervalRef = useRef(0); // stores interval in seconds
 
-  // Tick countdown every second while timer is active
+  // Tick countdown every second while timer is active; auto-reset at 0
   useEffect(() => {
-    if (!timerMode) { setTimerCountdown(0); return; }
+    if (!timerMode || timerIntervalSec <= 0) { setTimerCountdown(0); return; }
+    setTimerCountdown(timerIntervalSec);
     const id = window.setInterval(() => {
-      setTimerCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimerCountdown((prev) => (prev - 1 <= 0 ? timerIntervalSec : prev - 1));
     }, 1000);
     return () => clearInterval(id);
-  }, [timerMode]);
+  }, [timerMode, timerIntervalSec]);
 
-  // Reset countdown when backend heartbeat fires (iteration increments)
+  // Also reset countdown when backend heartbeat fires (iteration increments)
   useEffect(() => {
-    if (timerMode && timerIntervalRef.current > 0) {
-      setTimerCountdown(timerIntervalRef.current);
+    if (timerMode && timerIntervalSec > 0) {
+      setTimerCountdown(timerIntervalSec);
     }
-  }, [timerMode, timerIterationCount]);
+  }, [timerIterationCount]);
 
   function handleExport() {
     if (!sessionId) return;
@@ -148,8 +149,7 @@ function NotebookStatusBar() {
             onClick={() => {
               if (!ws || !sessionId) return;
               ws.send(JSON.stringify({ type: 'timer_stop', session_id: sessionId }));
-              useStore.setState({ timerMode: false, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
-              timerIntervalRef.current = 0;
+              useStore.setState({ timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
             }}
             title={t('status.timerStopTitle')}
           >
@@ -217,9 +217,8 @@ function NotebookStatusBar() {
           onStart={({ intervalSeconds }) => {
             if (!ws || !sessionId) return;
             ws.send(JSON.stringify({ type: 'timer_start', session_id: sessionId, interval_ms: intervalSeconds * 1000 }));
-            timerIntervalRef.current = intervalSeconds;
             setTimerCountdown(intervalSeconds);
-            useStore.setState({ timerMode: true, timerIterationCount: 0 });
+            useStore.setState({ timerMode: true, timerIntervalSec: intervalSeconds, timerIterationCount: 0 });
             setShowTimerDialog(false);
           }}
           onCancel={() => setShowTimerDialog(false)}
