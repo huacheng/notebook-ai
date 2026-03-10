@@ -79,7 +79,7 @@ export class AgentProcess {
 
     const args = this._buildArgs(resumeSessionId);
 
-    console.log(`[agent-process] Starting persistent ${this.engine} in ${this.cwd}...`);
+    console.log(`[agent-process] Starting persistent ${this.engine} in ${this.cwd}${resumeSessionId ? ` (resume: ${resumeSessionId})` : ''}...`);
 
     this.proc = spawn(this.engine, args, {
       cwd: this.cwd,
@@ -120,7 +120,57 @@ export class AgentProcess {
     });
 
     // Wait for the process to emit its first line of output to confirm it's ready.
-    await this._waitForFirstOutput();
+    try {
+      await this._waitForFirstOutput();
+    } catch (err) {
+      // If resume failed (expired session etc.), retry without --resume as fallback
+      if (resumeSessionId) {
+        console.warn(`[agent-process] Resume failed, retrying without --resume: ${(err as Error).message}`);
+        this.stop();
+
+        const freshArgs = this._buildArgs();
+        this.proc = spawn(this.engine, freshArgs, {
+          cwd: this.cwd,
+          env,
+          stdio: ['pipe', 'pipe', 'inherit'],
+        });
+
+        this.proc.on('error', (spawnErr) => {
+          console.error(`[agent-process] ${this.engine} spawn error:`, spawnErr.message);
+        });
+
+        if (onExit) {
+          this.proc.on('exit', (code) => {
+            console.log(`[agent-process] ${this.engine} exited with code ${code}`);
+            this.proc = null;
+            onExit(code);
+          });
+        }
+
+        this.rl = readline.createInterface({
+          input: this.proc.stdout!,
+          crlfDelay: Infinity,
+        });
+
+        this.rl.on('line', (line) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          try {
+            const msg = JSON.parse(trimmed);
+            if (msg.type === 'system' && msg.subtype === 'init' && msg.session_id) {
+              this.claudeSessionId = msg.session_id;
+            }
+            onMessage(msg);
+          } catch {
+            // Ignore non-JSON lines
+          }
+        });
+
+        await this._waitForFirstOutput();
+      } else {
+        throw err;
+      }
+    }
   }
 
   /**
