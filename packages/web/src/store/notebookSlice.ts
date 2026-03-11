@@ -483,6 +483,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       const savedAutoStatus = newSessionId ? state.autoStatuses?.[newSessionId] : null;
       return {
         openNotebooks: state.openNotebooks,
+        activeNotebookId: notebookId,
         activeNotebookTabId: notebookId,
         notebook: state.openNotebooks[notebookId]?.notebook ?? null,
         sessionId: newSessionId,

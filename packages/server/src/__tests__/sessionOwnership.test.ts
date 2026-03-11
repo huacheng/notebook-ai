@@ -39,11 +39,14 @@ describe('WS session permission enforcement (P1-1)', () => {
       const block = src.slice(caseStart, nextCase > 0 ? nextCase : caseStart + 1500);
 
       // Must contain a permission check — either direct sessionOwningUser/sessionSubscribers
-      // or the helper function checkSessionPermission
+      // or the helper functions checkSessionPermission/checkSessionOwnership
+      // Note: checkSessionOwnership is used for operations that may run during WS reconnect
+      // race conditions when subscription isn't yet established but user owns the session
       const hasPermissionCheck =
         block.includes('sessionOwningUser') ||
         block.includes('sessionSubscribers') ||
-        block.includes('checkSessionPermission');
+        block.includes('checkSessionPermission') ||
+        block.includes('checkSessionOwnership');
       expect(hasPermissionCheck).toBe(true);
     });
   }

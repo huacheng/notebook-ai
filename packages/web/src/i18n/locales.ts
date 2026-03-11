@@ -201,11 +201,11 @@ export const messages: Record<Language, Record<string, string>> = {
     'fv.pdfLoading': 'Loading PDF…',
 
     // ── CellOutput / RunningStatus ───────────────────────────────────────
-    'running.thinking': 'Status: Thinking…',
-    'running.sending': 'Status: Sending…',
-    'running.waiting': 'Status: Waiting…',
-    'running.processing': 'Status: Processing…',
-    'running.running': 'Status: Running…',
+    'running.thinking': 'Claude thinking…',
+    'running.sending': 'Sending to backend…',
+    'running.waiting': 'Backend received, waiting for Claude…',
+    'running.processing': 'Claude processing…',
+    'running.running': 'Claude responding…',
 
     // ── Sidebar / ProjectList ─────────────────────────────────────────────
     'sidebar.projects': 'Projects',
@@ -489,11 +489,11 @@ export const messages: Record<Language, Record<string, string>> = {
     'fv.pdfLoading': '正在加载 PDF…',
 
     // ── CellOutput / RunningStatus ───────────────────────────────────────
-    'running.thinking': '状态: 思考中…',
-    'running.sending': '状态: 发送中…',
-    'running.waiting': '状态: 等待中…',
-    'running.processing': '状态: 处理中…',
-    'running.running': '状态: 运行中…',
+    'running.thinking': 'Claude 思考中…',
+    'running.sending': '发送中 → 后端…',
+    'running.waiting': '后端已接收, 等待 Claude…',
+    'running.processing': 'Claude 处理中…',
+    'running.running': 'Claude 输出中…',
 
     // ── Sidebar / ProjectList ─────────────────────────────────────────────
     'sidebar.projects': '项目',

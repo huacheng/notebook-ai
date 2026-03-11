@@ -181,6 +181,8 @@ interface NotebookSession {
 
 export class SessionManager {
   private sessions = new Map<string, NotebookSession>();
+  /** Lock map to prevent concurrent createSession calls for the same notebook. */
+  private _createLocks = new Map<string, Promise<NotebookSession>>();
 
   /** Optional callback invoked after a successful auto-save to sync DB metadata. */
   onAutoSave?: (notebookDbId: string, cellCount: number) => void;
@@ -207,6 +209,36 @@ export class SessionManager {
     const sessionName = `nb-${hash}`;
 
     // Idempotent: if a session already exists for this notebook, reuse it.
+    const existing = this.sessions.get(sessionName);
+    if (existing) return existing;
+
+    // Prevent concurrent creation: if another request is already creating this session, wait for it.
+    const pendingCreate = this._createLocks.get(sessionName);
+    if (pendingCreate) return pendingCreate;
+
+    // Start creation and store the promise as a lock.
+    const createPromise = this._doCreateSession(sessionName, notebookPath, cwd, gitRoot, resumeSessionId);
+    this._createLocks.set(sessionName, createPromise);
+
+    try {
+      return await createPromise;
+    } finally {
+      this._createLocks.delete(sessionName);
+    }
+  }
+
+  /**
+   * Internal method that actually creates the session.
+   * Called by createSession after acquiring the creation lock.
+   */
+  private async _doCreateSession(
+    sessionName: string,
+    notebookPath: string,
+    cwd: string,
+    gitRoot?: string,
+    resumeSessionId?: string,
+  ): Promise<NotebookSession> {
+    // Double-check: another request may have completed while we waited for the lock
     const existing = this.sessions.get(sessionName);
     if (existing) return existing;
 
