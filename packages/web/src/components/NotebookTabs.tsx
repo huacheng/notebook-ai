@@ -63,7 +63,7 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
               onClick={() => setActiveFileTab(tabId)}
             >
               {file.loading && <span className="notebook-tab-spinner" />}
-              <span className="notebook-tab-title" title={file.path.split('/').pop()}>{truncate(file.path.split('/').pop() ?? '')}</span>
+              <span className="notebook-tab-title" title={file.path}>{truncate(file.path.split('/').pop() ?? '')}</span>
               <button
                 className="notebook-tab-close"
                 onClick={e => { e.stopPropagation(); closeFileTab(tabId); }}
