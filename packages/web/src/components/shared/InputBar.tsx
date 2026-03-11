@@ -250,6 +250,14 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const directSubmitCommand = (cmd: string) => {
     const source = `/${cmd} `;
     saveToHistory(source);
+    // If running, append to running cell instead of creating a new one
+    if (isRunning) {
+      const runningCell = notebook?.cells.find((c) => c.status === 'running' || c.status === 'pending');
+      if (runningCell) {
+        appendPrompt(runningCell.id, source);
+        return;
+      }
+    }
     submitPrompt(source);
   };
 
