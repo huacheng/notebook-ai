@@ -386,17 +386,7 @@ export function createPluginRouter(): IRouter {
       steps.push(`fixInstalledPluginVersion failed: ${msg.slice(0, 300)}`);
     }
 
-    // Step 3: Check current vs remote version
-    try {
-      const [pName, mpName] = pluginKey.split('@');
-      const base = pluginsDir();
-      const cacheDir = path.join(base, 'cache', mpName ?? '', pName ?? '');
-      const { readdir: rd } = await import('fs/promises');
-      const cached = await rd(cacheDir).catch(() => [] as string[]);
-      steps.push(`Cached versions: [${cached.join(', ')}]`);
-    } catch { /* ignore */ }
-
-    // Step 4: Git fallback if needed
+    // Step 3: Git fallback if needed
     try {
       const didFallback = await gitFallbackUpdate(pluginKey);
       if (didFallback) {
@@ -409,6 +399,19 @@ export function createPluginRouter(): IRouter {
       const msg = err instanceof Error ? err.message : String(err);
       steps.push(`Git fallback failed: ${msg.slice(0, 300)}`);
     }
+
+    // Step 4: Show final cached versions (after git fallback)
+    try {
+      const [pName, mpName] = pluginKey.split('@');
+      const base = pluginsDir();
+      const cacheDir = path.join(base, 'cache', mpName ?? '', pName ?? '');
+      const { readdir: rd } = await import('fs/promises');
+      const cached = await rd(cacheDir).catch(() => [] as string[]);
+      // Sort by semver to show latest
+      cached.sort((a, b) => compareSemver(a, b));
+      const latest = cached.length > 0 ? cached[cached.length - 1] : 'none';
+      steps.push(`Cached versions: [${cached.join(', ')}] (latest: ${latest})`);
+    } catch { /* ignore */ }
 
     console.log(`[plugin] Update ${pluginKey}: ${steps.join(' | ')}`);
     res.json({ ok: cliOk, steps });
