@@ -190,16 +190,13 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       const totalCells = data.totalCells ?? data.notebook.cells.length;
       const cellsOffset = totalCells - data.notebook.cells.length;
 
-      set((state) => ({
-        notebook: data.notebook,
-        sessionId: data.sessionId,
-        activeNotebookId: data.notebookId,
-        workspaceDir: data.workspaceDir,
-        notebookLoading: false,
-        cellsOffset,
-        loadingOlderCells: false,
-        // Sync openNotebooks so restored notebook appears in tab bar
-        openNotebooks: {
+      set((state) => {
+        // Check if user switched to a different notebook while we were loading.
+        // If so, only update openNotebooks (cache the data) but don't switch active tab.
+        const isStillTarget = state.activeNotebookId === data.notebookId ||
+                              state.activeNotebookTabId === data.notebookId;
+
+        const updatedOpenNotebooks = {
           ...state.openNotebooks,
           [data.notebookId]: {
             notebook: data.notebook,
@@ -207,9 +204,25 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
             scrollY: state.openNotebooks[data.notebookId]?.scrollY ?? 0,
             workspaceDir: data.workspaceDir,
           },
-        },
-        activeNotebookTabId: data.notebookId,
-      }));
+        };
+
+        if (!isStillTarget) {
+          // User switched away — just cache the data, don't change active state
+          return { openNotebooks: updatedOpenNotebooks };
+        }
+
+        return {
+          notebook: data.notebook,
+          sessionId: data.sessionId,
+          activeNotebookId: data.notebookId,
+          workspaceDir: data.workspaceDir,
+          notebookLoading: false,
+          cellsOffset,
+          loadingOlderCells: false,
+          openNotebooks: updatedOpenNotebooks,
+          activeNotebookTabId: data.notebookId,
+        };
+      });
 
       _persistNotebook(data.notebookId, data.notebook);
       get().subscribeToSession(data.sessionId);
