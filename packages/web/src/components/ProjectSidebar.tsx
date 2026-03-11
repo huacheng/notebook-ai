@@ -691,31 +691,11 @@ function FileBrowser() {
     }
   }, [activeProjectPath, openFileTab]);
 
-  const handleDirClick = useCallback(async (_subPath: string, _name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => {
-    if (meta.isNotebook && meta.worktreePath) {
-      // Open the notebook AND let navigateInto proceed (return false)
-      try {
-        const h: Record<string, string> = {};
-        if (authToken) h['Authorization'] = `Bearer ${authToken}`;
-        const res = await fetch(
-          `/api/projects/${activeProjectId}/files?path=${encodeURIComponent(meta.worktreePath)}`,
-          { headers: h },
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const nbEntry = (data.files as { name: string }[]).find(f => f.name.endsWith('.notebook.json'));
-          if (nbEntry) {
-            handleFileClick(meta.worktreePath, nbEntry.name);
-            // Don't return true — let FileSection navigate into the worktree dir
-          }
-        }
-      } catch { /* fall through to navigate */ }
-    } else if (meta.isNotebook) {
-      // isNotebook without worktreePath — open notebook, let navigateInto proceed
-      handleFileClick(_subPath, `${_name}.notebook.json`);
-    }
+  // Clicking a directory just navigates into it to show files.
+  // No special handling for notebook directories — they're treated as regular folders.
+  const handleDirClick = useCallback((_subPath: string, _name: string, _meta: { isNotebook?: boolean; worktreePath?: string }) => {
     // Return undefined → FileSection calls navigateInto() to show directory contents
-  }, [handleFileClick, authToken, activeProjectId]);
+  }, []);
 
   const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);
   const canCreateNb = nbTitle.trim().length > 0 && !nbTitleError;
