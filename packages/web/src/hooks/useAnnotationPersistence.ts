@@ -31,7 +31,8 @@ export function useAnnotationPersistence({
 
   // L1 + L2 save whenever annotations change
   useEffect(() => {
-    if (!annLoadedRef.current || !ws || wsStatus !== 'connected') return;
+    // Guard: skip if sessionId is empty (e.g. page refresh before session restored)
+    if (!annLoadedRef.current || !ws || wsStatus !== 'connected' || !sessionId) return;
     const lsKey = storageKey(notebookId, filePath);
     const serialized = JSON.stringify(annotations);
 
@@ -77,7 +78,8 @@ export function useAnnotationPersistence({
       setAnnotations(EMPTY_FILE_ANNOTATIONS);
     }
 
-    if (!ws || wsStatus !== 'connected') {
+    // Guard: skip WS load if sessionId is empty (page refresh before session restored)
+    if (!ws || wsStatus !== 'connected' || !sessionId) {
       annLoadedRef.current = true;
       return;
     }
