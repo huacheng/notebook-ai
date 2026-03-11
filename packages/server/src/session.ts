@@ -620,23 +620,18 @@ export class SessionManager {
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
     const runningCellId = findRunningCellId(session.notebook);
-    console.log('[ESC-DEBUG][BE][4] interruptCell() start, sessionId=', sessionId, 'runningCell=', runningCellId);
 
     // Nothing to interrupt — no cell is running
     if (!runningCellId) {
-      console.log('[ESC-DEBUG][BE][4-skip] No running cell, skipping interrupt');
       return;
     }
 
     // Clear rerun queue so no more cells auto-execute after interrupt
-    console.log('[ESC-DEBUG][BE][4a] clearing _rerunQueue:', !!session._rerunQueue);
     delete session._rerunQueue;
 
     // Stop timer mode if active — Esc stops everything
-    console.log('[ESC-DEBUG][BE][5] stopTimerMode');
     this.stopTimerMode(sessionId);
 
-    console.log('[ESC-DEBUG][BE][6] setting _interrupted = true');
     session._interrupted = true;
 
     // Force-complete the running cell synchronously (don't wait for async onExit)
@@ -651,7 +646,6 @@ export class SessionManager {
     session._pendingToolUseIds.clear();
 
     // Pre-start process with --resume so next prompt is instant
-    console.log('[ESC-DEBUG][BE][7b] Pre-starting process with --resume after interrupt');
     this._spawnAgent(session, sessionId, resumeSessionId ?? undefined).catch((err) => {
       console.error(`[session ${sessionId}] Pre-restart after interrupt failed:`, (err as Error).message);
     });
@@ -844,7 +838,6 @@ export class SessionManager {
     } else {
       status = isError ? 'error' : 'completed';
     }
-    console.log('[ESC-DEBUG][BE][10] completeCell status=', status, 'cellId=', cellId, '_interrupted was=', status === 'interrupted');
     session.notebook = updateCellStatus(session.notebook, cellId, status);
 
     // Heartbeat: clear pending tools on completion
@@ -855,7 +848,6 @@ export class SessionManager {
     session._execStartTimes.delete(cellId);
     session.notebook = updateCellDuration(session.notebook, cellId, duration_ms);
 
-    console.log('[ESC-DEBUG][BE][11] Broadcasting execution_complete, status=', status, 'duration_ms=', duration_ms);
     this.broadcast(session, {
       type: 'execution_complete',
       cell_id: cellId,
@@ -1208,11 +1200,6 @@ export class SessionManager {
   private handleJsonlMessage(session: NotebookSession, raw: unknown): void {
     const msg = raw as ClaudeJsonlMessage;
 
-    // Debug: log all messages when _interrupted is set to catch what Claude sends after Esc
-    if (session._interrupted) {
-      console.log('[ESC-DEBUG][BE][raw] _interrupted=true, msg.type=', msg.type, 'raw=', JSON.stringify(raw).substring(0, 500));
-    }
-
     switch (msg.type) {
       case 'assistant': {
         const assistant = msg as ClaudeTextMessage;
@@ -1307,7 +1294,6 @@ export class SessionManager {
       case 'result': {
         const result = msg as ClaudeResultMessage;
         const cellId = findRunningCellId(session.notebook);
-        console.log('[ESC-DEBUG][BE][9] handleJsonlMessage type=result, is_error=', result.is_error, '_interrupted=', session._interrupted, 'cellId=', cellId, 'raw_keys=', Object.keys(msg as object));
         if (!cellId) break;
 
         if (result.is_error && result.result) {

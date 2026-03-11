@@ -236,10 +236,8 @@ export class AgentProcess {
    */
   interrupt(): void {
     if (!this.isAlive()) {
-      console.log('[ESC-DEBUG][BE][7-agent] interrupt() skipped: not alive');
       return;
     }
-    console.log('[ESC-DEBUG][BE][7-agent] Killing Claude process pid=', this.proc!.pid);
     try { this.proc!.stdin?.end(); } catch { /* ignore */ }
     try { this.proc!.kill('SIGTERM'); } catch { /* ignore */ }
   }
@@ -269,21 +267,30 @@ export class AgentProcess {
         }
       }, timeoutMs);
 
-      this.rl!.once('line', () => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          resolve();
-        }
-      });
-
-      this.proc!.once('exit', (code) => {
+      const exitHandler = (code: number | null) => {
         if (!settled) {
           settled = true;
           clearTimeout(timer);
           reject(new Error(`${this.engine} exited early with code ${code}`));
         }
+      };
+
+      this.rl!.once('line', () => {
+        if (settled) return;
+        clearTimeout(timer);
+        // Grace period: wait briefly to detect immediate exit after first output.
+        // When --resume fails, Claude outputs an error result then exits with code 1.
+        // Without this delay, we'd resolve before the exit event fires.
+        setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            this.proc?.removeListener('exit', exitHandler);
+            resolve();
+          }
+        }, 150);
       });
+
+      this.proc!.on('exit', exitHandler);
     });
   }
 }
