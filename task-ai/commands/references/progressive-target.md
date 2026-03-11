@@ -27,12 +27,22 @@ satisfied → evolving → auto-generates substage → planning → ...
 
 ## .target.md Progressive Format
 
-### Stage 1 (initial — identical to single-stage format):
+### Status Markers
+
+| Marker | Applies To | Meaning |
+|--------|------------|---------|
+| `[DRAFT]` | Overall Objective | Goal is being discussed/refined (Phase 1 in progress) |
+| `[PENDING]` | Overall Objective | Goal confirmed, awaiting execution (user confirmed, not yet planning) |
+| (no marker) | Overall Objective | Goal is being executed (Stage 1+ active) |
+| `[ACTIVE]` | Stage | Currently executing stage |
+| `[COMPLETE]` | Stage | Completed stage |
+
+### Phase 1: Draft (status=draft, objective being refined):
 ```markdown
 # Task Target: notebook-name
 
-## Objective
-<user's overall goal>
+## Overall Objective [DRAFT]
+<user's initial goal description, still under discussion>
 
 ## Requirements
 ...
@@ -41,7 +51,36 @@ satisfied → evolving → auto-generates substage → planning → ...
 ...
 ```
 
-### After Stage 1 completes (auto fills Results on ACCEPT):
+### Phase 1 complete (user confirmed, status → planning):
+```markdown
+# Task Target: notebook-name
+
+## Overall Objective [PENDING]
+<confirmed goal, awaiting Stage 1 generation>
+
+## Requirements
+...
+
+## Constraints
+...
+```
+
+### Stage 1 active (status=executing):
+```markdown
+# Task Target: notebook-name
+
+## Overall Objective
+<persistent overall goal>
+
+---
+
+## Stage 1: <name> [ACTIVE]
+### Stage Objective
+### Requirements
+### Constraints
+```
+
+### Stage 1 complete (auto fills Results on ACCEPT):
 ```markdown
 # Task Target: notebook-name
 
@@ -68,8 +107,9 @@ satisfied → evolving → auto-generates substage → planning → ...
 ```
 
 **Key differences from old model:**
-- No `[PENDING]` stages — future stages are not predefined
-- Original top-level Objective becomes `## Overall Objective` when entering stage 2
+- `[DRAFT]` and `[PENDING]` track Overall Objective status during Phase 1
+- `[ACTIVE]` and `[COMPLETE]` track Stage execution status
+- Original top-level Objective becomes `## Overall Objective` (no marker) when Stage 1 starts
 - Stage 1 content is retroactively wrapped as `## Stage 1 [COMPLETE]` by auto (on check ACCEPT)
 
 ## Status Transitions

@@ -106,12 +106,17 @@ check evaluates deliverables against `.target.md`, `.convergence-baseline.md`, a
 ```
 Phase 1: Overall Objective (status=draft) — Human in the loop
   1. 对话式 refine：引导用户定义 Overall Objective
+     - .target.md 显示 `## Overall Objective [DRAFT]`（目标还在讨论中）
   2. Research（LLM 自决）：
      - 目标清晰、领域熟悉 → 跳过 research
      - 目标模糊或领域陌生 → 自动完成 research 全流程（O1→O2→O3 一次性完成），呈现结果
      - 用户可主动要求 research
-  3. 确认后调用 target 写入 .target.md + 生成 .convergence-baseline.md
-  4. 自动生成 Stage 1 目标（子阶段目标生成机制）→ planning
+  3. 用户确认后：
+     - 更新 .target.md：`[DRAFT]` → `[PENDING]`（目标已确定，等待执行）
+     - 生成 .convergence-baseline.md
+  4. 自动生成 Stage 1 目标：
+     - .target.md：`[PENDING]` 移除，添加 `## Stage 1: <name> [ACTIVE]`
+     - status → planning
 
 Phase 2: Planning (status=planning) — Full auto + user can intervene
   - Optional: research for technical references (implementation-level, not objective research)
