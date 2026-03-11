@@ -476,9 +476,9 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       get().restoreNotebook(notebookId);
       return;
     }
+    const newSessionId = entry?.sessionId ?? null;
     set(state => {
       _persistNotebookTabs(state.openNotebooks, notebookId);
-      const newSessionId = state.openNotebooks[notebookId]?.sessionId ?? null;
       // Restore per-session auto status
       const savedAutoStatus = newSessionId ? state.autoStatuses?.[newSessionId] : null;
       return {
@@ -494,6 +494,10 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         autoStatus: savedAutoStatus ?? { ...initialAutoStatus },
       };
     });
+    // Subscribe to the new session to receive updates
+    if (newSessionId && typeof get().subscribeToSession === 'function') {
+      get().subscribeToSession(newSessionId);
+    }
   },
 
   restoreOpenNotebookTabs: () => {
@@ -508,17 +512,29 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         openNotebooks[tabId] = { notebook: cached, sessionId: '', scrollY: 0, workspaceDir: null };
       }
     }
-    if (Object.keys(openNotebooks).length === 0) return;
-    const activeId = saved.activeId && openNotebooks[saved.activeId] ? saved.activeId : Object.keys(openNotebooks)[0];
+    const tabIds = Object.keys(openNotebooks);
+    if (tabIds.length === 0) return;
+    const activeId = saved.activeId && openNotebooks[saved.activeId] ? saved.activeId : tabIds[0];
     set({
       openNotebooks,
       activeNotebookTabId: activeId,
       sessionId: null, // No backend session yet
     });
-    // Trigger backend session creation for the active tab.
-    // restoreNotebook() will update sessionId and workspaceDir when done.
-    if (activeId && typeof get().restoreNotebook === 'function') {
-      get().restoreNotebook(activeId);
+    // Trigger backend session creation for ALL open tabs (not just active).
+    // This ensures all notebooks are subscribed and ready to use.
+    if (typeof get().restoreNotebook === 'function') {
+      // Restore active tab first for better UX
+      for (const tabId of tabIds) {
+        if (tabId === activeId) {
+          get().restoreNotebook(tabId);
+        }
+      }
+      // Then restore other tabs in background
+      for (const tabId of tabIds) {
+        if (tabId !== activeId) {
+          get().restoreNotebook(tabId);
+        }
+      }
     }
   },
 
