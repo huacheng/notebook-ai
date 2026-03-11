@@ -107,9 +107,9 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   | 'setCellGitDiff'
   | 'prependCells' | 'setCellsOffset'
   | 'generateSlide' | 'updateSlideSections'
-  | 'openNotebooks' | 'activeNotebookTabId' | 'streamBuffer'
+  | 'openNotebooks' | 'activeNotebookTabId' | 'tabNotifications' | 'streamBuffer'
   | 'openNotebookTab' | 'closeNotebookTab' | 'closeNotebookTabByPath' | 'closeProjectNotebookTabs' | 'setActiveNotebookTab' | 'restoreOpenNotebookTabs'
-  | 'appendStreamDelta' | 'flushStreamBuffer'
+  | 'appendStreamDelta' | 'flushStreamBuffer' | 'setTabNotification'
   | 'loadingCellIds' | 'acceptedCellIds' | 'requestCellLoad' | 'replaceCellStub'
 >> = (set, get) => ({
   notebook: null,
@@ -119,6 +119,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
   loadingOlderCells: false,
   openNotebooks: {},
   activeNotebookTabId: null,
+  tabNotifications: {},
   streamBuffer: {},
   loadingCellIds: new Set<string>(),
   acceptedCellIds: new Set<string>(),
@@ -481,6 +482,9 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       _persistNotebookTabs(state.openNotebooks, notebookId);
       // Restore per-session auto status
       const savedAutoStatus = newSessionId ? state.autoStatuses?.[newSessionId] : null;
+      // Clear tab notification for the newly active tab
+      const updatedNotifications = { ...state.tabNotifications };
+      delete updatedNotifications[notebookId];
       return {
         openNotebooks: state.openNotebooks,
         activeNotebookId: notebookId,
@@ -492,6 +496,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         editMode: false,
         pendingDeletes: new Set<string>(),
         autoStatus: savedAutoStatus ?? { ...initialAutoStatus },
+        tabNotifications: updatedNotifications,
       };
     });
     // Subscribe to the new session to receive updates
@@ -557,6 +562,18 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       return { streamBuffer: newBuf };
     });
     return text;
+  },
+
+  setTabNotification: (notebookId, hasNotification) => {
+    set(state => {
+      const updated = { ...state.tabNotifications };
+      if (hasNotification) {
+        updated[notebookId] = true;
+      } else {
+        delete updated[notebookId];
+      }
+      return { tabNotifications: updated };
+    });
   },
 
   // ── Cell lazy loading ────────────────────────────────────────────────────

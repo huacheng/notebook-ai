@@ -78,6 +78,7 @@ export interface NotebookStore {
   // ── Multi-notebook state ──────────────────────────────────────────────
   openNotebooks: Record<string, { notebook: Notebook; sessionId: string; scrollY: number; workspaceDir: string | null }>;
   activeNotebookTabId: string | null;
+  tabNotifications: Record<string, boolean>;
   streamBuffer: Record<string, { text: string; thinking: string }>;
 
   // ── Cell lazy loading state ────────────────────────────────────────────
@@ -227,6 +228,7 @@ export interface NotebookStore {
   restoreOpenNotebookTabs(): void;
   appendStreamDelta(cellId: string, delta: string, blockType: 'text' | 'thinking'): void;
   flushStreamBuffer(cellId: string): string;
+  setTabNotification(notebookId: string, hasNotification: boolean): void;
 
   // ── Cell lazy loading actions ──────────────────────────────────────────
   requestCellLoad(cellId: string): void;

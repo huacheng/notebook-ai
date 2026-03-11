@@ -98,3 +98,32 @@ export async function fetchGitBranches(
   if (!res.ok) throw new Error(`Git branches failed: ${res.status}`);
   return res.json();
 }
+
+// ── Library Git API ─────────────────────────────────────────────────────────
+
+export async function fetchLibraryGitLog(
+  token: string | null,
+  opts: { page?: number; limit?: number; stats?: boolean } = {},
+): Promise<GitLogResponse> {
+  const params = new URLSearchParams();
+  if (opts.page) params.set('page', String(opts.page));
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.stats) params.set('stats', 'true');
+
+  const qs = params.toString();
+  const url = `/api/library/git-log${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`Library git log failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLibraryGitDiff(
+  token: string | null,
+  commit: string,
+): Promise<string> {
+  const url = `/api/library/git-diff?commit=${encodeURIComponent(commit)}`;
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`Library git diff failed: ${res.status}`);
+  const data: { diff: string } = await res.json();
+  return data.diff;
+}

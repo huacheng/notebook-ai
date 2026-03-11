@@ -142,6 +142,9 @@ sessionManager.onClaudeSessionId = (sessionId, claudeSessionId) => {
   db.updateClaudeSessionId(sessionId, claudeSessionId);
 };
 
+// Start process monitor to detect session/process mismatches.
+sessionManager.startProcessMonitor();
+
 // ── REST: Health ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => {
@@ -235,6 +238,7 @@ async function importExistingNotebooks(): Promise<void> {
 
 function gracefulShutdown(signal: string) {
   console.log(`[shutdown] Received ${signal}, shutting down gracefully…`);
+  sessionManager.stopProcessMonitor();
   server.close(() => {
     console.log('[shutdown] HTTP server closed.');
     sessionManager.closeAllSessions().then(() => {

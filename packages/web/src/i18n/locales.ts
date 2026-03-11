@@ -245,6 +245,11 @@ export const messages: Record<Language, Record<string, string>> = {
     'deliverables.title': 'Deliverables',
     'deliverables.noProject': 'No active project',
 
+    // ── Git ───────────────────────────────────────────────────────────────
+    'git.title': 'Git',
+    'git.noCommits': 'No commits yet',
+    'git.loadMore': 'Load more',
+
     // ── WelcomeScreen ─────────────────────────────────────────────────────
     'welcome.title': 'NoteBook AI',
     'welcome.subtitle': 'An interactive notebook for AI-CLI',
@@ -532,6 +537,11 @@ export const messages: Record<Language, Record<string, string>> = {
     // ── Deliverables ──────────────────────────────────────────────────────
     'deliverables.title': '交付物',
     'deliverables.noProject': '无活跃项目',
+
+    // ── Git ───────────────────────────────────────────────────────────────
+    'git.title': 'Git',
+    'git.noCommits': '暂无提交',
+    'git.loadMore': '加载更多',
 
     // ── WelcomeScreen ─────────────────────────────────────────────────────
     'welcome.title': 'NoteBook AI',

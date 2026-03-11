@@ -1,4 +1,6 @@
-import { readFile, writeFile, readdir, realpath } from 'fs/promises';
+import { readFile, writeFile, readdir, realpath, appendFile } from 'fs/promises';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import * as path from 'path';
 import * as os from 'os';
 import crypto from 'crypto';
@@ -1484,6 +1486,84 @@ export class SessionManager {
 
       default:
         break;
+    }
+  }
+
+  // ── Process Monitor ─────────────────────────────────────────────────────────
+
+  private _monitorInterval: ReturnType<typeof setInterval> | null = null;
+  private static readonly MONITOR_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
+  private static readonly WARN_LOG_PATH = '/tmp/notebook-ai-warn.log';
+
+  /**
+   * Starts periodic monitoring of session count vs Claude process count.
+   * Logs warnings to warn.log if mismatch detected.
+   */
+  startProcessMonitor(): void {
+    if (this._monitorInterval) return; // Already running
+
+    this._monitorInterval = setInterval(() => {
+      this.checkProcessMismatch().catch(err => {
+        console.error('[session] Process monitor error:', err);
+      });
+    }, SessionManager.MONITOR_INTERVAL_MS);
+
+    // Run immediately on start
+    this.checkProcessMismatch().catch(err => {
+      console.error('[session] Process monitor error:', err);
+    });
+
+    console.log('[session] Process monitor started (60s interval)');
+  }
+
+  /**
+   * Stops the process monitor.
+   */
+  stopProcessMonitor(): void {
+    if (this._monitorInterval) {
+      clearInterval(this._monitorInterval);
+      this._monitorInterval = null;
+      console.log('[session] Process monitor stopped');
+    }
+  }
+
+  /**
+   * Counts Claude processes and compares with active sessions.
+   * Logs warning if mismatch detected.
+   */
+  private async checkProcessMismatch(): Promise<void> {
+    const execAsync = promisify(exec);
+
+    try {
+      // Count active sessions
+      const sessionCount = this.sessions.size;
+
+      // Count notebook Claude processes (those spawned with -p flag)
+      // Use ps + grep to avoid pgrep matching shell wrappers
+      const { stdout } = await execAsync(
+        "ps aux | grep -E 'claude -p --input-format' | grep -v grep | wc -l",
+        { timeout: 5000 }
+      );
+      const processCount = parseInt(stdout.trim(), 10) || 0;
+
+      // Check for mismatch
+      if (sessionCount !== processCount) {
+        const timestamp = new Date().toISOString();
+        const sessionIds = Array.from(this.sessions.keys()).join(', ');
+        const message = `[${timestamp}] WARN: Session/Process mismatch! Sessions: ${sessionCount} (${sessionIds}), Claude processes: ${processCount}\n`;
+
+        console.warn(message.trim());
+        await appendFile(SessionManager.WARN_LOG_PATH, message);
+      }
+    } catch (err) {
+      // pgrep returns exit code 1 when no processes found, which is fine
+      const sessionCount = this.sessions.size;
+      if (sessionCount > 0) {
+        const timestamp = new Date().toISOString();
+        const message = `[${timestamp}] WARN: Session/Process mismatch! Sessions: ${sessionCount}, Claude processes: 0 (or error counting)\n`;
+        console.warn(message.trim());
+        await appendFile(SessionManager.WARN_LOG_PATH, message);
+      }
     }
   }
 }

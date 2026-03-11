@@ -4,8 +4,14 @@ import path from 'path';
 import os from 'os';
 import { copyFile, unlink, stat, rm, writeFile, mkdir } from 'fs/promises';
 import { createReadStream } from 'fs';
-import { ensureLibraryDir } from '../workspace.js';
+import { execFile as execFileCb } from 'child_process';
+import { promisify } from 'util';
+import { ensureLibraryDir, ensureLibraryGit } from '../workspace.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
+import { unquoteGitPath } from '../git-utils.js';
+
+const execFile = promisify(execFileCb);
+const EXEC_TIMEOUT = 10000;
 
 /** Check if a library path refers to a system-predefined entry that must not be deleted. */
 function isProtectedLibraryPath(filePath: string): boolean {
@@ -181,6 +187,138 @@ export function createLibraryRouter(): IRouter {
       res.json({ ok: true });
     } catch (err) {
       res.status(400).json({ error: 'Operation failed.' });
+    }
+  });
+
+  // ── Git endpoints ─────────────────────────────────────────────────────────
+
+  interface RefInfo {
+    type: 'head' | 'branch' | 'remote' | 'tag';
+    name: string;
+  }
+
+  interface CommitFile {
+    path: string;
+    additions: number;
+    deletions: number;
+  }
+
+  interface CommitInfo {
+    hash: string;
+    shortHash: string;
+    parents: string[];
+    refs: RefInfo[];
+    message: string;
+    author: string;
+    date: string;
+    files: CommitFile[];
+  }
+
+  /**
+   * GET /api/library/git-log
+   * Returns git commit history for the library directory.
+   * Initializes git if not already a repo.
+   */
+  router.get('/git-log', async (req: Request, res: Response) => {
+    try {
+      const cwd = await ensureLibraryGit();
+
+      const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+      const stats = req.query.stats === 'true';
+      const skip = (page - 1) * limit;
+
+      const SEP = '---GIT-LOG-SEP---';
+      const format = `${SEP}%n%H%n%h%n%P%n%D%n%s%n%an%n%aI`;
+
+      const args = ['log', '--topo-order', `--pretty=format:${format}`, `--skip=${skip}`, `-${limit + 1}`];
+      if (stats) args.splice(3, 0, '--numstat');
+
+      const { stdout } = await execFile('git', args, { cwd, timeout: EXEC_TIMEOUT });
+
+      const commits: CommitInfo[] = [];
+      const blocks = stdout.split(SEP).filter((b) => b.trim());
+
+      for (const block of blocks) {
+        const rawLines = block.split('\n');
+        if (rawLines[0] === '') rawLines.shift();
+        if (rawLines.length < 7) continue;
+
+        const [hash, shortHash, parentLine, refLine, message, author, date, ...fileLines] = rawLines;
+
+        const parents = parentLine.trim() ? parentLine.trim().split(' ') : [];
+
+        const refs: RefInfo[] = [];
+        if (refLine.trim()) {
+          for (const raw of refLine.split(',')) {
+            const part = raw.trim();
+            if (!part) continue;
+            if (part.startsWith('HEAD -> ')) {
+              refs.push({ type: 'head', name: part.slice(8) });
+            } else if (part === 'HEAD') {
+              refs.push({ type: 'head', name: 'HEAD' });
+            } else if (part.startsWith('tag: ')) {
+              refs.push({ type: 'tag', name: part.slice(5) });
+            } else if (part.includes('/')) {
+              refs.push({ type: 'remote', name: part });
+            } else {
+              refs.push({ type: 'branch', name: part });
+            }
+          }
+        }
+
+        const files: CommitFile[] = [];
+        if (stats) {
+          for (const fl of fileLines) {
+            const trimmed = fl.trim();
+            if (!trimmed) continue;
+            const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+            if (match) {
+              files.push({
+                path: unquoteGitPath(match[3]),
+                additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+                deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+              });
+            }
+          }
+        }
+
+        commits.push({ hash, shortHash, parents, refs, message, author, date, files });
+      }
+
+      const hasMore = commits.length > limit;
+      if (hasMore) commits.pop();
+
+      res.json({ commits, hasMore, page, limit });
+    } catch (err: any) {
+      // No commits yet is fine
+      if (err.message?.includes('does not have any commits')) {
+        res.json({ commits: [], hasMore: false, page: 1, limit: 20 });
+        return;
+      }
+      console.error('[library] git-log error:', err);
+      res.status(500).json({ error: 'Git log failed.' });
+    }
+  });
+
+  /**
+   * GET /api/library/git-diff?commit=<hash>
+   * Returns the diff for a specific commit.
+   */
+  router.get('/git-diff', async (req: Request, res: Response) => {
+    const commit = req.query.commit as string | undefined;
+    if (!commit || !/^[a-f0-9]{7,40}$/i.test(commit)) {
+      res.status(400).json({ error: 'Invalid commit hash' });
+      return;
+    }
+
+    try {
+      const cwd = await ensureLibraryGit();
+      const { stdout } = await execFile('git', ['show', '--format=', commit], { cwd, timeout: EXEC_TIMEOUT });
+      res.json({ diff: stdout });
+    } catch (err) {
+      console.error('[library] git-diff error:', err);
+      res.status(500).json({ error: 'Git diff failed.' });
     }
   });
 

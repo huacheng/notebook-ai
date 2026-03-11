@@ -21,6 +21,13 @@ for port in $PORTS; do
   fi
 done
 
+# Kill orphaned Claude processes spawned by previous backend
+claude_pids=$(pgrep -f "claude -p --input-format stream-json" 2>/dev/null || true)
+if [ -n "$claude_pids" ]; then
+  echo "    Killing orphaned Claude processes: $claude_pids"
+  echo "$claude_pids" | xargs kill 2>/dev/null || true
+fi
+
 sleep 2
 
 # Force-kill anything still lingering

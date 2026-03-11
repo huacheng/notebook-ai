@@ -319,6 +319,17 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           } else {
             set({ lastCompletedCellId: parsed.cell_id });
           }
+          // Set tab notification for non-active notebook
+          if (msgSessionId) {
+            const state = get();
+            const openNotebooks = state.openNotebooks;
+            for (const [notebookId, entry] of Object.entries(openNotebooks)) {
+              if (entry.sessionId === msgSessionId && notebookId !== state.activeNotebookTabId) {
+                store.setTabNotification(notebookId, true);
+                break;
+              }
+            }
+          }
           break;
         }
         case 'git_diff':

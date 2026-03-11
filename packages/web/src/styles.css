@@ -6245,6 +6245,18 @@ button:focus-visible {
   to { transform: rotate(360deg); }
 }
 
+/* Tab notification badge (cell completed in background notebook) */
+.notebook-tab--notify {
+  background: rgba(14, 165, 233, 0.08);
+}
+.notebook-tab-badge {
+  width: 6px;
+  height: 6px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Split mode: two tab groups aligned with FileViewer (left) and Notebook (right) */
 .notebook-tabs--split {
   display: flex;
@@ -6323,6 +6335,130 @@ button:focus-visible {
 .sidebar-l2-tab--active {
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
+}
+
+/* ── Sidebar Git Log ─────────────────────────────────────────────────────── */
+
+.sidebar-git-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs);
+}
+
+.sidebar-git-log--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.sidebar-git-empty-msg {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sidebar-git-commit-wrap {
+  margin-bottom: var(--space-xs);
+}
+
+.sidebar-git-commit {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sidebar-git-commit:hover {
+  background: var(--bg-cell-hover);
+}
+
+.sidebar-git-commit--selected {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.sidebar-git-commit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.sidebar-git-hash {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.sidebar-git-time {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.sidebar-git-message {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.sidebar-git-author {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.sidebar-git-diff {
+  margin-top: var(--space-xs);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: #0f1117;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.sidebar-git-diff-loading {
+  padding: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.sidebar-git-diff-content {
+  margin: 0;
+  padding: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  color: #e6e6e6;
+  white-space: pre;
+}
+
+.sidebar-git-loading {
+  padding: var(--space-sm);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sidebar-git-load-more {
+  display: block;
+  width: 100%;
+  padding: var(--space-xs);
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-align: center;
+}
+
+.sidebar-git-load-more:hover {
+  text-decoration: underline;
 }
 
 

@@ -3,6 +3,7 @@ import * as lz4 from 'lz4js';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { FileSection } from './FileSection';
+import { SidebarGitLog } from './SidebarGitLog';
 import { runDeleteFlow } from './deleteFlow';
 import { runRenameFlow, type RenamePhase } from './renameFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
@@ -563,7 +564,7 @@ function FileBrowser() {
 
   const sessionId = useStore(s => s.sessionId);
 
-  const [l2Tab, setL2Tab] = useState<'files' | 'deliverables'>('files');
+  const [l2Tab, setL2Tab] = useState<'files' | 'git' | 'deliverables'>('files');
   const [showNbCreate, setShowNbCreate] = useState(false);
   const [nbTitle, setNbTitle] = useState('');
   const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
@@ -779,13 +780,19 @@ function FileBrowser() {
           {t('sidebar.files')}
         </button>
         <button
+          className={`sidebar-l2-tab${l2Tab === 'git' ? ' sidebar-l2-tab--active' : ''}`}
+          onClick={() => setL2Tab('git')}
+        >
+          {t('git.title')}
+        </button>
+        <button
           className={`sidebar-l2-tab${l2Tab === 'deliverables' ? ' sidebar-l2-tab--active' : ''}`}
           onClick={() => setL2Tab('deliverables')}
         >
           {t('deliverables.title')}
         </button>
       </div>
-      {l2Tab === 'files' ? (
+      {l2Tab === 'files' && (
         <>
           <FileSection
             key={activeProjectId ?? 'root'}
@@ -811,7 +818,11 @@ function FileBrowser() {
             }}
           />
         </>
-      ) : (
+      )}
+      {l2Tab === 'git' && activeProjectId && (
+        <SidebarGitLog source="project" projectId={activeProjectId} />
+      )}
+      {l2Tab === 'deliverables' && (
         <FileSection
           key={delivPath}
           baseUrl={`/api/projects/${activeProjectId}`}
@@ -917,6 +928,7 @@ export function ProjectSidebar() {
   const sidebarWidth = useStore(s => s.sidebarWidth);
 
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
+  const [libraryTab, setLibraryTab] = useState<'files' | 'git'>('files');
   const sidebarRef = useRef<HTMLElement>(null);
   const dragging = useRef(false);
 
@@ -958,28 +970,47 @@ export function ProjectSidebar() {
         <div className="sidebar-section-header">
           <span>{t('sidebar.library')}</span>
         </div>
-        <FileSection
-          baseUrl="/api/library"
-          authToken={authToken}
-          refreshKey={libraryRefreshKey}
-          showDownloadAll
-          dropLabel={t('sidebar.dropToLibrary')}
-          workspaceDir={workspaceDir}
-          noDeleteFilter={(name, subPath) => {
-            // Root-level dot-prefixed entries and MEMORY.md are system files
-            if (subPath === '.') return name.startsWith('.') || name === 'MEMORY.md';
-            // Everything under .memory/ is system-managed
-            return subPath === '.memory' || subPath.startsWith('.memory/');
-          }}
-          readOnlyPath={(subPath) => {
-            // System directories: .memory and its subdirectories
-            return subPath === '.memory' || subPath.startsWith('.memory/');
-          }}
-          onFileClick={(subPath, name) => {
-            const relPath = subPath === '.' ? name : `${subPath}/${name}`;
-            openFileTab({ path: relPath, source: 'library', sessionId: sessionId ?? '' });
-          }}
-        />
+        <div className="sidebar-l2-tabs">
+          <button
+            className={`sidebar-l2-tab${libraryTab === 'files' ? ' sidebar-l2-tab--active' : ''}`}
+            onClick={() => setLibraryTab('files')}
+          >
+            {t('sidebar.files')}
+          </button>
+          <button
+            className={`sidebar-l2-tab${libraryTab === 'git' ? ' sidebar-l2-tab--active' : ''}`}
+            onClick={() => setLibraryTab('git')}
+          >
+            {t('git.title')}
+          </button>
+        </div>
+        {libraryTab === 'files' && (
+          <FileSection
+            baseUrl="/api/library"
+            authToken={authToken}
+            refreshKey={libraryRefreshKey}
+            showDownloadAll
+            dropLabel={t('sidebar.dropToLibrary')}
+            workspaceDir={workspaceDir}
+            noDeleteFilter={(name, subPath) => {
+              // Root-level dot-prefixed entries and MEMORY.md are system files
+              if (subPath === '.') return name.startsWith('.') || name === 'MEMORY.md';
+              // Everything under .memory/ is system-managed
+              return subPath === '.memory' || subPath.startsWith('.memory/');
+            }}
+            readOnlyPath={(subPath) => {
+              // System directories: .memory and its subdirectories
+              return subPath === '.memory' || subPath.startsWith('.memory/');
+            }}
+            onFileClick={(subPath, name) => {
+              const relPath = subPath === '.' ? name : `${subPath}/${name}`;
+              openFileTab({ path: relPath, source: 'library', sessionId: sessionId ?? '' });
+            }}
+          />
+        )}
+        {libraryTab === 'git' && (
+          <SidebarGitLog source="library" />
+        )}
       </div>
     </aside>
   );

@@ -2,6 +2,7 @@ import path from 'path';
 import os from 'os';
 import { mkdirSync, existsSync, constants } from 'fs';
 import { writeFile, chmod, access } from 'fs/promises';
+import { GitManager } from './git.js';
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'nb-workspaces');
 
@@ -25,6 +26,17 @@ export function getLibraryDir(): string {
 export function ensureLibraryDir(): string {
   const dir = getLibraryDir();
   mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Ensures the library directory exists and is a git repository.
+ * Idempotent: only initializes git if not already a repo.
+ */
+export async function ensureLibraryGit(): Promise<string> {
+  const dir = ensureLibraryDir();
+  const git = new GitManager(dir);
+  await git.ensureRepo();
   return dir;
 }
 

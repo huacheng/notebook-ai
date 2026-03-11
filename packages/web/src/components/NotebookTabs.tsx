@@ -11,13 +11,9 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
 }) {
   const openNotebooks = useStore(s => s.openNotebooks);
   const activeNotebookTabId = useStore(s => s.activeNotebookTabId);
+  const tabNotifications = useStore(s => s.tabNotifications);
   const setActiveNotebookTab = useStore(s => s.setActiveNotebookTab);
   const closeNotebookTab = useStore(s => s.closeNotebookTab);
-  const gitTabOpen = useStore(s => s.gitTabOpen);
-  const openGitTab = useStore(s => s.openGitTab);
-  const closeGitTab = useStore(s => s.closeGitTab);
-  const activeProjectId = useStore(s => s.activeProjectId);
-  const projects = useStore(s => s.projects);
   const openFiles = useStore(s => s.openFiles);
   const activeFileTabId = useStore(s => s.activeFileTabId);
   const setActiveFileTab = useStore(s => s.setActiveFileTab);
@@ -26,27 +22,10 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
 
   const notebookTabs = Object.entries(openNotebooks);
   const fileTabs = Object.entries(openFiles);
-  const activeProject = activeProjectId ? projects.find(p => p.id === activeProjectId) : null;
 
-  if (notebookTabs.length === 0 && !activeProject && fileTabs.length === 0) return null;
+  if (notebookTabs.length === 0 && fileTabs.length === 0) return null;
 
   const hasActiveFile = activeFileTabId !== null;
-
-  // ── Git tab (shared between modes, never closable) ─────────────────
-  const gitTabEl = activeProject ? (
-    <div
-      className={`notebook-tab notebook-tab--git${gitTabOpen && !hasActiveFile ? ' notebook-tab--active' : ''}`}
-      onClick={() => {
-        if (inSplitView) {
-          openGitTab();
-        } else {
-          deactivateFileTab(); openGitTab();
-        }
-      }}
-    >
-      <span className="notebook-tab-title" title={`Git(${activeProject.title})`}>{truncate(`Git(${activeProject.title})`)}</span>
-    </div>
-  ) : null;
 
   // ── Split-view mode: two tab groups ────────────────────────────────
   if (inSplitView) {
@@ -77,9 +56,10 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
           {notebookTabs.map(([id, { notebook }]) => (
             <div
               key={id}
-              className={`notebook-tab${id === activeNotebookTabId && !gitTabOpen ? ' notebook-tab--active' : ''}`}
-              onClick={() => { closeGitTab(); setActiveNotebookTab(id); }}
+              className={`notebook-tab${id === activeNotebookTabId ? ' notebook-tab--active' : ''}${tabNotifications[id] ? ' notebook-tab--notify' : ''}`}
+              onClick={() => setActiveNotebookTab(id)}
             >
+              {tabNotifications[id] && <span className="notebook-tab-badge" />}
               <span className="notebook-tab-title" title={notebook.metadata.title}>{truncate(notebook.metadata.title)}</span>
               <button
                 className="notebook-tab-close"
@@ -89,7 +69,6 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
               </button>
             </div>
           ))}
-          {gitTabEl}
         </div>
       </div>
     );
@@ -101,9 +80,10 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
       {notebookTabs.map(([id, { notebook }]) => (
         <div
           key={id}
-          className={`notebook-tab${id === activeNotebookTabId && !gitTabOpen && !hasActiveFile ? ' notebook-tab--active' : ''}`}
-          onClick={() => { closeGitTab(); deactivateFileTab(); setActiveNotebookTab(id); }}
+          className={`notebook-tab${id === activeNotebookTabId && !hasActiveFile ? ' notebook-tab--active' : ''}${tabNotifications[id] ? ' notebook-tab--notify' : ''}`}
+          onClick={() => { deactivateFileTab(); setActiveNotebookTab(id); }}
         >
+          {tabNotifications[id] && <span className="notebook-tab-badge" />}
           <span className="notebook-tab-title" title={notebook.metadata.title}>{truncate(notebook.metadata.title)}</span>
           <button
             className="notebook-tab-close"
@@ -113,7 +93,6 @@ export function NotebookTabs({ inSplitView, splitRatio }: {
           </button>
         </div>
       ))}
-      {gitTabEl}
       {fileTabs.map(([tabId, file]) => (
         <div
           key={tabId}
