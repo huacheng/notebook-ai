@@ -788,7 +788,7 @@ function FileBrowser() {
       {l2Tab === 'files' ? (
         <>
           <FileSection
-            key={workspaceDir ?? 'root'}
+            key={activeProjectId ?? 'root'}
             baseUrl={`/api/projects/${activeProjectId}`}
             authToken={authToken}
             onFileClick={handleFileClick}
