@@ -5,8 +5,7 @@ An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude
 ![Notebook AI Screenshot](screen_shot.jpg)
 
 ```
-┌──────────────── Toolbar (model selector, connection status) ─────────────────┐
-├─ Sidebar (272px) ─┬─ Main Content ──────────────────────────┬─ Right Panel ──┤
+┌─ Sidebar (272px) ─┬─ Main Content ──────────────────────────┬─ Right Panel ──┐
 │ L1: Project List  │  Notebook Tabs ─── Git Tab              │ Deliverables   │
 │ L2: File Browser  │  ┌─ StatusBar (sticky) ──────────────┐  │ File Section   │
 │ ── divider ──     │  │  Cell list (prompt + AI response)  │  │                │
