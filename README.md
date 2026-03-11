@@ -2,6 +2,8 @@
 
 An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude or Gemini as the execution engine.
 
+![Notebook AI Screenshot](screen_shot.jpg)
+
 ```
 ┌──────────────── Toolbar (model selector, connection status) ─────────────────┐
 ├─ Sidebar (272px) ─┬─ Main Content ──────────────────────────┬─ Right Panel ──┤

@@ -452,20 +452,29 @@ export function Notebook() {
   const timerIterationCount = useStore((s) => s.timerIterationCount);
   const timerPaused = useStore((s) => s.timerPaused);
   const [scoreExpanded, setScoreExpanded] = useState(false);
+  const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
   const cells = notebook?.cells ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
   const cellsContainerRef = useRef<HTMLDivElement>(null);
   const prevHeightRef = useRef(0);
 
   // Scroll to bottom whenever a new cell is appended (not when loading older)
+  // Track which notebook the ref belongs to, reset on notebook switch
   const prevCellsLenRef = useRef(cells.length);
+  const prevNotebookIdRef = useRef(activeNotebookTabId);
   useEffect(() => {
+    // Reset ref on notebook switch to prevent false scroll trigger
+    if (activeNotebookTabId !== prevNotebookIdRef.current) {
+      prevNotebookIdRef.current = activeNotebookTabId;
+      prevCellsLenRef.current = cells.length;
+      return;
+    }
     // Only auto-scroll when cells grow at the tail (new prompt), not on prepend
     if (cells.length > prevCellsLenRef.current && cellsOffset === useStore.getState().cellsOffset) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
     prevCellsLenRef.current = cells.length;
-  }, [cells.length, cellsOffset]);
+  }, [cells.length, cellsOffset, activeNotebookTabId]);
 
   // Scroll position preservation after prepending older cells
   useEffect(() => {

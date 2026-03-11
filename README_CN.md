@@ -4,6 +4,8 @@
 
 AI 驱动的 Notebook 工作空间 — 类似 Jupyter Notebook，但以 Claude 或 Gemini 作为执行引擎。
 
+![Notebook AI 截图](screen_shot.jpg)
+
 ```
 ┌──────────────── 工具栏（模型选择、连接状态）─────────────────┐
 ├─ 侧边栏 (272px) ─┬─ 主内容区 ─────────────────┬─ 右侧面板 ─┤
