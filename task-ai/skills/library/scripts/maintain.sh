@@ -417,12 +417,13 @@ while [[ $# -gt 0 ]]; do
           ELAPSED_SINCE=$((NOW - LAST_RUN))
           if [[ "$ELAPSED_SINCE" -lt "$INTERVAL_SECONDS" ]]; then
               HOURS_AGO=$((ELAPSED_SINCE / 3600))
-              echo "[scheduled] Up to date — last run ${HOURS_AGO}h ago (interval: 24h). Skipping."
+              echo "[$(date '+%Y-%m-%d %H:%M:%S')] [scheduled] Up to date — last run ${HOURS_AGO}h ago (interval: 24h). Skipping."
               break
           fi
       fi
 
-      echo "=== Scheduled Maintenance ==="
+      echo ""
+      echo "=== Scheduled Maintenance [$(date '+%Y-%m-%d %H:%M:%S')] ==="
 
       # 1. Staleness check (references)
       echo ""
