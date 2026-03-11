@@ -4,16 +4,6 @@ An AI-powered notebook workspace — like Jupyter Notebook, but backed by Claude
 
 ![Notebook AI Screenshot](screen_shot.jpg)
 
-```
-┌─ Sidebar (272px) ─┬─ Main Content ──────────────────────────┬─ Right Panel ──┐
-│ L1: Project List  │  Notebook Tabs ─── Git Tab              │ Deliverables   │
-│ L2: File Browser  │  ┌─ StatusBar (sticky) ──────────────┐  │ File Section   │
-│ ── divider ──     │  │  Cell list (prompt + AI response)  │  │                │
-│ Library           │  │  ...streaming output...            │  │                │
-│                   │  └─ InputBar (sticky) ────────────────┘  │                │
-└───────────────────┴──────────────────────────────────────────┴────────────────┘
-```
-
 ## Features
 
 - **AI Notebook** — Multi-turn conversational cells with real-time streaming of thinking, text, and tool use
