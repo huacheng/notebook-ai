@@ -1,5 +1,5 @@
 import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
-import { _cacheKey, _loadCachedNotebook } from './cacheHelpers';
+import { _cacheKey, _loadCachedNotebook, _persistNotebook } from './cacheHelpers';
 import type { StateCreator } from 'zustand';
 import type {
   Cell,
@@ -398,6 +398,8 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         autoStatus: savedAutoStatus ?? { ...initialAutoStatus },
       };
     });
+    // Cache notebook data so it can be restored after page refresh
+    _persistNotebook(notebookId, notebook);
   },
 
   closeNotebookTab: (notebookId) => {
