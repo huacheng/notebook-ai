@@ -507,12 +507,16 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     }
     if (Object.keys(openNotebooks).length === 0) return;
     const activeId = saved.activeId && openNotebooks[saved.activeId] ? saved.activeId : Object.keys(openNotebooks)[0];
-    const restoredSessionId = openNotebooks[activeId]?.sessionId || null;
     set({
       openNotebooks,
       activeNotebookTabId: activeId,
-      sessionId: restoredSessionId,
+      sessionId: null, // No backend session yet
     });
+    // Trigger backend session creation for the active tab.
+    // restoreNotebook() will update sessionId and workspaceDir when done.
+    if (activeId && typeof get().restoreNotebook === 'function') {
+      get().restoreNotebook(activeId);
+    }
   },
 
   appendStreamDelta: (cellId, delta, blockType) => {
