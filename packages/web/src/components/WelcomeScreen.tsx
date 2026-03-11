@@ -99,6 +99,11 @@ export function WelcomeScreen() {
           }
           openNotebookTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
           subscribeToSession(data.sessionId);
+          // Auto-activate task-ai:auto mode for new notebooks
+          setTimeout(() => {
+            const { submitPrompt } = useStore.getState();
+            submitPrompt('/task-ai:auto ');
+          }, 100);
         }
       } catch { /* notebook created but couldn't auto-open */ }
     }

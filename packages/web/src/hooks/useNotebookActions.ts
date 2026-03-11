@@ -138,11 +138,18 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
 
   /**
    * Create notebook and immediately open it.
+   * Auto-activates /task-ai:auto mode after session is ready.
    */
   const createAndOpenNotebook = useCallback(
     async (projectId: string, title: string): Promise<void> => {
       const createResult = await createProjectNotebook(projectId, title);
       await openNotebookWithTab(createResult.notebookPath);
+      // Auto-activate task-ai:auto mode for new notebooks
+      // Small delay to ensure session is fully subscribed
+      setTimeout(() => {
+        const { submitPrompt } = useStore.getState();
+        submitPrompt('/task-ai:auto ');
+      }, 100);
     },
     [createProjectNotebook, openNotebookWithTab]
   );
