@@ -921,7 +921,8 @@ export function setupWebSocket(
 
         case 'restart_session': {
           const { session_id, clear } = msg;
-          if (!checkSessionPermission(session_id)) break;
+          // Use ownership check (not subscription) to allow restart during reconnect race
+          if (!checkSessionOwnership(session_id)) break;
           try {
             await sessionManager.restartSession(session_id, clear ? { skipResume: true } : undefined);
             sendToClient(ws, { type: 'session_restarted', session_id, cleared: !!clear });
