@@ -1183,7 +1183,8 @@ export function setupWebSocket(
         // Task lifecycle status: watch .status.json for changes and push updates
         case 'task_status_subscribe': {
           const sessionId = msg.session_id;
-          if (!checkSessionPermission(sessionId)) break;
+          // Use ownership check to allow during reconnect race (sent right after subscribe)
+          if (!checkSessionOwnership(sessionId)) break;
           const session = sessionManager.getSession(sessionId);
           if (!session) break;
           if (!fileWatcher) break;
