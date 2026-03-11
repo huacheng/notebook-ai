@@ -118,13 +118,7 @@ if [[ -z "$MAIN_BRANCH" ]] || ! git rev-parse --verify "refs/heads/$MAIN_BRANCH"
     fi
 fi
 
-# Read multi-stage info (used after merge in Phase 3)
-STAGE_CURRENT=$(python3 "$STATE_PY" get "$STATUS_JSON" stage.current 2>/dev/null || echo "1")
-
-# D2: Validate STAGE number contains only digits; D3: guard against zero/invalid values
-if [[ ! "$STAGE_CURRENT" =~ ^[0-9]+$ ]] || [[ "$STAGE_CURRENT" -eq 0 ]]; then
-    STAGE_CURRENT=1
-fi
+# v2: No stage info needed — merge is pure file copy, status handled by auto
 
 echo "[GIT] Copying .deliverables/ from $TASK_BRANCH to $MAIN_BRANCH..."
 
@@ -179,51 +173,13 @@ if [[ "$MERGE_FAILED" -ne 0 ]]; then
     exit 1
 fi
 
-# Deliverables copied — checkout back to task branch for state update
+# Deliverables copied — checkout back to task branch
 # D1: .status.json lives on task branch, not master
 if ! git checkout "$TASK_BRANCH"; then
-    echo "[ERROR] Failed to checkout back to $TASK_BRANCH for state update" >&2
+    echo "[ERROR] Failed to checkout back to $TASK_BRANCH" >&2
     exit 1
 fi
 
-# Phase 3: Post-merge finalization — unified evolving path (progressive evolution)
-# D1: Always transition to evolving — stages are emergent, not predefined
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# v2: stage.history entry includes commit (current HEAD) and convergence (from latest analysis)
-COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
-# Read convergence score from latest convergence analysis file if available
-CONVERGENCE_SCORE=$(python3 -c "
-import os, re, glob
-analysis_dir = os.path.join('$WORK_DIR', '.analysis')
-if os.path.isdir(analysis_dir):
-    files = sorted(glob.glob(os.path.join(analysis_dir, '*convergence*.md')), reverse=True)
-    for f in files:
-        with open(f) as fh:
-            for line in fh:
-                m = re.search(r'Current convergence[^0-9]*([0-9.]+)', line)
-                if m:
-                    print(m.group(1))
-                    exit()
-print('0.0')
-" 2>/dev/null || echo "0.0")
-
-# D3: Only write stage.history when transitioning from executing.
-# When called from evolving (auto already wrote history + set evolving), skip history push to avoid duplicates.
-if [[ "$CURRENT_STATUS" == "executing" ]]; then
-    echo "[STAGE] Stage $STAGE_CURRENT completed. Status → evolving."
-    if ! python3 "$STATE_PY" transition "$STATUS_JSON" --status evolving \
-        --stage-history "{\"stage\":$STAGE_CURRENT,\"name\":\"stage-$STAGE_CURRENT\",\"completed_at\":\"$TIMESTAMP\",\"commit\":\"$COMMIT_SHA\",\"convergence\":$CONVERGENCE_SCORE}"; then
-        echo "[ERROR] Failed to update task state to evolving" >&2
-        exit 1
-    fi
-else
-    echo "[STAGE] Status already evolving. Skipping stage.history write (auto handled)."
-fi
-
-# Git commit stage state
-cd "$WORK_DIR" || { echo "[ERROR] Cannot cd to $WORK_DIR" >&2; exit 1; }
-git add .status.json 2>/dev/null || echo "[WARN] git add failed for stage state" >&2
-git commit -m "task-ai($NOTEBOOK):merge stage $STAGE_CURRENT completed" 2>/dev/null || echo "[WARN] git commit failed for stage state" >&2
-
-echo "Task $NOTEBOOK stage $STAGE_CURRENT complete. Use /task-ai:target to define next stage or --satisfy to mark satisfied."
+# v2: merge is pure file copy — no status changes
+# Status transitions (executing → evolving) are handled by auto after check post-exec ACCEPT
+echo "Deliverables copied to .deliverables/$NOTEBOOK/ on $MAIN_BRANCH."

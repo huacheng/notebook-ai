@@ -113,7 +113,7 @@ Build a JWT authentication system
 
    3d. **ELSE** (normal mode, including first definition) → **Normal/Multi-stage Analysis Mode**:
       - **IF status ∈ {`draft`, `planning`}**: evaluate objective complexity:
-        - Is it beyond a single plan→exec→merge cycle?
+        - Is it beyond a single plan→exec→ACCEPT cycle?
         - Are there natural stage boundaries?
         - **IF suggests splitting**: propose stages to user as guidance (e.g., "Suggest starting with: 1.Basic auth, then evolving to OAuth, then RBAC"), but generate only the first stage in `.target.md` — subsequent stages emerge through the evolving → target cycle
         - **ELSE**: generate single-stage `.target.md` (simplified format)

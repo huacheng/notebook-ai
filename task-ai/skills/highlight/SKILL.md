@@ -288,7 +288,7 @@ check REPLAN may also need to update `.memory/.references/` `failure_count`. Thi
 ### §3.5 scope=complete — Comprehensive Distillation
 
 **Caller**: None (not inline)
-**Independent execution**: **Yes** — auto loop step after merge; manual invocation
+**Independent execution**: **Yes** — auto loop step after post-exec ACCEPT; manual invocation
 
 This is highlight's core scope for comprehensive experience distillation.
 
@@ -296,7 +296,7 @@ This is highlight's core scope for comprehensive experience distillation.
 
 | Mode | Trigger | Primary Input | Auxiliary Input |
 |------|---------|--------------|-----------------|
-| **auto-complete** | Auto loop after merge | System files (see table below) | None (no conversation context) |
+| **auto-complete** | Auto loop after post-exec ACCEPT | System files (see table below) | None (no conversation context) |
 | **manual-complete** | User runs `/task-ai:highlight` | **Current conversation context** | System files (structural supplement) |
 
 - auto-complete: agent starts independently, no conversation history, reads only from filesystem
@@ -358,7 +358,7 @@ manual-complete mode **skips idempotency check** — user explicit trigger alway
 
 For multi-type (e.g., `data-pipeline|ml`), split on `|` and write one file per segment. Each segment name uses directory-safe transform (`:` → `-`, e.g., `audio:dsp` → `audio-dsp`).
 
-**Final stage distillation** (last stage merge → `satisfied`): uses `<semantic>-complete.md`. Since all stages append to the same file (with stage info in frontmatter `sources[]`), the final distillation overwrites with a synthesized version incorporating all stage experiences.
+**Final stage distillation** (convergence ≥ 0.95 → user says `satisfied`): uses `<semantic>-complete.md`. Since all stages append to the same file (with stage info in frontmatter `sources[]`), the final distillation overwrites with a synthesized version incorporating all stage experiences.
 
 **Context budget guard**: When reading input files for distillation, apply an upper bound of ~50k tokens on total input. If combined input exceeds the context budget, prioritize in this order: `.status.json` > `.target.md` > `.summary.md` > `.plan.md` > `.type-profile.md` > existing provisional experience > `.analysis/` > `.test/` > `.bugfix/` > `.notes/` > `.thinking/raw/`. Truncate lowest-priority sources first. Log a warning if truncation occurs.
 
@@ -510,7 +510,7 @@ highlight **does not change notebook status**. Regardless of scope, `.status.jso
 | verify | None (verify manages status) |
 | thinking-raw | None (callers manage their own status) |
 | quality-update | None (check manages status) |
-| satisfied | None (merge already set satisfied) |
+| complete | None (auto manages status; user sets satisfied via --satisfy) |
 | adhoc | None (no notebook lifecycle) |
 | promote | None (batch operation, no notebook lifecycle) |
 

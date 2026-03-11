@@ -7,18 +7,18 @@ The progressive evolution model replaces predefined multi-stage planning with em
 **Key principles:**
 - Stages are emergent, not predefined — no `stage.total`
 - No terminal "complete" state — `satisfied` is non-terminal, can re-enter evolution
-- Each stage follows the full lifecycle: target → plan → check → exec → merge → evolving
+- Each stage follows the full lifecycle: target → plan → exec → check ACCEPT → auto sets evolving → highlight → report
 - LLM auto-generates next substage target based on convergence gap (see `auto/SKILL.md` Phase 4)
 - User can pause (`target --satisfy`) or refine Overall Objective to re-enter from `satisfied`
-- Stages do not merge independently — deliverables accumulate on the task branch. Only `--satisfy` triggers merge to main
+- Deliverables accumulate on the task branch. User can call merge anytime to copy deliverables to main (merge is pure file copy, no status changes)
 - The lifecycle diagram above is simplified; the full loop includes check, verify, and highlight steps — see `auto/SKILL.md` for the complete state machine
 
 ## Stage Lifecycle
 
 ```
-Stage 1: target → plan → exec → merge → evolving
+Stage 1: target → plan → exec → check ACCEPT → auto sets evolving → highlight → report
   ↓ convergence < 0.95 → LLM auto-generates next substage target (see auto/SKILL.md Phase 4)
-Stage 2: target → plan → exec → merge → evolving
+Stage 2: target → plan → exec → check ACCEPT → auto sets evolving → highlight → report
   ↓ convergence ≥ 0.95 → wait for user
 target --satisfy → satisfied
   ↓ later, user refines Overall Objective
@@ -41,7 +41,7 @@ satisfied → evolving → auto-generates substage → planning → ...
 ...
 ```
 
-### After Stage 1 completes (merge fills Results):
+### After Stage 1 completes (auto fills Results on ACCEPT):
 ```markdown
 # Task Target: notebook-name
 
@@ -55,7 +55,7 @@ satisfied → evolving → auto-generates substage → planning → ...
 ### Requirements
 ### Constraints
 ### Results
-<merge auto-fills>
+<auto fills on check ACCEPT>
 ```
 
 ### Stage 2 auto-generated (appended by target via auto Phase 4):
@@ -70,13 +70,13 @@ satisfied → evolving → auto-generates substage → planning → ...
 **Key differences from old model:**
 - No `[PENDING]` stages — future stages are not predefined
 - Original top-level Objective becomes `## Overall Objective` when entering stage 2
-- Stage 1 content is retroactively wrapped as `## Stage 1 [COMPLETE]` by merge
+- Stage 1 content is retroactively wrapped as `## Stage 1 [COMPLETE]` by auto (on check ACCEPT)
 
 ## Status Transitions
 
 | From | To | Via | Note |
 |------|-----|-----|------|
-| `executing` | `evolving` | merge | Always (no stage.total comparison) |
+| `executing` | `evolving` | auto (check ACCEPT) | Auto handles: update .target.md, .status.json, push stage.history |
 | `evolving` | `planning` | target | LLM auto-generates next substage target (convergence < 0.95) |
 | `evolving` | `satisfied` | target --satisfy | User says "enough" (convergence ≥ 0.95) |
 | `satisfied` | `evolving` | target (refine) | User refines Overall Objective → convergence drops |

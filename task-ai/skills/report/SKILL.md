@@ -1,6 +1,6 @@
 ---
 name: report
-description: "Generate a completion report for a finished task module. Triggered after merge completes, or manually for blocked/cancelled tasks to document progress and lessons learned."
+description: "Generate a completion report for a finished task module. In auto mode, triggered after post-exec ACCEPT (check → highlight → report → evolving decision), or manually for blocked/cancelled tasks to document progress and lessons learned."
 model_tier: medium
 auto_delegatable: true
 triggers:
@@ -117,7 +117,7 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 14. **Git commit**: `task-ai(<notebook>):report generate completion report`
 15. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/<notebook>/.report.md`."
 
-> *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between merge and report. For manual workflows: run `/task-ai:highlight` before `/task-ai:report` if distillation is needed.*
+> *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between check ACCEPT and report. For manual workflows: run `/task-ai:highlight` before `/task-ai:report` if distillation is needed.*
 
 **Note**: Report is a terminal step — it reads ALL history files (not just latest) to produce a comprehensive record. `.summary.md` is used as an overview, not a replacement for full history in report context.
 
@@ -167,7 +167,7 @@ When status is `evolving`, the report includes a Stage Review section:
 - Possible next directions: <1-2 suggestions>
 
 ### Decision Point
-> Current stage merged and complete.
+> Current stage accepted and complete.
 > - Continue evolving: describe next direction
 > - Pause: say "satisfied" or run /task-ai:target --satisfy
 ```
