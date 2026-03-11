@@ -958,7 +958,8 @@ export function setupWebSocket(
 
         case 'timer_start': {
           const { session_id, interval_ms } = msg;
-          if (!checkSessionPermission(session_id)) break;
+          // Use ownership check to allow timer_start during reconnect race
+          if (!checkSessionOwnership(session_id)) break;
           try {
             sessionManager.startTimerMode(session_id, interval_ms);
             sessionManager.broadcastToSession(session_id, { type: 'timer_started', session_id, interval_ms: interval_ms ?? null });
@@ -970,7 +971,8 @@ export function setupWebSocket(
 
         case 'timer_stop': {
           const { session_id } = msg;
-          if (!checkSessionPermission(session_id)) break;
+          // Use ownership check to allow timer_stop during reconnect race
+          if (!checkSessionOwnership(session_id)) break;
           try {
             sessionManager.stopTimerMode(session_id);
             sendToClient(ws, { type: 'timer_stopped_ack', session_id });
