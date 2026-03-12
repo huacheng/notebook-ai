@@ -457,6 +457,35 @@ export class SessionManager {
     return this.sessions.get(sessionId);
   }
 
+  /** Find an existing session by notebook path */
+  getSessionByNotebookPath(notebookPath: string): NotebookSession | undefined {
+    for (const session of this.sessions.values()) {
+      if (session.notebookPath === notebookPath) {
+        return session;
+      }
+    }
+    return undefined;
+  }
+
+  /** Get all active sessions (for monitoring/cleanup) */
+  getAllSessions(): NotebookSession[] {
+    return Array.from(this.sessions.values());
+  }
+
+  /** Check if a session has any connected WebSocket clients */
+  hasActiveConnections(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    return session ? session.listeners.size > 0 : false;
+  }
+
+  /** Check if a session is idle (no running cell, no pending operations) */
+  isSessionIdle(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return true;
+    const runningCellId = findRunningCellId(session.notebook);
+    return !runningCellId && session._pendingAppends === 0 && session._pendingToolUseIds.size === 0;
+  }
+
   /**
    * Restarts the agent process for an existing session.
    * Preserves the session ID, notebook state, and listeners.
@@ -1529,7 +1558,7 @@ export class SessionManager {
 
   /**
    * Counts Claude processes and compares with active sessions.
-   * Logs warning if mismatch detected.
+   * Logs warning if mismatch detected and attempts auto-recovery.
    */
   private async checkProcessMismatch(): Promise<void> {
     const execAsync = promisify(exec);
@@ -1554,6 +1583,26 @@ export class SessionManager {
 
         console.warn(message.trim());
         await appendFile(SessionManager.WARN_LOG_PATH, message);
+
+        // Auto-recovery: if sessions > processes, some processes died — restart them
+        if (sessionCount > processCount) {
+          console.log('[session] Attempting auto-recovery for dead processes...');
+          for (const [sessionId, session] of this.sessions.entries()) {
+            const isAlive = session.agentProcess.isAlive();
+            if (!isAlive) {
+              console.log(`[session ${sessionId}] Process dead, restarting...`);
+              try {
+                await this.restartSession(sessionId);
+                console.log(`[session ${sessionId}] Process restarted successfully.`);
+              } catch (err) {
+                console.error(`[session ${sessionId}] Failed to restart process:`, err);
+              }
+            }
+          }
+        }
+        // If processes > sessions, orphan processes exist — kill them
+        // (This shouldn't happen in normal operation, but just in case)
+        // We don't automatically kill them here to avoid killing user's interactive claude sessions
       }
     } catch (err) {
       // pgrep returns exit code 1 when no processes found, which is fine
@@ -1563,8 +1612,39 @@ export class SessionManager {
         const message = `[${timestamp}] WARN: Session/Process mismatch! Sessions: ${sessionCount}, Claude processes: 0 (or error counting)\n`;
         console.warn(message.trim());
         await appendFile(SessionManager.WARN_LOG_PATH, message);
+
+        // Attempt to restart all sessions
+        console.log('[session] All processes appear dead, attempting restart...');
+        for (const [sessionId, session] of this.sessions.entries()) {
+          const isAlive = session.agentProcess.isAlive();
+          if (!isAlive) {
+            try {
+              await this.restartSession(sessionId);
+              console.log(`[session ${sessionId}] Process restarted successfully.`);
+            } catch (restartErr) {
+              console.error(`[session ${sessionId}] Failed to restart process:`, restartErr);
+            }
+          }
+        }
       }
     }
+  }
+
+  /**
+   * Cleanup stale sessions that haven't been opened for the specified number of days.
+   * Only destroys sessions that are idle and have no active WS connections.
+   */
+  async cleanupStaleSessions(staleNotebooks: Array<{ notebook_path: string }>): Promise<number> {
+    let cleanedCount = 0;
+    for (const nb of staleNotebooks) {
+      const session = this.getSessionByNotebookPath(nb.notebook_path);
+      if (session && this.isSessionIdle(session.id) && !this.hasActiveConnections(session.id)) {
+        console.log(`[session] Cleaning up stale session for ${nb.notebook_path}`);
+        await this.closeSession(session.id);
+        cleanedCount++;
+      }
+    }
+    return cleanedCount;
   }
 }
 

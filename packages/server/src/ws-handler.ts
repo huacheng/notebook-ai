@@ -463,6 +463,13 @@ export function setupWebSocket(
 
             console.log(`[ws] Client ${clientId} subscribed to session ${session_id} (${subscribers.size} device(s))`);
 
+            // Update last_opened_at for session persistence tracking (best-effort, non-blocking)
+            try {
+              db.updateNotebookLastOpened(session.notebookPath);
+            } catch (err) {
+              console.warn('[ws] Failed to update last_opened_at:', err);
+            }
+
             // Broadcast device_connected to other subscribers
             if (!wasEmpty) {
               for (const sub of subscribers) {

@@ -93,6 +93,7 @@ describe('remove_cells git commit', () => {
     const db = {
       cleanupOldFileAnnotations: vi.fn(),
       updateNotebook: vi.fn(),
+      updateNotebookLastOpened: vi.fn(),
     } as any;
 
     // Wire up ws-handler
@@ -136,6 +137,7 @@ describe('remove_cells git commit', () => {
     const db = {
       cleanupOldFileAnnotations: vi.fn(),
       updateNotebook: vi.fn(),
+      updateNotebookLastOpened: vi.fn(),
     } as any;
 
     const wss = makeMockWss();

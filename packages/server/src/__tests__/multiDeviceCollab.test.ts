@@ -60,6 +60,7 @@ function createMockDb() {
     upsertFileAnnotations: vi.fn(),
     listNotebooks: vi.fn().mockReturnValue([]),
     updateNotebook: vi.fn(),
+    updateNotebookLastOpened: vi.fn(),
     closeSessionRecord: vi.fn(),
     createSessionRecord: vi.fn(),
   } as any;

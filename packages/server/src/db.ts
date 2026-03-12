@@ -18,6 +18,7 @@ export interface NotebookRow {
   cell_count: number;
   created_at: string;
   updated_at: string;
+  last_opened_at: string | null;
 }
 
 export interface SessionRow {
@@ -157,6 +158,13 @@ export class NotebookDb {
       this.db.exec(`ALTER TABLE sessions ADD COLUMN claude_session_id TEXT`);
     } catch (_err: unknown) { /* column already exists */ }
 
+    // Migration: add last_opened_at to notebooks (for session persistence)
+    try {
+      this.db.exec(`ALTER TABLE notebooks ADD COLUMN last_opened_at TEXT`);
+      // Initialize existing rows with created_at value
+      this.db.exec(`UPDATE notebooks SET last_opened_at = created_at WHERE last_opened_at IS NULL`);
+    } catch (_err: unknown) { /* column already exists */ }
+
     // ── Users & Invite Codes (multi-user support) ─────────────────────────────
     // First create tables with new schema (or they already exist with old schema)
     this.db.exec(`
@@ -247,11 +255,16 @@ export class NotebookDb {
 
   // ── Notebook CRUD ────────────────────────────────────────────────────────
 
-  createNotebook(notebook: Omit<NotebookRow, 'cell_count' | 'project_id' | 'agent'> & { project_id?: string | null; agent?: string }): NotebookRow {
-    const row = { ...notebook, project_id: notebook.project_id ?? null, agent: notebook.agent ?? 'claude' };
+  createNotebook(notebook: Omit<NotebookRow, 'cell_count' | 'project_id' | 'agent' | 'last_opened_at'> & { project_id?: string | null; agent?: string; last_opened_at?: string | null }): NotebookRow {
+    const row = {
+      ...notebook,
+      project_id: notebook.project_id ?? null,
+      agent: notebook.agent ?? 'claude',
+      last_opened_at: notebook.last_opened_at ?? notebook.created_at,
+    };
     const stmt = this.db.prepare(`
-      INSERT INTO notebooks (id, user_id, title, slug, workspace_dir, notebook_path, project_id, agent, status, cell_count, created_at, updated_at)
-      VALUES (@id, @user_id, @title, @slug, @workspace_dir, @notebook_path, @project_id, @agent, @status, 0, @created_at, @updated_at)
+      INSERT INTO notebooks (id, user_id, title, slug, workspace_dir, notebook_path, project_id, agent, status, cell_count, created_at, updated_at, last_opened_at)
+      VALUES (@id, @user_id, @title, @slug, @workspace_dir, @notebook_path, @project_id, @agent, @status, 0, @created_at, @updated_at, @last_opened_at)
     `);
     stmt.run(row);
     return this.getNotebook(notebook.id)!;
@@ -297,6 +310,35 @@ export class NotebookDb {
 
   getNotebookByPath(notebookPath: string): NotebookRow | undefined {
     return this.db.prepare('SELECT * FROM notebooks WHERE notebook_path = ? AND status = ?').get(notebookPath, 'active') as NotebookRow | undefined;
+  }
+
+  /** Update last_opened_at timestamp for a notebook */
+  updateNotebookLastOpened(notebookPath: string): void {
+    const now = new Date().toISOString();
+    this.db.prepare('UPDATE notebooks SET last_opened_at = ? WHERE notebook_path = ?').run(now, notebookPath);
+  }
+
+  /** Get notebooks opened within the last N days (for session rebuild on startup) */
+  getRecentNotebooks(days: number): NotebookRow[] {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    return this.db.prepare(`
+      SELECT * FROM notebooks
+      WHERE status = 'active'
+        AND (last_opened_at >= ? OR last_opened_at IS NULL)
+      ORDER BY last_opened_at DESC
+    `).all(cutoff) as NotebookRow[];
+  }
+
+  /** Get notebooks not opened for more than N days (for cleanup) */
+  getStaleNotebooks(days: number): NotebookRow[] {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    return this.db.prepare(`
+      SELECT * FROM notebooks
+      WHERE status = 'active'
+        AND last_opened_at IS NOT NULL
+        AND last_opened_at < ?
+      ORDER BY last_opened_at ASC
+    `).all(cutoff) as NotebookRow[];
   }
 
   deleteNotebook(id: string): void {

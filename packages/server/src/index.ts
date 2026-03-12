@@ -234,6 +234,54 @@ async function importExistingNotebooks(): Promise<void> {
   }
 }
 
+// ── Startup: rebuild sessions for recently active notebooks ────────────────────
+
+const ACTIVE_DAYS = 7; // Rebuild sessions for notebooks opened in the last 7 days
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // Cleanup stale sessions every hour
+
+async function rebuildActiveSessions(): Promise<void> {
+  const recentNotebooks = db.getRecentNotebooks(ACTIVE_DAYS);
+  if (recentNotebooks.length === 0) return;
+
+  console.log(`[startup] Rebuilding sessions for ${recentNotebooks.length} recent notebook(s)...`);
+  let rebuilt = 0;
+  for (const row of recentNotebooks) {
+    // Skip if session already exists
+    if (sessionManager.getSessionByNotebookPath(row.notebook_path)) continue;
+
+    try {
+      let notebook;
+      try {
+        notebook = await notebookStore.load(row.notebook_path);
+      } catch {
+        // Notebook file might be missing — create empty notebook
+        notebook = notebookStore.createNew(row.title, row.workspace_dir);
+      }
+
+      const dbRow = db.getActiveSession(row.id);
+      const resumeSessionId = dbRow?.claude_session_id ?? undefined;
+
+      await sessionManager.reconnectSession(
+        `nb-${crypto.createHash('sha1').update(row.notebook_path).digest('hex').slice(0, 8)}`,
+        row.notebook_path,
+        row.workspace_dir,
+        notebook,
+        null,
+        row.id,
+        undefined,
+        resumeSessionId,
+      );
+      rebuilt++;
+    } catch (err) {
+      console.warn(`[startup] Failed to rebuild session for "${row.title}":`, err);
+    }
+  }
+
+  if (rebuilt > 0) {
+    console.log(`[startup] Rebuilt ${rebuilt} session(s) for recent notebooks.`);
+  }
+}
+
 // ── Graceful shutdown (D3-1) ──────────────────────────────────────────────────
 
 function gracefulShutdown(signal: string) {
@@ -269,6 +317,9 @@ server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   importExistingNotebooks().catch((err) => console.error('[import] Error:', err));
 
+  // Rebuild sessions for recently active notebooks (session persistence)
+  rebuildActiveSessions().catch((err) => console.error('[startup] Error rebuilding sessions:', err));
+
   // Recover auto daemons from previous server session
   try {
     const recovered = recoverDaemons(db);
@@ -278,4 +329,22 @@ server.listen(PORT, () => {
   } catch (err) {
     console.error('[auto] Failed to recover daemons:', err);
   }
+
+  // Periodic cleanup of stale sessions (notebooks not opened for 7+ days)
+  setInterval(() => {
+    try {
+      const staleNotebooks = db.getStaleNotebooks(ACTIVE_DAYS);
+      if (staleNotebooks.length > 0) {
+        sessionManager.cleanupStaleSessions(staleNotebooks)
+          .then((cleaned) => {
+            if (cleaned > 0) {
+              console.log(`[cleanup] Cleaned up ${cleaned} stale session(s).`);
+            }
+          })
+          .catch((err) => console.error('[cleanup] Error cleaning sessions:', err));
+      }
+    } catch (err) {
+      console.error('[cleanup] Error querying stale notebooks:', err);
+    }
+  }, CLEANUP_INTERVAL_MS).unref();
 });
