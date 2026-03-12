@@ -27,7 +27,7 @@ Referenced from `auto/SKILL.md` §Four-Phase Flow.
 
 ## Phase 3: Execution (status=executing) — Full auto + user can intervene
 
-- All non-system output (code, configs, assets) goes to `<notebook>/.deliverables/` (merge only copies this directory — anything outside it won't reach main branch)
+- All non-system output (code, configs, assets) goes to `$NB_WORK_DIR/.deliverables/` (merge only copies this directory — anything outside it won't reach main branch)
 - Execute exec step by step
 - Key checkpoints trigger verify → check(mid-exec): significant issues, or every N steps (N from `.type-profile.md` Auto Adaptation `mid-exec check interval`, fallback 3)
 - All steps done → verify → check(post-exec)

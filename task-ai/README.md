@@ -53,14 +53,15 @@ $NB_WORKSPACES_ROOT/
 ├── .library/                    # Shared knowledge library
 │   └── .memory/                 # Experiences, references, thinking patterns
 ├── project-a/
-│   ├── .deliverables/           # Project-level deliverables
-│   └── notebook-1/
-│       ├── .deliverables/       # Task deliverables (merged to project level)
-│       └── .working/            # System state files
-│           ├── .status.json     # Task status, stage, phase
-│           ├── .target.md       # Objectives (evolves through dialog)
-│           ├── .plan.md         # Implementation plan
-│           └── .convergence-baseline.md  # Weighted R# scoring
+│   ├── .deliverables/           # Project-level deliverables (shared by all notebooks)
+│   └── .worktrees/              # Git worktrees directory
+│       └── task-notebook-1/     # Notebook worktree on branch task/notebook-1
+│           ├── .deliverables/   # Task deliverables (merged to project level)
+│           └── .working/        # System state files (TASKAI_WORK_DIR)
+│               ├── .status.json     # Task status, stage, phase
+│               ├── .target.md       # Objectives (evolves through dialog)
+│               ├── .plan.md         # Implementation plan
+│               └── .convergence-baseline.md  # Weighted R# scoring
 └── project-b/
     └── ...
 ```
