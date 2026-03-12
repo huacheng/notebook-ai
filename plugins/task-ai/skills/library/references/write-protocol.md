@@ -1,8 +1,8 @@
 # Library Write Protocol — Reference
 
-All sub-commands that write to `$NB_WORKSPACES_LIBRARY/` MUST follow the six-step protocol. This file provides the per-directory lock table, hold duration guidance, and stale-lock recovery procedure.
+All sub-commands that write to `$NB_WORKSPACES_LIBRARY/` MUST follow the eight-step protocol. This file provides the per-directory lock table, hold duration guidance, and stale-lock recovery procedure.
 
-## Six-Step Protocol
+## Eight-Step Protocol
 
 All library writers MUST execute these steps in order:
 
@@ -11,7 +11,13 @@ All library writers MUST execute these steps in order:
 3. **Write file** — write content via `.tmp` + atomic `rename` (overwrite) or `O_APPEND` (append)
 4. **Changelog append** — append one line to `.changelog` via `.changelog.lock` (see format below)
 5. **Update index** — append/update row in directory `.index.md` and `.master-index.md`
-6. **Release lock** — close fd and remove `<dir>/.lock`
+6. **Update relations** — extract `related_references` from frontmatter, append to `.relations.jsonl` (O_APPEND)
+   - Run: `python3 append-relations.py <file_path> [--notebook <name>]`
+   - Enables immediate graph search discovery of new file's associations
+7. **Release lock** — close fd and remove `<dir>/.lock`
+8. **Git commit** — `cd $NB_WORKSPACES_LIBRARY && git add -A && git commit -m "library(<category>): <action> <topic>"`
+   - `<category>`: `reference` | `experience` | `type-profile` | `pattern`
+   - Example: `library(reference): add jwt-auth-v2`
 
 ## Per-Directory Lock Table
 

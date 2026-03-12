@@ -207,7 +207,6 @@ Every task module gets a `.type-profile.md`. This is the **authoritative** domai
   - post-plan: <0.0-1.0, or "default">
   - mid-exec: <0.0-1.0, or "default">
   - post-exec: <0.0-1.0, or "default">
-  - pre-merge: <0.0-1.0, or "default">
 - **Retry limits**:
   - post-plan: <int, or "default">
   - mid-exec: <int, or "default">

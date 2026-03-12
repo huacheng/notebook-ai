@@ -136,9 +136,8 @@ while [[ $# -gt 0 ]]; do
           echo "[maintain:quick] Updated .last-maintained"
           ;;
         audit)
-          echo "[maintain:audit] Running full library audit..."
-          # D3: Use resolved script path for recursive invocation (CWD may change)
-          bash "$SCRIPT_DIR/maintain.sh" --rebuild-index --rebuild-relations --compact --check-staleness
+          echo "[maintain:audit] Redirecting to --full..."
+          bash "$SCRIPT_DIR/maintain.sh" --full
           ;;
         *)
           echo "Unknown mode: $MODE" >&2
@@ -368,17 +367,23 @@ while [[ $# -gt 0 ]]; do
       shift ;;
 
     --all)
-      # D1: Run rebuild-index → rebuild-relations → compact → check-staleness in sequence
-      echo "[maintain:all] Running full maintenance pipeline..."
+      # Alias for --full (backward compatibility)
+      echo "[maintain:all] Redirecting to --full..."
+      bash "$SCRIPT_DIR/maintain.sh" --full
+      shift ;;
+
+    --full)
+      # Full maintenance: rebuild-index + rebuild-relations + compact + check-staleness + git commit
+      echo "[maintain:full] Running full maintenance pipeline..."
+
       # Sweep stale locks first
-      echo "[maintain:all] Sweeping stale locks..."
+      echo "[maintain:full] Sweeping stale locks..."
       while IFS= read -r lockfile; do
           [[ -z "$lockfile" ]] && continue
           if [[ -f "$lockfile" ]]; then
               lock_pid=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['pid'])" "$lockfile" 2>/dev/null || echo "")
               if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
-                  echo "[maintain:all] Recovering stale lock: $lockfile (pid $lock_pid dead)"
-                  # D2: Use rename-based recovery per write-protocol.md to avoid TOCTOU
+                  echo "[maintain:full] Recovering stale lock: $lockfile (pid $lock_pid dead)"
                   stale_name="${lockfile}.stale.$$"
                   if mv "$lockfile" "$stale_name" 2>/dev/null; then
                       rm -f "$stale_name"
@@ -386,8 +391,27 @@ while [[ $# -gt 0 ]]; do
               fi
           fi
       done < <(find "$LIB_PATH" -maxdepth 4 -name ".lock" 2>/dev/null)
-      # D3: Use resolved script path for recursive invocation (CWD may change)
+
+      # Run maintenance steps
       bash "$SCRIPT_DIR/maintain.sh" --rebuild-index --rebuild-relations --compact --check-staleness
+
+      # Git commit
+      echo "[maintain:full] Git commit..."
+      cd "$LIB_PATH" || { echo "[ERROR] Cannot cd to $LIB_PATH" >&2; exit 1; }
+      if [[ -d ".git" ]]; then
+          if git diff --quiet && git diff --cached --quiet; then
+              echo "[maintain:full] No changes to commit"
+          else
+              git add -A
+              if git commit -m "library(full): full maintenance $(date +%Y-%m-%d)"; then
+                  echo "[maintain:full] Committed successfully"
+              else
+                  echo "[WARN] git commit failed" >&2
+              fi
+          fi
+      else
+          echo "[WARN] No git repo in $LIB_PATH"
+      fi
       shift ;;
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -417,16 +441,17 @@ while [[ $# -gt 0 ]]; do
           ELAPSED_SINCE=$((NOW - LAST_RUN))
           if [[ "$ELAPSED_SINCE" -lt "$INTERVAL_SECONDS" ]]; then
               HOURS_AGO=$((ELAPSED_SINCE / 3600))
-              echo "[scheduled] Up to date — last run ${HOURS_AGO}h ago (interval: 24h). Skipping."
+              echo "[$(date '+%Y-%m-%d %H:%M:%S')] [scheduled] Up to date — last run ${HOURS_AGO}h ago (interval: 24h). Skipping."
               break
           fi
       fi
 
-      echo "=== Scheduled Maintenance ==="
+      echo ""
+      echo "=== Scheduled Maintenance [$(date '+%Y-%m-%d %H:%M:%S')] ==="
 
       # 1. Staleness check (references)
       echo ""
-      echo "--- [1/4] Staleness Check ---"
+      echo "--- [1/6] Staleness Check ---"
       REF_DIR="$LIB_PATH/.memory/.references"
       STALE_COUNT=0
       if [[ -d "$REF_DIR" ]]; then
@@ -449,7 +474,7 @@ while [[ $# -gt 0 ]]; do
 
       # 2. T3→T4 production validation for all active skills
       echo ""
-      echo "--- [2/4] T3→T4 Production Validation ---"
+      echo "--- [2/6] T3→T4 Production Validation ---"
       ACTIVE_DIR="$LIB_PATH/.skills/.active"
       T3_PROMOTED=0
       if [[ -d "$ACTIVE_DIR" ]]; then
@@ -473,7 +498,7 @@ while [[ $# -gt 0 ]]; do
 
       # 3. Security rules evolution check
       echo ""
-      echo "--- [3/4] Security Rules Evolution ---"
+      echo "--- [3/6] Security Rules Evolution ---"
       CORE_RULE_AUTO="$SCRIPT_DIR/core-rule-auto.sh"
       if [[ -f "$CORE_RULE_AUTO" ]]; then
           if ! bash "$CORE_RULE_AUTO" cron-job 2>&1; then
@@ -483,20 +508,57 @@ while [[ $# -gt 0 ]]; do
           echo "  core-rule-auto.sh not found, skipping"
       fi
 
-      # 4. Changelog size check
+      # 4. Changelog auto-compact (monthly)
       echo ""
-      echo "--- [4/4] Changelog Size Check ---"
-      CHANGELOG="$LIB_PATH/.changelog"
-      if [[ -f "$CHANGELOG" ]]; then
-          LINE_COUNT=$(wc -l < "$CHANGELOG")
-          echo "  Changelog: $LINE_COUNT lines"
-          if [[ "$LINE_COUNT" -gt 2000 ]]; then
-              echo "  [WARN] Exceeds 2000-line threshold — run: library maintain --compact"
-          else
-              echo "  Within threshold"
+      echo "--- [4/6] Changelog Auto-Compact ---"
+      COMPACT_TS_FILE="$LIB_PATH/.last-compact"
+      COMPACT_INTERVAL=$((30 * 24 * 3600))  # 30 days in seconds
+      NOW_EPOCH=$(date +%s)
+      LAST_COMPACT=0
+      if [[ -f "$COMPACT_TS_FILE" ]]; then
+          LAST_COMPACT=$(cat "$COMPACT_TS_FILE" 2>/dev/null || echo 0)
+      fi
+      COMPACT_AGE=$((NOW_EPOCH - LAST_COMPACT))
+      if [[ $COMPACT_AGE -ge $COMPACT_INTERVAL ]]; then
+          echo "  Running compact (last run: $((COMPACT_AGE / 86400)) days ago)..."
+          if bash "$SCRIPT_DIR/maintain.sh" --compact 2>&1 | sed 's/^/  /'; then
+              date +%s > "$COMPACT_TS_FILE"
           fi
       else
-          echo "  No changelog found"
+          DAYS_UNTIL=$((($COMPACT_INTERVAL - COMPACT_AGE) / 86400))
+          echo "  Compact up to date — next in ${DAYS_UNTIL} days"
+      fi
+
+      # 5. Rebuild index (daily)
+      echo ""
+      echo "--- [5/6] Rebuild Index ---"
+      if [[ -f "$REBUILD_INDEX_PY" ]]; then
+          if python3 "$REBUILD_INDEX_PY" 2>&1 | sed 's/^/  /'; then
+              echo "  Index rebuilt successfully"
+          else
+              echo "  [WARN] rebuild-index.py failed" >&2
+          fi
+      else
+          echo "  [WARN] rebuild-index.py not found at $REBUILD_INDEX_PY"
+      fi
+
+      # 6. Git commit (daily)
+      echo ""
+      echo "--- [6/6] Git Commit ---"
+      cd "$LIB_PATH" || { echo "  [ERROR] Cannot cd to $LIB_PATH" >&2; }
+      if [[ -d ".git" ]]; then
+          if git diff --quiet && git diff --cached --quiet; then
+              echo "  No changes to commit"
+          else
+              git add -A
+              if git commit -m "library(scheduled): daily maintenance $(date +%Y-%m-%d)" 2>&1 | sed 's/^/  /'; then
+                  echo "  Committed successfully"
+              else
+                  echo "  [WARN] git commit failed" >&2
+              fi
+          fi
+      else
+          echo "  [WARN] No git repo in $LIB_PATH"
       fi
 
       # Update timestamp

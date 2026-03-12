@@ -20,7 +20,7 @@ arguments:
     description: "Natural language description for context review (e.g., '审查上面讨论的方案')"
     required: false
   - name: checkpoint
-    description: "Evaluation checkpoint: post-plan, mid-exec, post-exec, pre-merge, skill-review, skill-deep-review, audit-validate"
+    description: "Evaluation checkpoint: post-plan, mid-exec, post-exec, skill-review, skill-deep-review, audit-validate"
     required: false
 ---
 
@@ -34,7 +34,7 @@ Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 
 - [Scope Definitions](#scope-definitions) — §S1 context, §S2 lifecycle, §S3 skill, §S4 rules
 - [Four-File Anchored Review](#four-file-anchored-review) — dimension-anchor mapping table
 - [Convergence Evaluation](#convergence-evaluation) — formula, scoring scale, anchor mechanism
-- [Checkpoints](#checkpoints-scopelifecycle) — post-plan, mid-exec, post-exec, pre-merge
+- [Checkpoints](#checkpoints-scopelifecycle) — post-plan, mid-exec, post-exec
 - [Execution Steps](#execution-steps) — scope routing + lifecycle steps 1-18
 - [State Transitions](#state-transitions) — status transition table
 - [Regression Test Applicability](#regression-test-applicability) — who fixes, who tests
@@ -268,7 +268,6 @@ Every lifecycle checkpoint outputs D1-D6 numeric scores (0.0 - 1.0). Scores are 
 | post-plan | 0.70 | 3 replans | Stop, notify user |
 | mid-exec | 0.60 | 2 fixes | Stop current step, notify user |
 | post-exec | 0.75 | 3 fix/replan | Stop, notify user |
-| pre-merge | 0.80 | No retry | Fall back to Phase 3 (retry_count reset to 0) |
 
 ## Adaptive Audit Round Budget
 
@@ -421,35 +420,17 @@ The convergence gate only fires after D1-D6 passes. See [Convergence Evaluation]
 
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
-| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Convergence score is persisted in the convergence analysis file for downstream consumption by `merge` | Status unchanged (`executing`), proceed to `merge` (auto routes via Result-Based Routing) |
+| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Convergence score is persisted in the convergence analysis file for downstream consumption by auto | Status unchanged (`executing`); auto handles: update `.target.md` (Stage [`ACTIVE`] → [`COMPLETE`]), update `.status.json` (status → `evolving`, push to `stage.history`), then → highlight → report → evolving 入口决策 |
 | **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with evaluation + `.bugfix/<date>-<summary>.md` per fix item (with regression test spec per §Regression Test Applicability) | Status unchanged |
 | **ROLLBACK** | Create `.analysis/<date>-convergence-rollback.md` with failure reason + convergence delta. Record failure experience to highlight archive. Check renders the verdict only — the caller (auto loop or user) executes the actual rollback (`git reset --hard`, trim `stage.history`, set `status → evolving`) | Status unchanged by check; caller transitions `executing` → `evolving` |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
 
-### 4. pre-merge
-
-Final quality gate before merge. Runs four-file anchored D1-D6 scoring with threshold 0.80.
-
-**Reads:** `.target.md` + `.convergence-baseline.md` (if exists) + `.plan.md` + `.summary.md` + `.analysis/` (post-exec ACCEPT file) + `.test/` (results) + code changes
-
-**Evaluation Criteria:**
-
-All six dimensions scored 0.0-1.0 using four-file anchored review (see above). Overall composite calculated with weighted formula.
-
-**Outcomes:**
-
-| Result | Action | Status Transition |
-|--------|--------|-------------------|
-| **PASS** (overall >= 0.80) | Create `.analysis/<date>-pre-merge.md` | Status unchanged, proceed → `merge` |
-| **NEEDS_FIX** (overall < 0.80) | Create `.analysis/<date>-pre-merge.md` with failing dimensions | Fall back to Phase 3: reset `retry_count` to 0, resume from failing dimension steps |
-
-No retry at pre-merge — failure means the deliverable needs more Phase 3 work on the specific failing dimensions.
 
 ## Output Files
 
 | File | When Created | Content |
 |------|-------------|---------|
-| `.analysis/<date>-<summary>.md` | post-plan, mid-exec (BLOCKED), post-exec, pre-merge | Feasibility analysis, blocking analysis, or issue list. One file per assessment, preserving evaluation history |
+| `.analysis/<date>-<summary>.md` | post-plan, mid-exec (BLOCKED), post-exec | Feasibility analysis, blocking analysis, or issue list. One file per assessment, preserving evaluation history |
 | `.bugfix/<date>-<summary>.md` | mid-exec (NEEDS_FIX, REPLAN), post-exec (NEEDS_FIX) | Issue analysis, root cause, fix approach, regression test spec. One file per issue |
 | `.test/<date>-<checkpoint>-results.md` | mid-exec, post-exec | Test outcomes for criteria verification. One file per checkpoint evaluation |
 
@@ -471,7 +452,6 @@ Before step 1, determine scope from invocation:
    - `post-plan`: requires status `planning` or `re-planning`
    - `mid-exec`: requires status `executing`
    - `post-exec`: requires status `executing`
-   - `pre-merge`: requires status `executing` (after post-exec ACCEPT)
 3. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `satisfied`, extended object → at-or-past `min_status`). If any dependency is not met, verdict is BLOCKED with dependency details
 4. **Read** `.type-profile.md` if exists — "Verification Standards", "Quality metrics", and "Audit Adaptation" sections are the **primary** source for evaluation criteria and domain-specific audit checkpoints (see `plan/references/type-profiling.md` for type system details). If check reveals the profile's standards are inadequate for this domain, update the relevant sections with findings
 5. **Read** all relevant files per checkpoint (use `.summary.md` as primary context, latest file only from each history directory)
@@ -491,7 +471,7 @@ Before step 1, determine scope from invocation:
       - 10i. Evaluate each R# against current deliverables using scoring scale (1.00/0.75/0.50/0.25/0.00)
       - 10j. Compute weighted convergence score: `Σ(wᵢ × cᵢ) / Σ(wᵢ)`
       - 10k. Determine previous convergence (from `stage.history` in `.status.json` or previous convergence.md). **First stage (empty history)**: use 0.0 as previous — first stage always passes the convergence gate since any progress > 0
-      - 10l. **If convergence > previous** → proceed to ACCEPT. Write `.analysis/<date>-convergence.md` with per-R# detail (merge reads this file to record commit hash + convergence score to `stage.history`)
+      - 10l. **If convergence > previous** → proceed to ACCEPT. Write `.analysis/<date>-convergence.md` with per-R# detail (auto reads this file to record commit hash + convergence score to `stage.history`)
       - 10m. **If convergence ≤ previous** → render ROLLBACK verdict:
         1. Write `.analysis/<date>-convergence-rollback.md` with failure reason, convergence delta, and failure experience
         2. Record failure experience to highlight archive (scope=impl pattern)
@@ -513,14 +493,12 @@ Before step 1, determine scope from invocation:
 18. **Report** evaluation result with detailed reasoning. Then output next step prompt based on verdict:
     - PASS (post-plan) → "Plan approved. Ready to execute — say 'auto' to start the automatic execution loop, or `/task-ai:exec` to execute manually step by step."
     - NEEDS_REVISION (post-plan) → "Plan needs revision. Next: `/task-ai:plan` to revise based on the feedback above."
-    - ACCEPT (post-exec) → "Implementation accepted. Next: `/task-ai:merge` to merge the task branch."
+    - ACCEPT (post-exec) → "Implementation accepted. Auto mode will update .target.md and .status.json, then proceed to highlight → report → evolving decision."
     - NEEDS_FIX (mid/post-exec) → "Issues found. Next: `/task-ai:exec` to apply fixes based on the findings above."
     - ROLLBACK (post-exec) → "Convergence regressed — deliverables rolled back to previous stage endpoint. Next: `/task-ai:exec` to retry with a different approach. Refer to `.analysis/<date>-convergence-rollback.md` for failure analysis."
     - REPLAN → "Fundamental issues found. Next: `/task-ai:plan` to re-plan based on the feedback above."
     - CONTINUE (mid-exec) → "Progress OK. Next: `/task-ai:exec` to continue implementation."
     - BLOCKED → "Task blocked. Manual intervention required."
-    - PASS (pre-merge) → "Pre-merge check passed. Next: `/task-ai:merge` to merge."
-    - NEEDS_FIX (pre-merge) → "Pre-merge issues found. Next: `/task-ai:exec` to fix before merge."
 
 ## State Transitions
 
@@ -540,8 +518,6 @@ Before step 1, determine scope from invocation:
 | `executing` | `executing` | post-exec NEEDS_FIX |
 | `executing` | `evolving` | post-exec ROLLBACK |
 | `executing` | `re-planning` | post-exec REPLAN |
-| `executing` | `executing` | pre-merge PASS (→ merge) |
-| `executing` | `executing` | pre-merge NEEDS_FIX (→ Phase 3 retry) |
 
 ## Git
 
@@ -556,8 +532,6 @@ Before step 1, determine scope from invocation:
 | NEEDS_FIX (post-exec) | `task-ai(<notebook>):check post-exec NEEDS_FIX` |
 | ROLLBACK | `task-ai(<notebook>):check post-exec ROLLBACK` |
 | CONTINUE | `task-ai(<notebook>):check mid-exec CONTINUE` |
-| PASS (pre-merge) | `task-ai(<notebook>):check pre-merge PASS → merge` |
-| NEEDS_FIX (pre-merge) | `task-ai(<notebook>):check pre-merge NEEDS_FIX → Phase 3` |
 
 All outcomes commit their output files and state updates, regardless of whether status changes.
 
@@ -591,7 +565,6 @@ The Regression Test Protocol (step 10a-10f) triggers based on **who applies the 
 | **lifecycle** (post-plan) | Verdict only | plan (on NEEDS_REVISION) | No (check) / **Yes (plan)** | check renders verdict; plan applies fix with its own RED→GREEN |
 | **lifecycle** (mid-exec, post-exec) | Verdict only | exec (on NEEDS_FIX) | No (check) / **Yes (exec)** | check writes `.bugfix/` with test spec; exec executes RED→GREEN |
 | **lifecycle** (any) | L3 deep audit-and-fix | check itself | **Yes** | L3 audit directly modifies files → steps 7-9 mandatory |
-| **lifecycle** (pre-merge) | Verdict only | exec (on NEEDS_FIX) | No (check) / **Yes (exec)** | check identifies failing dimensions; exec fixes with RED→GREEN |
 | **skill** (skill-review) | Evaluate + promote | nobody (score only) | **No** | check evaluates and optionally moves files; no code/spec fix |
 | **skill** (skill-deep-review) | Evaluate + promote | nobody (score only) | **No** | same as skill-review |
 | **rules** (audit-validate) | Evaluate + move | nobody (move only) | **No** | check moves candidate files between directories; no content fix |
