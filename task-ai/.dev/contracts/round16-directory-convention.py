@@ -15,11 +15,11 @@ else:
     print("FAIL F47: .deliverables/ missing from notebook section in directory tree")
     FAIL += 1
 
-# F48: directory-convention.md must explain the merge path mapping
-if "<notebook>/.deliverables" in conv and "merge" in conv.lower():
+# F48: directory-convention.md must explain the merge path mapping (all notebooks share <project>/.deliverables/)
+if "<notebook>/.deliverables" in conv and "<project>/.deliverables" in conv and "merge" in conv.lower():
     print("PASS F48: merge path mapping documented")
 else:
-    print("FAIL F48: merge path mapping (<notebook>/.deliverables → .deliverables/<notebook>) not documented")
+    print("FAIL F48: merge path mapping (<notebook>/.deliverables → <project>/.deliverables) not documented")
     FAIL += 1
 
 print(f"\n{'ALL PASSED' if FAIL == 0 else f'{FAIL} FAILED'}")

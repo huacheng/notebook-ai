@@ -94,17 +94,17 @@ FORMAT=${FORMAT:-full}
 
 # D1: Resolve deliverables directory (report goes to project deliverables, not .working/)
 if [[ -n "${NB_PROJECT_DELIVERABLES:-}" ]]; then
-    DELIVERABLES_DIR="$NB_PROJECT_DELIVERABLES/$NOTEBOOK"
+    DELIVERABLES_DIR="$NB_PROJECT_DELIVERABLES"
 else
     NB_DIR="$(dirname "$TASKAI_WORK_DIR")"
-    PROJECT_DIR="$(dirname "$NB_DIR")"
-    DELIVERABLES_DIR="$PROJECT_DIR/.deliverables/$NOTEBOOK"
+    PROJECT_DIR="$(dirname "$(dirname "$NB_DIR")")"
+    DELIVERABLES_DIR="$PROJECT_DIR/.deliverables"
 fi
 if ! mkdir -p "$DELIVERABLES_DIR" 2>/dev/null; then
     echo "[ERROR] Failed to create deliverables directory: $DELIVERABLES_DIR" >&2
     exit 1
 fi
-REPORT_FILE="$DELIVERABLES_DIR/.report.md"
+REPORT_FILE="$DELIVERABLES_DIR/.report-$NOTEBOOK.md"
 
 # --- Helper: read file content or fallback (D3: cat with error suppression, returns fallback on failure) ---
 read_file_or() { cat "$1" 2>/dev/null || echo "${2:-N/A}"; }
