@@ -77,9 +77,13 @@ export async function listWorkspaceFiles(
     }
   }
 
-  // Directories first, then alphabetical.
+  // Directories first, then .notebook.json first among files, then alphabetical.
   results.sort((a, b) => {
     if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+    // Among files, .notebook.json comes first
+    const aIsNotebook = a.name.endsWith('.notebook.json');
+    const bIsNotebook = b.name.endsWith('.notebook.json');
+    if (aIsNotebook !== bIsNotebook) return aIsNotebook ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
 
