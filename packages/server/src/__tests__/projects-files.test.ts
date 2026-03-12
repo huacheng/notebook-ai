@@ -528,7 +528,8 @@ describe('POST /import — import project from tar.gz', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('id');
-    expect(res.body).toHaveProperty('title', 'Exported Project');
+    // Title derived from filename (project.tar.gz → project)
+    expect(res.body).toHaveProperty('title', 'project');
     expect(res.body).toHaveProperty('slug');
     expect(created.length).toBe(1);
   });

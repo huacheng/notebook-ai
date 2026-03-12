@@ -82,11 +82,6 @@ export function createProjectsRouter(
       await mkdir(path.join(projectPath, '.deliverables'), { recursive: true });
       await mkdir(path.join(projectPath, '.worktrees'), { recursive: true });
 
-      // Write project .status.json
-      await writeFile(path.join(projectPath, '.status.json'), JSON.stringify({
-        id, title, status: 'active', created_at: now, updated_at: now,
-      }, null, 2));
-
       // Create project-level .gitignore
       await ensureLibrarySkeleton(workspacesRoot, projectPath);
 
@@ -685,19 +680,9 @@ export function createProjectsRouter(
       }
       await execFileAsync('tar', ['xzf', file.path, '-C', tmpExtract]);
 
-      // Read .status.json for title (fallback to filename)
-      let title = '';
-      const statusPath = path.join(tmpExtract, '.status.json');
-      try {
-        const statusData = JSON.parse(await readFile(statusPath, 'utf-8'));
-        title = statusData.title || '';
-      } catch (_err: unknown) { /* no .status.json or invalid */ }
-
-      if (!title) {
-        // Derive title from uploaded filename: "my-project.tar.gz" → "my-project"
-        const orig = file.originalname || 'imported-project';
-        title = orig.replace(/\.(tar\.gz|tgz)$/i, '');
-      }
+      // Derive title from uploaded filename: "my-project.tar.gz" → "my-project"
+      const orig = file.originalname || 'imported-project';
+      const title = orig.replace(/\.(tar\.gz|tgz)$/i, '');
 
       // Create new project
       const slug = titleToSlug(title);
@@ -716,11 +701,6 @@ export function createProjectsRouter(
         '-a', '--exclude', '.git', '--exclude', '.worktrees',
         tmpExtract + '/', projectPath + '/',
       ]);
-
-      // Rewrite .status.json with new id and timestamps
-      await writeFile(path.join(projectPath, '.status.json'), JSON.stringify({
-        id, title, status: 'active', created_at: now, updated_at: now,
-      }, null, 2));
 
       // Ensure .deliverables directory exists
       await mkdir(path.join(projectPath, '.deliverables'), { recursive: true });
