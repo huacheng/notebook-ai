@@ -16,7 +16,7 @@ triggers:
     User wants a formal task REPORT → report. User wants to refresh .summary.md → summarize.
 arguments:
   - name: description
-    description: "Natural language description for ad-hoc experience capture (e.g., '总结下上面成功的操作经验')"
+    description: "Natural language description for ad-hoc experience capture (e.g., 'summarize the successful practices above')"
     required: false
 ---
 
@@ -69,29 +69,29 @@ Unified protocol for experience and thinking library writes. Defines 7 scopes co
 
 Experience files use **semantic names** (`<semantic>`) that describe the **knowledge domain**, not the source notebook instance. This enables cross-notebook knowledge accumulation: multiple notebooks contributing to the same domain append to the same experience file.
 
-### 语义名称确定（三级匹配）
+### Semantic Name Resolution (Three-Level Matching)
 
-写入经验文件时，通过以下流程确定文件名：
+When writing to an experience file, determine the filename through the following process:
 
-1. LLM 从经验内容提取核心知识领域关键词，组合为 kebab-case 名称
-2. **精确匹配**：检查 `.experiences/<type>/` 下是否有同名文件 → 命中则追加（O_APPEND）
-3. **索引匹配**：读取 `.experiences/<type>/.naming-index.md`，查找 semantic_name 或 aliases 列是否有语义等价条目 → 命中则使用规范名称追加
-4. **无匹配** → 新建文件，同时追加条目到 `.naming-index.md`（含 LLM 预生成的 2-3 个 alias）
+1. LLM extracts core knowledge domain keywords from the experience content, combining them into a kebab-case name
+2. **Exact match**: Check if a file with the same name exists under `.experiences/<type>/` → if found, append (O_APPEND)
+3. **Index match**: Read `.experiences/<type>/.naming-index.md`, search for semantically equivalent entries in semantic_name or aliases columns → if found, use the canonical name and append
+4. **No match** → Create new file, and append an entry to `.naming-index.md` (with 2-3 LLM-generated aliases)
 
-名称应描述**知识领域**而非任务实例：
-- 好: jwt-sliding-window-auth, react-virtual-scroll, sqlite-wal-concurrency
-- 坏: proj-a-auth, ticket-1234-fix, sprint-3-task
+Names should describe the **knowledge domain**, not task instances:
+- Good: jwt-sliding-window-auth, react-virtual-scroll, sqlite-wal-concurrency
+- Bad: proj-a-auth, ticket-1234-fix, sprint-3-task
 
-### .naming-index.md 维护
+### .naming-index.md Maintenance
 
-每次写入经验后，更新 `.experiences/<type>/.naming-index.md`：
+After each experience write, update `.experiences/<type>/.naming-index.md`:
 
 | semantic_name | aliases | file |
 |---------------|---------|------|
 | <name> | <alias1>, <alias2> | <name>-impl.md |
 
-- 新建文件时追加条目（含 LLM 预生成的 2-3 个 alias）
-- 索引用于后续写入的确定性匹配，避免同一知识领域被分散到多个文件
+- Append entry when creating new files (with 2-3 LLM-generated aliases)
+- Index enables deterministic matching for subsequent writes, preventing the same knowledge domain from being scattered across multiple files
 
 ---
 
@@ -488,9 +488,9 @@ Steps:
 ```
 
 Examples:
-- `/task-ai:highlight "总结下上面成功的操作经验"`
-- `/task-ai:highlight "这次调试 WebSocket 连接的方法很有效，记录下来"`
-- `/task-ai:highlight "记录这次 CSS 布局问题的解决思路"`
+- `/task-ai:highlight "summarize the successful practices above"`
+- `/task-ai:highlight "the WebSocket debugging method worked well, save it"`
+- `/task-ai:highlight "record the approach to solving this CSS layout issue"`
 
 #### Execution Protocol
 

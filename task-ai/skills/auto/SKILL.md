@@ -105,17 +105,17 @@ check evaluates deliverables against `.target.md`, `.convergence-baseline.md`, a
 
 ```
 Phase 1: Overall Objective (status=draft) — Human in the loop
-  1. 对话式 refine：引导用户定义 Overall Objective
-     - .target.md 显示 `## Overall Objective [DRAFT]`（目标还在讨论中）
-  2. Research（LLM 自决）：
-     - 目标清晰、领域熟悉 → 跳过 research
-     - 目标模糊或领域陌生 → 自动完成 research 全流程（O1→O2→O3 一次性完成），呈现结果
-     - 用户可主动要求 research
-  3. 用户确认后：
-     - 更新 .target.md：`[DRAFT]` → `[PENDING]`（目标已确定，等待执行）
-     - 生成 .convergence-baseline.md
-  4. 自动生成 Stage 1 目标：
-     - .target.md：`[PENDING]` 移除，添加 `## Stage 1: <name> [ACTIVE]`
+  1. Conversational refine: guide user to define Overall Objective
+     - .target.md shows `## Overall Objective [DRAFT]` (objective still under discussion)
+  2. Research (LLM decides):
+     - Objective clear, domain familiar → skip research
+     - Objective vague or domain unfamiliar → auto-complete research full flow (O1→O2→O3 in one pass), present results
+     - User can explicitly request research
+  3. After user confirmation:
+     - Update .target.md: `[DRAFT]` → `[PENDING]` (objective confirmed, awaiting execution)
+     - Generate .convergence-baseline.md
+  4. Auto-generate Stage 1 target:
+     - .target.md: remove `[PENDING]`, add `## Stage 1: <name> [ACTIVE]`
      - status → planning
 
 Phase 2: Planning (status=planning) — Full auto + user can intervene
@@ -135,7 +135,7 @@ Phase 3: Execution (status=executing) — Full auto + user can intervene
   - Exceeds retry limit → stop, notify user
   - User can intervene: "what does this error mean?" → explain + fix, continue
 
-Phase 4: Acceptance + 自动推进 (status=executing→evolving) — Full auto
+Phase 4: Acceptance + Auto Advance (status=executing→evolving) — Full auto
   - Step 1: check(post-exec, D1-D6, threshold=0.75)
     ├─ ACCEPT → Step 2 (convergence gate)
     ├─ NEEDS_FIX → exec(fix) → re-check (max 3)
@@ -144,32 +144,32 @@ Phase 4: Acceptance + 自动推进 (status=executing→evolving) — Full auto
   - Step 2: Convergence gate (within check)
     - check evaluates convergence score vs previous baseline
     ├─ convergence > previous → ACCEPT
-    │   auto sets status → evolving → highlight → report → evolving 入口决策
+    │   auto sets status → evolving → highlight → report → evolving entry decision
     └─ convergence ≤ previous → ROLLBACK
 
   No merge. No pre-merge check.
 
-  ### evolving 入口决策
+  ### Evolving Entry Decision
 
-  1. 读取最新 convergence score（从 `.analysis/*-convergence.md`）
-  2. **convergence ≥ 0.95**:
-     - 报告："convergence {score}，目标基本达成。如满意: /task-ai:target --satisfy；如需继续: 告诉我还需要什么"
-     - 等用户响应（不自动推进）
+  1. Read latest convergence score (from `.analysis/*-convergence.md`)
+  2. **convergence >= 0.95**:
+     - Report: "convergence {score}, objective largely achieved. If satisfied: /task-ai:target --satisfy; If more needed: tell me what else you need"
+     - Wait for user response (no auto-advance)
   3. **convergence < 0.95**:
-     - 自动生成下一子阶段目标：
-       a. 收集输入：未满足 R#（cᵢ < 1.0）、覆盖度趋势、已完成成果、失败排除清单、交付物状态
-       b. LLM 推理：聚类 R#、选择子集（优先 critical + 低覆盖度）、对照排除清单、粒度控制
-       c. 调用 target 写入新 Stage → .target.md
-       d. 自动进入 Phase 2 (Planning)
+     - Auto-generate next sub-stage target:
+       a. Collect inputs: unmet R# (ci < 1.0), coverage trends, completed deliverables, failed exclusion list, deliverable status
+       b. LLM reasoning: cluster R#, select subset (prioritize critical + low coverage), cross-check exclusion list, granularity control
+       c. Invoke target to write new Stage → .target.md
+       d. Auto-enter Phase 2 (Planning)
 
-  ### satisfied 重入
+  ### Satisfied Re-entry
 
-  用户在 satisfied 状态发起 refine（"还需要 X"）：
+  User initiates refine in satisfied state ("I also need X"):
   1. status: satisfied → evolving
-  2. 更新 .target.md Overall Objective
-  3. 更新 .convergence-baseline.md（新增/修改 R#）
-  4. convergence 因新 R# 下降
-  5. 自动生成下一子阶段目标 → planning → Phase 2
+  2. Update .target.md Overall Objective
+  3. Update .convergence-baseline.md (add/modify R#)
+  4. convergence drops due to new R#
+  5. Auto-generate next sub-stage target → planning → Phase 2
 ```
 
 ## Dialog Behavior
@@ -184,8 +184,8 @@ Phase 1 (Overall Objective) — waits for user confirmation (only users can vali
 |-----------|------------|
 | "I need WebSocket auth with token refresh" | Write/update .target.md |
 | "Also needs backward compatibility" | Append requirement to .target.md |
-| "Help me research this area" | 执行 research 全流程（O1→O2→O3 一次性完成），呈现结果 |
-| "OK looks good" / "Confirmed" | 写入 .target.md + .convergence-baseline.md → 自动生成 Stage 1 目标 → Phase 2 |
+| "Help me research this area" | Execute research full flow (O1→O2→O3 in one pass), present results |
+| "OK looks good" / "Confirmed" | Write .target.md + .convergence-baseline.md → auto-generate Stage 1 target → Phase 2 |
 | Silence | **Do not advance** — wait for user confirmation |
 
 Phases 2-4 — full auto, user can intervene:
@@ -214,18 +214,18 @@ User messages arriving during auto execution are semantically classified:
 
 | User says | Category | auto behavior |
 |-----------|----------|---------------|
-| "增加 OAuth 支持" | refinement | Write to buffer → confirm → continue |
-| "这个错误什么意思？" | question | Answer → continue |
-| "跳过步骤 3" | directive | Adjust → continue |
-| "继续" | continue | Continue |
+| "Add OAuth support" | refinement | Write to buffer → confirm → continue |
+| "What does this error mean?" | question | Answer → continue |
+| "Skip step 3" | directive | Adjust → continue |
+| "Continue" | continue | Continue |
 
 ### Buffer File
 
 Path: `.working/.pending-refinements.md` (git tracked)
 
 ```markdown
-- [2026-03-08 14:05] 增加 OAuth Google 登录支持
-- [2026-03-08 14:12] 登录失败限流从5次改为10次
+- [2026-03-08 14:05] Add OAuth Google login support
+- [2026-03-08 14:12] Change login failure rate limit from 5 to 10 attempts
 ```
 
 Each write is committed: `git add .working/.pending-refinements.md && git commit -m "auto: buffer refinement"`.
@@ -265,7 +265,7 @@ if .pending-refinements.md exists and non-empty:
 ### Confirm/Withdraw
 
 User can withdraw a buffered refinement before it is processed:
-- "取消刚才的 OAuth 需求" → remove matching entry from buffer, confirm removal
+- "Cancel the OAuth requirement I just mentioned" → remove matching entry from buffer, confirm removal
 - Already processed (buffer cleared at checkpoint) → inform user it was already applied
 
 ## Architecture
@@ -429,8 +429,8 @@ Reasons: `"timeout"`, `"max_iterations"`, `"user_stop"`, `"stall_limit"`, `"reas
 AUTO LOOP (4 phases — all within single Claude session)
 
 Phase 1: Overall Objective (human-in-loop)
-  对话式 refine → LLM 自决 research（跳过 / O1→O2→O3 一次性完成）
-  确认后写入 .target.md + .convergence-baseline.md → 自动生成 Stage 1 目标 → [Phase 2]
+  Conversational refine → LLM decides research (skip / O1→O2→O3 in one pass)
+  After confirmation write .target.md + .convergence-baseline.md → auto-generate Stage 1 target → [Phase 2]
 
 Phase 2: Planning (auto-review)
   plan ──→ verify ──→ check(post-plan, threshold=0.70) ─── PASS ──→ [Phase 3]
@@ -448,20 +448,20 @@ Phase 3: Execution (auto-review)
                                          │
                                     NEEDS_FIX / REPLAN (max 3)
 
-Phase 4: Acceptance + 自動推進 (auto)
+Phase 4: Acceptance + Auto Advance (auto)
   check(post-exec, D1-D6, threshold=0.75) ─── ACCEPT ──→ convergence gate
             │                                                │
             NEEDS_FIX ──→ exec(fix) → re-check (max 3)     ├─ convergence > previous ──→ ACCEPT
-            │                                                │   status → evolving → highlight → report → evolving 入口決策
+            │                                                │   status → evolving → highlight → report → evolving entry decision
             Max exceeded ──→ rollback → re-planning         │
                                                              └─ convergence ≤ previous ──→ ROLLBACK
-                                                                 highlight 记录失败 → 排除清单 → 重新生成子阶段目标 → Phase 2
-                                                                 （所有方向穷尽 → 停下报告用户）
+                                                                 highlight records failure → exclusion list → regenerate sub-stage target → Phase 2
+                                                                 (all directions exhausted → stop and report to user)
 
   Entry on evolving:
-    convergence ≥ 0.95 → 报告 + 等用户（--satisfy 或 refine）
-    convergence < 0.95 → 自动生成下一子阶段目标 → planning → Phase 2
-  Entry on satisfied: 报告完成状态；用户 refine → evolving → 自动生成子阶段 → planning
+    convergence >= 0.95 → report + wait for user (--satisfy or refine)
+    convergence < 0.95 → auto-generate next sub-stage target → planning → Phase 2
+  Entry on satisfied: report completion status; user refine → evolving → auto-generate sub-stage → planning
 
 Terminal: BLOCKED at any check → (stop, status → blocked)
 ```
@@ -502,15 +502,15 @@ The auto skill runs this loop within a single Claude session:
 
 | Current Status | First Step |
 |----------------|-----------|
-| `draft` | Phase 1（对话式定义 Overall Objective）— 引导用户定义目标，LLM 自决是否 research，确认后写入 .target.md + .convergence-baseline.md，自动生成 Stage 1 目标 → planning |
-| `planning` | Phase 2（plan → check）— Execute plan → verify → check (post-plan) |
-| `re-planning` | Phase 2（plan → check，带 check 反馈）— Read `phase` field: if `needs-plan` → execute plan; if `needs-check` → execute verify → check (post-plan); if empty → default to plan |
-| `review` | Phase 3（post-plan 已通过，exec）— Execute exec |
-| `executing` | Phase 3（exec → check）— Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX |
-| `evolving` | Phase 4（convergence < 0.95 自动推进 / ≥ 0.95 等用户）— 读取 convergence score，< 0.95 自动生成下一子阶段目标 → planning；≥ 0.95 报告并等用户响应 |
-| `satisfied` | 报告完成状态，用户可 refine → evolving → 自动生成子阶段 → planning |
-| `blocked` | 报告阻塞原因，等用户干预 |
-| `cancelled` | 报告任务已取消（终态）|
+| `draft` | Phase 1 (conversational Overall Objective definition) — guide user to define objective, LLM decides whether to research, after confirmation write .target.md + .convergence-baseline.md, auto-generate Stage 1 target → planning |
+| `planning` | Phase 2 (plan → check) — Execute plan → verify → check (post-plan) |
+| `re-planning` | Phase 2 (plan → check, with check feedback) — Read `phase` field: if `needs-plan` → execute plan; if `needs-check` → execute verify → check (post-plan); if empty → default to plan |
+| `review` | Phase 3 (post-plan passed, exec) — Execute exec |
+| `executing` | Phase 3 (exec → check) — Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX |
+| `evolving` | Phase 4 (convergence < 0.95 auto-advance / >= 0.95 wait for user) — read convergence score, < 0.95 auto-generate next sub-stage target → planning; >= 0.95 report and wait for user response |
+| `satisfied` | Report completion status, user can refine → evolving → auto-generate sub-stage → planning |
+| `blocked` | Report blocking reason, wait for user intervention |
+| `cancelled` | Report task cancelled (terminal state) |
 
 ### Result-Based Routing
 
@@ -536,27 +536,27 @@ The auto skill runs this loop within a single Claude session:
 | highlight | failed | report | — | Distillation failed (non-blocking) |
 | research | (collected) | `<caller>` | post-research | References collected, resume calling phase |
 | research | (sufficient) | `<caller>` | post-research | References sufficient |
-| research | (objective-complete) | `<caller>` | post-research | O1→O2→O3 一次性完成，呈现结果，resume calling phase |
+| research | (objective-complete) | `<caller>` | post-research | O1→O2→O3 completed in one pass, present results, resume calling phase |
 | verify | (pass) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (fail) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (partial) | check | (from trigger context) | Verification done, check renders verdict |
 | annotate | (processed) | `<by-layer>` | post-annotate | Layer-based: Requirement→plan/check, Planning→check, Eval-analysis→check, Eval-test→verify, Methodology→verify, Information/Comment-only→(none) |
 | report | (generated) | (evolving-entry) | — | Phase 4 complete → re-enter evolving decision (convergence < 0.95 → target; ≥ 0.95 → stop and wait) |
 
-### evolving 入口决策（内部步骤）
+### Evolving Entry Decision (Internal Step)
 
-`(evolving-entry)` 是 auto 循环内部步骤，不是子命令。执行 Phase 4 "evolving 入口决策"（见上方 §Phase 4）：
-- 读取 convergence score
-- ≥ 0.95 → `(stop)` 等用户
-- < 0.95 → 调用 target（stage advance）→ result `(stage-advanced)` → plan → Phase 2 继续循环
+`(evolving-entry)` is an internal step in the auto loop, not a sub-command. Executes Phase 4 "evolving entry decision" (see §Phase 4 above):
+- Read convergence score
+- >= 0.95 → `(stop)` wait for user
+- < 0.95 → invoke target (stage advance) → result `(stage-advanced)` → plan → Phase 2 continues loop
 
-### ROLLBACK 后重新生成
+### Post-ROLLBACK Regeneration
 
-1. highlight 记录失败经验到 `.experiences/<type>/<semantic>-failed.md`
-2. 从所有 `*-failed.md` 按 frontmatter `sources.notebook` 过滤当前任务排除清单
-3. 重新生成子阶段目标（排除清单作为硬约束注入 prompt）
-4. 如所有方向穷尽 → 停下报告用户
-5. 否则 → 新子阶段目标 → Phase 2
+1. highlight records failure experience to `.experiences/<type>/<semantic>-failed.md`
+2. From all `*-failed.md` files, filter current task exclusion list by frontmatter `sources.notebook`
+3. Regenerate sub-stage target (exclusion list injected as hard constraint in prompt)
+4. If all directions exhausted → stop and report to user
+5. Otherwise → new sub-stage target → Phase 2
 
 > **Safety**: git reset --hard only affects the task branch, not master. The previous stage commit is always available in stage.history (for stage 2+). Stage 1 ROLLBACK is blocked — falls back to NEEDS_FIX.
 

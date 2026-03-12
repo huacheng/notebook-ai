@@ -22,10 +22,10 @@ Single entry point for task lifecycle management in the `$NB_WORKSPACES_ROOT/` d
 ```
 init → target → research(target) → plan → research(test) → verify → check → exec → merge → report
             ↑                ↑         ↑              ↑       ↑       ↑
-            └──────────────── research 可在任意阶段独立调用 ─────────────────────┘
+            └──────────────── research can be invoked independently at any phase ───────────────┘
 ```
 
-辅助命令（随时可用）: `highlight` · `read` · `security` · `auto` · `cancel` · `list` · `annotate` · `summarize` · `library`
+Auxiliary commands (available anytime): `highlight` · `read` · `security` · `auto` · `cancel` · `list` · `annotate` · `summarize` · `library`
 
 > **research** acts as the **intelligence officer** — the only sub-command callable at every phase independently. See [research standalone invocation examples](#research--intelligence-collection-) below.
 
@@ -33,14 +33,14 @@ init → target → research(target) → plan → research(test) → verify → 
 
 ## Shared Context
 
-### 环境变量
+### Environment Variables
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `NB_WORKSPACES_ROOT` | `/home/user/nb-workspaces` | 工作区根目录，存放所有 notebook 和全局索引 |
-| `NB_WORKSPACES_LIBRARY` | `$NB_WORKSPACES_ROOT/.library` | 共享图书馆目录，存放跨任务知识资产 |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NB_WORKSPACES_ROOT` | `/home/user/nb-workspaces` | Workspace root directory, stores all notebooks and global indexes |
+| `NB_WORKSPACES_LIBRARY` | `$NB_WORKSPACES_ROOT/.library` | Shared library directory, stores cross-task knowledge assets |
 
-所有子命令在解析路径时，优先读取这两个环境变量。若未设置，使用默认值。
+All sub-commands read these two environment variables first when resolving paths. If not set, default values are used.
 
 ### Directory Convention
 
@@ -250,36 +250,36 @@ Sub-commands have different cognitive demands. Each SKILL.md frontmatter declare
 
 > Each sub-command's core logic is in `skills/<name>/SKILL.md`. Reference material is in `skills/<name>/references/` and loaded on demand.
 
-### 生命周期命令（按阶段顺序）
+### Lifecycle Commands (in phase order)
 
-| 命令 | 角色 | 说明 |
-|------|------|------|
-| `init` | 初始化 | 创建任务模块、分支、目标模板 |
-| `target` | 目标定义 | 定义/评审任务目标与需求 (`.target.md`) |
-| `research` ★ | **情报收集** | 全阶段情报官，独立可调（见下方专节） |
-| `plan` | 规划 | 生成实施计划 |
-| `verify` | 验证 | 执行测试，产出结果文件 |
-| `check` | 评估 | 六视角审计，渲染裁决 |
-| `exec` | 执行 | 逐步实施计划 |
-| `merge` | 合并 | 任务分支合并到主干 |
-| `report` | 报告 | 生成完成报告，提炼经验 |
+| Command | Role | Description |
+|---------|------|-------------|
+| `init` | Initialize | Create task module, branch, target template |
+| `target` | Target Definition | Define/review task objective and requirements (`.target.md`) |
+| `research` ★ | **Intelligence Collection** | Cross-phase intelligence officer, independently callable (see section below) |
+| `plan` | Planning | Generate implementation plan |
+| `verify` | Verification | Execute tests, produce result files |
+| `check` | Assessment | Six-perspective audit, render verdict |
+| `exec` | Execution | Implement plan step by step |
+| `merge` | Merge | Merge task branch to main |
+| `report` | Report | Generate completion report, distill lessons |
 
-### 自动化命令
+### Automation Commands
 
-| 命令 | 说明 |
-|------|------|
-| `auto` | 单会话自主执行完整生命周期 |
+| Command | Description |
+|---------|-------------|
+| `auto` | Single-session autonomous execution of full lifecycle |
 
-### 管理命令
+### Management Commands
 
-| 命令 | 说明 |
-|------|------|
-| `highlight` | 经验蒸馏引擎（综合蒸馏、对话经验捕获） |
-| `cancel` | 取消任务 |
-| `list` | 查询任务状态与依赖 |
-| `annotate` | 处理 Plan 面板批注 |
-| `summarize` | 重建 .summary.md 上下文摘要 |
-| `library` | 知识库管理（search / list / status / maintain） |
+| Command | Description |
+|---------|-------------|
+| `highlight` | Experience distillation engine (synthesis distillation, conversation experience capture) |
+| `cancel` | Cancel task |
+| `list` | Query task status and dependencies |
+| `annotate` | Process Plan panel annotations |
+| `summarize` | Rebuild .summary.md context summary |
+| `library` | Knowledge base management (search / list / status / maintain) |
 
 ### research — Intelligence Collection ★
 

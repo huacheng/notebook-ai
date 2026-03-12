@@ -17,7 +17,7 @@ triggers:
     User asks to RUN tests → verify. User asks to SEE task status → list.
 arguments:
   - name: description
-    description: "Natural language description for context review (e.g., '审查上面讨论的方案')"
+    description: "Natural language description for context review (e.g., 'review the solution discussed above')"
     required: false
   - name: checkpoint
     description: "Evaluation checkpoint: post-plan, mid-exec, post-exec, skill-review, skill-deep-review, audit-validate"
@@ -53,7 +53,7 @@ Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 
 
 **Parameter routing:**
 - No arguments → scope=context (review current conversation's plan/solution)
-- `check "<description>"` → scope=context with focus (e.g., "审查上面的修复方案")
+- `check "<description>"` -> scope=context with focus (e.g., "review the fix approach above")
 - `check --checkpoint post-plan` → scope=lifecycle (task lifecycle checkpoint)
 - `check --checkpoint skill-review --target <file>` → scope=skill (skill validation)
 - `check --checkpoint audit-validate` → scope=rules (rule candidate validation)
@@ -151,7 +151,7 @@ scope=context has two output modes, depending on whether check proceeds to fix i
 
 **Mode 2: Audit-and-fix** — check identifies issues AND proceeds to apply fixes directly:
 
-Mode 2 is entered when the user's invocation implies fixing (e.g., "审查与修复", "audit and fix", "review and fix"), or when the user explicitly confirms to proceed with fixes after seeing Mode 1 output. When in Mode 2, each fix that modifies code/spec/config files follows the RED→GREEN protocol (applying untested fixes risks false-green scenarios that propagate to downstream execution):
+Mode 2 is entered when the user's invocation implies fixing (e.g., "review and fix", "audit and fix"), or when the user explicitly confirms to proceed with fixes after seeing Mode 1 output. When in Mode 2, each fix that modifies code/spec/config files follows the RED→GREEN protocol (applying untested fixes risks false-green scenarios that propagate to downstream execution):
 
 1. **Classify** finding → (fix category, task type) → select test approach from `commands/references/test-strategy-by-type.md` Strategy Matrix
 2. **Write** the regression test (RED) — it should fail against current codebase (confirming the bug exists before fixing prevents false-green scenarios)
@@ -188,7 +188,7 @@ Verdict: NEEDS_REVISION
 #### Example (audit-and-fix)
 
 ```
-User: /task-ai:check "六维审查与修复"
+User: /task-ai:check "six-dimension audit and fix"
 ```
 
 ```
@@ -420,7 +420,7 @@ The convergence gate only fires after D1-D6 passes. See [Convergence Evaluation]
 
 | Result | Action | Status Transition |
 |--------|--------|-------------------|
-| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Convergence score is persisted in the convergence analysis file for downstream consumption by auto | Status unchanged (`executing`); auto handles: update `.target.md` (Stage [`ACTIVE`] → [`COMPLETE`]), update `.status.json` (status → `evolving`, push to `stage.history`), then → highlight → report → evolving 入口决策 |
+| **ACCEPT** | Create `.analysis/<date>-post-exec-accept.md` + `.analysis/<date>-convergence.md`, write `.test/<date>-post-exec-results.md`. Convergence score is persisted in the convergence analysis file for downstream consumption by auto | Status unchanged (`executing`); auto handles: update `.target.md` (Stage [`ACTIVE`] -> [`COMPLETE`]), update `.status.json` (status -> `evolving`, push to `stage.history`), then -> highlight -> report -> evolving entry decision |
 | **NEEDS_FIX** | Create `.analysis/<date>-post-exec-needs-fix.md` with evaluation + `.bugfix/<date>-<summary>.md` per fix item (with regression test spec per §Regression Test Applicability) | Status unchanged |
 | **ROLLBACK** | Create `.analysis/<date>-convergence-rollback.md` with failure reason + convergence delta. Record failure experience to highlight archive. Check renders the verdict only — the caller (auto loop or user) executes the actual rollback (`git reset --hard`, trim `stage.history`, set `status → evolving`) | Status unchanged by check; caller transitions `executing` → `evolving` |
 | **REPLAN** | Create `.analysis/<date>-post-exec-replan.md` with fundamental issues | `executing` → `re-planning`, set `phase: needs-plan` |
