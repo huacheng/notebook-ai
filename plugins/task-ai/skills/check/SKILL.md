@@ -28,6 +28,8 @@ arguments:
 
 Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 (D1 Correctness) → Gate 3 (D3 Reliability) → Gate 4 (D4+D5+D6 Optimization).
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 ## Table of Contents
 
 - [Usage](#usage) — invocation patterns and parameter routing

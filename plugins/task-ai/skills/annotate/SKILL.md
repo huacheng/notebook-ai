@@ -25,6 +25,8 @@ arguments:
 
 Process JSONL annotations from the file viewer prompt. Supports 4 annotation types: Insert, Delete, Replace, Comment. Each is triaged by file layer and cross-impact before execution.
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 **Input**: Annotations arrive as JSONL lines in the prompt context (one JSON object per line). The frontend prepends `/task-ai:annotate\n` to invoke this skill — annotations are parsed from the prompt, not from files.
 
 ## Input Format — JSONL

@@ -27,6 +27,8 @@ arguments:
 
 Query task status, details, and relationships. Pure read-only — no files written, no status changes, no git commits.
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 ## Usage
 
 ```

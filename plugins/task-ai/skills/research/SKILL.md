@@ -37,6 +37,8 @@ arguments:
 
 Collect external domain knowledge and organize it into `$NB_WORKSPACES_LIBRARY/.memory/.references/` to support all lifecycle phases: planning (implementation strategy), verification (testing tools and criteria), evaluation (domain standards), and execution (technical details). Acts as the intelligence arm of the task lifecycle — separating research from other phases for clearer logic.
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 **Key behaviors:**
 - **Library-first**: Always calls `library search` before researching to avoid redundant collection
 - **Incremental by default**: `--scope gap` only researches missing topics
