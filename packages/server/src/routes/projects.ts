@@ -436,6 +436,24 @@ export function createProjectsRouter(
       const session = await sessionManager.createSession(notebookPath, worktreePath);
       sessionId = session.id;
 
+      // Auto-send '/task-ai:auto load' to initialize task context (non-blocking)
+      const initCellId = `cell-init-${randomUUID().slice(0, 8)}`;
+      const initPrompt = '/task-ai:auto load';
+      session.notebook.cells.push({
+        id: initCellId,
+        type: 'prompt',
+        source: initPrompt,
+        outputs: [],
+        execution_count: 1,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      // Fire and forget - don't await to avoid blocking the response
+      sessionManager.executeCell(session.id, initCellId, initPrompt).catch((err) => {
+        console.error(`[projects] Auto-init cell failed for ${nbSlug}:`, err);
+      });
+
       // Save to DB
       const now = new Date().toISOString();
       const nbId = randomUUID();
