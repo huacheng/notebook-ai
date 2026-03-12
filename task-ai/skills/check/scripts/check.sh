@@ -70,9 +70,8 @@ else
     fi
 
     # D2/D3: Acquire concurrency lock (per SKILL.md Notes)
-    LOCK_DIR="$WORK_DIR/.working"
+    LOCK_DIR="$WORK_DIR"
     LOCK_FILE="$LOCK_DIR/.lock"
-    mkdir -p "$LOCK_DIR"
     if ! (set -o noclobber; echo "$$" > "$LOCK_FILE") 2>/dev/null; then
         LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "unknown")
         # D3: Stale lock recovery — check if holding process still exists

@@ -31,7 +31,7 @@ Generate a structured completion report for a task module, documenting what was 
 /task-ai:report [--format full|summary]
 ```
 
-**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Prerequisites
 
@@ -179,4 +179,4 @@ When status is `evolving`, the report includes a Stage Review section:
 - For `cancelled` tasks, the report documents the reason for cancellation
 - The report serves as a permanent record even after task files are archived
 - For `satisfied` tasks, report includes change history via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"` (uses `--fixed-strings` to avoid regex interpretation of parentheses; `--max-count=200` caps output for performance; works even after task branch deletion)
-- **Concurrency**: Report acquires `.working/.lock` before proceeding and releases on completion. Stale locks (holding PID is dead) are automatically recovered. (See Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Report acquires `.lock` before proceeding and releases on completion. Stale locks (holding PID is dead) are automatically recovered. (See Concurrency Protection in `commands/task-ai.md`)

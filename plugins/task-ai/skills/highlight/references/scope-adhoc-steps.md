@@ -12,7 +12,7 @@ Identify from user's natural language:
 ## Step 2 — Type Determination
 
 ```
-if in notebook context (CWD has .working/.status.json):
+if in notebook context (CWD has .status.json):
     type = .status.json type field
 elif user specified a domain in instruction:
     type = user-specified domain, match .type-registry.md existing types

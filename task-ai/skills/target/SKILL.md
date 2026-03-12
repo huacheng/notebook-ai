@@ -159,7 +159,7 @@ Build a JWT authentication system with refresh tokens and OAuth support
         - When generating Stage 1: remove `[PENDING]` from Overall Objective, add `## Stage 1: <name> [ACTIVE]`
       - **ELIF status == `planning`**: update existing `.target.md` content (no marker changes)
       - **ELSE** (status ∉ {`draft`, `planning`}): update current stage target content (no multi-stage analysis — plan is already based on current stage target)
-      - Atomic write to `.working/.target.md` + update `.status.json` + Git commit: `task-ai(<notebook>):target update objective`
+      - Atomic write to `.target.md` + update `.status.json` + Git commit: `task-ai(<notebook>):target update objective`
       - Execute highlight protocol scope=thinking-raw (optional, high-value). Inline call failure should not block target's main flow — highlight is enhancement, not gating.
 
    3e. **Convergence Baseline Generation** (after `.target.md` write, before Git commit):
@@ -193,7 +193,7 @@ Build a JWT authentication system with refresh tokens and OAuth support
       Include `.convergence-baseline.md` in the Git commit scope alongside `.target.md` and `.status.json`.
 
 4. **If `objective` is omitted (Read Mode)**:
-   - **Read**: Read the content of `.working/.target.md`.
+   - **Read**: Read the content of `.target.md`.
    - **Display**: Output the structured objective to the conversation window.
 5. **Validation**: Confirm the target reflects the user's intent.
 6. **Next Step Prompt** (output after write mode completes — guides the user to the correct next lifecycle step).

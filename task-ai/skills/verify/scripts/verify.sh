@@ -141,9 +141,8 @@ if [[ "$CHECKPOINT" != "quick" && "$CHECKPOINT" != "full" && ! "$CHECKPOINT" =~ 
 fi
 
 # D2/D3: Acquire concurrency lock (see SKILL.md Notes § Concurrency)
-LOCK_DIR="$WORK_DIR/.working"
+LOCK_DIR="$WORK_DIR"
 LOCK_FILE="$LOCK_DIR/.lock"
-mkdir -p "$LOCK_DIR"
 if ! mkdir "$LOCK_FILE" 2>/dev/null; then
     # D3: Stale lock detection — check if holding PID is still alive
     LOCK_PID_FILE="$LOCK_FILE/pid"

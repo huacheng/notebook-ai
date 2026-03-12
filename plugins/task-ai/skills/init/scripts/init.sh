@@ -115,11 +115,11 @@ if [[ $USE_WORKTREE -eq 1 ]]; then
     CLEANUP_WORKTREE="$WORKTREE_PATH"
     # D1: In worktree mode, files must be created inside the worktree directory
     WT_TARGET_DIR="$WORKTREE_PATH/$( realpath -m --relative-to="$GIT_TOPLEVEL" "$TARGET_DIR" )"
-    WORKING_DIR="$WT_TARGET_DIR/.working"
+    WORKING_DIR="$WT_TARGET_DIR"
     CLEANUP_DIR="$WT_TARGET_DIR"
 else
     git checkout "$BRANCH_NAME" || { echo "[ERROR] Failed to checkout $BRANCH_NAME" >&2; exit 1; }
-    WORKING_DIR="$TARGET_DIR/.working"
+    WORKING_DIR="$TARGET_DIR"
     CLEANUP_DIR="$TARGET_DIR"
 fi
 
@@ -133,17 +133,16 @@ else
 fi
 _GI_ENTRIES=(
   ".worktrees/"
-  "**/.working/.auto-stop"
-  "**/.working/.lock"
-  "**/.working/.library-state.json"
+  "**/.auto-stop"
+  "**/.lock"
+  "**/.lock.stale.*"
+  "**/.library-state.json"
   ".library/.changelog"
   ".library/.changelog-archive/.lock"
   ".library/.memory/.thinking/raw/"
   ".library/.memory/.thinking/patterns/.lock"
   ".library/.inconsistency.log"
   ".library/.ioc.md"
-  "**/.lock"
-  "**/.lock.stale.*"
 )
 _GI_CHANGED=0
 # D3: ensure parent directory exists (relevant in worktree mode with nested NB_ROOT)

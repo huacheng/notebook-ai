@@ -47,8 +47,8 @@ ensure_library() {
 find_nb_context() {
   local cur="$PWD"
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
-      export NB_WORKING="$cur/.working"
+    if [[ -f "$cur/.status.json" ]]; then
+      export NB_WORKING="$cur"
       export NB_NOTEBOOK="$(basename "$cur")"
       return 0
     fi
@@ -65,7 +65,7 @@ find_nb_context() {
       local nb_dir
       nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
       if [[ -n "$nb_dir" ]]; then
-        export NB_WORKING="$nb_dir/.working"
+        export NB_WORKING="$nb_dir"
         return 0
       fi
     fi
@@ -101,7 +101,7 @@ resolve_workdir() {
       echo "[ERROR] Notebook directory '$notebook' not found under $nb_root" >&2
       exit 1
     fi
-    export WORK_DIR="$nb_dir/.working"
+    export WORK_DIR="$nb_dir"
   fi
   export NB_NOTEBOOK="$notebook"
 }

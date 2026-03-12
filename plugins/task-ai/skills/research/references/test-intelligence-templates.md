@@ -8,7 +8,7 @@
 
 Use shell script to extract status:
 ```bash
-python3 "$TASK_AI_ROOT/core/state.py" get ".working/.status.json" status
+python3 "$TASK_AI_ROOT/core/state.py" get ".status.json" status
 ```
 
 **Test-S2a. If status = `planning`, `draft`, or `re-planning` -> Methodology collection**

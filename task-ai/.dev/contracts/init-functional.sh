@@ -19,7 +19,7 @@ trap 'git worktree remove "$TEST_WT" --force 2>/dev/null; git branch -D "task/$T
 # --- Test 1: Successful Initialization ---
 (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Functional Test" --tags "test,qa") > /dev/null 2>&1
 
-if [[ -f "$NB_WORKSPACES_ROOT/$TEST_PROJECT/$TEST_NB/.working/.status.json" ]]; then
+if [[ -f "$NB_WORKSPACES_ROOT/$TEST_PROJECT/$TEST_NB/.status.json" ]]; then
     emit_pass "init: successfully created metadata and directory"
 else
     emit_fail "init: failed to create metadata"

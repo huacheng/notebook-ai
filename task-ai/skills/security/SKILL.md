@@ -36,7 +36,7 @@ Acts as the mandatory pre-hook for existing sub-commands (`check` and `exec`), e
 /task-ai:security scan-skill "<path/to/SKILL.md>"
 ```
 
-**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Execution Steps
 

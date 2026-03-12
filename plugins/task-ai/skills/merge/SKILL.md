@@ -27,7 +27,7 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 /task-ai:merge
 ```
 
-**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ## Prerequisites
 
@@ -93,5 +93,5 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 - Status transitions (`executing` → `evolving`) are handled by auto after check post-exec ACCEPT
 - Refactoring is exec's per-step responsibility (exec Per-Step step 6 Refactor window) — merge does not refactor
 - Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
-- **Concurrency**: Lock acquisition/release is handled by the caller (auto mode or CLI dispatcher). `merge.sh` assumes `.working/.lock` is already held (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Lock acquisition/release is handled by the caller (auto mode or CLI dispatcher). `merge.sh` assumes `.lock` is already held (see Concurrency Protection in `commands/task-ai.md`)
 - **Note:** Deliverables accumulate on the task branch. Users can invoke merge at any time to copy current deliverables to main. Status transitions are handled by auto.

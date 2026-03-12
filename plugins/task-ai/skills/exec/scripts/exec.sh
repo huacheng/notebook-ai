@@ -84,11 +84,10 @@ if [[ ! -f "$STATE_PY" ]]; then
     exit 1
 fi
 
-# D2/D3: Concurrency — acquire .working/.lock before proceeding (per SKILL.md)
+# D2/D3: Concurrency — acquire .lock before proceeding (per SKILL.md)
 # Uses mkdir-based lock (same path as verify.sh/check.sh for mutual exclusion)
-LOCK_DIR="$WORK_DIR/.working"
+LOCK_DIR="$WORK_DIR"
 LOCK_FILE="$LOCK_DIR/.lock"
-mkdir -p "$LOCK_DIR"
 cleanup_exec() {
     rm -rf "$LOCK_FILE" 2>/dev/null || true
     rm -f "${SUMMARY_FILE}.tmp" 2>/dev/null || true

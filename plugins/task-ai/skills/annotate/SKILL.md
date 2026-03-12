@@ -67,11 +67,11 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 
 ## Execution Steps
 
-1. **Acquire `.working/.lock`** — if lock is held (e.g., auto is running), REJECT immediately (fast-fail, no queue). See §Concurrency
-2. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once. If any JSONL line fails to parse or is missing required fields, **release `.working/.lock`** and REJECT with error identifying the malformed line
-3. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. If any path escapes, **release `.working/.lock`** and REJECT (prevents path traversal)
+1. **Acquire `.lock`** — if lock is held (e.g., auto is running), REJECT immediately (fast-fail, no queue). See §Concurrency
+2. **Parse JSONL** from prompt context: extract `file`, `type`, `selected`, `cursor`, and type-specific content fields. Group annotations by `file` — read each source file once. If any JSONL line fails to parse or is missing required fields, **release `.lock`** and REJECT with error identifying the malformed line
+3. **Path validation**: each `file` absolute path must resolve (after symlink resolution) to a location under `$NB_WORKSPACES_ROOT/`. If any path escapes, **release `.lock`** and REJECT (prevents path traversal)
 4. **Determine file layer** for each annotation (Requirement / Planning / Evaluation / Methodology / Information). Files that don't match any known layer default to Information (lowest impact)
-5. **Read `.status.json`** — validate status is not terminal (`cancelled`). If terminal, **release `.working/.lock`** and REJECT. Note: `evolving` and `satisfied` are non-terminal and accept annotations
+5. **Read `.status.json`** — validate status is not terminal (`cancelled`). If terminal, **release `.lock`** and REJECT. Note: `evolving` and `satisfied` are non-terminal and accept annotations
 6. **Read context files**: `.target.md` + `.plan.md` + `.test/` (latest criteria)
 7. **Read** the annotated source file(s)
 8. **Content sanitization**: strip HTML comments (`<!-- ... -->`), ANSI escape sequences, and control characters (U+0000–U+001F except `\n` and `\t`, and U+007F) from annotation content before writing. Preserve markdown formatting and visible text
@@ -87,7 +87,7 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 14. **Execute highlight** protocol `scope=thinking-raw` — see `highlight/SKILL.md` §3.3. Optional (medium-value). Captures cross-impact assessment reasoning. Inline call failure should not block annotate's main flow — highlight is enhancement, not gating
 15. **Git commit** (skip if all annotations were unresolvable and no files changed): `task-ai(<notebook>):annotate annotations processed`
 16. **Generate execution report** (print to screen)
-17. **Release `.working/.lock`**
+17. **Release `.lock`**
 
 ## State Transitions — Three-Dimensional
 
@@ -139,7 +139,7 @@ task-ai(<notebook>):annotate annotations processed
 
 ## Concurrency
 
-- Annotate acquires `.working/.lock` before proceeding (see Concurrency Protection in `commands/task-ai.md`)
+- Annotate acquires `.lock` before proceeding (see Concurrency Protection in `commands/task-ai.md`)
 - **auto holds lock → annotate REJECTS** (fast-fail, no queue, no retry)
 - User can retry after auto's current step completes, or `/task-ai:cancel` to stop auto first
 - auto releases lock between iterations (at `.auto-stop` check), forming available windows

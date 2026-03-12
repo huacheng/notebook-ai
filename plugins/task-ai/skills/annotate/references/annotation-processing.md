@@ -21,14 +21,14 @@ Annotations arrive as JSONL (one JSON object per line) in the prompt context. Th
 **Single annotation**:
 
 ```jsonl
-{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
+{"file":"/home/user/nb-workspaces/myproject/task-1/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
 ```
 
 **Batch (multiple annotations, one or more files)**:
 
 ```jsonl
-{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
-{"file":"/home/user/nb-workspaces/myproject/task-1/.working/.target.md","type":"comment","selected":"Support offline mode","cursor":128,"comment":"离线模式的数据同步策略需要明确"}
+{"file":"/home/user/nb-workspaces/myproject/task-1/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
+{"file":"/home/user/nb-workspaces/myproject/task-1/.target.md","type":"comment","selected":"Support offline mode","cursor":128,"comment":"离线模式的数据同步策略需要明确"}
 ```
 
 ### Field Reference

@@ -49,7 +49,7 @@ Unified review capability with gated execution: Gate 1 (D2 Security) → Gate 2 
 /task-ai:check --checkpoint audit-validate  # Rule candidate validation
 ```
 
-**Notebook auto-detection:** When `--checkpoint` is used, the notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+**Notebook auto-detection:** When `--checkpoint` is used, the notebook is automatically resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 **Parameter routing:**
 - No arguments → scope=context (review current conversation's plan/solution)
@@ -433,7 +433,7 @@ Verification methods should match the task domain — a unit test suite for a do
 - For `post-exec`, if tests exist (`.test/` criteria files), they should be run and pass for ACCEPT — untested deliverables cannot be accepted with confidence
 - Check writes test results to `.test/<date>-<checkpoint>-results.md` (e.g., `YYYY-MM-DD-post-exec-results.md`) documenting test outcomes
 - `depends_on` in `.status.json` is always validated: if any dependency is not met (simple string → `satisfied`, extended object → at-or-past `min_status`), verdict is BLOCKED (not just flagged as risk)
-- **Concurrency**: Check acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Check acquires `.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
 - **Six-dimension audit (L3)**: For thorough evaluation, apply D1 Correctness / D2 Security / D3 Reliability / D4 Performance / D5 Architecture / D6 Maintainability checks systematically, adapted to the task's domain type. follow `references/six-dimension-audit.md` Audit Workflow steps 1-9 in full. When L3 audit **directly applies fixes** (audit-and-fix mode), steps 7-9 (regression test design, RED→GREEN confirmation, full suite verification) are mandatory per Regression Test Applicability table. When L3 audit only renders a verdict, embed test specs in output for downstream actor
 - **VFP applicability**: VFP applies when `type` contains `software` OR `.type-profile.md` contains `## Verification Cycle` section. See `commands/references/verification-first-protocol.md` for full applicability rules
 - **verify integration**: The `verify` sub-command can pre-run tests independently. When recent `verify` results exist (same day, matching checkpoint), check incorporates them instead of re-running. This is optional — check works standalone

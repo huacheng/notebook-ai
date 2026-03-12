@@ -31,7 +31,7 @@ Unified protocol for experience and thinking library writes. Defines 7 scopes co
 /task-ai:highlight "<description>"    # scope=adhoc — conversation experience capture
 ```
 
-**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 **Parameter routing:**
 - No arguments → scope=complete (auto-detect notebook from CWD or task branch; error if not in notebook context)
@@ -226,4 +226,4 @@ bash skills/highlight/scripts/promote.sh --target <experience-file.md>
 - **Fault isolation is universal**: All inline caller commands (the 9 commands listed in §3.3, plus check's additional §3.4 quality-update role) have the same guarantee — highlight protocol failure never blocks the caller's main flow
 - **No state mutations**: highlight is transparent to the state machine. This is consistent with the former `light` behavior
 - **.type-profiles/ dual ownership**: research creates/updates profiles (knowledge acquisition); highlight syncs during complete (experience write-back). Both use Library Write Protocol locks for concurrency safety
-- **Concurrency**: Independent executions (complete, adhoc) acquire `.working/.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`). promote does NOT acquire `.working/.lock` — it operates on library-level paths (`.skills/.candidates/`, `.changelog`) with its own `.changelog.lock`
+- **Concurrency**: Independent executions (complete, adhoc) acquire `.lock` before proceeding and release on completion (see Concurrency Protection in `commands/task-ai.md`). promote does NOT acquire `.lock` — it operates on library-level paths (`.skills/.candidates/`, `.changelog`) with its own `.changelog.lock`

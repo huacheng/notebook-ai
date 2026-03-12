@@ -107,8 +107,8 @@ git reset --hard <commit>          # in the task's worktree
 Add to project `.gitignore`:
 ```
 .worktrees/
-**/.working/.auto-stop
-**/.working/.lock
+**/.auto-stop
+**/.lock
 .library/.changelog
 .library/.changelog-archive/.lock
 .library/.memory/.thinking/raw/

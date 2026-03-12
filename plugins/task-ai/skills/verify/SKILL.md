@@ -39,7 +39,7 @@ Run domain-adapted tests and verification procedures for a task module, producin
 /task-ai:verify --generate-skill-tests --target <skill.md>
 ```
 
-**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
+**Notebook auto-detection:** The notebook is automatically resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`). No manual notebook parameter needed.
 
 ### Skill Test Generation Mode
 
@@ -119,4 +119,4 @@ task-ai(auth-refactor):verify step-3 verification
 - **check integration**: `check` can optionally invoke `verify` internally, or read pre-existing `verify` results from `.test/`. When recent `verify` results exist (same day, matching checkpoint), `check` incorporates them instead of re-running tests
 - **exec integration**: Per-step verification in `exec` can optionally invoke `verify --checkpoint step-N` for domain-specific testing. For lightweight checks (build + lint), inline verification is sufficient
 - **Domain adaptation**: Verification strategy should match the task `type` — running unit tests for a documentation task produces false confidence, while prose review for a software task misses regressions. Use `.type-profile.md` first, then per-type seed file `init/references/seed-types/<type>.md` for domain-specific testing procedures, tools, and thresholds. Supplement with web search for current best practices
-- **Concurrency**: Verify acquires `.working/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)
+- **Concurrency**: Verify acquires `.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/task-ai.md`)

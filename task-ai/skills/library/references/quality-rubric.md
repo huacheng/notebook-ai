@@ -90,7 +90,7 @@ quality:
 | Condition | System response |
 |-----------|----------------|
 | Any single L grade | Flagged in `raw/.index.md` row; does not block execution |
-| Two or more L grades in same step | Write warning note in `.working/.summary.md`: "Quality concern at <step>: multiple L grades" |
+| Two or more L grades in same step | Write warning note in `.summary.md`: "Quality concern at <step>: multiple L grades" |
 | Consecutive L grades across ≥ 2 steps | `report` notes pattern in lessons-learned section; does NOT distil these steps into `patterns/` |
 | All H grades across a step | Eligible for distillation into `patterns/` by `report` |
 | Pattern of L(thinking) + H(output) | Note in Quality Notes section: "Output quality may not be reproducible — reasoning was unstructured" |

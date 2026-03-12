@@ -35,7 +35,7 @@ Query task status, details, and relationships. Pure read-only — no files writt
 /task-ai:list --timeline       # Status transition timeline (notebook auto-detected)
 ```
 
-**Notebook auto-detection:** When in a notebook directory, details for that notebook are shown automatically. The notebook is resolved from CWD (`.working/.status.json`) or the current git branch (`task/<notebook>`).
+**Notebook auto-detection:** When in a notebook directory, details for that notebook are shown automatically. The notebook is resolved from CWD (`.status.json`) or the current git branch (`task/<notebook>`).
 
 ## Modes
 
@@ -55,7 +55,7 @@ Output a summary table of all notebooks:
 
 ### 2. Single Notebook Details (auto-detected from CWD or task branch)
 
-When invoked inside a notebook directory (CWD contains `.working/.status.json`) or on a task branch (`task/<notebook>`), outputs all fields from the notebook's `.working/.status.json` plus:
+When invoked inside a notebook directory (CWD contains `.status.json`) or on a task branch (`task/<notebook>`), outputs all fields from the notebook's `.status.json` plus:
 - `.summary.md` content (if exists) — condensed context
 - `.target.md` first 10 lines (preview, if exists) — requirements overview
 - File listing of `.working/` directory (system files and sub-directories)
@@ -87,8 +87,8 @@ Parse commit messages to reconstruct the timeline of status changes.
 
 ## Execution Steps
 
-1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.working/.status.json`. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT`: project / notebook / `.working/`
-2. **Metadata extraction**: For each discovered notebook, read `.working/.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output)
+1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.status.json`. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT`: project / notebook / `.working/`
+2. **Metadata extraction**: For each discovered notebook, read `.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output)
 3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: auto-detect notebook from CWD or task branch (REJECT if not in a notebook context — timeline requires a specific notebook), then extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
 
@@ -105,7 +105,7 @@ None — `list` does not create any commits.
 ## Notes
 
 - **Pure read-only**: `list` never writes files, never changes status, never creates commits. It is safe to run at any time without side effects
-- **No lock required**: Since `list` only reads files, it does not acquire `.working/.lock`
+- **No lock required**: Since `list` only reads files, it does not acquire `.lock`
 - **Corrupt/missing .status.json**: If a notebook's `.status.json` is missing or fails to parse, skip that notebook with a warning line in the output (do not abort the entire listing)
 - **Dependency validation**: The `--deps` mode only visualizes relationships; it does not validate whether dependencies are met (that is `check`'s responsibility)
 - **Mutually exclusive modes**: `--deps` and `--timeline` cannot be combined. If both are provided, reject with usage hint
