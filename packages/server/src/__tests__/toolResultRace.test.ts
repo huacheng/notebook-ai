@@ -38,7 +38,7 @@ describe('tool_result after result (race condition)', () => {
       onMessage = onMsg;
       onMsg({ type: 'system', subtype: 'hook_started' });
     });
-    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(async () => {});
     sendPromptSpy = vi.spyOn(AgentProcess.prototype, 'sendPrompt').mockImplementation(() => {});
   });
 

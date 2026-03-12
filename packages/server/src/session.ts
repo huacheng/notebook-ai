@@ -729,7 +729,8 @@ export class SessionManager {
     // D3: Await any pending post-completion work (git commit + autoSave) before closing
     await session._pendingPostComplete.catch(() => {});
 
-    session.agentProcess.stop();
+    // Wait for agent process to fully terminate before cleanup
+    await session.agentProcess.stop();
     session.listeners.clear();
     session.eventBuffer.clear();
     this.sessions.delete(sessionId);

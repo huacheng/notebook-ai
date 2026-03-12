@@ -23,7 +23,7 @@ vi.mock('../agent', () => ({
   AgentProcessFactory: {
     create: vi.fn(() => ({
       start: vi.fn(),
-      stop: vi.fn(),
+      stop: vi.fn().mockResolvedValue(undefined),
       sendPrompt: vi.fn(),
       interrupt: vi.fn(),
       on: vi.fn(),

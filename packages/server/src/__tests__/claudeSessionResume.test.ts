@@ -129,7 +129,7 @@ describe('claude_session_id in SessionManager', () => {
     startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg: (msg: unknown) => void) => {
       onMsg({ type: 'system', subtype: 'hook_started' });
     });
-    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(async () => {});
   });
 
   afterEach(() => {

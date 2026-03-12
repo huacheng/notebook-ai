@@ -76,7 +76,7 @@ beforeEach(async () => {
   vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
     onMsg({ type: 'system', subtype: 'hook_started' });
   });
-  vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+  vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(async () => {});
 });
 
 afterEach(() => {

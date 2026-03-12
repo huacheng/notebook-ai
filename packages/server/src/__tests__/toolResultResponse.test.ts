@@ -97,7 +97,7 @@ describe('SessionManager.submitToolResult', () => {
     startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
       (onMsg as Function)({ type: 'system', subtype: 'hook_started' });
     });
-    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(async () => {});
     const { GitManager } = await import('../git.js');
     ensureRepoSpy = vi.spyOn(GitManager.prototype, 'ensureRepo').mockResolvedValue();
   });

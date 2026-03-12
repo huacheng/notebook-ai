@@ -80,7 +80,7 @@ describe('SessionManager.createSession with default model', () => {
     startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
       onMsg({ type: 'system', subtype: 'hook_started' });
     });
-    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(async () => {});
   });
 
   afterEach(() => {

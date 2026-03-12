@@ -242,14 +242,36 @@ export class AgentProcess {
     try { this.proc!.kill('SIGTERM'); } catch { /* ignore */ }
   }
 
-  /** Terminates the persistent agent process. */
-  stop(): void {
+  /** Terminates the persistent agent process and waits for it to exit. */
+  async stop(): Promise<void> {
     this.rl?.close();
     this.rl = null;
-    if (this.proc) {
-      try { this.proc.stdin?.end(); } catch { /* ignore */ }
-      try { this.proc.kill('SIGTERM'); } catch { /* ignore */ }
-      this.proc = null;
+    if (!this.proc) return;
+
+    const proc = this.proc;
+    this.proc = null;
+
+    // If already exited, nothing to wait for
+    if (proc.exitCode !== null || proc.killed) return;
+
+    // Create a promise that resolves when the process exits
+    const exitPromise = new Promise<void>((resolve) => {
+      proc.once('exit', () => resolve());
+      proc.once('error', () => resolve());
+    });
+
+    // Send SIGTERM and wait for graceful exit (up to 3 seconds)
+    try { proc.stdin?.end(); } catch { /* ignore */ }
+    try { proc.kill('SIGTERM'); } catch { /* ignore */ }
+
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+    await Promise.race([exitPromise, timeout]);
+
+    // If still alive after timeout, force kill
+    if (proc.exitCode === null && !proc.killed) {
+      try { proc.kill('SIGKILL'); } catch { /* ignore */ }
+      // Give SIGKILL a moment to take effect
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
 

@@ -35,7 +35,7 @@ describe('interrupt (Esc)', () => {
     startSpy = vi.spyOn(AgentProcess.prototype, 'start').mockImplementation(async (onMsg) => {
       onMsg({ type: 'system', subtype: 'hook_started' });
     });
-    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(() => {});
+    stopSpy = vi.spyOn(AgentProcess.prototype, 'stop').mockImplementation(async () => {});
     sendPromptSpy = vi.spyOn(AgentProcess.prototype, 'sendPrompt').mockImplementation(() => {});
     interruptSpy = vi.spyOn(AgentProcess.prototype, 'interrupt').mockImplementation(() => {});
   });
