@@ -139,7 +139,7 @@ describe('ensureLibrarySkeleton', () => {
       path.join(projectPath, '.gitignore'),
       'utf-8',
     );
-    expect(gitignore).toContain('.worktrees/');
+    expect(gitignore).toContain('.claude/');
     expect(gitignore).toContain('**/.working/.lock');
   });
 
@@ -160,7 +160,7 @@ describe('ensureLibrarySkeleton', () => {
       'utf-8',
     );
     expect(gitignore).toContain('node_modules/');
-    expect(gitignore).toContain('.worktrees/');
+    expect(gitignore).toContain('.claude/');
   });
 
   it('does not duplicate gitignore entries on repeated calls', async () => {
@@ -175,7 +175,7 @@ describe('ensureLibrarySkeleton', () => {
       path.join(projectPath, '.gitignore'),
       'utf-8',
     );
-    const occurrences = gitignore.split('.worktrees/').length - 1;
+    const occurrences = gitignore.split('.claude/').length - 1;
     expect(occurrences).toBe(1);
   });
 });
