@@ -577,6 +577,15 @@ function FileBrowser() {
   const nbImportRef = useRef<HTMLInputElement>(null);
   const isInsideNotebook = currentSubPath !== '.';
 
+  // When navigating in Files tab, reset workspaceDir if leaving a worktree directory
+  const handleSubPathChange = useCallback((newPath: string) => {
+    setCurrentSubPath(newPath);
+    // Reset workspaceDir when navigating back to project root or .worktrees level
+    if (newPath === '.' || newPath === '.worktrees') {
+      useStore.setState({ workspaceDir: null });
+    }
+  }, []);
+
   // Deliverables tab state
   const delivPath = getDeliverablesPath(workspaceDir, activeProjectPath);
   const [delivRefreshKey, setDelivRefreshKey] = useState(0);
@@ -692,11 +701,16 @@ function FileBrowser() {
     }
   }, [activeProjectPath, openFileTab]);
 
-  // Clicking a directory just navigates into it to show files.
-  // No special handling for notebook directories — they're treated as regular folders.
-  const handleDirClick = useCallback((_subPath: string, _name: string, _meta: { isNotebook?: boolean; worktreePath?: string }) => {
-    // Return undefined → FileSection calls navigateInto() to show directory contents
-  }, []);
+  // Clicking a notebook directory updates workspaceDir so deliverables tab shows that notebook's deliverables.
+  // The directory navigation still happens (return undefined).
+  const handleDirClick = useCallback((subPath: string, name: string, meta: { isNotebook?: boolean; worktreePath?: string }) => {
+    if (!meta.isNotebook || !activeProjectPath) return; // Regular dir → just navigate
+
+    // Notebook directory clicked — update workspaceDir for deliverables path
+    const worktreePath = meta.worktreePath || `${activeProjectPath}/${subPath === '.' ? name : `${subPath}/${name}`}`;
+    useStore.setState({ workspaceDir: worktreePath });
+    // Return undefined → FileSection still navigates into the directory
+  }, [activeProjectPath]);
 
   const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);
   const canCreateNb = nbTitle.trim().length > 0 && !nbTitleError;
@@ -802,7 +816,7 @@ function FileBrowser() {
             onDirClick={handleDirClick}
             noDragFilter={(name) => name.endsWith('.notebook.json')}
             renderItemActions={renderItemActions}
-            onSubPathChange={setCurrentSubPath}
+            onSubPathChange={handleSubPathChange}
             refreshKey={fileRefreshKey}
             noDeleteFilter={(name, subPath) => {
               return name === '.status.json'
