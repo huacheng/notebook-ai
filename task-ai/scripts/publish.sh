@@ -21,6 +21,24 @@ log() { echo -e "${GREEN}[publish]${NC} $1"; }
 warn() { echo -e "${YELLOW}[warn]${NC} $1"; }
 error() { echo -e "${RED}[error]${NC} $1" >&2; exit 1; }
 
+# 0. L1 验证 (pre-publish)
+CONTRACTS_DIR="$TASK_AI_ROOT/.dev/contracts"
+if [[ -d "$CONTRACTS_DIR" ]]; then
+    log "运行 L1 验证..."
+    L1_FAIL=0
+    for script in step-numbering.sh sub-step-numbering.sh script-reachability.sh deleted-files.sh cross-refs.sh signal-whitelist.sh naming-conventions.sh frontmatter-validation.sh git-commit-conventions.sh; do
+        [[ ! -f "$CONTRACTS_DIR/$script" ]] && continue
+        if ! bash "$CONTRACTS_DIR/$script" > /dev/null 2>&1; then
+            echo -e "  ${RED}FAIL${NC}: $script"
+            L1_FAIL=1
+        fi
+    done
+    if [[ $L1_FAIL -eq 1 ]]; then
+        error "L1 验证失败，修复问题后再发布"
+    fi
+    log "✅ L1 验证通过"
+fi
+
 # 1. 确定版本号
 CURRENT_VERSION=$(grep '"version"' "$TASK_AI_ROOT/plugin.json" | sed 's/.*"version": "\([^"]*\)".*/\1/')
 log "当前版本: $CURRENT_VERSION"
