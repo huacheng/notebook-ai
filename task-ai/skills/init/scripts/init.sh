@@ -155,23 +155,7 @@ else
   done
 fi
 
-# 5. Project status (optional — skip if project already has .status.json)
-# In worktree mode, project metadata goes in worktree root
-if [[ $USE_WORKTREE -eq 1 ]]; then
-    PROJ_STATUS_PATH="$WORKTREE_PATH/.status.json"
-else
-    PROJ_STATUS_PATH="$PROJECT_DIR/.status.json"
-fi
-if [[ ! -f "$PROJ_STATUS_PATH" ]]; then
-    cat > "$PROJ_STATUS_PATH" <<PROJEOF
-{
-  "name": "$PROJECT_NAME",
-  "created": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
-PROJEOF
-fi
-
-# 6. Directory Creation (SKILL.md Step 10)
+# 5. Directory Creation (SKILL.md Step 10)
 mkdir -p "$WORKING_DIR"
 
 # 7. Metadata Creation — .status.json (SKILL.md Step 11)
@@ -233,7 +217,6 @@ else
 fi
 # D3: git with error handling — stage all created files
 GIT_ADD_FILES=("$WORKING_DIR/.status.json" "$WORKING_DIR/.target.md")
-[[ -f "$PROJ_STATUS_PATH" ]] && GIT_ADD_FILES+=("$PROJ_STATUS_PATH")
 [[ "$_GI_CHANGED" -eq 1 && -f "$_ROOT_GI" ]] && GIT_ADD_FILES+=("$_ROOT_GI")
 if ! "${GIT_CMD[@]}" add "${GIT_ADD_FILES[@]}"; then
     echo "[ERROR] git add failed" >&2
