@@ -67,7 +67,7 @@ Read the `type` field from `.status.json` to determine the task domain. Executio
 For each implementation step:
 
 1. **Read** relevant files (source code, configs, scripts, documentation)
-   > **Output directory**: All non-system file output (code, configs, assets) goes to `<notebook>/.deliverables/` — merge only copies this directory to main branch, so anything outside it won't be preserved. System files (`.status.json`, `.plan.md`, etc.) remain in `.working/`.
+   > **Output directory**: All non-system file output (code, configs, assets) goes to `$NB_WORK_DIR/.deliverables/` — merge only copies this directory to main branch, so anything outside it won't be preserved. System files (`.status.json`, `.plan.md`, etc.) remain in `$TASKAI_WORK_DIR/` (`.working/`).
 2. **VH confirmation** (VFP-applicable types with VH stubs): If (`type` contains `software` OR `.type-profile.md` contains `## Verification Cycle`) AND `.test/<date>-vh-stubs.test.*` exists (with vh-baseline.md confirming initial failure state), run **only** the tests corresponding to the current step (identified by the `[VH: ...]` annotations in `.plan.md`) before implementing:
    - **Expected: all Red (failing)** → proceed to implementation
    - **Unexpected: any Green (passing)** → log warning in `.notes/`: "Step N: test X was Green before implementation — test may be trivially satisfied or implementation leaked from a prior step". Continue implementation but flag for review
