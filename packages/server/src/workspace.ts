@@ -104,23 +104,28 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
   mkdirSync(workspaceDir, { recursive: true });
   const libraryDir = getLibraryDir();
   const libRelPath = path.relative(workspaceDir, libraryDir);
+  const workingDir = path.join(workspaceDir, '.working');
 
   let content =
     `# MEMORY\n\n` +
+    `## Task-AI Work Directory\n\n` +
+    `Path: \`.working\`\n` +
+    `Absolute path: \`${workingDir}\`\n\n` +
+    `This is the task-ai system files directory ($TASKAI_WORK_DIR). All task-ai state files are located here:\n\n` +
+    `- \`.status.json\` — task status and metadata\n` +
+    `- \`.target.md\` — task objectives\n` +
+    `- \`.plan.md\` — implementation plan\n` +
+    `- \`.summary.md\` — task context summary\n` +
+    `- \`.convergence-baseline.md\` — convergence tracking\n\n` +
+    `IMPORTANT: When /task-ai:* skills reference .status.json or other state files, they mean $TASKAI_WORK_DIR/.status.json (i.e., .working/.status.json), NOT the worktree root.\n\n` +
     `## Shared Library Directory\n\n` +
     `Path (relative to this workspace): \`${libRelPath}\`\n` +
     `Absolute path: \`${libraryDir}\`\n\n` +
-    `This is the shared library directory accessible to all notebooks.\n` +
-    `You can both read from and write to this directory.\n` +
-    `Use it to store datasets, scripts, configuration files, and other\n` +
-    `resources that should be shared across notebooks.\n\n` +
+    `This is the shared library directory accessible to all notebooks. You can both read from and write to this directory. Use it to store datasets, scripts, configuration files, and other resources that should be shared across notebooks.\n\n` +
     `## Deliverables Directory\n\n` +
     `Path: \`.deliverables\`\n` +
     `Absolute path: \`${path.join(workspaceDir, '.deliverables')}\`\n\n` +
-    `This is the deliverables directory for this notebook.\n` +
-    `Place final outputs here — reports, exported files, generated artifacts,\n` +
-    `and any other deliverables that should be presented to the user.\n` +
-    `Files in this directory are shown in the right panel of the UI.\n`;
+    `This is the deliverables directory for this notebook. Place final outputs here — reports, exported files, generated artifacts, and any other deliverables that should be presented to the user. Files in this directory are shown in the right panel of the UI.\n`;
 
   if (projectPath) {
     const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
