@@ -1,6 +1,6 @@
 ---
 name: target
-description: "Define, refine, and review task objectives and requirements in .target.md. Supports both conversational definition and file-based editing."
+description: "Define task objectives and requirements in .target.md. Use when the user describes what they want to build, says 'I want to...', 'the goal is...', 'set the target', 'define requirements', or needs to clarify/refine what should be accomplished before planning."
 model_tier: heavy
 auto_delegatable: false
 triggers:

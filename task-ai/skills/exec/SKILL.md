@@ -1,6 +1,6 @@
 ---
 name: exec
-description: "Execute the implementation plan for a reviewed task module. Triggered after check PASS (from review status) or on NEEDS_FIX continuation (from executing status with fix guidance)."
+description: "Execute the implementation plan — write code, make changes, build the deliverables. Use when the user says 'do it', 'implement', 'start coding', 'execute the plan', 'build it', or wants to begin actual implementation work after planning is complete."
 model_tier: heavy
 auto_delegatable: false
 triggers:
