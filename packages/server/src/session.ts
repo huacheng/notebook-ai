@@ -495,7 +495,7 @@ export class SessionManager {
    * process startup runs in background. Returns a Promise that resolves
    * when the new process is ready (callers can await or fire-and-forget).
    */
-  restartSession(sessionId: string, opts?: { skipResume?: boolean }): Promise<void> {
+  async restartSession(sessionId: string, opts?: { skipResume?: boolean }): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
@@ -521,8 +521,8 @@ export class SessionManager {
     // Clear rerun queue
     delete session._rerunQueue;
 
-    // Stop old process
-    session.agentProcess.stop();
+    // Stop old process and wait for it to exit
+    await session.agentProcess.stop();
 
     // Clear pending tool IDs (old process won't send tool_result)
     session._pendingToolUseIds.clear();
@@ -582,8 +582,8 @@ export class SessionManager {
       ),
     };
 
-    // 2. Stop old agent process
-    session.agentProcess.stop();
+    // 2. Stop old agent process and wait for it to exit
+    await session.agentProcess.stop();
     session._pendingToolUseIds.clear();
 
     // 3. Start new process without resume (clean context) — must await for rerun
@@ -637,8 +637,8 @@ export class SessionManager {
     // Stop timer mode before changing model to prevent timer on stale process
     this.stopTimerMode(sessionId);
 
-    // Stop old process
-    session.agentProcess.stop();
+    // Stop old process and wait for it to exit
+    await session.agentProcess.stop();
 
     // Create new AgentProcess with updated model (preserve allowedDirs)
     const engine = session.agentProcess.engine;
@@ -704,8 +704,8 @@ export class SessionManager {
     const resumeSessionId = session.claudeSessionId;
     session.claudeSessionId = undefined;
 
-    // Kill old process
-    session.agentProcess.stop();
+    // Kill old process and wait for it to exit
+    await session.agentProcess.stop();
     session._pendingToolUseIds.clear();
 
     // Pre-start process with --resume so next prompt is instant
