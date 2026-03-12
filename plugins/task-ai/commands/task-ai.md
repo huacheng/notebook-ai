@@ -44,7 +44,7 @@ All sub-commands read these two environment variables first when resolving paths
 
 ### Directory Convention
 
-> **See `commands/references/directory-convention.md`** for the full directory tree (`$NB_WORKSPACES_ROOT/`, `.library/`, `<project>/<notebook>/`), file naming conventions, and path resolution rules.
+> **See `commands/references/directory-convention.md`** for the full directory tree (`$NB_WORKSPACES_ROOT/`, `.library/`, `<project>/.worktrees/task-<notebook>/`), file naming conventions, and path resolution rules.
 
 ### .summary.md Format
 
@@ -169,8 +169,6 @@ Terminal states: only `cancelled`.
 
 **Non-notebook context**: If `.status.json` does not exist (CWD is not a notebook directory and not on a `task/` branch), the agent does not attempt phase-aware behavior — no research/refine calls, no status checks. Falls back to normal conversation mode.
 
-No `.session-context` file is used. Phase awareness is derived entirely from `.status.json`.
-
 ### Retry-Safe Design
 
 All skill scripts are designed to be **retry-safe** (non-atomic): if a script fails midway, re-running it produces the correct result without corruption. Status transitions occur after file writes, so partial failures leave the task in the pre-transition state. Idempotent file writes (overwrite, not append) ensure repeated runs converge.
@@ -230,7 +228,7 @@ Sub-commands that modify task module files MUST acquire `.lock` (O_CREAT | O_EXC
 
 **Corruption recovery**: If `.status.json` fails to parse (malformed JSON):
 
-1. **Git recovery**: `git show HEAD:<project>/<notebook>/.status.json` — restore from latest committed version
+1. **Git recovery**: `git show HEAD:<project>/.worktrees/task-<notebook>/.working/.status.json` — restore from latest committed version
 2. **If git recovery fails**: Reconstruct minimal `.status.json` with `"status": "draft"`, `"phase": ""`, preserve only what's parseable
 3. **Log**: Record corruption event and recovery action in `.analysis/<date>-index-recovery.md`
 

@@ -59,7 +59,7 @@ $NB_WORKSPACES_ROOT/
     └── <user-imported>/                   # User-imported files/folders (non-dot-prefixed)
         └── ...                            # Any structure; indexed by maintain --rebuild-index
 
-<project>/<notebook>/.working/
+<project>/.worktrees/task-<notebook>/.working/
 └── .library-state.json                    # Per-notebook library read cursor (gitignore)
 ```
 

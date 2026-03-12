@@ -50,7 +50,7 @@ After plan generation, the agent monitors conversation for plan refinements:
 2. **During conversation**: If user refines the plan, agent calls `/task-ai:plan --refine "content"`
 3. **When ready**: User proceeds to `/task-ai:exec`
 
-The agent maintains phase awareness via `.status.json` (see Phase Awareness Protocol in `commands/task-ai.md`). No `.session-context` file is used.
+The agent maintains phase awareness via `.status.json` (see Phase Awareness Protocol in `commands/task-ai.md`).
 
 ## Execution Steps
 

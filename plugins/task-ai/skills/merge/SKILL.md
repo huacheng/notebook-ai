@@ -47,7 +47,7 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
    - Copy temp content to `<project>/.deliverables/` on main
    - Commit
    ```
-   Source: <project>/<notebook>/.deliverables/*  (task branch)
+   Source: <project>/.worktrees/task-<notebook>/.deliverables/*  (task branch)
    Target: <project>/.deliverables/*  (main branch)
    ```
    Where `<task-branch>` is read from `.status.json` `branch` field (defaults to `task/<notebook>` if unset).
