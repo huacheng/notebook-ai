@@ -436,7 +436,18 @@ export function createProjectsRouter(
       const session = await sessionManager.createSession(notebookPath, worktreePath);
       sessionId = session.id;
 
+      // Save to DB first — only fire auto-send after DB succeeds
+      const now = new Date().toISOString();
+      const nbId = randomUUID();
+      db.createNotebook({
+        id: nbId, user_id: null, title, slug: nbSlug,
+        workspace_dir: worktreePath, notebook_path: notebookPath,
+        project_id: project.id,
+        status: 'active', created_at: now, updated_at: now,
+      });
+
       // Auto-send '/task-ai:auto load' to initialize task context (non-blocking)
+      // Only execute after DB insert succeeds to avoid orphan cell execution on rollback
       const initCellId = `cell-init-${randomUUID().slice(0, 8)}`;
       const initPrompt = '/task-ai:auto load';
       session.notebook.cells.push({
@@ -452,16 +463,6 @@ export function createProjectsRouter(
       // Fire and forget - don't await to avoid blocking the response
       sessionManager.executeCell(session.id, initCellId, initPrompt).catch((err) => {
         console.error(`[projects] Auto-init cell failed for ${nbSlug}:`, err);
-      });
-
-      // Save to DB
-      const now = new Date().toISOString();
-      const nbId = randomUUID();
-      db.createNotebook({
-        id: nbId, user_id: null, title, slug: nbSlug,
-        workspace_dir: worktreePath, notebook_path: notebookPath,
-        project_id: project.id,
-        status: 'active', created_at: now, updated_at: now,
       });
 
       res.json({
