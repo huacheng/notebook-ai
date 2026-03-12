@@ -119,9 +119,36 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 log "推送到远程..."
 git push origin master
 
+# 9. 创建 GitHub Release
+log "创建 GitHub Release..."
+RELEASE_NOTES="## task-ai v$NEW_VERSION
+
+### Changes
+- See commit history for details
+
+### Installation
+\`\`\`
+claude /plugin add task-ai@moonview
+\`\`\`
+
+### Update
+\`\`\`
+claude /plugin update task-ai@moonview
+\`\`\`
+"
+
+if gh release create "v$NEW_VERSION" \
+    --repo huacheng/moonview \
+    --title "task-ai v$NEW_VERSION" \
+    --notes "$RELEASE_NOTES" 2>/dev/null; then
+    log "✅ GitHub Release 创建成功: v$NEW_VERSION"
+else
+    warn "GitHub Release 创建失败（可能已存在或 gh 未授权）"
+fi
+
 log "✅ 发布完成: v$NEW_VERSION"
 
-# 9. 提示刷新 Claude 缓存
+# 10. 提示刷新 Claude 缓存
 echo ""
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}发布成功! 请执行以下命令刷新 Claude 缓存:${NC}"
