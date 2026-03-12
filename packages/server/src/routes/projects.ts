@@ -63,12 +63,13 @@ export function createProjectsRouter(
 
   // Create project
   router.post('/', async (req, res) => {
+    let projectPath: string | null = null;
     try {
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
 
       const slug = titleToSlug(title);
-      const projectPath = path.join(workspacesRoot, slug);
+      projectPath = path.join(workspacesRoot, slug);
 
       // Reject duplicate project slug
       if (existsSync(projectPath)) {
@@ -97,6 +98,12 @@ export function createProjectsRouter(
 
       res.json(project);
     } catch (err: unknown) {
+      // Rollback: delete created directory if it exists
+      if (projectPath && existsSync(projectPath)) {
+        try {
+          await rm(projectPath, { recursive: true, force: true });
+        } catch { /* ignore cleanup errors */ }
+      }
       res.status(500).json({ error: 'Internal server error.' });
     }
   });
