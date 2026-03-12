@@ -31,12 +31,12 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-if [[ ! -d "$WORK_DIR" ]]; then
+if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
     exit 1
 fi
 
-TEST_DIR="$WORK_DIR/.test"
+TEST_DIR="$TASKAI_WORK_DIR/.test"
 mkdir -p "$TEST_DIR"
 
 # Handle --generate-skill-tests (utility mode — no status check needed)
@@ -109,7 +109,7 @@ if [[ -n "$TARGET_FILE" && "$GENERATE_SKILL_TESTS" != "true" ]]; then
 fi
 
 # D1 Step 1: Check .status.json — reject terminal statuses, extract type
-STATUS_FILE="$WORK_DIR/.status.json"
+STATUS_FILE="$TASKAI_WORK_DIR/.status.json"
 TASK_TYPE=""
 if [[ -f "$STATUS_FILE" ]]; then
     TASK_STATUS=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$STATUS_FILE" | head -1 | sed 's/.*"status"[[:space:]]*:[[:space:]]*"//;s/"//' || true)
@@ -141,7 +141,7 @@ if [[ "$CHECKPOINT" != "quick" && "$CHECKPOINT" != "full" && ! "$CHECKPOINT" =~ 
 fi
 
 # D2/D3: Acquire concurrency lock (see SKILL.md Notes § Concurrency)
-LOCK_DIR="$WORK_DIR"
+LOCK_DIR="$TASKAI_WORK_DIR"
 LOCK_FILE="$LOCK_DIR/.lock"
 if ! mkdir "$LOCK_FILE" 2>/dev/null; then
     # D3: Stale lock detection — check if holding PID is still alive

@@ -37,7 +37,7 @@ if [[ "$ACTION" != "scan-skill" ]]; then
     resolve_nb_workdir "$NOTEBOOK"
     NOTEBOOK="$NB_NOTEBOOK"
 
-    if [[ ! -d "$WORK_DIR" ]]; then
+    if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
         echo "[ERROR] Working directory not found." >&2
         exit 1
     fi
@@ -171,7 +171,7 @@ verify_cmd() {
 }
 
 audit_plan() {
-    local plan_md="$WORK_DIR/.plan.md"
+    local plan_md="$TASKAI_WORK_DIR/.plan.md"
     if [[ ! -f "$plan_md" ]]; then
         echo "[SECURITY] PASS: No plan.md to audit"
         return 0

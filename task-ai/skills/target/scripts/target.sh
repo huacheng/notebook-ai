@@ -42,9 +42,9 @@ source "$SCRIPT_DIR/../../../core/lib.sh"
 # Auto-detect notebook context (exits on failure)
 resolve_nb_workdir
 
-TARGET_FILE="$WORK_DIR/.target.md"
-STATUS_FILE="$WORK_DIR/.status.json"
-BASELINE_FILE="$WORK_DIR/.convergence-baseline.md"
+TARGET_FILE="$TASKAI_WORK_DIR/.target.md"
+STATUS_FILE="$TASKAI_WORK_DIR/.status.json"
+BASELINE_FILE="$TASKAI_WORK_DIR/.convergence-baseline.md"
 STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 
 # ─────────────────────────────────────────────────────────────────────────────

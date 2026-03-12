@@ -41,10 +41,10 @@ done
 resolve_nb_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
-STATUS_JSON="$WORK_DIR/.status.json"
-PLAN_FILE="$WORK_DIR/.plan.md"
+STATUS_JSON="$TASKAI_WORK_DIR/.status.json"
+PLAN_FILE="$TASKAI_WORK_DIR/.plan.md"
 
-if [[ ! -d "$WORK_DIR" ]]; then
+if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
     exit 1
 fi
@@ -153,11 +153,11 @@ echo "Planning for task type: $TYPE"
 # 2. Generate .plan.md (Scaffold)
 # Archive existing plan only when re-planning (SKILL.md step 14)
 if [[ -f "$PLAN_FILE" ]] && [[ "$CURRENT_STATUS_GUARD" == "review" || "$CURRENT_STATUS_GUARD" == "executing" || "$CURRENT_STATUS_GUARD" == "re-planning" ]]; then
-    SUPERSEDED="$WORK_DIR/.plan-superseded.md"
+    SUPERSEDED="$TASKAI_WORK_DIR/.plan-superseded.md"
     if [[ -f "$SUPERSEDED" ]]; then
         # Append numeric suffix if superseded file exists
         i=2
-        while [[ -f "$WORK_DIR/.plan-superseded-$i.md" ]]; do
+        while [[ -f "$TASKAI_WORK_DIR/.plan-superseded-$i.md" ]]; do
             ((i++))
             # D3: Safety cap to prevent infinite loop on filesystem anomalies
             if [[ $i -gt 100 ]]; then
@@ -165,7 +165,7 @@ if [[ -f "$PLAN_FILE" ]] && [[ "$CURRENT_STATUS_GUARD" == "review" || "$CURRENT_
                 exit 1
             fi
         done
-        SUPERSEDED="$WORK_DIR/.plan-superseded-$i.md"
+        SUPERSEDED="$TASKAI_WORK_DIR/.plan-superseded-$i.md"
     fi
     # D3: mv with error handling - abort if fails to prevent data loss
     if ! mv "$PLAN_FILE" "$SUPERSEDED"; then
@@ -190,7 +190,7 @@ EOF
 
 # 3. Generate VH Stubs (for software types)
 if [[ "$TYPE" == *"software"* ]]; then
-    TEST_DIR="$WORK_DIR/.test"
+    TEST_DIR="$TASKAI_WORK_DIR/.test"
     mkdir -p "$TEST_DIR"
     DATE=$(date +%Y-%m-%d)
     STUB_FILE="$TEST_DIR/$DATE-vh-stubs.test.js"
@@ -241,8 +241,8 @@ if ! git add "${GIT_ADD_FILES[@]}" 2>/dev/null; then
     echo "[WARN] git add failed" >&2
 fi
 # Also add test directory if it exists (VH stubs, criteria)
-if [[ -d "$WORK_DIR/.test" ]]; then
-    git add "$WORK_DIR/.test" 2>/dev/null || true
+if [[ -d "$TASKAI_WORK_DIR/.test" ]]; then
+    git add "$TASKAI_WORK_DIR/.test" 2>/dev/null || true
 fi
 if ! git commit -m "task-ai($NOTEBOOK):plan generate implementation plan" 2>/dev/null; then
     echo "[WARN] git commit failed (may be no changes)" >&2

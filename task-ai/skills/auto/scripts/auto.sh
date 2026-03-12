@@ -31,13 +31,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 resolve_nb_workdir ""
-STATUS_JSON="$WORK_DIR/.status.json"
-STOP_FILE="$WORK_DIR/.auto-stop"
+STATUS_JSON="$TASKAI_WORK_DIR/.status.json"
+STOP_FILE="$TASKAI_WORK_DIR/.auto-stop"
 # D6: Use SCRIPT_DIR for consistent path construction
 STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 STATE_PY="$(cd "$(dirname "$STATE_PY")" && pwd)/$(basename "$STATE_PY")"
 
-if [[ ! -d "$WORK_DIR" ]]; then
+if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
     exit 1
 fi
@@ -85,7 +85,7 @@ COMPACTION=0
 case "$STATUS" in
   draft)
     # Phase 1: Check target status before routing
-    TARGET_MD="$WORK_DIR/.target.md"
+    TARGET_MD="$TASKAI_WORK_DIR/.target.md"
     if [[ -f "$TARGET_MD" ]]; then
         # D1: Validate substantive content before any routing (per SKILL.md §Entry Point)
         if [[ ! -s "$TARGET_MD" ]] || ! grep -qE '^##' "$TARGET_MD"; then
@@ -178,7 +178,7 @@ ITERATION=$((ITERATION + 1))
 MAX_ITERATIONS=200
 if [[ "$ITERATION" -ge "$MAX_ITERATIONS" ]]; then
     echo "[ERROR] Hard iteration limit reached ($MAX_ITERATIONS). Stopping auto loop to prevent runaway." >&2
-    echo '{"stop_reason":"hard_iteration_limit","iteration":'"$ITERATION"'}' > "$WORK_DIR/.auto-stop"
+    echo '{"stop_reason":"hard_iteration_limit","iteration":'"$ITERATION"'}' > "$TASKAI_WORK_DIR/.auto-stop"
     exit 1
 fi
 
