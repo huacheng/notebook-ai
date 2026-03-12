@@ -69,7 +69,7 @@ mixed 模式 = 部分 auto + 部分 human（`human_vhs` 列表标注）
 | 变量 | 含义 |
 |------|------|
 | `TASKAI_WORK_DIR` | `<project>/.worktrees/task-<notebook>/.working/` — notebook 级系统工作目录 |
-| `NB_PROJECT_DELIVERABLES` | `<project>/.deliverables/` — project 级交付物目录（merge 时从 `.working/.deliverables/` 复制） |
+| `NB_PROJECT_DELIVERABLES` | `<project>/.deliverables/` — project 级交付物目录（merge 时从 `$NB_WORK_DIR/.deliverables/` 复制） |
 
 以下路径均相对于 `$TASKAI_WORK_DIR`，交付物写入 `$NB_PROJECT_DELIVERABLES/<notebook>/`。
 

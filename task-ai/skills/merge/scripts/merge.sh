@@ -124,7 +124,7 @@ echo "[GIT] Copying .deliverables/ from $TASK_BRANCH to $MAIN_BRANCH..."
 
 # Resolve paths before branch switch (paths vanish after checkout master)
 NB_DIR="$(dirname "$TASKAI_WORK_DIR")"
-PROJECT_DIR="$(dirname "$NB_DIR")"
+PROJECT_DIR="$(dirname "$(dirname "$NB_DIR")")"
 SRC_DELIVERABLES="$NB_DIR/.deliverables"
 DELIVERABLES_TARGET="$PROJECT_DIR/.deliverables/$NOTEBOOK"
 
