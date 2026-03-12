@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # L2: Functional test for init sub-command
 # Verifies directory creation, branch safety, and metadata integrity.
-# Runs init.sh inside a temporary git worktree to avoid checkout on the main working tree.
+# Creates a temporary workspace with a test project (git repo).
 
 source "$(dirname "$0")/lib.sh"
 
@@ -9,31 +9,42 @@ INIT_SH="$TASK_AI_ROOT/skills/init/scripts/init.sh"
 TEST_PROJECT="test-project"
 TEST_NB="functional-test-$(date +%s)"
 
-# Create a temporary worktree so init.sh's git checkout doesn't touch the main tree
-TEST_WT="/tmp/nb-init-func-wt-$$"
-git worktree add --detach "$TEST_WT" HEAD > /dev/null 2>&1
+# Create temporary workspace root
+TEST_WS="/tmp/nb-init-func-ws-$$"
+mkdir -p "$TEST_WS"
 
-export NB_WORKSPACES_ROOT="$TEST_WT"
-trap 'git worktree remove "$TEST_WT" --force 2>/dev/null; git branch -D "task/$TEST_NB" 2>/dev/null; git branch -D "task/branch-clash" 2>/dev/null' EXIT
+# Create test project as a git repository
+TEST_PROJECT_DIR="$TEST_WS/$TEST_PROJECT"
+mkdir -p "$TEST_PROJECT_DIR"
+git -C "$TEST_PROJECT_DIR" init --initial-branch=master > /dev/null 2>&1
+git -C "$TEST_PROJECT_DIR" config user.email "test@test.com"
+git -C "$TEST_PROJECT_DIR" config user.name "Test"
+# Create initial commit so branch operations work
+echo "# Test Project" > "$TEST_PROJECT_DIR/README.md"
+git -C "$TEST_PROJECT_DIR" add README.md
+git -C "$TEST_PROJECT_DIR" commit -m "initial commit" > /dev/null 2>&1
+
+export NB_WORKSPACES_ROOT="$TEST_WS"
+trap 'rm -rf "$TEST_WS"' EXIT
 
 # --- Test 1: Successful Initialization ---
-(cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Functional Test" --tags "test,qa") > /dev/null 2>&1
+"$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Functional Test" --tags "test,qa" > /dev/null 2>&1
 
-if [[ -f "$NB_WORKSPACES_ROOT/$TEST_PROJECT/.worktrees/task-$TEST_NB/.working/.status.json" ]]; then
+if [[ -f "$TEST_PROJECT_DIR/.worktrees/task-$TEST_NB/.working/.status.json" ]]; then
     emit_pass "init: successfully created metadata and directory"
 else
     emit_fail "init: failed to create metadata"
 fi
 
-# Check branch creation (branches are shared across worktrees)
-if git branch --list "task/$TEST_NB" | grep -q "$TEST_NB"; then
+# Check branch creation
+if git -C "$TEST_PROJECT_DIR" branch --list "task/$TEST_NB" | grep -q "$TEST_NB"; then
     emit_pass "init: successfully created git branch"
 else
     emit_fail "init: failed to create git branch"
 fi
 
 # --- Test 2: Negative Test - Directory Collision ---
-OUTPUT=$( (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB") 2>&1 )
+OUTPUT=$("$INIT_SH" "$TEST_PROJECT" "$TEST_NB" 2>&1)
 if echo "$OUTPUT" | grep -q "Directory already exists"; then
     emit_pass "init: correctly blocked directory collision"
 else
@@ -42,13 +53,22 @@ fi
 
 # --- Test 3: Negative Test - Branch Collision ---
 DUPLICATE_BRANCH="task/branch-clash"
-git branch "$DUPLICATE_BRANCH" > /dev/null 2>&1
+git -C "$TEST_PROJECT_DIR" branch "$DUPLICATE_BRANCH" > /dev/null 2>&1
 
-OUTPUT=$( (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "branch-clash") 2>&1 )
+OUTPUT=$("$INIT_SH" "$TEST_PROJECT" "branch-clash" 2>&1)
 if echo "$OUTPUT" | grep -q "Git branch already exists"; then
     emit_pass "init: correctly blocked branch collision"
 else
     emit_fail "init: failed to block branch collision"
+fi
+
+# --- Test 4: Negative Test - Invalid Project (no .git) ---
+mkdir -p "$TEST_WS/not-a-repo"
+OUTPUT=$("$INIT_SH" "not-a-repo" "some-notebook" 2>&1)
+if echo "$OUTPUT" | grep -q "not a git repository"; then
+    emit_pass "init: correctly rejected non-git project"
+else
+    emit_fail "init: failed to reject non-git project"
 fi
 
 # --- Test: init.sh builds tags JSON safely (no unquoted variable expansion) ---
@@ -65,10 +85,5 @@ if grep -n '"title": "\$TITLE"' "$INIT_SH" | grep -qv '^#'; then
 else
   emit_pass "init: \$TITLE is escaped or sanitized before JSON injection"
 fi
-
-# Cleanup (also covered by trap)
-git worktree remove "$TEST_WT" --force 2>/dev/null
-git branch -D "task/$TEST_NB" > /dev/null 2>&1
-git branch -D "$DUPLICATE_BRANCH" > /dev/null 2>&1
 
 summary
