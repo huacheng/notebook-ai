@@ -381,16 +381,22 @@ export function createProjectsRouter(
 
   // Create notebook within project
   router.post('/:projectId/notebooks', async (req, res) => {
+    let worktreePath: string | null = null;
+    let branchName: string | null = null;
+    let projectPath: string | null = null;
+    let sessionId: string | null = null;
+
     try {
       const project = db.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ error: 'project not found' });
 
+      projectPath = project.path;
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
 
       const nbSlug = titleToSlug(title);
-      const branchName = `task/${nbSlug}`;
-      const worktreePath = path.join(project.path, '.worktrees', `task-${nbSlug}`);
+      branchName = `task/${nbSlug}`;
+      worktreePath = path.join(project.path, '.worktrees', `task-${nbSlug}`);
 
       // Reject duplicate notebook slug (check worktree path, not old nbDir)
       if (existsSync(worktreePath)) {
@@ -428,6 +434,7 @@ export function createProjectsRouter(
 
       // Create session with worktree as cwd
       const session = await sessionManager.createSession(notebookPath, worktreePath);
+      sessionId = session.id;
 
       // Save to DB
       const now = new Date().toISOString();
@@ -449,6 +456,27 @@ export function createProjectsRouter(
       });
     } catch (err: unknown) {
       console.error('[projects] Create notebook error:', err);
+
+      // Rollback: close session, remove worktree, delete branch
+      if (sessionId) {
+        try { await sessionManager.closeSession(sessionId); } catch { /* ignore */ }
+      }
+      if (worktreePath && existsSync(worktreePath) && projectPath) {
+        try {
+          const git = new GitManager(projectPath);
+          await git.removeWorktree(worktreePath);
+        } catch {
+          // Fallback: force delete directory
+          try { await rm(worktreePath, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      }
+      if (branchName && projectPath) {
+        try {
+          const git = new GitManager(projectPath);
+          await git.deleteBranch(projectPath, branchName);
+        } catch { /* ignore - branch may not exist */ }
+      }
+
       res.status(500).json({ error: 'Internal server error.' });
     }
   });
