@@ -42,56 +42,46 @@ ensure_library() {
 
 # --- Context Discovery ---
 
-# Identifies the current notebook based on CWD or Git branch.
-# Sets NB_NOTEBOOK and NB_WORKING. Returns 0 if found, 1 otherwise.
-find_nb_context() {
-  local cur="$PWD"
-  while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
-      export NB_WORKING="$cur/.working"
-      # Directory is task-<notebook>, extract notebook name
-      local dir_name="$(basename "$cur")"
-      export NB_NOTEBOOK="${dir_name#task-}"
-      return 0
-    fi
-    cur="$(dirname "$cur")"
-  done
-
-  local branch
-  branch=$(git branch --show-current 2>/dev/null || true)
-  if [[ -n "$branch" && "$branch" =~ ^task/ ]]; then
-    local nb_name="${branch#task/}"
-    # D2: Validate notebook name from branch to prevent path traversal
-    if [[ "$nb_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-      export NB_NOTEBOOK="$nb_name"
-      local nb_dir
-      # Search in <project>/.worktrees/task-<notebook> structure
-      nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 4 -path "*/.worktrees/task-$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
-      if [[ -n "$nb_dir" ]]; then
-        export NB_WORKING="$nb_dir/.working"
-        return 0
-      fi
-    fi
-  fi
-
-  return 1
-}
-
-# --- Notebook Workdir Resolution ---
-
-# Resolves NOTEBOOK and WORK_DIR from argument or context.
-# Usage: resolve_workdir "$1"
+# Resolves notebook context from CWD, git branch, or explicit name.
 # Sets: NB_NOTEBOOK, WORK_DIR (exported)
+# Usage:
+#   resolve_workdir           # auto-detect from CWD or branch
+#   resolve_workdir "name"    # explicit notebook name
 # Exits on failure.
 resolve_workdir() {
   local notebook="${1:-}"
+
   if [[ -z "$notebook" ]]; then
-    if ! find_nb_context; then
-      echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
-      exit 1
+    # Auto-detect from CWD
+    local cur="$PWD"
+    while [[ "$cur" != "/" && "$cur" != "." ]]; do
+      if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
+        export WORK_DIR="$cur/.working"
+        local dir_name="$(basename "$cur")"
+        export NB_NOTEBOOK="${dir_name#task-}"
+        return 0
+      fi
+      cur="$(dirname "$cur")"
+    done
+
+    # Fallback: detect from git branch
+    local branch
+    branch=$(git branch --show-current 2>/dev/null || true)
+    if [[ -n "$branch" && "$branch" =~ ^task/ ]]; then
+      local nb_name="${branch#task/}"
+      if [[ "$nb_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        local nb_dir
+        nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 4 -path "*/.worktrees/task-$nb_name" -type d -print -quit 2>/dev/null || true)
+        if [[ -n "$nb_dir" ]]; then
+          export WORK_DIR="$nb_dir/.working"
+          export NB_NOTEBOOK="$nb_name"
+          return 0
+        fi
+      fi
     fi
-    notebook="$NB_NOTEBOOK"
-    export WORK_DIR="$NB_WORKING"
+
+    echo "[ERROR] No active task context detected. Enter a notebook directory or specify a name." >&2
+    exit 1
   else
     if [[ ! "$notebook" =~ ^[a-zA-Z0-9_-]+$ ]]; then
       echo "[ERROR] Invalid notebook name." >&2

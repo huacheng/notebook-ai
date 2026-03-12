@@ -39,14 +39,12 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
-if ! find_nb_context; then
-    echo "[ERROR] No active task context detected. Enter a notebook directory or switch to a task branch." >&2
-    exit 1
-fi
+# Auto-detect notebook context (exits on failure)
+resolve_workdir
 
-TARGET_FILE="$NB_WORKING/.target.md"
-STATUS_FILE="$NB_WORKING/.status.json"
-BASELINE_FILE="$NB_WORKING/.convergence-baseline.md"
+TARGET_FILE="$WORK_DIR/.target.md"
+STATUS_FILE="$WORK_DIR/.status.json"
+BASELINE_FILE="$WORK_DIR/.convergence-baseline.md"
 STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 
 # ─────────────────────────────────────────────────────────────────────────────
