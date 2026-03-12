@@ -28,6 +28,8 @@ arguments:
 
 Generate an implementation plan from `.target.md`. Annotation processing is handled by the `annotate` sub-command.
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 ## Usage
 
 ```bash

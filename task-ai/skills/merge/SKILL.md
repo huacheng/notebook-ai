@@ -21,6 +21,8 @@ arguments: []
 
 Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/` on main. All notebooks share the same project-level deliverables directory.
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 ## Usage
 
 ```

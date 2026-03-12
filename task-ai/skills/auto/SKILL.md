@@ -30,6 +30,8 @@ Dialog-driven four-phase flow: Target → Planning → Execution → Acceptance.
 
 **No auto mode to activate.** Notebook existence IS the context. Claude reads `.status.json` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
 
+> **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, `.analysis/`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
+
 ```
 Frontend UI: init (create notebook) → .status.json status=draft
   │

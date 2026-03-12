@@ -88,7 +88,7 @@ export async function getClaudeDefaultModel(): Promise<string | undefined> {
  */
 function buildMemorySystemPrompt(workspaceDir: string): string {
   const memoryPath = path.join(workspaceDir, '.MEMORY.md');
-  return `Read the ${memoryPath} file. It contains important context, including the Shared Library Directory, Deliverables Directory and Project Deliverables Directory path.`;
+  return `Read ${memoryPath} for workspace paths.`;
 }
 
 // ── Claude Code JSONL message shapes ────────────────────────────────────────
