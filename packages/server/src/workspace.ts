@@ -121,8 +121,9 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
   if (projectPath) {
     const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
     content +=
-      `\n## Project Deliverables (shared across project notebooks)\n` +
-      `Path: \`${projDelRel}\` → \`${path.join(projectPath, '.deliverables')}\`\n`;
+      `\n## Project Deliverables\n` +
+      `Path: \`${projDelRel}\` → \`${path.join(projectPath, '.deliverables')}\`\n` +
+      `Write cross-notebook outputs here (shared datasets, reports, artifacts).\n`;
   }
 
   const memoryPath = path.join(workspaceDir, MEMORY_FILENAME);
