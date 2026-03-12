@@ -243,6 +243,7 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Deliverables ──────────────────────────────────────────────────────
     'deliverables.title': 'Deliverables',
+    'deliverables.notebook': 'NB Deliverables',
     'deliverables.noProject': 'No active project',
 
     // ── Git ───────────────────────────────────────────────────────────────
@@ -536,6 +537,7 @@ export const messages: Record<Language, Record<string, string>> = {
 
     // ── Deliverables ──────────────────────────────────────────────────────
     'deliverables.title': '交付物',
+    'deliverables.notebook': 'NB 交付物',
     'deliverables.noProject': '无活跃项目',
 
     // ── Git ───────────────────────────────────────────────────────────────

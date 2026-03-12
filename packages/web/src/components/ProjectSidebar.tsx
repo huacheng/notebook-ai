@@ -802,11 +802,8 @@ function FileBrowser() {
         <button
           className={`sidebar-l2-tab${l2Tab === 'deliverables' ? ' sidebar-l2-tab--active' : ''}`}
           onClick={() => setL2Tab('deliverables')}
-          title={workspaceDir ? workspaceDir.split('/').pop()?.replace(/^task-/, '') : t('deliverables.title')}
         >
-          {workspaceDir
-            ? workspaceDir.split('/').pop()?.replace(/^task-/, '') || t('deliverables.title')
-            : t('deliverables.title')}
+          {workspaceDir ? t('deliverables.notebook') : t('deliverables.title')}
         </button>
       </div>
       {l2Tab === 'files' && (
