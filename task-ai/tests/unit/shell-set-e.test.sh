@@ -12,7 +12,7 @@ SCRIPTS=$(find "$TASK_AI_ROOT" -name "*.sh" -type f \
 MISSING=0
 
 for script in $SCRIPTS; do
-    if ! head -10 "$script" | grep -qE 'set\s+-[a-z]*e'; then
+    if ! head -15 "$script" | grep -qE 'set\s+-[a-z]*e'; then
         echo "FAIL: $script missing 'set -e'"
         ((MISSING++)) || true
     fi

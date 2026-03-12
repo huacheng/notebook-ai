@@ -18,9 +18,9 @@ if grep -qE '≥\s*70%' "$TASK_AI_ROOT/skills/auto/SKILL.md"; then
     ((FAILED++)) || true
 fi
 
-# H-DOC-2: highlight scope count should be consistent (6, not 7)
-if grep -q '7 scopes' "$TASK_AI_ROOT/skills/highlight/SKILL.md"; then
-    echo "FAIL: highlight/SKILL.md has inconsistent '7 scopes' (should be 6)"
+# H-DOC-2: highlight scope count should be consistent (7 scopes: §3.1-§3.7)
+if grep -q '8 scopes' "$TASK_AI_ROOT/skills/highlight/SKILL.md"; then
+    echo "FAIL: highlight/SKILL.md has inconsistent scope count (should be 7)"
     ((FAILED++)) || true
 fi
 
