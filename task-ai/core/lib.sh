@@ -47,8 +47,8 @@ ensure_library() {
 find_nb_context() {
   local cur="$PWD"
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -f "$cur/.status.json" ]]; then
-      export NB_WORKING="$cur"
+    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
+      export NB_WORKING="$cur/.working"
       export NB_NOTEBOOK="$(basename "$cur")"
       return 0
     fi
@@ -63,9 +63,10 @@ find_nb_context() {
     if [[ "$nb_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
       export NB_NOTEBOOK="$nb_name"
       local nb_dir
-      nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
+      # Search in <project>/.worktrees/task-<notebook> structure
+      nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 4 -path "*/.worktrees/task-$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
       if [[ -n "$nb_dir" ]]; then
-        export NB_WORKING="$nb_dir"
+        export NB_WORKING="$nb_dir/.working"
         return 0
       fi
     fi
@@ -96,12 +97,13 @@ resolve_workdir() {
     fi
     local nb_root="${NB_WORKSPACES_ROOT:-$(pwd)}"
     local nb_dir
-    nb_dir=$(find "$nb_root" -maxdepth 3 -name "$notebook" -type d -print -quit 2>/dev/null)
+    # Search in <project>/.worktrees/task-<notebook> structure
+    nb_dir=$(find "$nb_root" -maxdepth 4 -path "*/.worktrees/task-$notebook" -type d -print -quit 2>/dev/null)
     if [[ -z "$nb_dir" ]]; then
       echo "[ERROR] Notebook directory '$notebook' not found under $nb_root" >&2
       exit 1
     fi
-    export WORK_DIR="$nb_dir"
+    export WORK_DIR="$nb_dir/.working"
   fi
   export NB_NOTEBOOK="$notebook"
 }
