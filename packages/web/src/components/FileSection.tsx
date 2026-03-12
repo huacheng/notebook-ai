@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react';
-import { cacheSet, cacheGet, TTL } from '../utils/localCache';
+import { cacheSet, cacheGet, cacheRemove, TTL } from '../utils/localCache';
 import { makeFetchGuard } from '../utils/fetchGuard';
 import { computeBreadcrumb, computeNavigateUp } from '../utils/worktreePath';
 import { isWsFresh } from '../utils/wsFilesPush';
@@ -389,7 +389,12 @@ export function FileSection({
         { method: 'DELETE', headers: h },
       );
       if (!res.ok) setError(((await res.json()) as { error: string }).error);
-      else setFiles((prev) => prev.filter((f) => f.name !== name));
+      else {
+        setFiles((prev) => prev.filter((f) => f.name !== name));
+        // Clear cache to prevent stale data on refresh
+        const cacheKey = `nb-filelist-${baseUrl}-${subPath}`;
+        cacheRemove(cacheKey);
+      }
     } catch (err) { setError(String(err)); }
   }
 
