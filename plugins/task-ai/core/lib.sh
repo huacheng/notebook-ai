@@ -46,7 +46,7 @@ ensure_library() {
 # Sets (exported):
 #   NB_NOTEBOOK  - notebook name (without task- prefix)
 #   NB_WORK_DIR  - notebook root: <project>/.worktrees/task-<notebook>/
-#   TASKAI_WORK_DIR     - task-ai system files: <notebook>/.working/
+#   TASKAI_WORK_DIR     - task-ai system files: $NB_WORK_DIR/.working/
 # Usage:
 #   resolve_workdir           # auto-detect from CWD or branch
 #   resolve_workdir "name"    # explicit notebook name

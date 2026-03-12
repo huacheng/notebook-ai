@@ -95,7 +95,7 @@ $NB_WORKSPACES_ROOT/                        # 环境变量: NB_WORKSPACES_ROOT
 - **Library** (`.library/`): Shared knowledge base, independent git repository
 - **Project** (`<project>/`): Each project is an independent git repository
 - **Notebook** (`<project>/.worktrees/task-<notebook>/`): Each notebook is a git worktree on branch `task/<notebook>`
-- **System Files** (`<notebook>/.working/`): task-ai managed files (status, plan, analysis, etc.)
+- **System Files** (`$NB_WORK_DIR/.working/`): task-ai managed files (status, plan, analysis, etc.)
 
 ## Environment Variables
 
@@ -105,7 +105,7 @@ $NB_WORKSPACES_ROOT/                        # 环境变量: NB_WORKSPACES_ROOT
 | `NB_WORKSPACES_LIBRARY` | `$NB_WORKSPACES_ROOT/.library/` | Shared knowledge library |
 | `NB_NOTEBOOK` | — | Notebook name (without `task-` prefix) |
 | `NB_WORK_DIR` | `<project>/.worktrees/task-<notebook>/` | Notebook root directory |
-| `TASKAI_WORK_DIR` | `<notebook>/.working/` | task-ai system files directory |
+| `TASKAI_WORK_DIR` | `$NB_WORK_DIR/.working/` | task-ai system files directory |
 
 ## Path Resolution
 

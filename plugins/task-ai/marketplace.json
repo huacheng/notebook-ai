@@ -9,7 +9,7 @@
     {
       "name": "task-ai",
       "description": "Structured task lifecycle management with 18 skills: init, target, highlight, plan, research, read, security, check, verify, exec, merge, report, auto, cancel, list, annotate, summarize, library. Git-integrated workflow with branch-per-task, worktree support, and context-aware execution.",
-      "version": "1.2.28",
+      "version": "1.2.29",
       "author": {
         "name": "huacheng"
       },
