@@ -262,6 +262,8 @@ export function FileSection({
   const [creating, setCreating] = useState<'file' | 'folder' | null>(null);
   const [newName, setNewName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // Track recently deleted items to filter them out even if WS push restores cache
+  const [recentlyDeleted, setRecentlyDeleted] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newNameRef = useRef<HTMLInputElement>(null);
   const fetchGuard = useRef(makeFetchGuard()).current;
@@ -382,20 +384,37 @@ export function FileSection({
     if (confirmDelete !== name) { setConfirmDelete(name); return; }
     setConfirmDelete(null);
     const fp = subPath === '.' ? name : `${subPath}/${name}`;
+    const url = `${baseUrl}/files?path=${encodeURIComponent(fp)}`;
     const h: Record<string, string> = {}; if (authToken) h['Authorization'] = `Bearer ${authToken}`;
     try {
-      const res = await fetch(
-        `${baseUrl}/files?path=${encodeURIComponent(fp)}`,
-        { method: 'DELETE', headers: h },
-      );
-      if (!res.ok) setError(((await res.json()) as { error: string }).error);
-      else {
+      const res = await fetch(url, { method: 'DELETE', headers: h });
+      if (!res.ok) {
+        const text = await res.text();
+        try {
+          const errData = JSON.parse(text);
+          setError(errData.error || `Delete failed (${res.status})`);
+        } catch {
+          setError(`Delete failed (${res.status})`);
+        }
+      } else {
+        // Add to recently deleted to filter out even if WS push restores it
+        setRecentlyDeleted(prev => new Set(prev).add(name));
         setFiles((prev) => prev.filter((f) => f.name !== name));
-        // Clear cache to prevent stale data on refresh
+        // Clear cache
         const cacheKey = `nb-filelist-${baseUrl}-${subPath}`;
         cacheRemove(cacheKey);
+        // Clear from recentlyDeleted after 5s (enough time for WS push to settle)
+        setTimeout(() => {
+          setRecentlyDeleted(prev => {
+            const next = new Set(prev);
+            next.delete(name);
+            return next;
+          });
+        }, 5000);
       }
-    } catch (err) { setError(String(err)); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    }
   }
 
   function downloadFile(name: string) {
@@ -490,7 +509,12 @@ export function FileSection({
               <IconDownload />
             </button>
           )}
-          <button className="fp-btn" onClick={() => fetchFiles(subPath)} disabled={loading} title={t('file.refresh')}>
+          <button className="fp-btn" onClick={() => {
+            // Force clear cache before refresh to ensure fresh data
+            const cacheKey = `nb-filelist-${baseUrl}-${subPath}`;
+            cacheRemove(cacheKey);
+            fetchFiles(subPath);
+          }} disabled={loading} title={t('file.refresh')}>
             <IconRefresh />
           </button>
         </div>
@@ -547,7 +571,7 @@ export function FileSection({
           )}
 
           {/* Entries */}
-          {!loading && files.map((f) => {
+          {!loading && files.filter(f => !recentlyDeleted.has(f.name)).map((f) => {
             const isNbDir = f.type === 'directory' && f.isNotebook;
             const isNbFile = f.name.endsWith('.notebook.json');
             // Strip task- prefix and .notebook.json suffix for notebook display names
@@ -594,7 +618,7 @@ export function FileSection({
               <span className="fp-name">{displayName}</span>
               <FileIcon name={f.name} />
               {renderItemActions?.(f, subPath) ?? (
-              <div className="fp-actions">
+              <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
                 {isReadOnly ? null : confirmDelete === f.name ? (
                   <span className="fp-confirm">
                     <button className="fp-confirm-ok" onClick={() => deleteEntry(f.name)}>del?</button>
