@@ -12,9 +12,9 @@ triggers:
     en: [look into, find out about, what are the options, explore approaches, feasibility analysis, reference implementation, deepen objective]
   disambiguate: >
     Core intent: investigate / explore / collect knowledge — output is Insights or .references/ files.
-    User wants to understand before acting ("先调研一下") → research.
-    User says "深化目标" → research --caller target (autonomous O1→O2→O3).
-    Ambiguous word "需求": user ANALYZING requirement gaps or proposing missing ones → research --caller target --phase requirements.
+    User wants to understand before acting ("research first") -> research.
+    User says "deepen objective" -> research --caller target (autonomous O1->O2->O3).
+    Ambiguous word "requirements": user ANALYZING requirement gaps or proposing missing ones -> research --caller target --phase requirements.
 arguments:
   - name: topic
     description: "Natural language topic to research (for standalone mode without notebook context)"
@@ -217,7 +217,7 @@ steps below produce the target insights.
 
 ### --phase objective: Autonomous 3-Stage Deepening (O1 → O2 → O3)
 
-> 废弃：O1→O2→O3 逐轮人工确认、[PROPOSED] 标记门禁、detect_stage.py 阶段检测
+> Deprecated: O1->O2->O3 per-round manual confirmation, [PROPOSED] marker gating, detect_stage.py stage detection
 
 A single invocation completes **all three stages** autonomously. The LLM executes O1 → O2 → O3 in sequence without per-round user confirmation. Results are presented once at the end.
 

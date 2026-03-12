@@ -94,4 +94,4 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 - Refactoring is exec's per-step responsibility (exec Per-Step step 6 Refactor window) — merge does not refactor
 - Merge does **not** delete branches or worktrees — the user retains full control over cleanup timing
 - **Concurrency**: Lock acquisition/release is handled by the caller (auto mode or CLI dispatcher). `merge.sh` assumes `.working/.lock` is already held (see Concurrency Protection in `commands/task-ai.md`)
-- **Note:** 交付物累积在 task 分支上。用户可随时调用 merge 将当前交付物复制到 main。状态转换由 auto 处理。
+- **Note:** Deliverables accumulate on the task branch. Users can invoke merge at any time to copy current deliverables to main. Status transitions are handled by auto.

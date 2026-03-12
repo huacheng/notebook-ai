@@ -1,6 +1,6 @@
 ---
 name: target
-description: "Define, refine, and review task objectives and requirements in .target.md. Supports both conversational definition and file-based editing."
+description: "Define task objectives and requirements in .target.md. Use when the user describes what they want to build, says 'I want to...', 'the goal is...', 'set the target', 'define requirements', or needs to clarify/refine what should be accomplished before planning."
 model_tier: heavy
 auto_delegatable: false
 triggers:
@@ -12,9 +12,9 @@ triggers:
     en: [I want to build, change the goal, update requirements, show target, what's the current objective, next stage, adjust scope]
   disambiguate: >
     Core intent: define / update / view .target.md content.
-    User states a concrete goal ("我想做 X") or modifies existing one ("改成 Y") → target.
-    User says "深化目标" or "调研可行性" → research --caller target, NOT target.
-    Ambiguous word "需求": user DESCRIBING requirement content → target; user INVESTIGATING what's missing → research.
+    User states a concrete goal ("I want to do X") or modifies existing one ("change to Y") -> target.
+    User says "deepen objective" or "feasibility research" -> research --caller target, NOT target.
+    Ambiguous word "requirements": user DESCRIBING requirement content -> target; user INVESTIGATING what's missing -> research.
 arguments:
   - name: objective
     description: "The task goal, requirements, and constraints (optional — omit to read current target)"
@@ -128,7 +128,7 @@ Build a JWT authentication system with refresh tokens and OAuth support
 3. **If `objective` is provided (Write Mode)** — three-branch routing:
 
    3a. **IF status == `evolving`** → **Stage Advance Mode**:
-      触发：auto Phase 4 evolving 入口自动调用（子阶段目标由 LLM 自动生成），或用户手动 `/task-ai:target`
+      Trigger: auto Phase 4 evolving entry auto-invocation (sub-stage objectives are LLM-generated), or user manual `/task-ai:target`
       1. Read `.target.md`, archive old plan: `.plan.md` → `.plan-stage-<N>.md` (where N = current stage); `.plan-superseded.md` → `.plan-superseded-stage-<N>.md` (if exists); `.analysis/` → `.analysis-stage-<N>/` (if exists); `.test/` → `.test-stage-<N>/` (if exists). Skip missing files (non-fatal).
       2. Clear (non-fatal — skip if directory missing or empty): `.bugfix/` directory contents
       3. Increment `stage.current`, append new Stage section to `.target.md` with user's objective
@@ -174,8 +174,8 @@ Build a JWT authentication system with refresh tokens and OAuth support
 
       | # | Requirement | Weight | Source |
       |---|------------|--------|--------|
-      | R1 | JWT 认证登录 | 3 | Objective |
-      | R2 | Refresh token 刷新 | 2 | Requirements §1 |
+      | R1 | JWT authentication login | 3 | Objective |
+      | R2 | Refresh token renewal | 2 | Requirements §1 |
       ```
 
       Weight levels: **critical = 3** (core functionality, must-have), **important = 2** (main feature, can degrade), **optional = 1** (nice-to-have).
@@ -184,7 +184,7 @@ Build a JWT authentication system with refresh tokens and OAuth support
 
       | Trigger | Baseline action |
       |---------|----------------|
-      | First write (stage 1, from draft) | Extract atomic requirements from `.target.md` → generate `.convergence-baseline.md` |
+      | First write (stage 1, from draft) | Extract atomic requirements from `.target.md` -> generate `.convergence-baseline.md` |
       | `--refine` | Incremental update — add/modify R# entries |
       | Stage advance (evolving → planning, step 3a) | Baseline unchanged (Overall Objective unchanged) |
       | Modify Overall Objective | Regenerate baseline (preserve existing score records) |
@@ -226,7 +226,7 @@ After write mode completes, output the exact next step based on the resulting st
 | `blocked` | (updated) | `planning` | `post-target` | Target revised to unblock |
 | `evolving` | (updated) | `planning` | `post-target` | LLM auto-generates next substage target → stage advance |
 | `evolving` | --satisfy | `satisfied` | — | User temporarily satisfied |
-| `satisfied` | refine Overall Objective | `evolving` | — | 用户 refine Overall Objective → 更新 baseline → convergence 下降 |
+| `satisfied` | refine Overall Objective | `evolving` | — | User refines Overall Objective → update baseline → convergence decreases |
 | `satisfied` | (updated) | `planning` | `post-target` | Re-enter evolution |
 | `cancelled` | REJECT | — | — | Terminal state |
 

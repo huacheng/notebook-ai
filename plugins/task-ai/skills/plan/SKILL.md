@@ -1,6 +1,6 @@
 ---
 name: plan
-description: "Generate implementation plans for a task module. Triggered after init when .target.md requirements are defined, or on re-plan when check/exec identify issues requiring plan revision."
+description: "Generate step-by-step implementation plans with verification criteria. Use when the user asks 'how should we do this', 'make a plan', 'break this down into steps', 'what's the approach', or needs a roadmap before implementation."
 model_tier: heavy
 auto_delegatable: false
 triggers:
