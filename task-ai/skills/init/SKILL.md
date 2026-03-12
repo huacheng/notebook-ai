@@ -133,14 +133,14 @@ Dependencies reference other task modules. Two formats — simple string (requir
 1. **Validate** project_name and notebook_name: both must match `[a-zA-Z0-9_-]+` (ASCII letters, digits, hyphens, underscores), no whitespace, no leading dot, no path separators
 2. **Check** `$NB_WORKSPACES_ROOT/` directory exists; create if missing. Check `$NB_WORKSPACES_LIBRARY/` (= `$NB_WORKSPACES_ROOT/.library/`) exists; if missing, create the library skeleton: `.changelog` (empty file), `.changelog-archive/` (empty directory — git won't track it until `maintain --compact` writes the first archive file), `.master-index.md` (empty table header), `.type-registry.md` (initialized from seed types hardcoded in `init-lib.sh` — see `references/seed-types/.summary.md` for the type catalog and `plan/references/type-profiling.md` for registry format), `.memory/` (with sub-directories `.memory/.references/`, `.memory/.experiences/`, `.memory/.type-profiles/`, `.memory/.thinking/raw/`, `.memory/.thinking/patterns/` — created eagerly by `init-lib.sh`). `.plugin-registry.md` is created lazily by the `auto` sub-command on first successful plugin delegation. **Gitignore setup** (idempotent): ensure the following entries exist in `$NB_WORKSPACES_ROOT/.gitignore` (create file if missing; append only missing entries): `.worktrees/`, `**/.auto-stop`, `**/.lock`, `**/.lock.stale.*`, `**/.library-state.json`, `.library/.changelog`, `.library/.changelog-archive/.lock`, `.library/.memory/.thinking/raw/`, `.library/.memory/.thinking/patterns/.lock`, `.library/.inconsistency.log`, `.library/.ioc.md`
 3. **Check** `$NB_WORKSPACES_ROOT/<project_name>/` exists; create if missing (with `.status.json`)
-4. **Check** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/` does not already exist; abort with error if it does
+4. **Check** `<project>/.worktrees/task-<notebook_name>/` does not already exist; abort with error if it does
 5. **Check branch collision**: verify `task/<notebook_name>` branch does not already exist (`git branch --list task/<notebook_name>`). If exists, abort with error suggesting the user delete the old branch or choose a different name
 6. **Check working tree clean**: verify no uncommitted changes to tracked files (`git status --porcelain` then filter out `??` untracked entries). Untracked and gitignored files (e.g., `$NB_WORKSPACES_ROOT/` ephemeral files) do NOT block init. If tracked files have modifications, abort with error — branch should be created from a clean state to avoid mixing unrelated changes. User should commit or stash first
 7. **Git**: create branch `task/<notebook_name>` from current HEAD
 8. **If `--worktree`**: `git worktree add .worktrees/task-<notebook_name> task/<notebook_name>`
 9. **If not worktree**: `git checkout task/<notebook_name>`
-10. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/` directory. In worktree mode, all paths below are translated to the worktree directory (e.g., `<worktree>/<relative-path-from-repo-root>/...`)
-11. **Create** `.status.json` with JSON:
+10. **Create** `.working/` directory under the notebook root. In worktree mode, this is `<project>/.worktrees/task-<notebook_name>/.working/` (NB_WORK_DIR is the notebook root, TASKAI_WORK_DIR is `.working/`)
+11. **Create** `$TASKAI_WORK_DIR/.status.json` with JSON:
    - `title`: from `--title` argument or notebook_name
    - `type`: `""` (empty — auto-discovered by `research` during planning)
    - `status`: `draft`
@@ -153,7 +153,7 @@ Dependencies reference other task modules. Two formats — simple string (requir
    - `branch`: `task/<notebook_name>`
    - `worktree`: `.worktrees/task-<notebook_name>` (or empty if no worktree)
    - `stage`: `{ "current": 1, "history": [] }` (progressive target default)
-12. **Create** `$NB_WORKSPACES_ROOT/<project_name>/<notebook_name>/.target.md` with default template (task type in `.status.json` is auto-discovered by `research` during planning):
+12. **Create** `$TASKAI_WORK_DIR/.target.md` with default template (task type in `.status.json` is auto-discovered by `research` during planning):
     ```markdown
     # Task Target: <title>
 

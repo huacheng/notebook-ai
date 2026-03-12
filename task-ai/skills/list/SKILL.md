@@ -87,7 +87,7 @@ Parse commit messages to reconstruct the timeline of status changes.
 
 ## Execution Steps
 
-1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project list notebook directories (depth 1) that contain `.status.json`. Max scan depth is 3 levels from `$NB_WORKSPACES_ROOT`: project / notebook / `.working/`
+1. **Scan** `$NB_WORKSPACES_ROOT/` — list project directories (depth 1), then within each project scan `.worktrees/task-*/` for notebook worktrees that contain `.working/.status.json`. Max scan depth is 4 levels from `$NB_WORKSPACES_ROOT`: project / .worktrees / task-<notebook> / .working/
 2. **Metadata extraction**: For each discovered notebook, read `.status.json`. For list-all mode, extract `title`, `status`, `phase`, `completed_steps`, `type`, and `updated`. For single-notebook mode, read all fields (full JSON output)
 3. **If `--deps`**: build dependency graph from all notebooks' `depends_on` fields; **if `--timeline`**: auto-detect notebook from CWD or task branch (REJECT if not in a notebook context — timeline requires a specific notebook), then extract history via `git log --format="%h %ai %s" --fixed-strings --grep="task-ai(<notebook>)" -n 100`
 4. **Display**: Format and print output (table, details, Mermaid graph, or timeline)
