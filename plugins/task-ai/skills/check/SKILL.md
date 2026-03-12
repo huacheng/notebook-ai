@@ -370,7 +370,12 @@ Before step 1, determine scope from invocation:
     - **`quality_status` updates**: execute highlight protocol scope=quality-update — see `highlight/SKILL.md` §3.4. ACCEPT (post-exec): provisional → verified. REPLAN: provisional → invalidated (if experience was misleading source). Inline call failure should not block check's main flow (same fault isolation)
 13. **Update** each written directory's `.summary.md` — overwrite with condensed summary of ALL entries in that directory (`.analysis/.summary.md`, `.bugfix/.summary.md`, `.test/.summary.md` as applicable per checkpoint)
 14. **Write** task-level `.summary.md` with condensed context: task state, plan summary, evaluation outcome, progress (`completed_steps`), known issues, key decisions (integrate from directory summaries)
-15. **Update** `.status.json` status and timestamp per outcome
+15. **MANDATORY STATUS UPDATE** — Use Edit tool to update `.status.json` per State Transitions table below:
+    - Read current `.status.json`
+    - Set `"status"` field to the new status from State Transitions table (e.g., `planning` → `review` on PASS)
+    - Update `"updated"` timestamp to current ISO-8601
+    - Write back with Edit tool
+    - **VERIFY**: After write, read `.status.json` again to confirm `status` field changed as expected. If unchanged, the update FAILED — retry or abort
 16. Execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture quality judgment and ACCEPT/REPLAN decision reasoning. Inline call failure should not block check's main flow (same fault isolation)
 17. **Git commit**: per outcome (see Git section below). All outcomes commit their output files and state updates, regardless of whether status changes
 18. **Report** evaluation result with detailed reasoning. Then output next step prompt based on verdict:

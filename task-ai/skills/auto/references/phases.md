@@ -5,22 +5,25 @@ Referenced from `auto/SKILL.md` §Four-Phase Flow.
 ## Phase 1: Overall Objective (status=draft) — Human in the loop
 
 1. Conversational refine: guide user to define Overall Objective
-   - .target.md shows `## Overall Objective [DRAFT]` (objective still under discussion)
+   - .target.md shows `## Overall Objective` with itemized goals (no markers — all items under discussion)
+   - Each item is a separate bullet point, e.g., `- Build JWT auth system`
 2. Research (LLM decides):
    - Objective clear, domain familiar → skip research
    - Objective vague or domain unfamiliar → auto-complete research full flow (O1→O2→O3 in one pass), present results
    - User can explicitly request research
-3. After user confirmation:
-   - Update .target.md: `[DRAFT]` → `[PENDING]` (objective confirmed, awaiting execution)
-   - Generate .convergence-baseline.md
+3. After user confirms specific items:
+   - Add `[CONFIRMED]` to each confirmed item, e.g., `- Build JWT auth system [CONFIRMED]`
+   - Items without markers remain in discussion (excluded from plan scope)
+   - Generate .convergence-baseline.md from `[CONFIRMED]` items only
 4. Auto-generate Stage 1 target:
-   - .target.md: remove `[PENDING]`, add `## Stage 1: <name> [ACTIVE]`
+   - .target.md: remove `[CONFIRMED]`, add `## Stage 1: <name> [ACTIVE]`
    - status → planning
 
 ## Phase 2: Planning (status=planning) — Full auto + user can intervene
 
 - Optional: research for technical references (implementation-level, not objective research)
 - Execute plan → verify(post-plan) → check(post-plan) (no code output — verify validates plan document quality)
+- Plan generation updates .target.md: each `[CONFIRMED]` item covered by plan → `[PROCESSED]`
 - check D1-D6 ≥ 0.70 → auto-advance to Phase 3
 - score < threshold → auto-replan based on failing dimensions → re-check
 - User can intervene: "step 3 unnecessary" → modify .plan.md, re-check

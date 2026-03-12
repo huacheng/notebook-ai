@@ -31,8 +31,11 @@ satisfied → evolving → auto-generates substage → planning → ...
 
 | Marker | Applies To | Meaning |
 |--------|------------|---------|
-| `[DRAFT]` | Overall Objective | Goal is being discussed/refined (Phase 1 in progress) |
-| `[PENDING]` | Overall Objective | Goal confirmed, awaiting execution (user confirmed, not yet planning) |
+| (no marker) | Objective item | Item is being discussed — excluded from plan scope |
+| `[CONFIRMED]` | Objective item | Item confirmed by user — included in plan scope |
+| `[PROCESSED]` | Objective item | Plan generated for this item — execution in progress |
+
+**Plan gate**: At least one `[CONFIRMED]` item required. Unconfirmed items are excluded from current plan.
 | (no marker) | Overall Objective | Goal is being executed (Stage 1+ active) |
 | `[ACTIVE]` | Stage | Currently executing stage |
 | `[COMPLETE]` | Stage | Completed stage |
@@ -41,8 +44,11 @@ satisfied → evolving → auto-generates substage → planning → ...
 ```markdown
 # Task Target: notebook-name
 
-## Overall Objective [DRAFT]
-<user's initial goal description, still under discussion>
+## Overall Objective
+- <goal item 1>
+- <goal item 2>
+- <goal item 3>
+<!-- No markers — all items under discussion -->
 
 ## Requirements
 ...
@@ -51,26 +57,32 @@ satisfied → evolving → auto-generates substage → planning → ...
 ...
 ```
 
-### Phase 1 complete (user confirmed, status → planning):
-```markdown
-# Task Target: notebook-name
-
-## Overall Objective [PENDING]
-<confirmed goal, awaiting Stage 1 generation>
-
-## Requirements
-...
-
-## Constraints
-...
-```
-
-### Stage 1 active (status=executing):
+### Phase 1 complete (items confirmed, status → planning):
 ```markdown
 # Task Target: notebook-name
 
 ## Overall Objective
-<persistent overall goal>
+- <goal item 1> [CONFIRMED]
+- <goal item 2> [CONFIRMED]
+- <goal item 3>
+<!-- Only [CONFIRMED] items included in plan -->
+
+## Requirements
+...
+
+## Constraints
+...
+```
+
+### Stage 1 active (status=executing, plan generated):
+```markdown
+# Task Target: notebook-name
+
+## Overall Objective
+- <goal item 1> [PROCESSED]
+- <goal item 2> [PROCESSED]
+- <goal item 3> [CONFIRMED]
+<!-- [PROCESSED] = in current plan; [CONFIRMED] = queued for later -->
 
 ---
 
@@ -85,7 +97,9 @@ satisfied → evolving → auto-generates substage → planning → ...
 # Task Target: notebook-name
 
 ## Overall Objective
-<persistent overall goal>
+- <goal item 1> [PROCESSED]
+- <goal item 2> [PROCESSED]
+- <goal item 3> [CONFIRMED]
 
 ---
 
@@ -107,9 +121,11 @@ satisfied → evolving → auto-generates substage → planning → ...
 ```
 
 **Key differences from old model:**
-- `[DRAFT]` and `[PENDING]` track Overall Objective status during Phase 1
+- Markers are per-item, not per-section
+- No marker = item under discussion (excluded from plan)
+- `[CONFIRMED]` = item confirmed (included in plan scope)
+- `[PROCESSED]` = item in execution (plan generated)
 - `[ACTIVE]` and `[COMPLETE]` track Stage execution status
-- Original top-level Objective becomes `## Overall Objective` (no marker) when Stage 1 starts
 - Stage 1 content is retroactively wrapped as `## Stage 1 [COMPLETE]` by auto (on check ACCEPT)
 
 ## Status Transitions

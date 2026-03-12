@@ -59,6 +59,7 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
    - Also read prior `[COMPLETE]` stages' `### Results` sections as context (already-implemented capabilities)
    - Library context loading (steps 10-12) naturally includes prior-stage experience files distilled by highlight
    - If `stage.current == 1`: read entire `.target.md` as before (backward compatible)
+   - **BLOCKING CHECK**: If `.target.md` has no objective items with `[CONFIRMED]` or `[PROCESSED]` markers AND no `## Stage` sections exist, REJECT with error: "Cannot generate plan — no confirmed objectives. Run `/task-ai:target` to confirm at least one objective item first." (Plan only covers `[CONFIRMED]` items; unconfirmed items are excluded from scope)
 2. **Read `.convergence-baseline.md`** from `.working/` directory for requirement coverage mapping. This file contains numbered requirements (R1, R2, ...) extracted by `target` from the convergence baseline:
    - If `.convergence-baseline.md` exists → parse the R# requirement list for use in plan step annotation (step 16)
    - If `.convergence-baseline.md` does not exist → warn ("convergence baseline not found — skipping R# coverage mapping") and continue. This is backward compatible — older targets may not have generated it
@@ -112,7 +113,16 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
 21. Create `.notes/<YYYY-MM-DD>-<summary>-plan.md` with research findings and key decisions
 22. **Update** `.notes/.summary.md` — overwrite with condensed summary of ALL notes files in `.notes/`
 23. Write task-level `.summary.md` with condensed context: plan overview, key decisions, requirements summary, known constraints (integrate from directory summaries)
-24. Update `.status.json`: set `type` field (if not already set or if task nature changed), status → `planning` (from `draft`/`planning`/`blocked`) or `re-planning` (from `review`/`executing`/`re-planning`), update timestamp. If the **new** status is `re-planning`, set `phase: needs-check`. For all other **new** statuses, clear `phase` to `""`. Reset `completed_steps` to `0` (new/revised plan invalidates prior progress)
+24. **MANDATORY STATUS UPDATE** — Use Edit tool to update `.status.json` (atomic write required):
+    - Read current `.status.json`
+    - Set `"status"`: `"planning"` (from `draft`/`planning`/`blocked`) or `"re-planning"` (from `review`/`executing`/`re-planning`)
+    - Set `"phase"`: `"needs-check"` if new status is `re-planning`, otherwise `""`
+    - Set `"completed_steps"`: `0` (new plan invalidates prior progress)
+    - Set `"type"` field if not already set
+    - Update `"updated"` timestamp to current ISO-8601
+    - Write back with Edit tool
+    - **VERIFY**: After write, read `.status.json` again to confirm `status` field changed. If still `draft`, the update FAILED — retry or abort
+    - **Update `.target.md`**: for each objective item with `[CONFIRMED]` that is covered by the plan, change marker to `[PROCESSED]`
 25. Execute highlight protocol scope=thinking-raw — see `skills/highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture design and trade-off reasoning. Inline call failure should not block plan's main flow — highlight is enhancement, not gating
 26. **L1 Six-Dimension Self-Audit** — scan `.plan.md` against `.target.md` and `.convergence-baseline.md` using the unified six-dimension checklist (`references/self-audit-checklist.md`). For each dimension (D1 Correctness → D6 Maintainability), check 2-4 items and fix issues in-place:
     - Read `.plan.md`, `.target.md`, `.convergence-baseline.md` (if exists), `.type-profile.md` (if exists)

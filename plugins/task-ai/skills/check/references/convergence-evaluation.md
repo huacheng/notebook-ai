@@ -14,15 +14,17 @@ Where:
 
 ## Scoring Scale
 
-Each R# item is evaluated against current deliverables:
+Each R# item is evaluated against its **Acceptance Criteria** (from `.convergence-baseline.md`):
 
-| Score | Meaning |
-|-------|---------|
-| **1.00** | Fully satisfied — requirement completely implemented and verified |
-| **0.75** | Mostly satisfied — core functionality present, minor gaps |
-| **0.50** | Partially satisfied — some progress but significant gaps remain |
-| **0.25** | Minimally addressed — initial work started, mostly incomplete |
-| **0.00** | Not addressed — no deliverable progress toward this requirement |
+| Score | Meaning | Acceptance Criteria Check |
+|-------|---------|---------------------------|
+| **1.00** | Fully satisfied — requirement completely implemented and verified | All acceptance criteria pass |
+| **0.75** | Mostly satisfied — core functionality present, minor gaps | Most criteria pass, minor edge cases fail |
+| **0.50** | Partially satisfied — some progress but significant gaps remain | Half of criteria pass |
+| **0.25** | Minimally addressed — initial work started, mostly incomplete | Some structure exists, most criteria fail |
+| **0.00** | Not addressed — no deliverable progress toward this requirement | No criteria pass |
+
+**Evaluation rule**: Score each R# by checking its acceptance criteria against the deliverables. The criteria are concrete tests — "returns 401 on expired token" is either true or false for the current code.
 
 ## Anchor Mechanism
 

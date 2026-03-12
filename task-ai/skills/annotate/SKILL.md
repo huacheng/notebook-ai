@@ -78,11 +78,15 @@ Requirement layer (strongest) → Planning → Evaluation → Methodology → In
 9. **Triage** each annotation by type × file layer
 10. **Cross-impact assessment** (based on file layer × annotation type — see §Cross-Impact Assessment)
 11. **Execute changes**: write to source file. Comment annotations append `> 💬`/`> 📝` blockquotes — never modify existing content. Apply modify-type annotations in reverse cursor order (see `references/annotation-processing.md` §Batch ordering)
-12. **Update `.status.json`** (atomic write via `.status.json.tmp` + rename) per State Transitions (three-dimensional: `status × file_layer × annotation_type`):
+12. **MANDATORY STATUS UPDATE** — Update `.status.json` (atomic write via `.status.json.tmp` + rename) per State Transitions (three-dimensional: `status × file_layer × annotation_type`):
+    - Read current `.status.json`
+    - Determine new status from State Transitions table (three-dimensional lookup)
     - If new status is `re-planning`, set `phase: needs-check`
     - If status is unchanged (including `evolving`), preserve existing `phase`
     - If status changed to something other than `re-planning`, clear `phase` to `""`
     - Update `updated` timestamp
+    - Write back atomically (`.status.json.tmp` + rename)
+    - **VERIFY**: After write, read `.status.json` again to confirm `status` field matches expected value. If unchanged when a change was expected, retry or abort
 13. **Write `.summary.md`** (atomic write via `.summary.md.tmp` + rename) with condensed context reflecting annotation changes
 14. **Execute highlight** protocol `scope=thinking-raw` — see `highlight/SKILL.md` §3.3. Optional (medium-value). Captures cross-impact assessment reasoning. Inline call failure should not block annotate's main flow — highlight is enhancement, not gating
 15. **Git commit** (skip if all annotations were unresolvable and no files changed): `task-ai(<notebook>):annotate annotations processed`

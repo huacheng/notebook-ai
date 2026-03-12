@@ -97,7 +97,11 @@ For each implementation step:
 
 1. **Read** `.status.json` — validate status is `review` or `executing`
 2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `satisfied`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
-3. **Update** `.status.json` status to `executing`, clear `phase` to `""`, update timestamp
+3. **MANDATORY STATUS UPDATE** — Use Edit tool to update `.status.json`:
+   - Set `"status"`: `"executing"`
+   - Set `"phase"`: `""`
+   - Update `"updated"` timestamp to current ISO-8601
+   - **VERIFY**: After write, read `.status.json` to confirm `status` is `executing`. If unchanged, retry or abort
 4. **Discover** all implementation steps from `.plan.md`
 5. **Detect completed steps**: read `completed_steps` field from `.status.json` to determine progress; skip steps ≤ `completed_steps`
 6. **If NEEDS_FIX resumption**: determine fix source by reading **both** `.bugfix/` and `.analysis/` latest files. `.bugfix/` contains actionable fix items with regression test specs (from both mid-exec and post-exec NEEDS_FIX); `.analysis/` contains the full evaluation context. For each fix item in `.bugfix/`, follow the **Regression Test Protocol** from `commands/references/test-strategy-by-type.md`:
@@ -124,9 +128,9 @@ For each implementation step:
    9.6. **Refactor window** — check for refactoring opportunities, run full suite to confirm no regressions (VFP-applicable types only, see Per-Step step 6)
    9.7. Verify against `.test/` criteria (diagnostics / build check). For domain-specific testing, can optionally invoke `verify --checkpoint step-N`
    9.8. Record result (include VFP cycle summary for VFP-applicable types)
-   9.9. Update `.status.json` `completed_steps` to current step number
+   9.9. **Update `.status.json`** — Use Edit tool to set `"completed_steps"` to current step number and `"updated"` timestamp
 10. **After all steps** (or on failure):
-    - Update `.status.json` timestamp
+    - **Update `.status.json`** — Use Edit tool to set `"updated"` timestamp
     - Write task-level `.summary.md` with condensed context: current progress, steps completed, key decisions, issues encountered, remaining work (integrate from directory summaries)
     - If all steps complete: execute highlight protocol scope=impl — see `highlight/SKILL.md` §3.1. Extract implementation experience from current execution context, write to library. Inline call failure should not block exec's main flow — highlight is an enhancement step, not a gating requirement
     - If all steps complete: execute highlight protocol scope=thinking-raw — see `highlight/SKILL.md` §3.3. Optional, encouraged (high-value). Capture implementation decisions and problem-solving reasoning. Inline call failure should not block exec's main flow (same fault isolation)

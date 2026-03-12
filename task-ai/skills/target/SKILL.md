@@ -59,9 +59,11 @@ When the user expresses intent to modify the target during `planning` status, th
 
 | Marker | Applies To | Meaning |
 |--------|------------|---------|
-| `[DRAFT]` | Overall Objective | Goal is being discussed/refined (Phase 1 dialog in progress) |
-| `[PENDING]` | Overall Objective | Goal confirmed by user, awaiting Stage 1 generation |
-| (no marker) | Overall Objective | Goal is being executed (Stage 1+ active) |
+| (no marker) | Objective item | Item is being discussed/refined — not included in plan |
+| `[CONFIRMED]` | Objective item | Item confirmed by user, will be included in plan |
+| `[PROCESSED]` | Objective item | Plan generated for this item, execution in progress |
+
+**Plan gate**: At least one `[CONFIRMED]` item required before plan can proceed. Items without markers are excluded from current plan scope.
 | `[ACTIVE]` | Stage | Currently executing stage |
 | `[COMPLETE]` | Stage | Completed stage |
 
@@ -69,13 +71,15 @@ When the user expresses intent to modify the target during `planning` status, th
 ```markdown
 # Task Target: notebook-name
 
-## Overall Objective [DRAFT]
+## Overall Objective
 
-Build a JWT authentication system
+- Build a JWT authentication system for user login
+- Support refresh tokens for session extension
+- Integrate with existing user database
 
 ## Refinements
 
-- [2026-03-04 10:05] Use refresh tokens for session extension
+- [2026-03-04 10:05] Add OAuth2 provider support
 
 ## Requirements
 
@@ -86,25 +90,47 @@ Build a JWT authentication system
 <!-- Any constraints or limitations -->
 ```
 
-**Phase 1 complete (user confirmed, status → planning):**
+**Phase 1 (partial confirmation — some items confirmed):**
 ```markdown
-# Task Target: notebook-name
+## Overall Objective
 
-## Overall Objective [PENDING]
-
-Build a JWT authentication system with refresh tokens and OAuth support
-
-## Requirements
-...
+- Build a JWT authentication system for user login [CONFIRMED]
+- Support refresh tokens for session extension [CONFIRMED]
+- Integrate with existing user database
+- Add OAuth2 provider support
 ```
 
-**Stage 1 active (status=executing):**
+**Overall Objective Format**: Always break down into itemized bullet points. Never write as a single long paragraph. Each item should be:
+- One atomic goal (testable completion)
+- Concrete and specific (not vague)
+- Independent enough to track separately
+- Marked `[CONFIRMED]` when user approves, or no marker if still discussing
+
+**Phase 1 complete (all items confirmed, status → planning):**
 ```markdown
 # Task Target: notebook-name
 
 ## Overall Objective
 
-Build a JWT authentication system with refresh tokens and OAuth support
+- Build a JWT authentication system for user login [CONFIRMED]
+- Support refresh tokens for session extension [CONFIRMED]
+- Integrate with existing user database [CONFIRMED]
+- Add OAuth2 provider support (Google, GitHub) [CONFIRMED]
+
+## Requirements
+...
+```
+
+**Stage 1 active (status=executing, plan generated):**
+```markdown
+# Task Target: notebook-name
+
+## Overall Objective
+
+- Build a JWT authentication system for user login [PROCESSED]
+- Support refresh tokens for session extension [PROCESSED]
+- Integrate with existing user database [CONFIRMED]
+- Add OAuth2 provider support (Google, GitHub) [CONFIRMED]
 
 ---
 
@@ -123,7 +149,13 @@ Build a JWT authentication system with refresh tokens and OAuth support
 
 2. **If `--satisfy` is provided**:
    - If status != `evolving` → REJECT with error "Can only satisfy tasks in evolving status."
-   - Else: update `.status.json` status → `satisfied`, git commit `task-ai(<notebook>):target mark satisfied`, output message "Task marked as satisfied."
+   - **MANDATORY STATUS UPDATE**:
+     - Read current `.status.json`
+     - Set `"status"`: `"satisfied"`
+     - Update `"updated"` timestamp
+     - Write back with Edit tool
+     - **VERIFY**: After write, read `.status.json` again to confirm `status` is `satisfied`. If unchanged, retry or abort
+   - Git commit `task-ai(<notebook>):target mark satisfied`, output message "Task marked as satisfied."
 
 3. **If `objective` is provided (Write Mode)** — three-branch routing:
 
@@ -132,7 +164,14 @@ Build a JWT authentication system with refresh tokens and OAuth support
       1. Read `.target.md`, archive old plan: `.plan.md` → `.plan-stage-<N>.md` (where N = current stage); `.plan-superseded.md` → `.plan-superseded-stage-<N>.md` (if exists); `.analysis/` → `.analysis-stage-<N>/` (if exists); `.test/` → `.test-stage-<N>/` (if exists). Skip missing files (non-fatal).
       2. Clear (non-fatal — skip if directory missing or empty): `.bugfix/` directory contents
       3. Increment `stage.current`, append new Stage section to `.target.md` with user's objective
-      4. Update `.status.json`: `stage.current` incremented, `status` → `planning`, `completed_steps` → `0`
+      4. **MANDATORY STATUS UPDATE**:
+         - Read current `.status.json`
+         - Set `stage.current` incremented
+         - Set `"status"`: `"planning"`
+         - Set `"completed_steps"`: `0`
+         - Update `"updated"` timestamp
+         - Write back with Edit tool
+         - **VERIFY**: After write, read `.status.json` again to confirm `status` is `planning`. If unchanged, retry or abort
       5. Git commit: `task-ai(<notebook>):target stage <N+1> defined`
       6. Execute highlight protocol scope=thinking-raw (optional, high-value)
 
@@ -144,22 +183,34 @@ Build a JWT authentication system with refresh tokens and OAuth support
       - Execute highlight protocol scope=thinking-raw (optional, high-value)
 
    3c. **ELIF status == `satisfied`** → **Re-enter Evolution**:
-      - Update `.status.json` status → `planning`
+      - **MANDATORY STATUS UPDATE**:
+        - Read current `.status.json`
+        - Set `"status"`: `"planning"`
+        - Update `"updated"` timestamp
+        - Write back with Edit tool
+        - **VERIFY**: After write, read `.status.json` again to confirm `status` is `planning`. If unchanged, retry or abort
       - Write user's objective to `.target.md`
       - Git commit: `task-ai(<notebook>):target re-enter evolution`
 
    3d. **ELSE** (normal mode, including first definition) → **Normal/Multi-stage Analysis Mode**:
       - **IF status == `draft`** (Phase 1 dialog in progress):
-        - Write `.target.md` with `## Overall Objective [DRAFT]` marker (goal under discussion)
-        - When user confirms objective: update marker `[DRAFT]` → `[PENDING]` (goal confirmed, awaiting Stage 1)
+        - Write `.target.md` with `## Overall Objective` and itemized goals (no markers — all items under discussion)
+        - When user confirms specific items: add `[CONFIRMED]` marker to each confirmed item (e.g., `- Build JWT auth [CONFIRMED]`)
+        - Plan can proceed once at least one item has `[CONFIRMED]`
         - Evaluate objective complexity:
           - Is it beyond a single plan→exec→ACCEPT cycle?
           - Are there natural stage boundaries?
           - **IF suggests splitting**: propose stages to user as guidance (e.g., "Suggest starting with: 1.Basic auth, then evolving to OAuth, then RBAC"), but generate only the first stage in `.target.md` — subsequent stages emerge through the evolving → target cycle
-        - When generating Stage 1: remove `[PENDING]` from Overall Objective, add `## Stage 1: <name> [ACTIVE]`
+        - When generating Stage 1: remove `[CONFIRMED]` from Overall Objective, add `## Stage 1: <name> [ACTIVE]`
+        - **MANDATORY STATUS UPDATE** (after Stage 1 generated):
+          - Read current `.status.json`
+          - Set `"status"`: `"planning"`
+          - Update `"updated"` timestamp
+          - Write back with Edit tool
+          - **VERIFY**: After write, read `.status.json` again to confirm `status` is `planning`. If unchanged, retry or abort
       - **ELIF status == `planning`**: update existing `.target.md` content (no marker changes)
       - **ELSE** (status ∉ {`draft`, `planning`}): update current stage target content (no multi-stage analysis — plan is already based on current stage target)
-      - Atomic write to `.target.md` + update `.status.json` + Git commit: `task-ai(<notebook>):target update objective`
+      - Atomic write to `.target.md` + Git commit: `task-ai(<notebook>):target update objective`
       - Execute highlight protocol scope=thinking-raw (optional, high-value). Inline call failure should not block target's main flow — highlight is enhancement, not gating.
 
    3e. **Convergence Baseline Generation** (after `.target.md` write, before Git commit):
@@ -172,11 +223,20 @@ Build a JWT authentication system with refresh tokens and OAuth support
       Generated from: .target.md Overall Objective + Requirements
       Updated: <ISO-8601 timestamp>
 
-      | # | Requirement | Weight | Source |
-      |---|------------|--------|--------|
-      | R1 | JWT authentication login | 3 | Objective |
-      | R2 | Refresh token renewal | 2 | Requirements §1 |
+      | # | Requirement | Acceptance Criteria | Weight | Source |
+      |---|-------------|---------------------|--------|--------|
+      | R1 | JWT token generation on login | Returns valid JWT with user_id, exp, iat claims; token verifiable with secret | 3 | Objective |
+      | R2 | Token expiration handling | Rejects expired tokens with 401; exp claim honored | 3 | Objective |
+      | R3 | Refresh token issuance | Refresh token stored securely; longer TTL than access token | 2 | Requirements §1 |
+      | R4 | Refresh token rotation | Old refresh token invalidated on use; new pair issued | 2 | Requirements §1 |
+      | R5 | Token revocation | Logout invalidates all tokens for user; revoked tokens rejected | 2 | Requirements §2 |
       ```
+
+      **R# Atomization Rules** — each R# must be:
+      - **Atomic**: One verifiable behavior per R# (not "authentication system" but "login returns JWT")
+      - **Testable**: Has concrete acceptance criteria (not "works correctly" but "returns 401 on expired token")
+      - **Independent**: Can be scored 0.0-1.0 without depending on other R# completion
+      - **Granular**: If a requirement has multiple aspects, split into multiple R# (e.g., R1, R2, R3 instead of one "JWT auth")
 
       Weight levels: **critical = 3** (core functionality, must-have), **important = 2** (main feature, can degrade), **optional = 1** (nice-to-have).
 

@@ -55,10 +55,13 @@ Cancel a task module, stopping any active auto loop and optionally cleaning up t
      - (c) if held by a **different live session** → REJECT with error identifying the holding session — user must stop that session first or use `cancel` from the holding session. Cancel does NOT force-override locks held by other live sessions to prevent concurrent write corruption
 4. **Acquire** `.lock` (see Concurrency Protection in `commands/task-ai.md`). After step 3 cleans up any auto-held lock, this acquires a fresh lock for cancel's own writes. If lock is still held by a different live session, REJECT — user must stop that session first
 5. **If uncommitted changes exist**, git commit snapshot: `task-ai(<notebook>):cancel pre-cancel snapshot`. If the snapshot commit fails (e.g., git error), log a warning and continue — the cancel operation should not abort due to a snapshot failure
-6. **Update** `.status.json` (atomic write via `.status.json.tmp` + rename). If the atomic write fails, **release `.lock`** and ABORT with error — cancel requires a successful status update:
-   - Set `status` to `cancelled`
-   - Update `updated` timestamp
+6. **MANDATORY STATUS UPDATE** — Update `.status.json` (atomic write via `.status.json.tmp` + rename). If the atomic write fails, **release `.lock`** and ABORT with error — cancel requires a successful status update:
+   - Read current `.status.json`
+   - Set `"status"`: `"cancelled"`
+   - Update `"updated"` timestamp
    - If `--reason` provided, add `"cancel_reason"` field with the sanitized reason text
+   - Write back atomically (`.status.json.tmp` + rename)
+   - **VERIFY**: After write, read `.status.json` again to confirm `status` is `cancelled`. If unchanged, release `.lock` and ABORT
 7. **Write** `.summary.md` (atomic write via `.summary.md.tmp` + rename) with condensed context: previous status (before cancellation), cancellation reason, progress at time of cancellation (`completed_steps`), any known issues
 8. **Git commit**: `task-ai(<notebook>):cancel user cancelled`
 9. **Release** `.lock`
