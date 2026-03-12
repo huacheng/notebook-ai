@@ -17,18 +17,28 @@ triggers:
     User wants ONE step manually → exec. User wants just the plan → plan.
 arguments:
   - name: action
-    description: "Action: start or stop"
+    description: "Action: run (default, execute immediately), load (load spec only), stop"
     required: false
-    default: start
+    default: run
 ---
 
 # /task-ai:auto — Conversational Task Lifecycle
 
-Dialog-driven four-phase flow: Target → Planning → Execution → Acceptance. Claude reads state files to determine the current phase and acts accordingly. No "auto mode" to activate — notebook existence IS the context.
+Dialog-driven four-phase flow: Target → Planning → Execution → Acceptance. Claude reads state files to determine the current phase and acts accordingly.
+
+## Action Routing
+
+| Action | Behavior |
+|--------|----------|
+| `run` (default) | **Execute immediately** — read `.status.json`, derive phase, start execution loop |
+| `load` | **Load spec only** — do NOT execute, wait for user to say "run" or "启动" |
+| `stop` | Stop current execution loop |
+
+**On `/task-ai:auto` or `/task-ai:auto run`**: START EXECUTING IMMEDIATELY. Read `.status.json` → derive phase → execute phase-appropriate action → continue cycling until `satisfied` or user interrupts.
 
 ## Core Principle
 
-**No auto mode to activate.** Notebook existence IS the context. Claude reads `.status.json` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
+Notebook existence IS the context. Claude reads `.status.json` + `.target.md` each conversation turn, derives the current phase, and executes the appropriate action. User dialog directly drives phase progression.
 
 > **Path Rule**: All system files (`.status.json`, `.target.md`, `.plan.md`, `.analysis/`, etc.) are in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly. See `commands/task-ai.md` §System File Path Rule.
 
@@ -48,7 +58,10 @@ Semantic understanding of user message → execute phase-appropriate action
 ## Usage
 
 ```
-/task-ai:auto [--stop]
+/task-ai:auto              # Execute immediately (default: run)
+/task-ai:auto run          # Execute immediately
+/task-ai:auto load         # Load spec only, wait for user trigger
+/task-ai:auto stop         # Stop execution loop
 ```
 
 ## Four-Phase Flow
@@ -380,7 +393,7 @@ Auto mode inherits git behavior from each sub-command. No additional git commits
 
 ## Notes
 
-- Auto mode starts by entering `/task-ai:auto` in the prompt input window (notebook is auto-detected from CWD or git branch context)
+- Auto mode starts by entering `/task-ai:auto` or `/task-ai:auto run` in the prompt input window — both execute immediately (notebook is auto-detected from CWD or git branch context)
 - Daemon's only active intervention is writing `.auto-stop`; all other activity is passive monitoring
 - `.auto-stop` is a transient file — should be in `.gitignore`
 - **Known trade-off**: First entry on `executing` status always runs verify → check (post-exec). If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration
