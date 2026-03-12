@@ -51,7 +51,7 @@ fi
 LIBRARY_ONLY_CHECKPOINTS="audit-validate"
 if [[ " $LIBRARY_ONLY_CHECKPOINTS " =~ " $CHECKPOINT " ]]; then
     # Set minimal context for library operations
-    WORK_DIR=""
+    TASKAI_WORK_DIR=""
     STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 else
     # Normal notebook-context checkpoints
@@ -60,17 +60,17 @@ else
         echo "[ERROR] Notebook name required for checkpoint '$CHECKPOINT'." >&2
         exit 1
     fi
-    resolve_workdir "$NOTEBOOK"
+    resolve_nb_workdir "$NOTEBOOK"
     NOTEBOOK="$NB_NOTEBOOK"
-    STATUS_JSON="$WORK_DIR/.status.json"
+    STATUS_JSON="$TASKAI_WORK_DIR/.status.json"
 
-    if [[ ! -d "$WORK_DIR" ]]; then
+    if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
         echo "[ERROR] Working directory not found for notebook '$NOTEBOOK'." >&2
         exit 1
     fi
 
     # D2/D3: Acquire concurrency lock (per SKILL.md Notes)
-    LOCK_DIR="$WORK_DIR"
+    LOCK_DIR="$TASKAI_WORK_DIR"
     LOCK_FILE="$LOCK_DIR/.lock"
     if ! (set -o noclobber; echo "$$" > "$LOCK_FILE") 2>/dev/null; then
         LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "unknown")
@@ -89,11 +89,11 @@ else
     # D3: Release lock and clean temp files on exit (normal or error)
     cleanup() {
         rm -f "$LOCK_FILE" 2>/dev/null || true
-        rm -f "$WORK_DIR"/.analysis/*.tmp.$$ 2>/dev/null || true
+        rm -f "$TASKAI_WORK_DIR"/.analysis/*.tmp.$$ 2>/dev/null || true
     }
     trap cleanup EXIT
 
-    ANALYSIS_DIR="$WORK_DIR/.analysis"
+    ANALYSIS_DIR="$TASKAI_WORK_DIR/.analysis"
     mkdir -p "$ANALYSIS_DIR"
     STATE_PY="$SCRIPT_DIR/../../../core/state.py"
 fi

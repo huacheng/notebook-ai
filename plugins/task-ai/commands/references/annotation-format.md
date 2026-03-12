@@ -25,7 +25,7 @@ Annotations arrive as **JSONL** (one JSON object per line) in the prompt context
 ## Example
 
 ```jsonl
-{"file":"/home/user/nb-workspaces/proj/task-1/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
+{"file":"/home/user/nb-workspaces/proj/.worktrees/task-1/.working/.target.md","type":"replace","selected":"Max response time: 500ms","cursor":42,"replacement":"Max response time: 200ms"}
 ```
 
 ## Positioning

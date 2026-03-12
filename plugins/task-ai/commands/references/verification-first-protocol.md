@@ -68,10 +68,10 @@ mixed 模式 = 部分 auto + 部分 human（`human_vhs` 列表标注）
 ## Path Variables
 | 变量 | 含义 |
 |------|------|
-| `NB_TASK_WORKING` | `$NB_WORKSPACES_ROOT/<project>/<notebook>/.working/` — notebook 级系统工作目录 |
-| `NB_PROJECT_DELIVERABLES` | `$NB_WORKSPACES_ROOT/<project>/.deliverables/` — project 级交付物目录 |
+| `TASKAI_WORK_DIR` | `<project>/.worktrees/task-<notebook>/.working/` — notebook 级系统工作目录 |
+| `NB_PROJECT_DELIVERABLES` | `<project>/.deliverables/` — project 级交付物目录（merge 时从 `$NB_WORK_DIR/.deliverables/` 复制） |
 
-以下路径均相对于 `$NB_TASK_WORKING`，交付物写入 `$NB_PROJECT_DELIVERABLES/<notebook>/`。
+以下路径均相对于 `$TASKAI_WORK_DIR`，交付物写入 `$NB_PROJECT_DELIVERABLES/`。
 
 ## Data Flow Contract
 | 阶段 | 产出 | 消费方 |
@@ -81,7 +81,7 @@ mixed 模式 = 部分 auto + 部分 human（`human_vhs` 列表标注）
 | verify | VFP Metrics in results | check |
 | check | VFP Compliance in analysis | report |
 | auto | vfp_cycles_completed in signal | daemon |
-| report | `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` | 用户 |
+| report | `$NB_PROJECT_DELIVERABLES/.report-<notebook>.md` | 用户 |
 
 ## VFP Metrics
 VH total / Satisfied / Unsatisfied / VFP cycle count / CGG pass / Regressions /

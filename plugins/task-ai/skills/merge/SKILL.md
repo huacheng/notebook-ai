@@ -19,7 +19,7 @@ arguments: []
 
 # /task-ai:merge — Copy Deliverables to Main
 
-Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/<notebook>/` on main.
+Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/` on main. All notebooks share the same project-level deliverables directory.
 
 ## Usage
 
@@ -44,11 +44,11 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 3. **Copy deliverables only** — does NOT do full git merge:
    - Save `<notebook>/.deliverables/` content from task branch to a temp directory (before branch switch)
    - Checkout main
-   - Copy temp content to `<project>/.deliverables/<notebook>/` on main
+   - Copy temp content to `<project>/.deliverables/` on main
    - Commit
    ```
    Source: <project>/<notebook>/.deliverables/*  (task branch)
-   Target: <project>/.deliverables/<notebook>/*  (main branch)
+   Target: <project>/.deliverables/*  (main branch)
    ```
    Where `<task-branch>` is read from `.status.json` `branch` field (defaults to `task/<notebook>` if unset).
    If the task branch has no `<notebook>/.deliverables/` directory, the copy is silently skipped (no error).
@@ -65,10 +65,10 @@ Copy a completed task's `<notebook>/.deliverables/` to `<project>/.deliverables/
 2. **Validate dependencies**: read `depends_on` from `.status.json`, check each dependency module's `.status.json` status against its required level (simple string → `satisfied`, extended object → at-or-past `min_status`). If any dependency is not met, REJECT with error listing blocking dependencies
 3. **Verify** ACCEPT verdict: check latest `.analysis/` file for `post-exec-accept`
 4. **Read** `.summary.md` for task context (plan overview, completed steps, key decisions)
-5. **Copy deliverables**: Save `<notebook>/.deliverables/` to temp → checkout main → copy to `<project>/.deliverables/<notebook>/` → commit on main
+5. **Copy deliverables**: Save `<notebook>/.deliverables/` to temp → checkout main → copy to `<project>/.deliverables/` → commit on main
 6. **If no `<notebook>/.deliverables/`**: skip copy silently (no error)
 7. **Checkout back** to task branch
-8. **Report** merge result: "Deliverables copied to `.deliverables/<notebook>/` on main."
+8. **Report** merge result: "Deliverables copied to `.deliverables/` on main."
 
 ## State Transitions
 

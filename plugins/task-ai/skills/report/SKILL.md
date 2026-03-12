@@ -97,7 +97,7 @@ Compact single-section report with: status, type, created/completed timestamps, 
 
 ## Output
 
-The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the project's deliverables directory, not `.working/`) and also printed to screen. The deliverables directory is resolved as `<project-dir>/.deliverables/<notebook>/`.
+The report is written to `$NB_PROJECT_DELIVERABLES/.report-<notebook>.md` (the project's deliverables directory, not `.working/`) and also printed to screen. The deliverables directory is resolved as `<project-dir>/.deliverables/`.
 
 ## Execution Steps
 
@@ -113,9 +113,9 @@ The report is written to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md` (the p
 10. **Read adoption data**: Read `.plan.md` `## Adopted Experiences` section (lessons adopted from prior tasks). Read `$NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/` for this notebook's experience files — check `adoption_count` in frontmatter (lessons from this task adopted by others). Compose the Adoption Summary sub-section of Lessons Learned
 11. **Collect** git changes related to the task (if identifiable via `git log --oneline --all --max-count=200 --fixed-strings --grep="task-ai(<notebook>)"`)
 12. **Compose** report in requested format
-13. **Write** to `$NB_PROJECT_DELIVERABLES/<notebook>/.report.md`
+13. **Write** to `$NB_PROJECT_DELIVERABLES/.report-<notebook>.md`
 14. **Git commit**: `task-ai(<notebook>):report generate completion report`
-15. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/<notebook>/.report.md`."
+15. **Print** report to screen. Then output: "Task lifecycle complete. Report saved to `.deliverables/.report-<notebook>.md`."
 
 > *Note: Library experience distillation (formerly steps in report) has moved to `highlight(scope=complete)` — see `highlight/SKILL.md` §3.5. In auto loop, highlight runs as an independent step between check ACCEPT and report. For manual workflows: run `/task-ai:highlight` before `/task-ai:report` if distillation is needed.*
 

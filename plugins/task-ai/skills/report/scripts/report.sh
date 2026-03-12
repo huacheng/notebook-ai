@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
 NOTEBOOK="${1:-}"
-resolve_workdir "$NOTEBOOK"
+resolve_nb_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 FORMAT=""
@@ -24,14 +24,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -d "$WORK_DIR" ]]; then
+if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found for $NOTEBOOK." >&2
     exit 1
 fi
 
 echo "Generating report for $NOTEBOOK..."
 STATE_PY="$TASK_AI_ROOT/core/state.py"
-STATUS_JSON="$WORK_DIR/.status.json"
+STATUS_JSON="$TASKAI_WORK_DIR/.status.json"
 
 # D3: Check state.py existence before calling
 if [[ ! -f "$STATE_PY" ]]; then
@@ -40,7 +40,7 @@ if [[ ! -f "$STATE_PY" ]]; then
 fi
 
 # D3: Concurrency — acquire .lock before proceeding (with stale lock recovery)
-LOCK_FILE="$WORK_DIR/.lock"
+LOCK_FILE="$TASKAI_WORK_DIR/.lock"
 _LOCK_ACQUIRED=false
 cleanup_lock() { if $_LOCK_ACQUIRED; then rm -f "$LOCK_FILE"; fi; }
 trap cleanup_lock EXIT INT TERM
@@ -51,12 +51,12 @@ if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
         echo "[WARN] Removing stale .lock (PID $existing_pid is dead)" >&2
         rm -f "$LOCK_FILE"
         if ! (set -o noclobber; echo $$ > "$LOCK_FILE") 2>/dev/null; then
-            echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+            echo "[ERROR] Another task-ai process holds .lock in $TASKAI_WORK_DIR" >&2
             exit 1
         fi
         _LOCK_ACQUIRED=true
     else
-        echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+        echo "[ERROR] Another task-ai process holds .lock in $TASKAI_WORK_DIR" >&2
         exit 1
     fi
 else
@@ -79,7 +79,7 @@ TYPE=$(python3 "$STATE_PY" get "$STATUS_JSON" type 2>/dev/null || echo "")
 TYPE=${TYPE:-generic}
 
 # D1: Prerequisites — draft with no plan produces minimal notice
-if [[ "$STATUS" == "draft" && ! -f "$WORK_DIR/.plan.md" ]]; then
+if [[ "$STATUS" == "draft" && ! -f "$TASKAI_WORK_DIR/.plan.md" ]]; then
     echo "No meaningful content to report — task is still in draft with no plan."
     # D3: release lock via trap
     exit 0
@@ -94,17 +94,17 @@ FORMAT=${FORMAT:-full}
 
 # D1: Resolve deliverables directory (report goes to project deliverables, not .working/)
 if [[ -n "${NB_PROJECT_DELIVERABLES:-}" ]]; then
-    DELIVERABLES_DIR="$NB_PROJECT_DELIVERABLES/$NOTEBOOK"
+    DELIVERABLES_DIR="$NB_PROJECT_DELIVERABLES"
 else
-    NB_DIR="$(dirname "$WORK_DIR")"
-    PROJECT_DIR="$(dirname "$NB_DIR")"
-    DELIVERABLES_DIR="$PROJECT_DIR/.deliverables/$NOTEBOOK"
+    NB_DIR="$(dirname "$TASKAI_WORK_DIR")"
+    PROJECT_DIR="$(dirname "$(dirname "$NB_DIR")")"
+    DELIVERABLES_DIR="$PROJECT_DIR/.deliverables"
 fi
 if ! mkdir -p "$DELIVERABLES_DIR" 2>/dev/null; then
     echo "[ERROR] Failed to create deliverables directory: $DELIVERABLES_DIR" >&2
     exit 1
 fi
-REPORT_FILE="$DELIVERABLES_DIR/.report.md"
+REPORT_FILE="$DELIVERABLES_DIR/.report-$NOTEBOOK.md"
 
 # --- Helper: read file content or fallback (D3: cat with error suppression, returns fallback on failure) ---
 read_file_or() { cat "$1" 2>/dev/null || echo "${2:-N/A}"; }
@@ -131,16 +131,16 @@ $(cat "$f" 2>/dev/null)
 
 # 1b. Summary overview from .summary.md (D1: SKILL.md step 4)
 SUMMARY_OVERVIEW=""
-if [[ -f "$WORK_DIR/.summary.md" ]]; then
-    SUMMARY_OVERVIEW=$(cat "$WORK_DIR/.summary.md" 2>/dev/null || true)
+if [[ -f "$TASKAI_WORK_DIR/.summary.md" ]]; then
+    SUMMARY_OVERVIEW=$(cat "$TASKAI_WORK_DIR/.summary.md" 2>/dev/null || true)
 fi
 
 # 2. Objective from .target.md
-OBJECTIVE=$(read_file_or "$WORK_DIR/.target.md" "N/A")
+OBJECTIVE=$(read_file_or "$TASKAI_WORK_DIR/.target.md" "N/A")
 
 # 3. Plan from .plan.md
-if [[ -f "$WORK_DIR/.plan.md" ]]; then
-    PLAN_CONTENT=$(cat "$WORK_DIR/.plan.md" 2>/dev/null || echo "N/A")
+if [[ -f "$TASKAI_WORK_DIR/.plan.md" ]]; then
+    PLAN_CONTENT=$(cat "$TASKAI_WORK_DIR/.plan.md" 2>/dev/null || echo "N/A")
 else
     PLAN_CONTENT="N/A"
 fi
@@ -165,26 +165,26 @@ fi
 
 # 5. Execution Timeline from .auto-timeline.md (verbatim if exists)
 TIMELINE_SECTION=""
-if [[ -f "$WORK_DIR/.auto-timeline.md" ]]; then
+if [[ -f "$TASKAI_WORK_DIR/.auto-timeline.md" ]]; then
     TIMELINE_SECTION="## Execution Timeline
-$(cat "$WORK_DIR/.auto-timeline.md" 2>/dev/null || echo "_Failed to read timeline._")
+$(cat "$TASKAI_WORK_DIR/.auto-timeline.md" 2>/dev/null || echo "_Failed to read timeline._")
 "
 fi
 
 # 6. Verification from .test/ (all .md files, sorted; then .jsonl files, sorted)
-VERIFICATION_MD=$(collect_dir_files "$WORK_DIR/.test" '*.md' "")
-VERIFICATION_JSONL=$(collect_dir_files "$WORK_DIR/.test" '*.jsonl' "")
+VERIFICATION_MD=$(collect_dir_files "$TASKAI_WORK_DIR/.test" '*.md' "")
+VERIFICATION_JSONL=$(collect_dir_files "$TASKAI_WORK_DIR/.test" '*.jsonl' "")
 VERIFICATION="${VERIFICATION_MD}${VERIFICATION_JSONL}"
 VERIFICATION=${VERIFICATION:-N/A}
 
 # 7. Analysis from .analysis/ (all files, sorted)
-ANALYSIS=$(collect_dir_files "$WORK_DIR/.analysis" '*.md' "N/A")
+ANALYSIS=$(collect_dir_files "$TASKAI_WORK_DIR/.analysis" '*.md' "N/A")
 
 # 8. Issues from .bugfix/ (all files, sorted)
-ISSUES=$(collect_dir_files "$WORK_DIR/.bugfix" '*.md' "None")
+ISSUES=$(collect_dir_files "$TASKAI_WORK_DIR/.bugfix" '*.md' "None")
 
 # 9. Notes from .notes/ (all files, sorted)
-NOTES=$(collect_dir_files "$WORK_DIR/.notes" '*.md' "N/A")
+NOTES=$(collect_dir_files "$TASKAI_WORK_DIR/.notes" '*.md' "N/A")
 
 # 10. Git changes related to the task (D1: collect for all statuses if identifiable)
 CHANGES="N/A"
@@ -203,7 +203,7 @@ fi
 # 11. Compose report in requested format
 if [[ "$FORMAT" == "summary" ]]; then
     # Summary format: status, objective (1 line), key changes, verification result
-    obj_line=$(grep -v -e '^#' -e '^$' "$WORK_DIR/.target.md" 2>/dev/null | head -n 1 || true)
+    obj_line=$(grep -v -e '^#' -e '^$' "$TASKAI_WORK_DIR/.target.md" 2>/dev/null | head -n 1 || true)
     obj_line=${obj_line:-N/A}
     # D6: Format multi-line changes as code block for summary readability
     if [[ "$CHANGES" == "N/A" ]]; then
@@ -219,7 +219,7 @@ if [[ "$FORMAT" == "summary" ]]; then
 - **Completed**: $COMPLETED
 - **Objective**: $obj_line
 - **Key Changes**: $changes_fmt
-- **Verification**: $(head -n 5 "$WORK_DIR/.test/.summary.md" 2>/dev/null || echo "N/A")
+- **Verification**: $(head -n 5 "$TASKAI_WORK_DIR/.test/.summary.md" 2>/dev/null || echo "N/A")
 "
 else
     # Full format: all sections per SKILL.md

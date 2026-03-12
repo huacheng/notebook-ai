@@ -69,7 +69,7 @@ task-ai(auth-refactor):target stage 2 defined
 After task completion confirmed (`check --checkpoint post-exec` ACCEPT), the `merge` sub-command copies deliverables to main:
 
 1. **Save** `<notebook>/.deliverables/` content from task branch to temp dir
-2. **Checkout main**, copy to `<project>/.deliverables/<notebook>/`, commit
+2. **Checkout main**, copy to `<project>/.deliverables/`, commit
 3. **Checkout back** to task branch for state transition (→ `evolving`)
 
 No full git merge — only deliverables are copied. Branches and worktrees are NOT deleted.
@@ -90,7 +90,7 @@ git worktree add .worktrees/task-<module> -b task/<notebook>
 - Each task runs in an isolated directory with full project copy
 - Multiple tasks can `exec` simultaneously without conflict
 - `auto` daemon operates in the task's worktree directory
-- On completion, copy deliverables: `merge` copies `<notebook>/.deliverables/` to `<project>/.deliverables/<notebook>/` on main
+- On completion, copy deliverables: `merge` copies `<notebook>/.deliverables/` to `<project>/.deliverables/` on main
 
 ## Rollback
 

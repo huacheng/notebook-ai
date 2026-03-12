@@ -51,7 +51,7 @@ run_secure_cmd() {
 
 NOTEBOOK="${1:-}"
 TARGET_STEP=""
-resolve_workdir "$NOTEBOOK"
+resolve_nb_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 shift || true
@@ -67,15 +67,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -d "$WORK_DIR" ]]; then
+if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
     echo "[ERROR] Working directory not found." >&2
     exit 1
 fi
 
-STATUS_JSON="$WORK_DIR/.status.json"
+STATUS_JSON="$TASKAI_WORK_DIR/.status.json"
 STATE_PY="$TASK_AI_ROOT/core/state.py"
-NOTES_DIR="$WORK_DIR/.notes"
-SUMMARY_FILE="$WORK_DIR/.summary.md"
+NOTES_DIR="$TASKAI_WORK_DIR/.notes"
+SUMMARY_FILE="$TASKAI_WORK_DIR/.summary.md"
 mkdir -p "$NOTES_DIR"
 
 # D3: Check state.py existence before calling
@@ -86,7 +86,7 @@ fi
 
 # D2/D3: Concurrency — acquire .lock before proceeding (per SKILL.md)
 # Uses mkdir-based lock (same path as verify.sh/check.sh for mutual exclusion)
-LOCK_DIR="$WORK_DIR"
+LOCK_DIR="$TASKAI_WORK_DIR"
 LOCK_FILE="$LOCK_DIR/.lock"
 cleanup_exec() {
     rm -rf "$LOCK_FILE" 2>/dev/null || true
@@ -104,11 +104,11 @@ if ! mkdir "$LOCK_FILE" 2>/dev/null; then
             rm -rf "$LOCK_FILE"
             mkdir "$LOCK_FILE" 2>/dev/null || { echo "[ERROR] Failed to reclaim lock" >&2; exit 1; }
         else
-            echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+            echo "[ERROR] Another task-ai process holds .lock in $TASKAI_WORK_DIR" >&2
             exit 1
         fi
     else
-        echo "[ERROR] Another task-ai process holds .lock in $WORK_DIR" >&2
+        echo "[ERROR] Another task-ai process holds .lock in $TASKAI_WORK_DIR" >&2
         exit 1
     fi
 fi
@@ -142,26 +142,26 @@ if [[ "$CURRENT_STATUS" == "executing" ]]; then
     echo "[exec] Resuming execution (NEEDS_FIX or continuation)."
     # Check for fix guidance files (AI agent reads these for full context)
     # D1: Sort by filename (reverse alpha) to match "most recent by filename date" per SKILL.md
-    LATEST_BUGFIX=$(find "$WORK_DIR/.bugfix" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
+    LATEST_BUGFIX=$(find "$TASKAI_WORK_DIR/.bugfix" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_BUGFIX" ]]; then
         echo "[exec] Fix guidance available: $(basename "$LATEST_BUGFIX")"
     fi
-    LATEST_ANALYSIS=$(find "$WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
+    LATEST_ANALYSIS=$(find "$TASKAI_WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | head -1)
     if [[ -n "$LATEST_ANALYSIS" ]]; then
         echo "[exec] Analysis available: $(basename "$LATEST_ANALYSIS")"
     fi
 fi
 
 # D1: Prerequisite checks — .target.md and .analysis/ should exist
-if [[ ! -f "$WORK_DIR/.target.md" ]]; then
+if [[ ! -f "$TASKAI_WORK_DIR/.target.md" ]]; then
     echo "[WARN] .target.md not found — execution may lack requirements context" >&2
 fi
-if [[ -z "$(find "$WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]]; then
+if [[ -z "$(find "$TASKAI_WORK_DIR/.analysis" -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]]; then
     echo "[WARN] .analysis/ has no evaluation files — check may not have run" >&2
 fi
 
 # Step Discovery — extract steps from .plan.md
-PLAN_MD="$WORK_DIR/.plan.md"
+PLAN_MD="$TASKAI_WORK_DIR/.plan.md"
 if [[ -f "$PLAN_MD" ]]; then
     TOTAL_STEPS=$(grep -cE '^##\s+Step\s+[0-9]+' "$PLAN_MD" 2>/dev/null || echo "0")
 else

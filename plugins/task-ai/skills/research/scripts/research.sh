@@ -92,15 +92,15 @@ case "$SCOPE" in
 esac
 
 # Try to resolve notebook context (may fail if standalone topic research)
-WORK_DIR=""
+TASKAI_WORK_DIR=""
 if [[ -n "$NOTEBOOK" ]] || [[ -z "$TOPIC" ]]; then
-    resolve_workdir "${NOTEBOOK:-}" 2>/dev/null && {
+    resolve_nb_workdir "${NOTEBOOK:-}" 2>/dev/null && {
         NOTEBOOK="$NB_NOTEBOOK"
-        # resolve_workdir sets WORK_DIR via export
+        # resolve_nb_workdir sets TASKAI_WORK_DIR via export
     } || true
 fi
 
-TARGET_MD="${WORK_DIR:+$WORK_DIR/.target.md}"
+TARGET_MD="${TASKAI_WORK_DIR:+$TASKAI_WORK_DIR/.target.md}"
 
 # Default --phase to "objective" when --caller target (per SKILL.md)
 if [[ "$CALLER" == "target" && -z "$PHASE" ]]; then
@@ -215,7 +215,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # Standalone topic research (no notebook context)
 # ─────────────────────────────────────────────────────────────────────────────
-if [[ -n "$TOPIC" ]] && [[ -z "$WORK_DIR" ]]; then
+if [[ -n "$TOPIC" ]] && [[ -z "$TASKAI_WORK_DIR" ]]; then
     echo "[research] Standalone topic: $TOPIC"
 
     # Step 1: Search library first
@@ -309,9 +309,9 @@ RESEARCH_END
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Notebook-context research (requires WORK_DIR and .target.md)
+# Notebook-context research (requires TASKAI_WORK_DIR and .target.md)
 # ─────────────────────────────────────────────────────────────────────────────
-if [[ -z "$WORK_DIR" ]] || [[ ! -f "$TARGET_MD" ]]; then
+if [[ -z "$TASKAI_WORK_DIR" ]] || [[ ! -f "$TARGET_MD" ]]; then
     echo "[ERROR] No notebook context and no topic provided" >&2
     echo "Usage: research.sh [notebook] [--caller ...] OR research.sh \"topic to research\"" >&2
     exit 1

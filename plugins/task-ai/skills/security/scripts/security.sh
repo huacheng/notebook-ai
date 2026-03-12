@@ -26,7 +26,7 @@ if [[ -z "$ACTION" ]]; then
     exit 1
 fi
 
-# D3: Validate action before resolve_workdir to avoid confusing errors
+# D3: Validate action before resolve_nb_workdir to avoid confusing errors
 case "$ACTION" in
     verify-cmd|audit-plan|scan-skill) ;;
     *) echo "[ERROR] Unknown action: $ACTION" >&2; exit 1 ;;
@@ -34,10 +34,10 @@ esac
 
 # scan-skill doesn't require a working directory
 if [[ "$ACTION" != "scan-skill" ]]; then
-    resolve_workdir "$NOTEBOOK"
+    resolve_nb_workdir "$NOTEBOOK"
     NOTEBOOK="$NB_NOTEBOOK"
 
-    if [[ ! -d "$WORK_DIR" ]]; then
+    if [[ ! -d "$TASKAI_WORK_DIR" ]]; then
         echo "[ERROR] Working directory not found." >&2
         exit 1
     fi
@@ -171,7 +171,7 @@ verify_cmd() {
 }
 
 audit_plan() {
-    local plan_md="$WORK_DIR/.plan.md"
+    local plan_md="$TASKAI_WORK_DIR/.plan.md"
     if [[ ! -f "$plan_md" ]]; then
         echo "[SECURITY] PASS: No plan.md to audit"
         return 0
