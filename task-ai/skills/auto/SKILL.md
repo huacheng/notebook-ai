@@ -17,9 +17,8 @@ triggers:
     User wants ONE step manually → exec. User wants just the plan → plan.
 arguments:
   - name: action
-    description: "Action: run (default, execute immediately), load (load spec only), stop"
+    description: "Action: load (load spec only, wait for user trigger), stop (stop execution). Omit for immediate execution."
     required: false
-    default: run
 ---
 
 # /task-ai:auto — Conversational Task Lifecycle
@@ -28,13 +27,13 @@ Dialog-driven four-phase flow: Target → Planning → Execution → Acceptance.
 
 ## Action Routing
 
-| Action | Behavior |
-|--------|----------|
-| `run` (default) | **Execute immediately** — read `.status.json`, derive phase, start execution loop |
-| `load` | **Load spec only** — do NOT execute, wait for user to say "run" or "启动" |
-| `stop` | Stop current execution loop |
+| Command | Behavior |
+|---------|----------|
+| `/task-ai:auto` | **Execute immediately** — read `.status.json`, derive phase, start execution loop |
+| `/task-ai:auto load` | **Load spec only** — do NOT execute, wait for user to say "启动" or "start" |
+| `/task-ai:auto stop` | Stop current execution loop |
 
-**On `/task-ai:auto` or `/task-ai:auto run`**: START EXECUTING IMMEDIATELY. Read `.status.json` → derive phase → execute phase-appropriate action → continue cycling until `satisfied` or user interrupts.
+**On `/task-ai:auto`**: START EXECUTING IMMEDIATELY. Read `.status.json` → derive phase → execute phase-appropriate action → continue cycling until `satisfied` or user interrupts.
 
 ## Core Principle
 
@@ -58,8 +57,7 @@ Semantic understanding of user message → execute phase-appropriate action
 ## Usage
 
 ```
-/task-ai:auto              # Execute immediately (default: run)
-/task-ai:auto run          # Execute immediately
+/task-ai:auto              # Execute immediately
 /task-ai:auto load         # Load spec only, wait for user trigger
 /task-ai:auto stop         # Stop execution loop
 ```
@@ -393,7 +391,7 @@ Auto mode inherits git behavior from each sub-command. No additional git commits
 
 ## Notes
 
-- Auto mode starts by entering `/task-ai:auto` or `/task-ai:auto run` in the prompt input window — both execute immediately (notebook is auto-detected from CWD or git branch context)
+- Auto mode starts by entering `/task-ai:auto` in the prompt input window — execution begins immediately (notebook is auto-detected from CWD or git branch context)
 - Daemon's only active intervention is writing `.auto-stop`; all other activity is passive monitoring
 - `.auto-stop` is a transient file — should be in `.gitignore`
 - **Known trade-off**: First entry on `executing` status always runs verify → check (post-exec). If execution was incomplete, check routes back via NEEDS_FIX, adding one extra iteration
