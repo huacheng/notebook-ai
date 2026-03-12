@@ -24,14 +24,14 @@ Additionally, `$NB_WORKSPACES_LIBRARY/.changelog.lock` is held briefly by any li
 
 ## VFP File Pattern Lock Coverage
 
-The following VFP (Verification-First Protocol) file patterns reside under `$NB_TASK_WORKING` and are protected by the task module lock (`.lock`). No additional locks are needed — the task module lock provides exclusive access:
+The following VFP (Verification-First Protocol) file patterns reside under `$TASKAI_WORK_DIR` and are protected by the task module lock (`.lock`). No additional locks are needed — the task module lock provides exclusive access:
 
 | VFP Pattern | Location | Writers | Purpose |
 |-------------|----------|---------|---------|
-| `vh-stubs.*` | `$NB_TASK_WORKING/vh-stubs.*` | `plan` | VH stub files generated during planning |
-| `vh-baseline.md` | `$NB_TASK_WORKING/vh-baseline.md` | `plan` | Initial VH failure state baseline |
-| `cumulative-green.jsonl` | `$NB_TASK_WORKING/.test/<date>-cumulative-green.jsonl` | `exec` | CGG cumulative pass records (append) |
-| `hil-snapshots/` | `$NB_TASK_WORKING/.test/hil-snapshots/` | `exec` | HIL approval snapshot artifacts |
+| `vh-stubs.*` | `$TASKAI_WORK_DIR/vh-stubs.*` | `plan` | VH stub files generated during planning |
+| `vh-baseline.md` | `$TASKAI_WORK_DIR/vh-baseline.md` | `plan` | Initial VH failure state baseline |
+| `cumulative-green.jsonl` | `$TASKAI_WORK_DIR/.test/<date>-cumulative-green.jsonl` | `exec` | CGG cumulative pass records (append) |
+| `hil-snapshots/` | `$TASKAI_WORK_DIR/.test/hil-snapshots/` | `exec` | HIL approval snapshot artifacts |
 | `vfp_cycles_completed` | In-memory (auto session) | `auto`, `exec` | VFP cycle counter tracked in-memory |
 
 All VFP files are scoped to a single notebook's `.working/` directory. Since the task module lock already serializes all sub-command access to `.working/`, these files inherit that protection automatically.
