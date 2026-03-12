@@ -49,7 +49,9 @@ find_nb_context() {
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
     if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
       export NB_WORKING="$cur/.working"
-      export NB_NOTEBOOK="$(basename "$cur")"
+      # Directory is task-<notebook>, extract notebook name
+      local dir_name="$(basename "$cur")"
+      export NB_NOTEBOOK="${dir_name#task-}"
       return 0
     fi
     cur="$(dirname "$cur")"
