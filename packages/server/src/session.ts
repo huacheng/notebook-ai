@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir, realpath, appendFile } from 'fs/promises';
+import { readFile, writeFile, appendFile } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
@@ -141,8 +141,6 @@ interface NotebookSession {
   _interrupted?: boolean;
   /** Event buffer for WS resume-after reconnection. */
   eventBuffer: EventBuffer;
-  /** Allowed directories for cross-project isolation (--add-dir). */
-  allowedDirs?: string[];
   /** D3: per-session mutex to prevent TOCTOU race in executeCell. */
   _executeLock: Promise<void>;
   /** D3: tracks pending post-completion work (git commit + autoSave) so closeSession can await. */
@@ -282,31 +280,10 @@ export class SessionManager {
       assets: { intermediate_files: [] },
     });
 
-    // Compute allowedDirs: sibling worktree directories under the same project
-    // D2-8: resolve symlinks via realpath to prevent symlink escaping
-    let allowedDirs: string[] | undefined;
-    try {
-      const parentDir = path.dirname(cwd);
-      const realParent = await realpath(parentDir);
-      const siblings = await readdir(realParent, { withFileTypes: true });
-      const cwdName = path.basename(cwd);
-      const resolved: string[] = [];
-      for (const d of siblings) {
-        if (!d.isDirectory() || d.name === cwdName || d.name.startsWith('.')) continue;
-        const fullPath = path.join(realParent, d.name);
-        // Verify the resolved path is still under parentDir (no symlink escape)
-        const realFullPath = await realpath(fullPath).catch(() => null);
-        if (realFullPath && realFullPath.startsWith(realParent + path.sep)) {
-          resolved.push(realFullPath);
-        }
-      }
-      allowedDirs = resolved.length > 0 ? resolved : undefined;
-    } catch (_err: unknown) { /* parent doesn't exist or not readable — skip */ }
-
     const session: NotebookSession = {
       id: sessionName,
       cwd,
-      agentProcess: new AgentProcess(engine, cwd, buildMemorySystemPrompt(cwd), model, allowedDirs),
+      agentProcess: new AgentProcess(engine, cwd, buildMemorySystemPrompt(cwd), model),
       notebook,
       gitManager,
       notebookPath,
@@ -315,7 +292,6 @@ export class SessionManager {
       _executeLock: Promise.resolve(),
       _pendingPostComplete: Promise.resolve(),
       eventBuffer: new EventBuffer(),
-      allowedDirs,
       _persistedToolUseIds: new Set(),
       _lastOutputTime: Date.now(),
       _autoSaveTimer: null,
@@ -539,7 +515,7 @@ export class SessionManager {
   private _spawnAgent(session: NotebookSession, sessionId: string, resumeSessionId?: string): Promise<void> {
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
-    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
+    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model);
 
     const ready = session.agentProcess.start(
       (raw: unknown) => this.handleJsonlMessage(session, raw),
@@ -640,9 +616,9 @@ export class SessionManager {
     // Stop old process and wait for it to exit
     await session.agentProcess.stop();
 
-    // Create new AgentProcess with updated model (preserve allowedDirs)
+    // Create new AgentProcess with updated model
     const engine = session.agentProcess.engine;
-    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model, session.allowedDirs);
+    session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model);
 
     // Start new process (clean — no resume)
     await session.agentProcess.start(
