@@ -49,7 +49,7 @@ Define or review the core mission for a notebook. This command acts as the cogni
 
 ## Refinement
 
-The agent maintains phase awareness via `.status.json` (see Phase Awareness Protocol in `commands/task-ai.md`). No `.session-context` file is used.
+The agent maintains phase awareness via `.status.json` (see Phase Awareness Protocol in `commands/task-ai.md`).
 
 When the user expresses intent to modify the target during `planning` status, the agent calls `/task-ai:target --refine "..."` naturally. No additional phase file is needed — `.status.json` `status: planning` is sufficient context.
 

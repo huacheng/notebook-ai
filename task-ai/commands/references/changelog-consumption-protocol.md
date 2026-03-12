@@ -3,7 +3,7 @@
 Sub-commands that load library context at startup (plan, research, exec, check, verify) MUST follow this protocol:
 
 ```
-1. Read   <project>/<notebook>/.working/.library-state.json
+1. Read   <project>/.worktrees/task-<notebook>/.working/.library-state.json
           → last_library_read  (ISO 8601 timestamp)
           → changelog_offset   (byte offset into .changelog)
 
@@ -14,7 +14,7 @@ Sub-commands that load library context at startup (plan, research, exec, check, 
 3. Score each new line using per-directory relevance scoring (same as library search):
           Lines scoring ≥ threshold → load the referenced library file
 
-4. Write  <project>/<notebook>/.working/.library-state.json  (atomic: .tmp → rename)
+4. Write  <project>/.worktrees/task-<notebook>/.working/.library-state.json  (atomic: .tmp → rename)
           → last_library_read  = now
           → changelog_offset   = new EOF byte position
 ```

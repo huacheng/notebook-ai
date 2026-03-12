@@ -47,9 +47,8 @@ $NB_WORKSPACES_ROOT/                        # 环境变量: NB_WORKSPACES_ROOT
 ├── project-a/                              # 项目目录（独立 git 仓库）
 │   ├── .git/
 │   ├── .gitignore                          # task-ai 自动添加 .working/ 临时文件忽略规则
-│   ├── .deliverables/                      # project 级交付物目录
-│   │   └── <notebook>/                     # 按 notebook 隔离
-│   │       └── .report.md                  # 完成报告（由 report 子命令生成）
+│   ├── .deliverables/                      # project 级交付物目录（所有 notebook 共用）
+│   │   └── .report-<notebook>.md           # 完成报告（由 report 子命令生成）
 │   │
 │   └── .worktrees/                         # git worktrees 目录
 │       ├── task-notebook-1/                # 环境变量: NB_WORK_DIR — notebook 根目录
@@ -150,11 +149,11 @@ Project names and notebook names share the same validation rule: ASCII letters, 
 
 ## Merge Path Mapping
 
-During `merge`, `<notebook>/.deliverables/` on the task branch is copied to `<project>/.deliverables/<notebook>/` on main. No full git merge — only deliverables are transferred.
+During `merge`, `<notebook>/.deliverables/` on the task branch is copied to `<project>/.deliverables/` on main. No full git merge — only deliverables are transferred. All notebooks share the same project-level deliverables directory.
 
 ```
 Source (task branch):  <project>/.worktrees/task-<notebook>/.deliverables/*
-Target (main branch):  <project>/.deliverables/<notebook>/*
+Target (main branch):  <project>/.deliverables/*
 ```
 
 Non-system file output (code, configs, assets) during exec MUST be written to `$NB_WORK_DIR/.deliverables/`, not elsewhere in the project tree.

@@ -58,7 +58,7 @@ $NB_WORKSPACES_ROOT/
     ├── .status.json                    # Project metadata
     └── <notebook_name>/
         ├── .deliverables/              # Non-system output directory (code, configs, assets)
-        │                               # Created during exec; merged to <project>/.deliverables/<notebook>/ on main
+        │                               # Created during exec; merged to <project>/.deliverables/ on main
         ├── .status.json                # Task metadata (JSON) — machine-readable
         └── .target.md                  # Task target / requirements — human-authored
 ```
