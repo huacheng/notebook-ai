@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-resolve_workdir ""
+resolve_nb_workdir ""
 STATUS_JSON="$WORK_DIR/.status.json"
 STOP_FILE="$WORK_DIR/.auto-stop"
 # D6: Use SCRIPT_DIR for consistent path construction

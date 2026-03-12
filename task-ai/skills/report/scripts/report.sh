@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
 NOTEBOOK="${1:-}"
-resolve_workdir "$NOTEBOOK"
+resolve_nb_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 FORMAT=""

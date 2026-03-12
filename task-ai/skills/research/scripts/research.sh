@@ -94,9 +94,9 @@ esac
 # Try to resolve notebook context (may fail if standalone topic research)
 WORK_DIR=""
 if [[ -n "$NOTEBOOK" ]] || [[ -z "$TOPIC" ]]; then
-    resolve_workdir "${NOTEBOOK:-}" 2>/dev/null && {
+    resolve_nb_workdir "${NOTEBOOK:-}" 2>/dev/null && {
         NOTEBOOK="$NB_NOTEBOOK"
-        # resolve_workdir sets WORK_DIR via export
+        # resolve_nb_workdir sets WORK_DIR via export
     } || true
 fi
 

@@ -40,7 +40,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../core/lib.sh"
 
 # Auto-detect notebook context (exits on failure)
-resolve_workdir
+resolve_nb_workdir
 
 TARGET_FILE="$WORK_DIR/.target.md"
 STATUS_FILE="$WORK_DIR/.status.json"

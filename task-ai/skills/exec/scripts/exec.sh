@@ -51,7 +51,7 @@ run_secure_cmd() {
 
 NOTEBOOK="${1:-}"
 TARGET_STEP=""
-resolve_workdir "$NOTEBOOK"
+resolve_nb_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 shift || true

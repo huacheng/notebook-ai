@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-resolve_workdir "$NOTEBOOK"
+resolve_nb_workdir "$NOTEBOOK"
 NOTEBOOK="$NB_NOTEBOOK"
 
 STATUS_JSON="$WORK_DIR/.status.json"

@@ -60,7 +60,7 @@ else
         echo "[ERROR] Notebook name required for checkpoint '$CHECKPOINT'." >&2
         exit 1
     fi
-    resolve_workdir "$NOTEBOOK"
+    resolve_nb_workdir "$NOTEBOOK"
     NOTEBOOK="$NB_NOTEBOOK"
     STATUS_JSON="$WORK_DIR/.status.json"
 
