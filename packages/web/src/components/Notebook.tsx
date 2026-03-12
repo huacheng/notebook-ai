@@ -35,8 +35,11 @@ function NotebookStatusBar() {
 
   const isRunning = notebook?.cells.some((c) => c.status === 'running') ?? false;
 
-  const listTitle = notebookList.find((n) => n.id === activeNotebookId)?.title;
-  const title = listTitle ?? notebook?.metadata.title ?? 'Untitled Notebook';
+  // Prefer notebook.metadata.title (always accurate for current notebook)
+  // Fall back to notebookList lookup only if metadata is missing
+  const title = notebook?.metadata.title
+    ?? notebookList.find((n) => n.id === activeNotebookId)?.title
+    ?? 'Untitled Notebook';
   const inSlide = activeTab === 'slide';
 
   const [showCommitModal, setShowCommitModal] = useState(false);
