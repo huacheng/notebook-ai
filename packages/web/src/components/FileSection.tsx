@@ -401,14 +401,22 @@ export function FileSection({
   async function triggerDl(url: string, filename?: string) {
     const headers: Record<string, string> = {};
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || '';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `Download failed (${res.status})` }));
+        setError(data.error || `Download failed (${res.status})`);
+        return;
+      }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename || '';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed');
+    }
   }
 
   function startFileDrag(e: React.DragEvent, name: string) {
@@ -473,7 +481,7 @@ export function FileSection({
           </>
           )}
           {showDownloadAll && !isReadOnly && (
-            <button className="fp-btn" onClick={() => triggerDl(`${baseUrl}/files/zip`)} title={t('file.downloadAll')}>
+            <button className="fp-btn" onClick={() => triggerDl(`${baseUrl}/files/zip?path=${encodeURIComponent(subPath)}`)} title={t('file.downloadAll')}>
               <IconDownload />
             </button>
           )}
