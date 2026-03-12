@@ -51,31 +51,31 @@ All sub-commands read these two environment variables first when resolving paths
 **All task-ai system files MUST be in `$TASKAI_WORK_DIR/` (= `$NB_WORK_DIR/.working/`), NOT in `$NB_WORK_DIR/` directly.**
 
 ```
-$NB_WORK_DIR/                         ← notebook 根目录 (worktree)
-├── .deliverables/                    ← 产出目录 (在 .working/ 外)
-└── .working/                         ← $TASKAI_WORK_DIR — 系统文件目录
-    ├── .status.json                  ✓ 正确位置
-    ├── .target.md                    ✓ 正确位置
-    ├── .convergence-baseline.md      ✓ 正确位置
-    ├── .plan.md                      ✓ 正确位置
-    ├── .summary.md                   ✓ 正确位置
-    ├── .type-profile.md              ✓ 正确位置
-    ├── .analysis/                    ✓ 正确位置
-    ├── .test/                        ✓ 正确位置
-    ├── .bugfix/                      ✓ 正确位置
-    └── .notes/                       ✓ 正确位置
+$NB_WORK_DIR/                         ← notebook root (worktree)
+├── .deliverables/                    ← output directory (outside .working/)
+└── .working/                         ← $TASKAI_WORK_DIR — system files directory
+    ├── .status.json                  ✓ correct
+    ├── .target.md                    ✓ correct
+    ├── .convergence-baseline.md      ✓ correct
+    ├── .plan.md                      ✓ correct
+    ├── .summary.md                   ✓ correct
+    ├── .type-profile.md              ✓ correct
+    ├── .analysis/                    ✓ correct
+    ├── .test/                        ✓ correct
+    ├── .bugfix/                      ✓ correct
+    └── .notes/                       ✓ correct
 ```
 
-**错误示例**（直接放在 worktree 根目录）:
+**Wrong** (placed directly in worktree root):
 ```
-$NB_WORK_DIR/.status.json             ✗ 错误！
-$NB_WORK_DIR/.target.md               ✗ 错误！
+$NB_WORK_DIR/.status.json             ✗ WRONG!
+$NB_WORK_DIR/.target.md               ✗ WRONG!
 ```
 
-**正确示例**:
+**Correct**:
 ```
-$TASKAI_WORK_DIR/.status.json         ✓ 即 $NB_WORK_DIR/.working/.status.json
-$TASKAI_WORK_DIR/.target.md           ✓ 即 $NB_WORK_DIR/.working/.target.md
+$TASKAI_WORK_DIR/.status.json         ✓ i.e. $NB_WORK_DIR/.working/.status.json
+$TASKAI_WORK_DIR/.target.md           ✓ i.e. $NB_WORK_DIR/.working/.target.md
 ```
 
 When SKILL.md mentions `.status.json`, `.target.md`, `.plan.md`, etc. without explicit path, it ALWAYS means `$TASKAI_WORK_DIR/<file>`, NEVER `$NB_WORK_DIR/<file>`.
