@@ -108,32 +108,20 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
 
   let content =
     `# MEMORY\n\n` +
-    `## Task-AI Work Directory\n\n` +
-    `Path: \`.working\`\n` +
-    `Absolute path: \`${workingDir}\`\n\n` +
-    `This is the task-ai system files directory ($TASKAI_WORK_DIR). All task-ai state files are located here:\n\n` +
-    `- \`.status.json\` — task status and metadata\n` +
-    `- \`.target.md\` — task objectives\n` +
-    `- \`.plan.md\` — implementation plan\n` +
-    `- \`.summary.md\` — task context summary\n` +
-    `- \`.convergence-baseline.md\` — convergence tracking\n\n` +
-    `IMPORTANT: When /task-ai:* skills reference .status.json or other state files, they mean $TASKAI_WORK_DIR/.status.json (i.e., .working/.status.json), NOT the worktree root.\n\n` +
-    `## Shared Library Directory\n\n` +
-    `Path (relative to this workspace): \`${libRelPath}\`\n` +
-    `Absolute path: \`${libraryDir}\`\n\n` +
-    `This is the shared library directory accessible to all notebooks. You can both read from and write to this directory. Use it to store datasets, scripts, configuration files, and other resources that should be shared across notebooks.\n\n` +
-    `## Deliverables Directory\n\n` +
-    `Path: \`.deliverables\`\n` +
-    `Absolute path: \`${path.join(workspaceDir, '.deliverables')}\`\n\n` +
-    `This is the deliverables directory for this notebook. Place final outputs here — reports, exported files, generated artifacts, and any other deliverables that should be presented to the user. Files in this directory are shown in the right panel of the UI.\n`;
+    `## Task-AI Work Directory ($TASKAI_WORK_DIR)\n` +
+    `Path: \`.working\` → \`${workingDir}\`\n` +
+    `State files: .status.json, .target.md, .plan.md, .summary.md, .convergence-baseline.md\n` +
+    `Note: /task-ai:* commands reference .working/.status.json, not worktree root.\n\n` +
+    `## Shared Library (read/write, shared across notebooks)\n` +
+    `Path: \`${libRelPath}\` → \`${libraryDir}\`\n\n` +
+    `## Deliverables (outputs shown in right panel)\n` +
+    `Path: \`.deliverables\` → \`${path.join(workspaceDir, '.deliverables')}\`\n`;
 
   if (projectPath) {
     const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
     content +=
-      `\n## Project Deliverables Directory\n\n` +
-      `Path (relative to this workspace): \`${projDelRel}\`\n` +
-      `Absolute path: \`${path.join(projectPath, '.deliverables')}\`\n\n` +
-      `This is the project-level deliverables directory shared across all notebooks in the project.\n`;
+      `\n## Project Deliverables (shared across project notebooks)\n` +
+      `Path: \`${projDelRel}\` → \`${path.join(projectPath, '.deliverables')}\`\n`;
   }
 
   const memoryPath = path.join(workspaceDir, MEMORY_FILENAME);
