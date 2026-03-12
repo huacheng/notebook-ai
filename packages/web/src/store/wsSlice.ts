@@ -30,6 +30,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'pendingSuggestions' | 'setPendingSuggestions' | 'clearPendingSuggestions'
   | 'commands' | 'commandsLoaded' | 'setCommands'
   | 'appendPrompt'
+  | 'pendingAutoCommand'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -41,6 +42,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   lastAskQuestionCellId: null,
   commands: [] as Command[],
   commandsLoaded: false,
+  pendingAutoCommand: null,
 
   async connectWebSocket() {
     // Clean up any pending (CONNECTING) WS from a previous call
@@ -808,6 +810,20 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               }
               return updates;
             });
+          }
+          break;
+        }
+        case 'session_ready': {
+          // Session is fully ready (Claude process running) — fire pending auto command
+          const readySid = (parsed as any).session_id as string | undefined;
+          const pending = get().pendingAutoCommand;
+          if (pending && readySid === pending.sessionId) {
+            // Use setTimeout to ensure state is settled before submitting
+            setTimeout(() => {
+              const { submitPrompt } = get();
+              submitPrompt(pending.command);
+            }, 0);
+            set({ pendingAutoCommand: null });
           }
           break;
         }

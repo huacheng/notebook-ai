@@ -1059,6 +1059,10 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
     notebook: NotebookSchema,
   }),
   z.object({
+    type: z.literal('session_ready'),
+    session_id: z.string(),
+  }),
+  z.object({
     type: z.literal('cell_removed'),
     session_id: z.string().optional(),
     cell_id: z.string(),

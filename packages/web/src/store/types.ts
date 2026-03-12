@@ -109,6 +109,9 @@ export interface NotebookStore {
   timerPaused: boolean;
   timerPausedResumeAt: number;
 
+  // ── Auto command queue (sent on session_ready) ─────────────────────────
+  pendingAutoCommand: { sessionId: string; command: string } | null;
+
   // ── WebSocket state ────────────────────────────────────────────────────
   ws: WebSocket | null;
   wsStatus: 'disconnected' | 'connecting' | 'connected';

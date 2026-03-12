@@ -515,6 +515,12 @@ export function setupWebSocket(
               compression: 'lz4',
             });
 
+            // Signal that session is ready for commands (Claude process is running)
+            sendToClient(ws, {
+              type: 'session_ready',
+              session_id,
+            });
+
           }
           break;
         }

@@ -98,12 +98,9 @@ export function WelcomeScreen() {
             notebook = JSON.parse(new TextDecoder().decode(decompressed));
           }
           openNotebookTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
+          // Queue auto command to be sent when session_ready is received
+          useStore.setState({ pendingAutoCommand: { sessionId: data.sessionId, command: '/task-ai:auto load' } });
           subscribeToSession(data.sessionId);
-          // Auto-activate task-ai:auto mode for new notebooks
-          setTimeout(() => {
-            const { submitPrompt } = useStore.getState();
-            submitPrompt('/task-ai:auto ');
-          }, 100);
         }
       } catch { /* notebook created but couldn't auto-open */ }
     }
