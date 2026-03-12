@@ -43,8 +43,8 @@ done
 
 # D6: NB_WORKSPACES_ROOT is already exported by lib.sh; alias for brevity
 NB_ROOT="$NB_WORKSPACES_ROOT"
-TARGET_DIR="$NB_ROOT/$PROJECT_NAME/.worktrees/task-$NOTEBOOK_NAME"
-BRANCH_NAME="task/$PROJECT_NAME/$NOTEBOOK_NAME"
+TARGET_DIR="$NB_ROOT/$PROJECT_NAME/$NOTEBOOK_NAME"
+BRANCH_NAME="task/$NOTEBOOK_NAME"
 
 # 1. Validation (SKILL.md Step 1 — before any side effects)
 if [[ ! "$PROJECT_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then echo "[ERROR] Invalid project name." >&2; exit 1; fi
@@ -115,11 +115,11 @@ if [[ $USE_WORKTREE -eq 1 ]]; then
     CLEANUP_WORKTREE="$WORKTREE_PATH"
     # D1: In worktree mode, files must be created inside the worktree directory
     WT_TARGET_DIR="$WORKTREE_PATH/$( realpath -m --relative-to="$GIT_TOPLEVEL" "$TARGET_DIR" )"
-    WORKING_DIR="$WT_TARGET_DIR/.working"
+    WORKING_DIR="$WT_TARGET_DIR"
     CLEANUP_DIR="$WT_TARGET_DIR"
 else
     git checkout "$BRANCH_NAME" || { echo "[ERROR] Failed to checkout $BRANCH_NAME" >&2; exit 1; }
-    WORKING_DIR="$TARGET_DIR/.working"
+    WORKING_DIR="$TARGET_DIR"
     CLEANUP_DIR="$TARGET_DIR"
 fi
 
@@ -132,18 +132,17 @@ else
   _ROOT_GI="$NB_ROOT/.gitignore"
 fi
 _GI_ENTRIES=(
-  "/.worktrees/"
-  "**/.working/.auto-stop"
-  "**/.working/.lock"
-  "**/.working/.library-state.json"
+  ".worktrees/"
+  "**/.auto-stop"
+  "**/.lock"
+  "**/.lock.stale.*"
+  "**/.library-state.json"
   ".library/.changelog"
   ".library/.changelog-archive/.lock"
   ".library/.memory/.thinking/raw/"
   ".library/.memory/.thinking/patterns/.lock"
   ".library/.inconsistency.log"
   ".library/.ioc.md"
-  "**/.lock"
-  "**/.lock.stale.*"
 )
 _GI_CHANGED=0
 # D3: ensure parent directory exists (relevant in worktree mode with nested NB_ROOT)

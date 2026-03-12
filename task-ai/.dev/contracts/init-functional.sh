@@ -14,20 +14,19 @@ TEST_WT="/tmp/nb-init-func-wt-$$"
 git worktree add --detach "$TEST_WT" HEAD > /dev/null 2>&1
 
 export NB_WORKSPACES_ROOT="$TEST_WT"
-trap 'git worktree remove "$TEST_WT" --force 2>/dev/null; git branch -D "task/$TEST_PROJECT/$TEST_NB" 2>/dev/null; git branch -D "task/$TEST_PROJECT/branch-clash" 2>/dev/null' EXIT
+trap 'git worktree remove "$TEST_WT" --force 2>/dev/null; git branch -D "task/$TEST_NB" 2>/dev/null; git branch -D "task/branch-clash" 2>/dev/null' EXIT
 
 # --- Test 1: Successful Initialization ---
 (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "$TEST_NB" --title "Functional Test" --tags "test,qa") > /dev/null 2>&1
 
-if [[ -f "$NB_WORKSPACES_ROOT/$TEST_PROJECT/.worktrees/task-$TEST_NB/.working/.status.json" ]]; then
+if [[ -f "$NB_WORKSPACES_ROOT/$TEST_PROJECT/$TEST_NB/.status.json" ]]; then
     emit_pass "init: successfully created metadata and directory"
 else
     emit_fail "init: failed to create metadata"
 fi
 
 # Check branch creation (branches are shared across worktrees)
-# Branch format: task/<project>/<notebook>
-if git branch --list "task/$TEST_PROJECT/$TEST_NB" | grep -q "$TEST_NB"; then
+if git branch --list "task/$TEST_NB" | grep -q "$TEST_NB"; then
     emit_pass "init: successfully created git branch"
 else
     emit_fail "init: failed to create git branch"
@@ -42,8 +41,7 @@ else
 fi
 
 # --- Test 3: Negative Test - Branch Collision ---
-# Branch format: task/<project>/<notebook>
-DUPLICATE_BRANCH="task/$TEST_PROJECT/branch-clash"
+DUPLICATE_BRANCH="task/branch-clash"
 git branch "$DUPLICATE_BRANCH" > /dev/null 2>&1
 
 OUTPUT=$( (cd "$TEST_WT" && "$INIT_SH" "$TEST_PROJECT" "branch-clash") 2>&1 )
@@ -70,7 +68,7 @@ fi
 
 # Cleanup (also covered by trap)
 git worktree remove "$TEST_WT" --force 2>/dev/null
-git branch -D "task/$TEST_PROJECT/$TEST_NB" > /dev/null 2>&1
+git branch -D "task/$TEST_NB" > /dev/null 2>&1
 git branch -D "$DUPLICATE_BRANCH" > /dev/null 2>&1
 
 summary

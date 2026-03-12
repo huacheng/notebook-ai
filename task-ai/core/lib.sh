@@ -47,8 +47,8 @@ ensure_library() {
 find_nb_context() {
   local cur="$PWD"
   while [[ "$cur" != "/" && "$cur" != "." ]]; do
-    if [[ -d "$cur/.working" && -f "$cur/.working/.status.json" ]]; then
-      export NB_WORKING="$cur/.working"
+    if [[ -f "$cur/.status.json" ]]; then
+      export NB_WORKING="$cur"
       export NB_NOTEBOOK="$(basename "$cur")"
       return 0
     fi
@@ -57,15 +57,17 @@ find_nb_context() {
 
   local branch
   branch=$(git branch --show-current 2>/dev/null || true)
-  # Branch format: task/<project>/<notebook>
-  if [[ -n "$branch" && "$branch" =~ ^task/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$ ]]; then
-    local proj_name="${BASH_REMATCH[1]}"
-    local nb_name="${BASH_REMATCH[2]}"
-    export NB_NOTEBOOK="$nb_name"
-    local nb_dir="$NB_WORKSPACES_ROOT/$proj_name/.worktrees/task-$nb_name"
-    if [[ -d "$nb_dir/.working" ]]; then
-      export NB_WORKING="$nb_dir/.working"
-      return 0
+  if [[ -n "$branch" && "$branch" =~ ^task/ ]]; then
+    local nb_name="${branch#task/}"
+    # D2: Validate notebook name from branch to prevent path traversal
+    if [[ "$nb_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      export NB_NOTEBOOK="$nb_name"
+      local nb_dir
+      nb_dir=$(find "$NB_WORKSPACES_ROOT" -maxdepth 3 -name "$NB_NOTEBOOK" -type d -print -quit 2>/dev/null || true)
+      if [[ -n "$nb_dir" ]]; then
+        export NB_WORKING="$nb_dir"
+        return 0
+      fi
     fi
   fi
 
@@ -88,26 +90,18 @@ resolve_workdir() {
     notebook="$NB_NOTEBOOK"
     export WORK_DIR="$NB_WORKING"
   else
-    local nb_root="${NB_WORKSPACES_ROOT:-$(pwd)}"
-    local nb_dir
-    # Support <project>/<notebook> format for disambiguation
-    if [[ "$notebook" =~ ^([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$ ]]; then
-      local proj="${BASH_REMATCH[1]}"
-      local nb="${BASH_REMATCH[2]}"
-      nb_dir="$nb_root/$proj/.worktrees/task-$nb"
-      notebook="$nb"
-    elif [[ "$notebook" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-      # Search in <project>/.worktrees/task-<notebook> structure
-      nb_dir=$(find "$nb_root" -maxdepth 4 -path "*/.worktrees/task-$notebook" -type d -print -quit 2>/dev/null)
-    else
+    if [[ ! "$notebook" =~ ^[a-zA-Z0-9_-]+$ ]]; then
       echo "[ERROR] Invalid notebook name." >&2
       exit 1
     fi
-    if [[ -z "$nb_dir" || ! -d "$nb_dir" ]]; then
+    local nb_root="${NB_WORKSPACES_ROOT:-$(pwd)}"
+    local nb_dir
+    nb_dir=$(find "$nb_root" -maxdepth 3 -name "$notebook" -type d -print -quit 2>/dev/null)
+    if [[ -z "$nb_dir" ]]; then
       echo "[ERROR] Notebook directory '$notebook' not found under $nb_root" >&2
       exit 1
     fi
-    export WORK_DIR="$nb_dir/.working"
+    export WORK_DIR="$nb_dir"
   fi
   export NB_NOTEBOOK="$notebook"
 }
