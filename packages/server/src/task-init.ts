@@ -4,15 +4,19 @@ import path from 'path';
 export interface TaskStatusJson {
   title: string;
   type: string;
-  status: 'draft';
+  status: 'draft' | 'planning' | 'review' | 'executing' | 're-planning' | 'evolving' | 'satisfied' | 'blocked' | 'cancelled';
   phase: string;
   completed_steps: number;
   created: string;
   updated: string;
-  depends_on: any[];
+  depends_on: string[];
   tags: string[];
   branch: string;
   worktree: string;
+  stage: {
+    current: number;
+    history: { stage: number; commit: string; convergence: number }[];
+  };
 }
 
 export async function initTaskWorkingDir(opts: {
@@ -36,6 +40,10 @@ export async function initTaskWorkingDir(opts: {
     tags: [],
     branch: opts.branchName,
     worktree: opts.worktreePath,
+    stage: {
+      current: 1,
+      history: [],
+    },
   };
 
   await writeFile(
