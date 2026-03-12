@@ -114,8 +114,9 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
     `Note: /task-ai:* commands reference .working/.status.json, not worktree root.\n\n` +
     `## Shared Library (read/write, shared across notebooks)\n` +
     `Path: \`${libRelPath}\` → \`${libraryDir}\`\n\n` +
-    `## Deliverables (outputs shown in right panel)\n` +
-    `Path: \`.deliverables\` → \`${path.join(workspaceDir, '.deliverables')}\`\n`;
+    `## Deliverables\n` +
+    `Path: \`.deliverables\` → \`${path.join(workspaceDir, '.deliverables')}\`\n` +
+    `Write generated code, data, scripts, and other non-system outputs here.\n`;
 
   if (projectPath) {
     const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
