@@ -302,10 +302,47 @@ export function createLibraryRouter(): IRouter {
   });
 
   /**
-   * GET /api/library/git-diff?commit=<hash>
-   * Returns the diff for a specific commit.
+   * GET /api/library/git-diff?commit=<hash>&file=<path>
+   * Returns the diff for a specific commit, optionally filtered by file.
    */
   router.get('/git-diff', async (req: Request, res: Response) => {
+    const commit = req.query.commit as string | undefined;
+    const file = req.query.file as string | undefined;
+    if (!commit || !/^[a-f0-9]{7,40}$/i.test(commit)) {
+      res.status(400).json({ error: 'Invalid commit hash' });
+      return;
+    }
+
+    try {
+      const cwd = await ensureLibraryGit();
+
+      // Use diff against parent to get proper diff (handles root commit too)
+      let args: string[];
+      try {
+        await execFile('git', ['rev-parse', `${commit}~1`], { cwd, timeout: EXEC_TIMEOUT });
+        args = ['diff', `${commit}~1`, commit];
+      } catch {
+        // Root commit — use diff-tree which handles --root correctly
+        args = ['diff-tree', '-p', '--root', commit];
+      }
+
+      if (file) {
+        args.push('--', file);
+      }
+
+      const { stdout } = await execFile('git', args, { cwd, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
+      res.json({ diff: stdout });
+    } catch (err) {
+      console.error('[library] git-diff error:', err);
+      res.status(500).json({ error: 'Git diff failed.' });
+    }
+  });
+
+  /**
+   * GET /api/library/git-commit-files?commit=<hash>
+   * Returns the list of files changed in a specific commit.
+   */
+  router.get('/git-commit-files', async (req: Request, res: Response) => {
     const commit = req.query.commit as string | undefined;
     if (!commit || !/^[a-f0-9]{7,40}$/i.test(commit)) {
       res.status(400).json({ error: 'Invalid commit hash' });
@@ -314,11 +351,62 @@ export function createLibraryRouter(): IRouter {
 
     try {
       const cwd = await ensureLibraryGit();
-      const { stdout } = await execFile('git', ['show', '--format=', commit], { cwd, timeout: EXEC_TIMEOUT });
-      res.json({ diff: stdout });
+      const { stdout } = await execFile(
+        'git',
+        ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
+        { cwd, timeout: EXEC_TIMEOUT },
+      );
+
+      const files: CommitFile[] = [];
+      for (const line of stdout.split('\n')) {
+        const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+        if (match) {
+          files.push({
+            additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+            deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+            path: unquoteGitPath(match[3]),
+          });
+        }
+      }
+
+      res.json({ files });
     } catch (err) {
-      console.error('[library] git-diff error:', err);
-      res.status(500).json({ error: 'Git diff failed.' });
+      console.error('[library] git-commit-files error:', err);
+      res.status(500).json({ error: 'Failed to get commit files' });
+    }
+  });
+
+  /**
+   * GET /api/library/git-branches
+   * Returns the list of branches for the library directory.
+   */
+  router.get('/git-branches', async (req: Request, res: Response) => {
+    try {
+      const cwd = await ensureLibraryGit();
+      const { stdout } = await execFile('git', ['branch', '-a', '--no-color'], { cwd, timeout: EXEC_TIMEOUT });
+      const branches: string[] = [];
+      let current = '';
+
+      for (const line of stdout.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith('* ')) {
+          current = trimmed.slice(2);
+          branches.push(current);
+        } else {
+          branches.push(trimmed);
+        }
+      }
+
+      res.json({ current, branches });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('not a git repository')) {
+        res.json({ current: '', branches: [] });
+      } else {
+        console.error('[library] git-branches error:', msg);
+        res.status(500).json({ error: 'Failed to get branches' });
+      }
     }
   });
 

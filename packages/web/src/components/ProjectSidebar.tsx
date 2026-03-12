@@ -3,7 +3,7 @@ import * as lz4 from 'lz4js';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { FileSection } from './FileSection';
-import { SidebarGitLog } from './SidebarGitLog';
+import { GitHistoryPanel } from './GitHistoryPanel';
 import { runDeleteFlow } from './deleteFlow';
 import { runRenameFlow, type RenamePhase } from './renameFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
@@ -820,7 +820,7 @@ function FileBrowser() {
         </>
       )}
       {l2Tab === 'git' && activeProjectId && (
-        <SidebarGitLog source="project" projectId={activeProjectId} />
+        <GitHistoryPanel projectId={activeProjectId} />
       )}
       {l2Tab === 'deliverables' && (
         <FileSection
@@ -1009,7 +1009,7 @@ export function ProjectSidebar() {
           />
         )}
         {libraryTab === 'git' && (
-          <SidebarGitLog source="library" />
+          <GitHistoryPanel source="library" />
         )}
       </div>
     </aside>

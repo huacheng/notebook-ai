@@ -430,6 +430,7 @@ textarea.cell-input {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar-divider {
@@ -6102,6 +6103,7 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
 }
 
 .file-browser-header {
@@ -6615,7 +6617,9 @@ button:focus-visible {
 .git-history-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-page);
 }
 

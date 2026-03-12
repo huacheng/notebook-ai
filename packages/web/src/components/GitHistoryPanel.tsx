@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useStore } from '../store';
-import { fetchGitLog, fetchGitDiff, fetchGitBranches, fetchGitCommitFiles } from '../api/git';
+import {
+  fetchGitLog, fetchGitDiff, fetchGitBranches, fetchGitCommitFiles,
+  fetchLibraryGitLog, fetchLibraryGitDiff, fetchLibraryGitBranches, fetchLibraryGitCommitFiles,
+} from '../api/git';
 import type { GitLogResponse } from '../api/git';
 import type { CommitInfo, CommitFile, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
@@ -9,6 +12,17 @@ import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { GIT_DEFAULT_ALL_BRANCHES } from '../utils/gitDefaults';
 import { useWatcher } from '../hooks/useWatcher';
 import { useWsRequest } from '../hooks/useWsRequest';
+
+// ---------------------------------------------------------------------------
+// Props type for GitHistoryPanel
+// ---------------------------------------------------------------------------
+
+interface GitHistoryPanelProps {
+  /** Project ID for project mode */
+  projectId?: string;
+  /** Source type - 'library' uses library git endpoints */
+  source?: 'library';
+}
 
 // ---------------------------------------------------------------------------
 // localStorage cache for git history
@@ -22,16 +36,16 @@ interface GitCache {
   latestHash: string;
 }
 
-function gitCacheKey(projectId: string): string {
-  return `nb-git-${projectId}`;
+function gitCacheKey(id: string): string {
+  return `nb-git-${id}`;
 }
 
-function loadGitCache(projectId: string): GitCache | null {
-  return cacheGet<GitCache>(gitCacheKey(projectId), TTL.GIT_HISTORY);
+function loadGitCache(id: string): GitCache | null {
+  return cacheGet<GitCache>(gitCacheKey(id), TTL.GIT_HISTORY);
 }
 
-function saveGitCache(projectId: string, cache: GitCache): void {
-  cacheSet(gitCacheKey(projectId), cache);
+function saveGitCache(id: string, cache: GitCache): void {
+  cacheSet(gitCacheKey(id), cache);
 }
 
 /** Format ISO date to compact relative time */
@@ -257,10 +271,11 @@ const DiffView = memo(function DiffView({ diff }: { diff: string }) {
 // ---------------------------------------------------------------------------
 
 const CommitItem = memo(function CommitItem({
-  commit, projectId, token, laneNode, maxLanes,
+  commit, projectId, source, token, laneNode, maxLanes,
 }: {
   commit: CommitInfo;
-  projectId: string;
+  projectId?: string;
+  source?: 'library';
   token: string | null;
   laneNode: LaneNode | undefined;
   maxLanes: number;
@@ -271,32 +286,42 @@ const CommitItem = memo(function CommitItem({
   const diffFileRef = useRef(diffFile);
   diffFileRef.current = diffFile;
 
+  const isLibrary = source === 'library';
+
   // Load commit files via WebSocket with REST fallback
   const { data: files, loading: loadingFiles } = useWsRequest<CommitFile[]>({
     enabled: expanded,
-    createWsMessage: () => ({ type: 'git_commit_files_request', project_id: projectId, commit: commit.hash }),
-    responseEvent: 'nb:git-commit-files-response',
-    errorEvent: 'nb:git-commit-files-error',
+    createWsMessage: isLibrary
+      ? () => ({ type: 'library_git_commit_files_request', commit: commit.hash })
+      : () => ({ type: 'git_commit_files_request', project_id: projectId, commit: commit.hash }),
+    responseEvent: isLibrary ? 'nb:library-git-commit-files-response' : 'nb:git-commit-files-response',
+    errorEvent: isLibrary ? 'nb:library-git-commit-files-error' : 'nb:git-commit-files-error',
     extractData: (d) => d.files as CommitFile[],
-    restFallback: () => fetchGitCommitFiles(projectId, token, commit.hash),
+    restFallback: isLibrary
+      ? () => fetchLibraryGitCommitFiles(token, commit.hash)
+      : () => fetchGitCommitFiles(projectId!, token, commit.hash),
     initialValue: commit.files,
     errorValue: [],
     allowRetry: true,
     preloaded: commit.files.length > 0,
-    deps: [projectId, commit.hash],
+    deps: [projectId, source, commit.hash],
   });
 
   // Load diff via WebSocket with REST fallback
   const { data: diffContent, loading: loadingDiff } = useWsRequest<string>({
     enabled: !!diffFile,
-    createWsMessage: () => ({ type: 'git_diff_request', project_id: projectId, commit: commit.hash, file: diffFile }),
-    responseEvent: 'nb:git-diff-response',
-    errorEvent: 'nb:git-diff-error',
+    createWsMessage: isLibrary
+      ? () => ({ type: 'library_git_diff_request', commit: commit.hash, file: diffFile })
+      : () => ({ type: 'git_diff_request', project_id: projectId, commit: commit.hash, file: diffFile }),
+    responseEvent: isLibrary ? 'nb:library-git-diff-response' : 'nb:git-diff-response',
+    errorEvent: isLibrary ? 'nb:library-git-diff-error' : 'nb:git-diff-error',
     extractData: (d) => d.diff as string,
-    restFallback: () => fetchGitDiff(projectId, token, commit.hash, diffFile ?? undefined),
+    restFallback: isLibrary
+      ? () => fetchLibraryGitDiff(token, commit.hash, diffFile ?? undefined)
+      : () => fetchGitDiff(projectId!, token, commit.hash, diffFile ?? undefined),
     initialValue: '',
     errorValue: 'Failed to load diff',
-    deps: [diffFile, projectId, commit.hash],
+    deps: [diffFile, projectId, source, commit.hash],
   });
 
   const handleToggle = useCallback(() => {
@@ -388,11 +413,13 @@ const CommitItem = memo(function CommitItem({
 // GitHistoryPanel — main component
 // ---------------------------------------------------------------------------
 
-export function GitHistoryPanel({ projectId }: { projectId: string }) {
+export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
   const authToken = useStore((s) => s.authToken);
+  const isLibrary = source === 'library';
+  const cacheId = isLibrary ? '__library__' : projectId!;
 
   // Hydrate from localStorage cache
-  const cached = useMemo(() => loadGitCache(projectId), [projectId]);
+  const cached = useMemo(() => loadGitCache(cacheId), [cacheId]);
 
   const [commits, setCommits] = useState<CommitInfo[]>(cached?.commits ?? []);
   const [page, setPage] = useState(1);
@@ -409,26 +436,30 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
   // scrollRef removed — IntersectionObserver replaces scroll handler
 
   useEffect(() => {
-    fetchGitBranches(projectId, authToken)
+    const fetchBranches = isLibrary
+      ? () => fetchLibraryGitBranches(authToken)
+      : () => fetchGitBranches(projectId!, authToken);
+
+    fetchBranches()
       .then(({ current, branches: list }) => {
         setCurrentBranch(current);
         setBranches(list);
       })
       .catch(() => {});
-  }, [projectId, authToken]);
+  }, [projectId, isLibrary, authToken]);
 
   // Persist to cache whenever commits or branches change
   const commitsRef = useRef(commits);
   commitsRef.current = commits;
   const persistCache = useCallback((newCommits: CommitInfo[], newHasMore: boolean) => {
-    saveGitCache(projectId, {
+    saveGitCache(cacheId, {
       commits: newCommits.slice(0, 5), // only cache first page
       hasMore: newHasMore,
       branches,
       currentBranch,
       latestHash: newCommits[0]?.hash ?? '',
     });
-  }, [projectId, branches, currentBranch]);
+  }, [cacheId, branches, currentBranch]);
 
   const loadPage = useCallback(async (p: number, file: string, append: boolean, all: boolean, branch: string) => {
     // If we already have cached commits, don't show loading indicator (silent refresh)
@@ -437,59 +468,64 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
     try {
       let resp: GitLogResponse;
 
-      // Try WS for simple queries (no file/branch filter) — avoids HTTP overhead
-      const ws = useStore.getState().ws;
-      if (!file && !branch && ws && ws.readyState === WebSocket.OPEN) {
-        try {
-          resp = await new Promise<GitLogResponse>((resolve, reject) => {
-            const requestId = crypto.randomUUID();
-            const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 120_000);
-            function onResponse(e: Event) {
-              const d = (e as CustomEvent).detail;
-              if (d.request_id === requestId) {
-                cleanup();
-                const hasMore = d.commits.length > 0;
-                resolve({ commits: d.commits, hasMore, error: undefined });
+      if (isLibrary) {
+        // Library mode: use REST API (no WebSocket support for library yet)
+        resp = await fetchLibraryGitLog(authToken, { page: p });
+      } else {
+        // Project mode: Try WS for simple queries (no file/branch filter) — avoids HTTP overhead
+        const ws = useStore.getState().ws;
+        if (!file && !branch && ws && ws.readyState === WebSocket.OPEN) {
+          try {
+            resp = await new Promise<GitLogResponse>((resolve, reject) => {
+              const requestId = crypto.randomUUID();
+              const timeout = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 120_000);
+              function onResponse(e: Event) {
+                const d = (e as CustomEvent).detail;
+                if (d.request_id === requestId) {
+                  cleanup();
+                  const hasMore = d.commits.length > 0;
+                  resolve({ commits: d.commits, hasMore, error: undefined });
+                }
               }
-            }
-            function onError(e: Event) {
-              const d = (e as CustomEvent).detail;
-              if (d.request_id === requestId) {
-                cleanup();
-                resolve({ commits: [], hasMore: false, error: d.error });
+              function onError(e: Event) {
+                const d = (e as CustomEvent).detail;
+                if (d.request_id === requestId) {
+                  cleanup();
+                  resolve({ commits: [], hasMore: false, error: d.error });
+                }
               }
-            }
-            function cleanup() {
-              clearTimeout(timeout);
-              window.removeEventListener('nb:git-log-response', onResponse);
-              window.removeEventListener('nb:git-log-error', onError);
-            }
-            window.addEventListener('nb:git-log-response', onResponse);
-            window.addEventListener('nb:git-log-error', onError);
-            ws.send(JSON.stringify({
-              type: 'git_log_request',
-              request_id: requestId,
-              project_id: projectId,
+              function cleanup() {
+                clearTimeout(timeout);
+                window.removeEventListener('nb:git-log-response', onResponse);
+                window.removeEventListener('nb:git-log-error', onError);
+              }
+              window.addEventListener('nb:git-log-response', onResponse);
+              window.addEventListener('nb:git-log-error', onError);
+              ws.send(JSON.stringify({
+                type: 'git_log_request',
+                request_id: requestId,
+                project_id: projectId,
+                page: p,
+                limit: 20,
+                all: all || undefined,
+                stats: undefined,
+              }));
+            });
+          } catch {
+            // WS failed — fallback to REST
+            resp = await fetchGitLog(projectId!, authToken, {
               page: p,
-              limit: 20,
               all: all || undefined,
-              stats: undefined,
-            }));
-          });
-        } catch {
-          // WS failed — fallback to REST
-          resp = await fetchGitLog(projectId, authToken, {
+            });
+          }
+        } else {
+          resp = await fetchGitLog(projectId!, authToken, {
             page: p,
+            file: file || undefined,
             all: all || undefined,
+            branch: branch || undefined,
           });
         }
-      } else {
-        resp = await fetchGitLog(projectId, authToken, {
-          page: p,
-          file: file || undefined,
-          all: all || undefined,
-          branch: branch || undefined,
-        });
       }
 
       if (resp.error) setError(resp.error);
@@ -514,16 +550,19 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, authToken, persistCache]);
+  }, [projectId, isLibrary, authToken, persistCache]);
 
   useEffect(() => {
     loadPage(1, search, false, allBranches, selectedBranch);
   }, [search, allBranches, selectedBranch, loadPage]);
 
   // WebSocket-based change detection (replaces 3s HTTP polling)
-  useWatcher('git', { projectId });
+  // Only enabled for project mode
+  useWatcher('git', isLibrary ? {} : { projectId });
 
   useEffect(() => {
+    if (isLibrary) return; // No WebSocket watcher for library
+
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.project_id !== projectId) return;
@@ -542,7 +581,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
     };
     window.addEventListener('nb:git-changed', handler);
     return () => window.removeEventListener('nb:git-changed', handler);
-  }, [projectId, search, allBranches, selectedBranch, loadPage, persistCache]);
+  }, [projectId, isLibrary, search, allBranches, selectedBranch, loadPage, persistCache]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -631,6 +670,7 @@ export function GitHistoryPanel({ projectId }: { projectId: string }) {
             key={c.hash}
             commit={c}
             projectId={projectId}
+            source={source}
             token={authToken}
             laneNode={laneMap.get(c.hash)}
             maxLanes={maxLanes}
