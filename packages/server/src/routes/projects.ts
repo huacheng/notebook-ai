@@ -436,6 +436,10 @@ export function createProjectsRouter(
       const session = await sessionManager.createSession(notebookPath, worktreePath);
       sessionId = session.id;
 
+      // Replace session.notebook with the correct notebook (with proper title)
+      // so that auto-send output is written to the correctly named file
+      session.notebook = notebook;
+
       // Save to DB first — only fire auto-send after DB succeeds
       const now = new Date().toISOString();
       const nbId = randomUUID();
@@ -460,10 +464,13 @@ export function createProjectsRouter(
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
+      console.log(`[projects] Auto-init: pushing cell ${initCellId} to session ${session.id}, cells count: ${session.notebook.cells.length}`);
       // Fire and forget - don't await to avoid blocking the response
-      sessionManager.executeCell(session.id, initCellId, initPrompt).catch((err) => {
-        console.error(`[projects] Auto-init cell failed for ${nbSlug}:`, err);
-      });
+      sessionManager.executeCell(session.id, initCellId, initPrompt)
+        .then(() => console.log(`[projects] Auto-init cell ${initCellId} started successfully`))
+        .catch((err) => {
+          console.error(`[projects] Auto-init cell failed for ${nbSlug}:`, err);
+        });
 
       res.json({
         notebookId: nbId,
