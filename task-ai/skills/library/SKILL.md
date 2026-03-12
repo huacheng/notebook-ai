@@ -55,7 +55,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 ## Usage
 
 ```
-/task-ai:library search "<query>" [--type <type>] [--topic <topic>] [--notebook <name>]
+/task-ai:library search "<query>" [--type <type>] [--limit N] [--no-recommend]
 /task-ai:library list [--type <type>]
 /task-ai:library status
 /task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all] [--scheduled [--force]] [--install-cron] [--uninstall-cron]
@@ -83,29 +83,63 @@ The sub-command executes one of the following operations based on the provided a
 
 ### search "<query>"
 
-Find relevant library files matching query text, with optional type or topic filter.
+Find relevant library files using **graph-enhanced search** with multi-factor scoring.
 
-Search follows a three-tier progressive disclosure model to minimise token cost:
-- **Layer 1** (~50 tokens): `.index.md` lookup — returns file IDs, titles, scores, and match rationale
-- **Layer 2** (~200 tokens): `.summary.md` snippets — for selected IDs, load prose summaries
-- **Layer 3** (~500-1000 tokens): full file content — only for user-selected high-value results
+```bash
+/task-ai:library search "<query>" [--type <type>] [--limit 10] [--no-recommend]
+```
 
-By default, `search` returns Layer 1 results and their Layer 2 summaries. Full content (Layer 3) is loaded only when the user or sub-command explicitly requests a specific file.
+#### Scoring Model
 
-**Detailed Steps:**
+Search uses a composite scoring formula that balances three factors:
 
-1.  **Read** `.memory/.references/.summary.md` — keyword match against query
-2.  **Read** `.memory/.experiences/.summary.md` — match by type or semantic-name keyword
-3.  **Read** `.memory/.thinking/patterns/.index.md` — match by problem-type keyword
-4.  **Read** `.memory/.type-profiles/.index.md` — match by type name
-5.  **Filter** (optional): if `--notebook <name>` is provided, pre-filter experience candidates by checking frontmatter `sources.notebook` field — only retain experiences whose `sources.notebook` matches `<name>`. This is used by substage target generation to find failed experiences from a specific notebook.
-6.  **Score each candidate** using directory-appropriate scoring:
-   - `.memory/.experiences/<type>/`: type exact match 10pts / shared segment 5pts / keyword 2pts each, threshold ≥ 8
-   - `.memory/.references/`: topic exact match 10pts / topic keyword overlap 3pts each / type keyword 2pts each, threshold ≥ 8
-   - `.memory/.thinking/patterns/`: problem-type keyword 3pts each / task type relevance 2pts, threshold ≥ 6
-   - `.memory/.type-profiles/`: type exact match → always include (no threshold)
-7.  **Sort results** by score DESC; apply **4000-token context budget** — load files until budget exhausted; always include top-scored result regardless of budget
-8.  **Print scored results** table with file path, score, and match rationale
+```
+final_score = base × (0.5 + 0.3 × used_by_norm + 0.2 × freshness)
+```
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| **base** | 0.5 | Keyword match quality (topic exact=1.0, contains=0.8, keywords=0.6) |
+| **used_by** | 0.3 | Reference count from `.relations.jsonl` (normalized, cap=5) |
+| **freshness** | 0.2 | File age bonus: `max(0, 1 - days_old/30)` |
+
+This balances **proven value** (used_by) with **discovery opportunity** (freshness) — new files get a 30-day window to be found before freshness decays.
+
+#### Graph Traversal (Multi-hop Recommendations)
+
+After direct keyword matches, search performs **BFS graph traversal** on `.relations.jsonl` to find related content:
+
+```
+Direct hit: jwt-auth (score 0.69)
+    ├── H1: session-management (score 0.35) ← related-to jwt-auth
+    │       └── H2: rate-limiting (score 0.09) ← related-to session-management
+    └── H1: oauth-flow (score 0.27) ← related-to jwt-auth
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `MAX_GRAPH_HOPS` | 2 | Maximum traversal depth |
+| `RECOMMEND_SCORE_FACTOR` | 0.5 | Score decay per hop (H2 = 0.25×) |
+| `MAX_GRAPH_EXPAND` | 20 | Max nodes to expand |
+
+Use `--no-recommend` to disable graph expansion (keyword-only search).
+
+#### Output Format
+
+```
+Score    Hop   Topic                   Used   Fresh  Path
+─────────────────────────────────────────────────────────────────
+0.693    -     jwt-auth                3      0.93   .memory/.references/jwt-auth.md
+0.347    H1    session-management      1      0.33   ... ← jwt-auth
+0.087    H2    rate-limiting           0      0.97   ... ← session-management
+```
+
+#### Progressive Disclosure
+
+Results support three-tier loading to minimize token cost:
+- **Layer 1** (~50 tokens): Scored table above
+- **Layer 2** (~200 tokens): `.summary.md` snippets for selected entries
+- **Layer 3** (~500-1000 tokens): Full file content on explicit request
 
 ### `list [--type <type>]`
 
@@ -158,12 +192,7 @@ Lightweight incremental maintenance — processes only new changelog entries sin
 
 #### `--mode audit`
 
-Full library audit — equivalent to `--all`. Use for scheduled maintenance.
-
-```bash
-/task-ai:library maintain --mode audit
-# Equivalent to: maintain --rebuild-index --compact --check-staleness
-```
+Alias for `--full`. Kept for backward compatibility.
 
 #### `--rebuild-index`
 
@@ -209,21 +238,37 @@ Report stale knowledge without auto-triggering `research`.
 
 #### `--all`
 
-Run `--rebuild-index` → `--compact` → `--check-staleness` in sequence. Also sweep for stale `.lock` files: for each `.lock` file in library, read its `pid`; if `kill -0 <pid>` fails → remove stale lock and log cleanup.
+Alias for `--full`. Kept for backward compatibility.
+
+#### `--full`
+
+Full library maintenance — stale lock sweep + rebuild-index + rebuild-relations + compact + check-staleness + git commit.
+
+**Detailed Steps:**
+
+1.  **Stale lock sweep**: for each `.lock` file in library, read its `pid`; if `kill -0 <pid>` fails → remove stale lock and log cleanup
+2.  **Rebuild index**: run `--rebuild-index` (rebuild all `.index.md` and `.master-index.md`)
+3.  **Rebuild relations**: run `--rebuild-relations` (rebuild cross-references between library entries)
+4.  **Compact**: run `--compact` (archive changelog entries >90 days old)
+5.  **Check staleness**: run `--check-staleness` (report stale knowledge)
+6.  **Git commit**: `cd $NB_WORKSPACES_LIBRARY && git add -A && git commit -m "library(full): full maintenance <date>"`
 
 #### `--scheduled [--force]`
 
-Lightweight periodic maintenance — timestamp-gated (24h interval), suitable for cron or auto loop post-report hook.
+Periodic maintenance — timestamp-gated (24h interval), suitable for cron or auto loop post-report hook.
 
-**Runs four checks:**
+**Runs six steps:**
 
 1. **Staleness check** — scan `.memory/.references/` for files older than 30 days, report stale count
 2. **T3→T4 production validation** — scan all `.skills/.active/` T3 skills, promote to T4 if `usage_count >= 3` and zero REPLAN failures (same logic as `--promote-skill`)
 3. **Security rules evolution** — invoke `core-rule-auto.sh cron-job` (Core: 7d / Extended: 1d, own timestamp gating)
-4. **Changelog size check** — warn if `.changelog` exceeds 2000-line threshold
+4. **Changelog auto-compact** — run `--compact` if last compact was ≥30 days ago (archives entries >90 days old)
+5. **Rebuild index** — run `--rebuild-index` (daily consistency repair)
+6. **Git commit** — commit all maintenance changes: `task-ai(library):maintain scheduled`
 
 **Timestamp gating:**
 - Reads `.last-scheduled` (epoch seconds); skips if last run < 24h ago
+- Reads `.last-compact` (epoch seconds); runs compact if last run ≥ 30 days ago
 - `--force` bypasses the timestamp check
 - On completion, writes current epoch to `.last-scheduled`
 
@@ -281,7 +326,7 @@ Security rules evolution loop — discovers new threats and evolves Core/Extende
 
 ## Library Write Protocol
 
-> **See `skills/library/references/write-protocol.md`** for the full six-step write protocol (mkdir → acquire lock → write file → changelog append → update index → release lock), changelog line format, append vs overwrite rules, and `.summary.md` staleness notes.
+> **See `skills/library/references/write-protocol.md`** for the full eight-step write protocol (mkdir → acquire lock → write file → changelog append → update index → update relations → release lock → git commit), changelog line format, append vs overwrite rules, and `.summary.md` staleness notes.
 
 ---
 
