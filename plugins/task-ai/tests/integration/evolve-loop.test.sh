@@ -64,7 +64,7 @@ echo "PASS"
 
 # Test 5: Create mock working directory for check.sh
 echo -n "Test 5: Setup working directory... "
-# lib.sh resolve_workdir expects: $NB_WORKSPACES_ROOT/<notebook>/.working/
+# lib.sh resolve_nb_workdir expects: $NB_WORKSPACES_ROOT/<project>/.worktrees/task-<notebook>/.working/
 MOCK_NB_DIR="$TEST_DIR/_evolve"
 MOCK_WORK_DIR="$MOCK_NB_DIR/.working"
 mkdir -p "$MOCK_WORK_DIR/.analysis"

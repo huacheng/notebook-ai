@@ -13,9 +13,12 @@ if ! grep -q 'git merge' "$MERGE_SH"; then
     ((FAILED++)) || true
 fi
 
-# Should NOT hardcode 'master' as branch name
-if grep -qE 'into master|checkout master|merge.*master' "$MERGE_SH"; then
+# Should NOT hardcode 'master' as branch name (exclude fallback detection logic)
+# Allowed: refs/heads/master (branch existence check), MAIN_BRANCH="master" (fallback assignment), comments
+HARDCODED_MASTER=$(grep -E 'into master|checkout master|git merge.*master' "$MERGE_SH" | grep -vE 'refs/heads/master|MAIN_BRANCH="master"|^\s*#' || true)
+if [[ -n "$HARDCODED_MASTER" ]]; then
     echo "FAIL: merge.sh hardcodes 'master' branch"
+    echo "  Found: $HARDCODED_MASTER"
     ((FAILED++)) || true
 fi
 

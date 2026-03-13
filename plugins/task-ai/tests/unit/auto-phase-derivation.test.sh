@@ -7,7 +7,7 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 AUTO_SH="$SCRIPT_DIR/skills/auto/scripts/auto.sh"
 
-# Create mock notebook with .working subdirectory (resolve_workdir sets WORK_DIR=nb_dir/.working)
+# Create mock notebook with .working subdirectory (resolve_nb_workdir sets TASKAI_WORK_DIR=nb_dir/.working)
 mkdir -p "$TEST_DIR/test-nb/.working"
 cat > "$TEST_DIR/test-nb/.working/.status.json" <<'EOF'
 {"name": "test-nb", "status": "planning", "type": "software"}
