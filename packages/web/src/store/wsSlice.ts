@@ -901,6 +901,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   subscribeToSession(sessionId) {
+    // Guard against empty sessionId (e.g., restored tabs before backend session created)
+    if (!sessionId) return;
     const { ws, lastEventIndex, sessionReadyStatus } = get();
     if (ws && ws.readyState === WebSocket.OPEN) {
       // Only set to 'subscribing' if no status exists (avoid overwriting 'subscribing' or 'ready')
@@ -923,10 +925,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'unsubscribe', session_id: sessionId }));
     }
-    // D4-3: Clean up lastEventIndex entry to prevent unbounded growth
+    // D4-3: Clean up lastEventIndex and sessionReadyStatus to prevent unbounded growth
     set((state) => {
-      const { [sessionId]: _, ...rest } = state.lastEventIndex;
-      return { lastEventIndex: rest };
+      const { [sessionId]: _, ...restIdx } = state.lastEventIndex;
+      const { [sessionId]: __, ...restStatus } = state.sessionReadyStatus;
+      return { lastEventIndex: restIdx, sessionReadyStatus: restStatus };
     });
   },
 
