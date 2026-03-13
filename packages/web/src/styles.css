@@ -1343,6 +1343,31 @@ textarea.cell-input {
   padding: var(--space-sm) var(--space-md);
 }
 
+/* ── Prompt images (from .images/ directory) ─────────────────── */
+.cell-prompt-images {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  max-width: 82%;
+  margin-left: auto;
+}
+.cell-prompt-image {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  object-fit: contain;
+  background: var(--bg-cell);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.cell-prompt-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 /* ── Appended segments (frozen/greyed) ─────────────────── */
 .cell-appended-segments {
   display: flex;

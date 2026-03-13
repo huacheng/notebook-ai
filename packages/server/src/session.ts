@@ -390,6 +390,7 @@ export class SessionManager {
             id: cellId,
             type: 'prompt' as const,
             source,
+            image_refs: imageRefs,  // Store image paths (not base64)
             outputs: [],
             execution_count: 0,
             status: 'idle' as const,
@@ -401,6 +402,7 @@ export class SessionManager {
         type: 'cell_created',
         cell_id: cellId,
         source,
+        image_refs: imageRefs,  // Include for multi-device sync
       });
     }
 

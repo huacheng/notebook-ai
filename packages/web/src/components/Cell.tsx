@@ -1,9 +1,35 @@
 import { memo } from 'react';
-import type { Cell as CellData, PromptCell } from '@notebook-ai/shared';
+import type { Cell as CellData, PromptCell, ImageRef } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
 import { MarkdownBody } from './MarkdownBody';
 import { useT } from '../i18n';
 import { useCellLazyLoad, isCellStub, type CellStub } from '../hooks/useCellLazyLoad';
+import { useStore } from '../store';
+
+// ── Cell prompt images (renders image_refs from .images/ directory) ─────────
+
+interface CellPromptImagesProps {
+  imageRefs?: ImageRef[];
+  sessionId: string | null;
+}
+
+const CellPromptImages = memo(function CellPromptImages({ imageRefs, sessionId }: CellPromptImagesProps) {
+  if (!imageRefs || imageRefs.length === 0 || !sessionId) return null;
+
+  return (
+    <div className="cell-prompt-images">
+      {imageRefs.map((ref, i) => (
+        <img
+          key={i}
+          src={`/api/notebooks/${encodeURIComponent(sessionId)}/files/download?path=${encodeURIComponent(ref.path)}`}
+          alt={`Prompt image ${i + 1}`}
+          className="cell-prompt-image"
+          loading="lazy"
+        />
+      ))}
+    </div>
+  );
+});
 
 // ── Status indicator (non-running states only) ──────────────────────────────
 
@@ -31,6 +57,7 @@ interface CellProps {
 
 export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: CellProps) {
   const t = useT();
+  const sessionId = useStore((s) => s.sessionId);
   if (cell.type !== 'prompt') return null;
 
   // Lazy loading: detect if cell is a stub
@@ -39,6 +66,7 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
 
   const execNum = cell.execution_count || index + 1;
   const hasResponse = !isStub && (cell.outputs.length > 0 || cell.status === 'running');
+  const imageRefs = (cell as PromptCell).image_refs;
 
   return (
     <div
@@ -62,6 +90,11 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
         <span className="cell-index">[{execNum}]</span>
         <MarkdownBody content={cell.source} className="cell-prompt-source" />
       </div>
+
+      {/* ── Prompt images (from .images/ directory) ── */}
+      {imageRefs && imageRefs.length > 0 && (
+        <CellPromptImages imageRefs={imageRefs} sessionId={sessionId} />
+      )}
 
       {/* ── Appended segments (frozen, greyed) ── */}
       {('segments' in cell) && (cell as PromptCell).segments && (cell as PromptCell).segments!.length > 0 && (
