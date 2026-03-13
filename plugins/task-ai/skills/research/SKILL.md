@@ -161,13 +161,19 @@ Callable independently for preparatory research before any phase, or to suppleme
      - For novel domains: **register** new type in `$NB_WORKSPACES_LIBRARY/.type-registry.md` (append row with date + source task)
    10.4. **Write** or update `.type-profile.md` with all sections including **Phase Intelligence** and **Audit Adaptation** (per-dimension domain checkpoints — use seed tables from `check/references/six-dimension-audit.md` Domain Adaptation as starting point, supplement with web research for novel types)
    10.5. **Update** `type` in `.status.json` (use `A|B` format for hybrids)
-   10.6. **Sync to shared**: copy `.type-profile.md` to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (acquire `.memory/.type-profiles/.lock` first; apply directory-safe transform: replace `:` with `-` in type segment when used as filename, e.g., `science:astro` → `science-astro`). For ALL types — seed types also benefit from cross-task profile accumulation. Release lock after write
+   10.6. **Sync to shared**: copy `.type-profile.md` to library using `library write`:
+     ```bash
+     /task-ai:library write ".memory/.type-profiles/<primary-type>.md" \
+       --content-file .type-profile.md \
+       --notebook <notebook-name>
+     ```
+     Apply directory-safe transform: replace `:` with `-` in type segment (e.g., `science:astro` → `science-astro`). For ALL types — seed types also benefit from cross-task profile accumulation
    10.7. **If `--caller verify|check|exec`** and `.type-profile.md` exists:
      - Check if current phase's section in profile is adequate (e.g., verify caller → "Verification Standards" section; check caller → "Audit Adaptation" + "Verification Standards" sections)
      - If inadequate or missing: web search for domain-specific methodology for this phase
      - If type classification changed (e.g., discovered secondary domain): update type in `.status.json` to `A|B` format, register new type if needed
      - Update `.type-profile.md` with findings, append to refinement log
-     - **Sync to shared**: if profile was significantly updated → merge changes to `$NB_WORKSPACES_LIBRARY/.memory/.type-profiles/<primary-type>.md` (apply directory-safe transform for `:` in type, acquire `.memory/.type-profiles/.lock`, release after write)
+     - **Sync to shared**: if profile was significantly updated → use `library write` to merge changes (same as step 10.6)
 11. **Release `.lock`** if acquired in step 9 (type discovery complete, `.status.json` and `.type-profile.md` updated)
 12. **Determine research direction**: Read `.type-profile.md` "Phase Intelligence" section first. If it has direction for the calling phase, use it. Otherwise fall back to per-type seed file `init/references/seed-types/<type>.md` for the calling phase's methodology. For types not in seed files, use `.type-profile.md` as sole direction source
 13. **Gap analysis** (based on library search results from step 7):
