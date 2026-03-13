@@ -213,6 +213,8 @@ export interface FileSectionProps {
   initialPath?: string;
   /** Starting sub-path when component mounts. If not set, uses initialPath. */
   startPath?: string;
+  /** Allow navigating above initialPath (default: false). When true, user can navigate to root. */
+  allowNavigateAbove?: boolean;
   /** Files matching this filter are NOT draggable (e.g. notebook files in sidebar). */
   noDragFilter?: (filename: string) => boolean;
   /** Custom action buttons for specific file entries. Return non-null to replace defaults. */
@@ -240,6 +242,7 @@ export function FileSection({
   onFileClick,
   initialPath = '.',
   startPath,
+  allowNavigateAbove = false,
   noDragFilter,
   renderItemActions,
   noDeleteFilter,
@@ -566,7 +569,7 @@ export function FileSection({
           {loading && <div className="fp-empty">{t('file.loading')}</div>}
 
           {/* Up directory */}
-          {!loading && subPath !== '.' && (
+          {!loading && subPath !== '.' && (allowNavigateAbove || subPath !== initialPath) && (
             <div className="fp-entry fp-entry-dir fp-entry-up" onClick={navigateUp}>
               <span className="fp-dir-up-icon">↩</span>
               <span className="fp-name">..</span>

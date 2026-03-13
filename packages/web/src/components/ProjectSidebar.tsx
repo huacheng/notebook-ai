@@ -813,6 +813,7 @@ function FileBrowser() {
             baseUrl={`/api/projects/${activeProjectId}`}
             authToken={authToken}
             startPath={currentSubPath}
+            allowNavigateAbove
             onFileClick={handleFileClick}
             onDirClick={handleDirClick}
             noDragFilter={(name) => name.endsWith('.notebook.json')}
