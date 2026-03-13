@@ -36,7 +36,7 @@ const DOTFILE_HIDDEN = new Set([
   '.auto-stop',
   '.lock',
   '.library-state.json',
-  '.gitignore',
+  '.images',  // prompt screenshots, not user-editable
 ]);
 const HIDDEN_TOPDIRS = new Set(['.worktrees', '.git', '.deliverables']);
 const ALWAYS_HIDDEN_DIRS = new Set(['.deliverables', '.git', '.claude']);

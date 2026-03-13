@@ -13,6 +13,7 @@ import {
   type CellOutput,
   type PromptImage,
   type PromptSegment,
+  type ImageRef,
 } from '@notebook-ai/shared';
 import { EventBuffer } from './event-buffer.js';
 import {
@@ -340,7 +341,7 @@ export class SessionManager {
    * Sends a prompt to Claude and marks the cell as running.
    * Output messages arrive asynchronously via the process stdout handler.
    */
-  async executeCell(sessionId: string, cellId: string, source: string, images?: PromptImage[]): Promise<void> {
+  async executeCell(sessionId: string, cellId: string, source: string, images?: PromptImage[], imageRefs?: ImageRef[]): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new Error(`Session "${sessionId}" not found.`);
@@ -413,8 +414,14 @@ export class SessionManager {
     session._execStartTimes.set(cellId, Date.now());
     session._lastCellId = cellId;
 
-    if (images && images.length > 0) {
-      session.agentProcess.sendPrompt(source, images);
+    // Resolve images: prefer image_refs (file paths) over embedded base64
+    let resolvedImages: PromptImage[] | undefined = images;
+    if (imageRefs && imageRefs.length > 0) {
+      resolvedImages = await this.loadImageRefs(session.cwd, imageRefs);
+    }
+
+    if (resolvedImages && resolvedImages.length > 0) {
+      session.agentProcess.sendPrompt(source, resolvedImages);
     } else {
       session.agentProcess.sendPrompt(source);
     }
@@ -427,6 +434,35 @@ export class SessionManager {
     } finally {
       unlock!();
     }
+  }
+
+  /**
+   * Load images from disk given their relative paths.
+   * Returns PromptImage[] with base64-encoded data for sending to Claude.
+   */
+  private async loadImageRefs(cwd: string, imageRefs: ImageRef[]): Promise<PromptImage[]> {
+    const results: PromptImage[] = [];
+    for (const ref of imageRefs) {
+      try {
+        const filePath = path.join(cwd, ref.path);
+        // Security: ensure path is within cwd
+        const realPath = path.resolve(filePath);
+        if (!realPath.startsWith(path.resolve(cwd))) {
+          console.warn(`[loadImageRefs] Path traversal attempt: ${ref.path}`);
+          continue;
+        }
+        const buffer = await readFile(filePath);
+        const ext = path.extname(ref.path).toLowerCase().slice(1);
+        const mediaType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}` as PromptImage['media_type'];
+        results.push({
+          media_type: mediaType,
+          data: buffer.toString('base64'),
+        });
+      } catch (err) {
+        console.warn(`[loadImageRefs] Failed to load ${ref.path}:`, err);
+      }
+    }
+    return results;
   }
 
   getSession(sessionId: string): NotebookSession | undefined {
@@ -776,7 +812,7 @@ export class SessionManager {
    * Append a prompt to the currently running cell and send it to Claude stdin immediately.
    * Used when user submits while a cell is already executing.
    */
-  appendPrompt(sessionId: string, cellId: string, source: string, images?: PromptImage[]): void {
+  async appendPrompt(sessionId: string, cellId: string, source: string, images?: PromptImage[], imageRefs?: ImageRef[]): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
@@ -785,10 +821,17 @@ export class SessionManager {
       throw new Error(`Cell "${cellId}" is not running.`);
     }
 
-    // Append segment to cell
+    // Resolve images: prefer image_refs (file paths) over embedded base64
+    let resolvedImages: PromptImage[] | undefined = images;
+    if (imageRefs && imageRefs.length > 0) {
+      resolvedImages = await this.loadImageRefs(session.cwd, imageRefs);
+    }
+
+    // Append segment to cell (store image_refs for persistence, not base64)
     const segment: PromptSegment = {
       text: source,
-      images,
+      images: undefined,  // Don't persist base64 in notebook
+      image_refs: imageRefs,
       addedAt: new Date().toISOString(),
     };
     const existing = ('segments' in cell && Array.isArray(cell.segments)) ? cell.segments as PromptSegment[] : [];
@@ -804,8 +847,8 @@ export class SessionManager {
     session._pendingAppends++;
 
     // Send to Claude stdin immediately
-    if (images && images.length > 0) {
-      session.agentProcess.sendPrompt(source, images);
+    if (resolvedImages && resolvedImages.length > 0) {
+      session.agentProcess.sendPrompt(source, resolvedImages);
     } else {
       session.agentProcess.sendPrompt(source);
     }

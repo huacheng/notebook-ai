@@ -72,10 +72,17 @@ export const PromptImageSchema = z.object({
 });
 export type PromptImage = z.infer<typeof PromptImageSchema>;
 
+// Image reference (path only, no embedded data - images stored in .images/ directory)
+export const ImageRefSchema = z.object({
+  path: z.string().max(1024),  // relative path in workspace, e.g. ".images/xxx.png"
+});
+export type ImageRef = z.infer<typeof ImageRefSchema>;
+
 // ── Prompt Segment (append-to-running-cell model) ───────────────────────────
 export const PromptSegmentSchema = z.object({
   text: z.string(),
   images: z.array(PromptImageSchema).optional(),
+  image_refs: z.array(ImageRefSchema).optional(),
   addedAt: z.string(),
 });
 export type PromptSegment = z.infer<typeof PromptSegmentSchema>;
@@ -83,7 +90,8 @@ export type PromptSegment = z.infer<typeof PromptSegmentSchema>;
 export const PromptCellSchema = BaseCellSchema.extend({
   type: z.literal('prompt'),
   source: z.string(),
-  images: z.array(PromptImageSchema).optional(),
+  images: z.array(PromptImageSchema).optional(),        // deprecated: inline base64 images
+  image_refs: z.array(ImageRefSchema).optional(),       // preferred: file paths in .images/
   segments: z.array(PromptSegmentSchema).optional(),
   outputs: z.array(CellOutputSchema).default([]),
   git_diff: z.string().optional(),
@@ -259,7 +267,8 @@ export const ExecuteRequestSchema = z.object({
   session_id: z.string(),
   cell_id: z.string(),
   source: z.string(),
-  images: z.array(PromptImageSchema).optional(),
+  images: z.array(PromptImageSchema).optional(),        // deprecated: inline base64
+  image_refs: z.array(ImageRefSchema).optional(),       // preferred: file paths
 });
 
 export const SaveNotebookSchema = z.object({
@@ -459,6 +468,7 @@ export const AppendPromptSchema = z.object({
   cell_id: z.string(),
   source: z.string(),
   images: z.array(PromptImageSchema).optional(),
+  image_refs: z.array(ImageRefSchema).optional(),
 });
 
 export const TimerStartSchema = z.object({
@@ -533,6 +543,7 @@ export const CellCreatedMessageSchema = z.object({
   cell_id: z.string(),
   source: z.string(),
   images: z.array(PromptImageSchema).optional(),
+  image_refs: z.array(ImageRefSchema).optional(),
 });
 
 // Multi-device sync: broadcast when cell status changes (e.g., running)

@@ -952,6 +952,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           cell_id: cellId,
           source: cell.source,
           ...('images' in cell && cell.images ? { images: cell.images } : {}),
+          ...('image_refs' in cell && cell.image_refs ? { image_refs: cell.image_refs } : {}),
         })
       );
     } else {
@@ -1077,7 +1078,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   setCommands: (commands: Command[]) => set({ commands, commandsLoaded: true }),
 
   // ── Prompt Append ───────────────────────────────────────────────────────
-  appendPrompt(cellId: string, source: string, images?) {
+  appendPrompt(cellId: string, source: string, images?, imageRefs?) {
     const { ws, sessionId } = get();
     if (!ws || ws.readyState !== WebSocket.OPEN || !sessionId) {
       set({ sessionNotice: '⚠️ Not connected — prompt not sent' });
@@ -1090,6 +1091,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       cell_id: cellId,
       source,
       ...(images ? { images } : {}),
+      ...(imageRefs ? { image_refs: imageRefs } : {}),
     }));
   },
 });

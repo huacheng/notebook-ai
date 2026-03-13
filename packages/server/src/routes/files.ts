@@ -111,6 +111,55 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
   );
 
   /**
+   * POST /api/notebooks/:sessionId/files/prompt-image
+   * Saves a base64-encoded image to .images/ directory for use in prompts.
+   * Body: { media_type: string, data: string (base64) }
+   * Returns: { path: string } - relative path to saved image
+   */
+  router.post('/:sessionId/files/prompt-image', async (req: Request, res: Response) => {
+    const { sessionId } = req.params as { sessionId: string };
+    const { media_type, data } = req.body as { media_type?: string; data?: string };
+
+    // Validate input
+    const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (!media_type || !supportedTypes.includes(media_type)) {
+      res.status(400).json({ error: `Unsupported image type: ${media_type}` });
+      return;
+    }
+    if (!data || typeof data !== 'string') {
+      res.status(400).json({ error: 'Missing image data' });
+      return;
+    }
+
+    const session = sessionManager.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: `Session "${sessionId}" not found.` });
+      return;
+    }
+
+    try {
+      // Create .images directory if needed
+      const imagesDir = path.join(session.cwd, '.images');
+      await mkdir(imagesDir, { recursive: true });
+
+      // Generate unique filename
+      const ext = media_type.split('/')[1].replace('+xml', ''); // png, jpeg, gif, webp
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const filePath = path.join(imagesDir, filename);
+
+      // Decode and save
+      const buffer = Buffer.from(data, 'base64');
+      await writeFile(filePath, buffer);
+
+      // Return relative path
+      res.json({ path: `.images/${filename}` });
+    } catch (err) {
+      console.error('[prompt-image] Save failed:', err);
+      res.status(500).json({ error: 'Failed to save image' });
+    }
+  });
+
+  /**
    * GET /api/notebooks/:sessionId/files/download?path=<relative-path>
    * Streams a single file from the workspace as a download.
    */

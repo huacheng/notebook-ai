@@ -84,6 +84,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'input.stopVoice': 'Stop voice input',
     'input.run': 'Run (Ctrl+Enter)',
     'input.noSession': 'No active session — open a notebook first.',
+    'input.unsupportedImageType': 'Unsupported image format: {0} (only PNG, JPEG, GIF, WebP)',
     'input.shortcuts': '/ commands  @ files  # cells',
 
     // ── Notification ─────────────────────────────────────────────────────
@@ -378,6 +379,7 @@ export const messages: Record<Language, Record<string, string>> = {
     'input.stopVoice': '停止语音输入',
     'input.run': '运行 (Ctrl+Enter)',
     'input.noSession': '无活动会话 — 请先打开一个 notebook。',
+    'input.unsupportedImageType': '不支持的图片格式: {0} (仅支持 PNG, JPEG, GIF, WebP)',
     'input.shortcuts': '/ 命令  @ 文件  # 单元格',
 
     // ── Notification ─────────────────────────────────────────────────────

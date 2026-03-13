@@ -71,6 +71,7 @@ export async function initTaskWorkingDir(opts: {
 
 const GITIGNORE_ENTRIES = [
   '.claude/',
+  '**/.images/',
   '**/.working/.auto-signal',
   '**/.working/.auto-signal.tmp',
   '**/.working/.auto-stop',

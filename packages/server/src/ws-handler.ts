@@ -561,10 +561,10 @@ export function setupWebSocket(
         }
 
         case 'execute_request': {
-          const { session_id, cell_id, source, images } = msg;
+          const { session_id, cell_id, source, images, image_refs } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
-            await sessionManager.executeCell(session_id, cell_id, source, images);
+            await sessionManager.executeCell(session_id, cell_id, source, images, image_refs);
           } catch (err) {
             sendToClient(ws, {
               type: 'error',
@@ -1455,10 +1455,10 @@ export function setupWebSocket(
         // ─── Prompt Queue ───────────────────────────────────────────────────────
 
         case 'append_prompt': {
-          const { session_id, cell_id, source, images } = msg;
+          const { session_id, cell_id, source, images, image_refs } = msg;
           if (!checkSessionPermission(session_id)) break;
           try {
-            sessionManager.appendPrompt(session_id, cell_id, source, images);
+            await sessionManager.appendPrompt(session_id, cell_id, source, images, image_refs);
           } catch (err) {
             sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
           }

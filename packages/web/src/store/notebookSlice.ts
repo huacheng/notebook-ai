@@ -183,14 +183,19 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
     });
   },
 
-  submitPrompt(source, images) {
+  submitPrompt(source, images, imageRefs) {
     // Intercept frontend slash commands before sending to backend
     const cmd = source.trim().toLowerCase();
     if (cmd === '/model') { get().openModelPanel(); return; }
     if (cmd === '/clear') { get().clearSession(); return; }
 
     const cell = makeCell('prompt');
-    const cellWithSource = { ...cell, source, ...(images && images.length > 0 ? { images } : {}) };
+    const cellWithSource = {
+      ...cell,
+      source,
+      ...(images && images.length > 0 ? { images } : {}),
+      ...(imageRefs && imageRefs.length > 0 ? { image_refs: imageRefs } : {}),
+    };
     set((state) => {
       if (!state.notebook) return {};
       const updated = {

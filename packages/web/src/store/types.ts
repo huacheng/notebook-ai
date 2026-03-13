@@ -7,6 +7,7 @@ import type {
   SlideSection,
   NotebookListItem,
   PromptImage,
+  ImageRef,
 } from '@notebook-ai/shared';
 import type { ProjectListItem } from './projectSlice';
 import type { PluginStatusResponse } from '../api/plugin';
@@ -158,7 +159,7 @@ export interface NotebookStore {
   updateTitle(title: string): void;
   updateAgent(agent: 'claude' | 'gemini'): void;
   addCell(type: CellType, index?: number): void;
-  submitPrompt(source: string, images?: PromptImage[]): void;
+  submitPrompt(source: string, images?: PromptImage[], imageRefs?: ImageRef[]): void;
   removeCell(cellId: string): void;
   moveCell(cellId: string, direction: 'up' | 'down'): void;
   updateCellSource(cellId: string, source: string): void;
@@ -251,7 +252,7 @@ export interface NotebookStore {
   clearPendingSuggestions(): void;
 
   // ── Prompt Append ────────────────────────────────────────────────────
-  appendPrompt(cellId: string, source: string, images?: PromptImage[]): void;
+  appendPrompt(cellId: string, source: string, images?: PromptImage[], imageRefs?: ImageRef[]): void;
 
   // ── WebSocket actions ──────────────────────────────────────────────────
   connectWebSocket(): Promise<void>;

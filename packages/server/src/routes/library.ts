@@ -32,6 +32,9 @@ export function createLibraryRouter(): IRouter {
     limits: { fileSize: 100 * 1024 * 1024, files: 20 },
   });
 
+  // Library hidden entries: .git/ is internal, .gitignore is visible for user editing
+  const LIBRARY_HIDDEN = new Set(['.git']);
+
   /**
    * GET /api/library/files?path=<subpath>
    * Lists files in the library directory (or a subdirectory).
@@ -41,6 +44,8 @@ export function createLibraryRouter(): IRouter {
     try {
       const libraryDir = ensureLibraryDir();
       const result = await listWorkspaceFiles(libraryDir, subPath);
+      // Filter out .git/ but keep .gitignore visible for user editing
+      result.files = result.files.filter(f => !LIBRARY_HIDDEN.has(f.name));
       res.json(result);
     } catch (err) {
       res.status(400).json({ error: 'File listing failed.' });

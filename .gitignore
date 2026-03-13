@@ -24,3 +24,6 @@ __pycache__/
 
 # Library Knowledge Base (Independent Repo)
 .library/
+
+# Prompt images (pasted screenshots, not version controlled)
+**/.images/

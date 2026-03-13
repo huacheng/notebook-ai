@@ -25,7 +25,8 @@ describe('WS handler append_prompt routing', () => {
     const src = wsHandlerSrc();
     const caseBlock = src.match(/case 'append_prompt'[\s\S]*?break;\s*\}/);
     expect(caseBlock).toBeTruthy();
-    expect(caseBlock![0]).toContain('sessionManager.appendPrompt(session_id, cell_id, source, images)');
+    // Now includes image_refs and is async
+    expect(caseBlock![0]).toContain('await sessionManager.appendPrompt(session_id, cell_id, source, images, image_refs)');
   });
 
   it('should send error to client on failure', () => {

@@ -51,7 +51,7 @@ if (process.env['NODE_ENV'] === 'production') {
 const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));  // Match WebSocket maxPayload for base64 images
 
 // Build ALLOWED_ORIGINS dynamically from all network interfaces
 const ALLOWED_ORIGINS = new Set([

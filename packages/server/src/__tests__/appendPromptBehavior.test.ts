@@ -45,8 +45,8 @@ describe('appendPrompt behavior', () => {
     const src = sessionSrc();
     const method = src.match(/appendPrompt[\s\S]*?broadcast\(session/);
     expect(method).toBeTruthy();
-    // Should check for images and pass them to sendPrompt
-    expect(method![0]).toContain('images');
-    expect(method![0]).toMatch(/sendPrompt\(source,\s*images\)/);
+    // Should resolve image_refs and pass resolvedImages to sendPrompt
+    expect(method![0]).toContain('resolvedImages');
+    expect(method![0]).toMatch(/sendPrompt\(source,\s*resolvedImages\)/);
   });
 });

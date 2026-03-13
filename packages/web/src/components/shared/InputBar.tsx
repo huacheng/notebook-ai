@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { loadDraft, saveDraft, clearDraft } from '../../utils/promptDraft';
-import { extractImagesFromClipboard, MAX_IMAGES, type PastedImage } from '../../utils/pasteImages';
+import { extractImagesFromClipboard, uploadPromptImage, MAX_IMAGES, type ImageRef } from '../../utils/pasteImages';
 import { getCaretCoordinates } from '../../utils/getCaretCoordinates';
 import { useMention } from '../../hooks/useMention';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
@@ -52,7 +52,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   // Draft key: per-notebook
   const draftKey = activeNotebookTabId || sessionId || '';
   const [text, setText] = useState(() => loadDraft(draftKey));
-  const [images, setImages] = useState<PastedImage[]>([]);
+  const [images, setImages] = useState<ImageRef[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
@@ -143,10 +143,33 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   }, [uploadStatus]);
 
   async function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const pasted = await extractImagesFromClipboard(e);
-    if (pasted.length > 0) {
+    const { images: pasted, skippedTypes } = await extractImagesFromClipboard(e);
+    if (pasted.length > 0 || skippedTypes.length > 0) {
       e.preventDefault();
-      setImages((prev) => [...prev, ...pasted].slice(0, MAX_IMAGES));
+    }
+    if (skippedTypes.length > 0) {
+      setUploadStatus({
+        phase: 'error',
+        message: t('input.unsupportedImageType', skippedTypes.join(', ')),
+      });
+    }
+    if (pasted.length > 0 && sessionId) {
+      // Upload images immediately to server
+      setUploadStatus({ phase: 'uploading', count: pasted.length });
+      try {
+        const uploaded: ImageRef[] = [];
+        for (const img of pasted) {
+          const ref = await uploadPromptImage(sessionId, img, authToken);
+          uploaded.push(ref);
+        }
+        setImages((prev) => [...prev, ...uploaded].slice(0, MAX_IMAGES));
+        setUploadStatus(null);
+      } catch (err) {
+        setUploadStatus({
+          phase: 'error',
+          message: String(err instanceof Error ? err.message : err),
+        });
+      }
     }
   }
 
@@ -155,17 +178,17 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     if (!source && images.length === 0) return;
     // Save to prompt history before submitting
     if (source) saveToHistory(source);
-    const imgs = images.length > 0
-      ? images.map(({ media_type, data }) => ({ media_type, data }))
+    const imageRefs = images.length > 0
+      ? images.map(({ path }) => ({ path }))
       : undefined;
     // If running, append to the running cell instead of creating a new one
     if (isRunning) {
       const runningCell = notebook?.cells.find((c) => c.status === 'running' || c.status === 'pending');
       if (runningCell) {
-        appendPrompt(runningCell.id, source || '(image)', imgs);
+        appendPrompt(runningCell.id, source || '(image)', undefined, imageRefs);
       }
     } else {
-      submitPrompt(source || '(image)', imgs);
+      submitPrompt(source || '(image)', undefined, imageRefs);
     }
     setText('');
     setImages([]);
