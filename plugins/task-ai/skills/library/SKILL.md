@@ -59,6 +59,7 @@ The shared knowledge library at `$NB_WORKSPACES_ROOT/.library/` aggregates cross
 /task-ai:library list [--type <type>]
 /task-ai:library status
 /task-ai:library maintain [--mode quick|audit] [--rebuild-index] [--rebuild-relations] [--compact] [--check-staleness] [--all] [--scheduled [--force]] [--install-cron] [--uninstall-cron]
+/task-ai:library write <path> [--content <content>] [--content-file <file>] [--notebook <name>] [--no-commit]
 ```
 
 ## Library Directory Structure
@@ -78,6 +79,7 @@ The sub-command executes one of the following operations based on the provided a
 3. **status**: Audit library health across six dimensions.
 4. **maintain**: Maintenance operations including index rebuild and changelog compaction.
 5. **evolve**: Security rules evolution loop (discover → review → integrate).
+6. **write**: Atomic write with full 8-step protocol (concurrency-safe).
 
 ## Operation Details
 
@@ -322,6 +324,49 @@ Security rules evolution loop — discovers new threats and evolves Core/Extende
 
 **User triggers evolution manually** — task-ai does not run background daemons.
 
+### `write <path>`
+
+Atomic write with full 8-step protocol — **the only correct way to write to library**.
+
+```bash
+/task-ai:library write <path> [--content <content>] [--content-file <file>] [--notebook <name>] [--no-commit]
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `<path>` | Destination path relative to `$NB_WORKSPACES_LIBRARY` (e.g., `.memory/.experiences/software/auth-impl.md`) |
+| `--content` | Content to write (for short content) |
+| `--content-file` | Path to file containing content (for longer content) |
+| `--notebook` | Source notebook name (recorded in changelog and relations) |
+| `--no-commit` | Skip git commit step (use when batching multiple writes) |
+
+If neither `--content` nor `--content-file` is provided, content is read from stdin.
+
+**Why use this instead of direct Write tool:**
+
+1. **Concurrency protection**: Acquires directory-level `.lock` before writing, preventing race conditions when multiple Claude processes write simultaneously
+2. **Changelog consistency**: Appends standardized changelog entry (action, category, topic, path, notebook)
+3. **Index integrity**: Updates both directory `.index.md` and `.master-index.md`
+4. **Relation tracking**: Updates `.relations.jsonl` via `append-relations.py`
+5. **Atomic writes**: Uses `.tmp` + rename pattern for crash safety
+
+**8-Step Protocol (executed by `library-write.sh`):**
+
+```
+1. mkdir -p     → ensure target directory exists
+2. acquire lock → mkdir $DIR/.lock (O_CREAT|O_EXCL semantics)
+3. write file   → atomic: write .tmp then mv
+4. changelog    → append timestamped entry to .changelog
+5. index        → update directory .index.md + .master-index.md
+6. relations    → update .relations.jsonl via append-relations.py
+7. release lock → rm -rf $DIR/.lock
+8. git commit   → task-ai(library): <action> <topic>
+```
+
+**Stale lock detection**: If lock exists but holding PID is dead (`kill -0` fails), the lock is reclaimed automatically.
+
+**MANDATORY FOR ALL LIBRARY WRITES**: All sub-commands that write to library (research, highlight, check, exec, verify, report, read) MUST use `library write` instead of direct Write tool. Direct Write bypasses concurrency protection and will cause data corruption under concurrent access.
+
 ---
 
 ## Library Write Protocol
@@ -372,6 +417,7 @@ External content is sanitised using 10 injection protection categories before st
 
 | Operation | Commit message |
 |-----------|---------------|
+| `write` | `task-ai(library):<category> <action> <topic>` |
 | `maintain --compact` | `task-ai(library):maintain archive YYYY-MM` |
 | `maintain --rebuild-index` | `task-ai(library):maintain rebuild index` |
 | `maintain --scheduled` | No commit (T3→T4 changes are uncommitted; caller should commit if needed) |

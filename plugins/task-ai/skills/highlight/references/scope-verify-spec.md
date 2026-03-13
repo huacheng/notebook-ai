@@ -52,4 +52,14 @@ topic_keywords: [keyword1, keyword2]
 
 ## Write Steps
 
-Same as scope=impl (steps 1-5), with different filename (`<semantic>-verify.md`) and source field (`highlight-verify`).
+**Use `library write` for all library writes** — same as scope=impl.
+
+1. Generate content per Content Structure above (with frontmatter)
+2. Execute:
+   ```bash
+   /task-ai:library write ".memory/.experiences/<type>/<semantic>-verify.md" \
+     --content-file <temp-content-file> \
+     --notebook <notebook-name>
+   ```
+
+> **WARNING**: Do NOT use direct Write tool for library writes — it bypasses concurrency protection.

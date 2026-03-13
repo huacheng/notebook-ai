@@ -52,8 +52,23 @@ topic_keywords: [keyword1, keyword2]
 
 ## Write Steps
 
-1. acquire `.memory/.experiences/.lock`
-2. O_APPEND write to `<semantic>-impl.md` (if file has frontmatter, append after `---` separator)
-3. acquire `.changelog.lock` → append: `<ts> | experience | .memory/.experiences/<type>/<semantic>-impl.md | quality_status:provisional | source:highlight-exec` → release `.changelog.lock`
-4. update `<type>/.index.md` (overwrite matching row or append new row)
-5. release `.memory/.experiences/.lock`
+**Use `library write` for all library writes** — ensures proper locking, changelog, and index updates.
+
+1. Generate content per Content Structure above (with frontmatter)
+2. Execute:
+   ```bash
+   /task-ai:library write ".memory/.experiences/<type>/<semantic>-impl.md" \
+     --content-file <temp-content-file> \
+     --notebook <notebook-name>
+   ```
+
+The `library write` command handles the full 8-step protocol internally:
+- Lock acquisition (directory-level `.lock`)
+- Atomic write (.tmp → rename)
+- Changelog append
+- Index updates (.index.md + .master-index.md)
+- Relations update (.relations.jsonl)
+- Lock release
+- Git commit
+
+> **WARNING**: Do NOT use direct Write tool for library writes — it bypasses concurrency protection.

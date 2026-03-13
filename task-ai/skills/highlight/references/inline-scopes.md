@@ -167,23 +167,30 @@ Follow `$NB_WORKSPACES_LIBRARY/references/quality-rubric.md` H/M/L self-assessme
 
 ### Write Steps (status upgrade to verified)
 
-1. acquire `.memory/.experiences/.lock`
-2. read target file frontmatter
-3. modify `quality_status: provisional → verified`
-4. atomic write (.tmp → rename)
-5. acquire `.changelog.lock` → append: `<ts> | experience | <path> | quality_status:verified | promoted-by:check` → release
-6. release `.memory/.experiences/.lock`
+**Use `library write` for all library writes**:
+
+1. Read target file, modify frontmatter `quality_status: provisional → verified`
+2. Execute:
+   ```bash
+   /task-ai:library write "<target-path>" \
+     --content-file <modified-file> \
+     --notebook <notebook-name>
+   ```
 
 ### Write Steps (invalidation)
 
-Same as status upgrade steps above, but `quality_status: provisional → invalidated`, changelog marks `invalidated-by:check`.
+Same as status upgrade, but `quality_status: provisional → invalidated`.
 
 ### Related Operation — failure_count Update
 
-check REPLAN may also need to update `.memory/.references/` `failure_count`. This operation **does NOT belong to highlight protocol** — `.references/` is managed by research/read. check operates directly via Library Write Protocol:
+check REPLAN may also need to update `.memory/.references/` `failure_count`. Use `library write`:
 
-1. acquire `.memory/.references/.lock`
-2. read frontmatter → `failure_count++`
-3. atomic write
-4. append changelog: `<ts> | reference | <path> | failure_count:<n>`
-5. release `.memory/.references/.lock`
+1. Read reference file, increment `failure_count` in frontmatter
+2. Execute:
+   ```bash
+   /task-ai:library write "<reference-path>" \
+     --content-file <modified-file> \
+     --notebook <notebook-name>
+   ```
+
+> **WARNING**: Do NOT use direct Write tool for library writes — it bypasses concurrency protection.
