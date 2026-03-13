@@ -901,10 +901,14 @@ export class SessionManager {
 
     // Defer completion if there are appended prompts waiting for Claude to consume.
     // Each append sends a user message to stdin; Claude will produce a new result for each.
+    // Only defer if _pendingAppends remains > 0 AFTER decrement; when it reaches 0, proceed to complete.
     if (session._pendingAppends > 0 && !isError) {
       session._pendingAppends--;
-      console.log(`[session ${session.id}] completeCell deferred: _pendingAppends=${session._pendingAppends} remaining`);
-      return;
+      if (session._pendingAppends > 0) {
+        console.log(`[session ${session.id}] completeCell deferred: _pendingAppends=${session._pendingAppends} remaining`);
+        return;
+      }
+      console.log(`[session ${session.id}] completeCell: last pending append consumed, completing cell`);
     }
     // Reset counter on final completion
     session._pendingAppends = 0;
