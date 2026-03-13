@@ -1,0 +1,13 @@
+{
+  "_meta": { "version": "2.0", "last_verified": "2026-03-07", "note": "Progressive evolution model — evolving replaces success/stage-done in merge results" },
+  "result_whitelist": [
+    "PASS","NEEDS_REVISION","ACCEPT","NEEDS_FIX","REPLAN","BLOCKED","CONTINUE",
+    "(generated)","(done)","(mid-exec)","(step-N)","(blocked)","(hil-pending)",
+    "(collected)","(sufficient)","(o1-collected)","(o2-collected)","(o3-collected)","(objective-complete)",
+    "(pass)","(fail)","(partial)","(processed)",
+    "evolving","conflict","rejected",
+    "(distilled)","(skipped-idempotent)","failed"
+  ],
+  "next_whitelist": ["plan","check","exec","merge","report","research","verify","annotate","highlight","(stop)"],
+  "checkpoint_whitelist": ["","post-plan","post-research","post-o1","post-o2","post-o3","mid-exec","post-exec","quick","full","step-N","regression","dependency-blocked","no-accept"]
+}

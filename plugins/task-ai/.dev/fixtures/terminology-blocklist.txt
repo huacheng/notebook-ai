@@ -1,0 +1,16 @@
+# Old terminology -> New VFP terminology
+# Format: old_term<TAB>new_term
+# Lines starting with # are comments
+# Matching is case-sensitive, done on stripped (non-code-block) markdown content
+Red stub	VH stub
+Red test skeleton	VH stub
+Red confirmation	VH confirmation
+Green confirmation	HS confirmation
+Red baseline	VH baseline
+Red→Green	VH→HS
+TDD Metrics	VFP Metrics
+TDD Compliance	VFP Compliance
+TDD Discipline Audit	VFP Discipline Audit
+TDD Cycle	VFP Cycle
+tdd_cycles_completed	vfp_cycles_completed
+correctness checks	correctness/completeness checks

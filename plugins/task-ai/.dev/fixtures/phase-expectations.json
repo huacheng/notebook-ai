@@ -1,0 +1,28 @@
+{
+  "_meta": { "version": "1.0", "last_verified": "2026-02-24" },
+  "phase-0": {
+    "description": "Red baseline: infrastructure created, most L2/L3 expected to fail",
+    "newly_green": [],
+    "still_red": ["L2-terminology:*", "L2-seed-completeness:*", "L2-lock-coverage:*", "L2-signal-field-names:*"]
+  },
+  "phase-1": {
+    "description": "Protocol extraction: structural changes in place",
+    "newly_green": ["L3-protocol-compliance:*", "L2-lock-coverage:*", "L2-index-completeness:*"],
+    "still_red": ["L2-terminology:*", "L2-seed-completeness:*", "L2-signal-field-names:*"]
+  },
+  "phase-2": {
+    "description": "SKILL.md refactoring: terminology and signal names updated",
+    "newly_green": ["L2-terminology:*", "L2-signal-field-names:*", "L2-data-flow:*"],
+    "still_red": ["L2-seed-completeness:*"]
+  },
+  "phase-3": {
+    "description": "Domain generalization: seed-types have Verification Cycle",
+    "newly_green": ["L2-seed-completeness:*"],
+    "still_red": []
+  },
+  "phase-4": {
+    "description": "Full validation: all tests green",
+    "newly_green": ["*"],
+    "still_red": []
+  }
+}

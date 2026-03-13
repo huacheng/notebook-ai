@@ -1,0 +1,619 @@
+{"test":"L1-step-numbering:annotate","status":"PASS","detail":"annotate: 16 steps, sequential"}
+{"test":"L1-step-numbering:auto","status":"WARN","detail":"auto: no numbered steps found in Execution Steps"}
+{"test":"L1-step-numbering:cancel","status":"PASS","detail":"cancel: 10 steps, sequential"}
+{"test":"L1-step-numbering:check","status":"PASS","detail":"check: 19 steps, sequential"}
+{"test":"L1-step-numbering:exec","status":"PASS","detail":"exec: 10 steps, sequential"}
+{"test":"L1-step-numbering:init","status":"PASS","detail":"init: 14 steps, sequential"}
+{"test":"L1-step-numbering:library","status":"WARN","detail":"library: no numbered steps found in Execution Steps"}
+{"test":"L1-step-numbering:list","status":"PASS","detail":"list: 4 steps, sequential"}
+{"test":"L1-step-numbering:merge","status":"PASS","detail":"merge: 10 steps, sequential"}
+{"test":"L1-step-numbering:plan","status":"PASS","detail":"plan: 27 steps, sequential"}
+{"test":"L1-step-numbering:report","status":"PASS","detail":"report: 19 steps, sequential"}
+{"test":"L1-step-numbering:research","status":"PASS","detail":"research: 20 steps, sequential"}
+{"test":"L1-step-numbering:summarize","status":"PASS","detail":"summarize: 10 steps, sequential"}
+{"test":"L1-step-numbering:verify","status":"PASS","detail":"verify: 16 steps, sequential"}
+{"test":"L1-cross-refs:commands/references/git-details.md","status":"PASS","detail":"commands/references/git-details.md: ref 'skills/merge/SKILL.md' exists"}
+{"test":"L1-cross-refs:commands/references/library-write-protocol.md","status":"PASS","detail":"commands/references/library-write-protocol.md: ref 'library/references/write-protocol.md' exists"}
+{"test":"L1-cross-refs:commands/references/type-field.md","status":"PASS","detail":"commands/references/type-field.md: ref 'init/references/seed-types/.summary.md' exists"}
+{"test":"L1-cross-refs:commands/references/type-field.md","status":"PASS","detail":"commands/references/type-field.md: ref 'plan/references/type-profiling.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/directory-convention.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/summary-formats.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/type-field.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/state-matrix.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/annotation-format.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/depends-on-format.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/git-details.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'auto/SKILL.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/concurrency.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/model-routing.md' exists"}
+{"test":"L1-cross-refs:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: ref 'commands/references/lifecycle-hooks.md' exists"}
+{"test":"L1-cross-refs:skills/annotate/SKILL.md","status":"PASS","detail":"skills/annotate/SKILL.md: ref 'references/annotation-processing.md' exists"}
+{"test":"L1-cross-refs:skills/auto/SKILL.md","status":"PASS","detail":"skills/auto/SKILL.md: ref 'references/stall-detection.md' exists"}
+{"test":"L1-cross-refs:skills/auto/SKILL.md","status":"PASS","detail":"skills/auto/SKILL.md: ref 'references/context-quota.md' exists"}
+{"test":"L1-cross-refs:skills/auto/SKILL.md","status":"PASS","detail":"skills/auto/SKILL.md: ref 'references/backend-api.md' exists"}
+{"test":"L1-cross-refs:skills/auto/SKILL.md","status":"PASS","detail":"skills/auto/SKILL.md: ref 'references/backend-api.md' exists"}
+{"test":"L1-cross-refs:skills/auto/SKILL.md","status":"PASS","detail":"skills/auto/SKILL.md: ref 'auto/references/plugin-delegation.md' exists"}
+{"test":"L1-cross-refs:skills/auto/references/stall-detection.md","status":"PASS","detail":"skills/auto/references/stall-detection.md: ref 'references/context-quota.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'plan/references/type-profiling.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'skills/library/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'skills/library/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'skills/merge/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'init/references/seed-types/<type>.md' exists"}
+{"test":"L1-cross-refs:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: ref 'references/six-dimension-audit.md' exists"}
+{"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'plan/references/type-profiling.md' exists"}
+{"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'init/references/seed-types/<type>.md' exists"}
+{"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'skills/library/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: ref 'skills/library/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/init/SKILL.md","status":"PASS","detail":"skills/init/SKILL.md: ref 'plan/references/type-profiling.md' exists"}
+{"test":"L1-cross-refs:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: ref 'commands/references/library-write-protocol.md' exists"}
+{"test":"L1-cross-refs:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: ref 'references/write-protocol.md' exists"}
+{"test":"L1-cross-refs:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: ref 'commands/references/changelog-consumption-protocol.md' exists"}
+{"test":"L1-cross-refs:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: ref 'references/quality-rubric.md' exists"}
+{"test":"L1-cross-refs:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: ref 'references/injection-rules.md' exists"}
+{"test":"L1-cross-refs:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: ref 'references/blocked-sources.md' exists"}
+{"test":"L1-cross-refs:skills/library/references/quality-rubric.md","status":"PASS","detail":"skills/library/references/quality-rubric.md: ref 'library/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/library/references/write-protocol.md","status":"PASS","detail":"skills/library/references/write-protocol.md: ref 'commands/references/library-write-protocol.md' exists"}
+{"test":"L1-cross-refs:skills/plan/SKILL.md","status":"PASS","detail":"skills/plan/SKILL.md: ref 'skills/research/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/plan/SKILL.md","status":"PASS","detail":"skills/plan/SKILL.md: ref 'skills/library/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/plan/SKILL.md","status":"PASS","detail":"skills/plan/SKILL.md: ref 'init/references/seed-types/<type>.md' exists"}
+{"test":"L1-cross-refs:skills/plan/SKILL.md","status":"PASS","detail":"skills/plan/SKILL.md: ref 'check/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: ref 'skills/plan/SKILL.md' exists"}
+{"test":"L1-cross-refs:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: ref 'plan/references/type-profiling.md' exists"}
+{"test":"L1-cross-refs:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: ref 'commands/references/verification-first-protocol.md' exists"}
+{"test":"L1-cross-refs:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: ref 'references/blocked-sources.md' exists"}
+{"test":"L1-cross-refs:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: ref 'references/injection-rules.md' exists"}
+{"test":"L1-cross-refs:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: ref 'auto/references/plugin-delegation.md' exists"}
+{"test":"L1-cross-refs:skills/verify/SKILL.md","status":"PASS","detail":"skills/verify/SKILL.md: ref 'plan/references/type-profiling.md' exists"}
+{"test":"L1-cross-refs:skills/verify/SKILL.md","status":"PASS","detail":"skills/verify/SKILL.md: ref 'skills/library/SKILL.md' exists"}
+{"test":"L1-signal-whitelist:annotate","status":"PASS","detail":"annotate: signal result '(processed)' in whitelist"}
+{"test":"L1-signal-whitelist:annotate","status":"PASS","detail":"annotate: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'PASS' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'exec' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'NEEDS_REVISION' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'BLOCKED' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'CONTINUE' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'exec' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'NEEDS_FIX' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'exec' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'REPLAN' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'BLOCKED' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'ACCEPT' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'merge' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'NEEDS_FIX' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'exec' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal result 'REPLAN' in whitelist"}
+{"test":"L1-signal-whitelist:check","status":"PASS","detail":"check: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal result '(done)' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal result '(mid-exec)' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal result '(step-N)' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal result '(blocked)' in whitelist"}
+{"test":"L1-signal-whitelist:exec","status":"PASS","detail":"exec: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal result 'success' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal next 'report' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal result 'conflict' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal result 'rejected' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal result 'rejected' in whitelist"}
+{"test":"L1-signal-whitelist:merge","status":"PASS","detail":"merge: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:plan","status":"PASS","detail":"plan: signal result '(generated)' in whitelist"}
+{"test":"L1-signal-whitelist:plan","status":"PASS","detail":"plan: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:report","status":"PASS","detail":"report: signal result '(generated)' in whitelist"}
+{"test":"L1-signal-whitelist:report","status":"PASS","detail":"report: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(o1-collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-o1' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(o2-collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-o2' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(o3-collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-o3' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(objective-complete)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next '(stop)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(sufficient)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(sufficient)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'plan' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(sufficient)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(sufficient)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'verify' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'check' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(sufficient)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'check' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'exec' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(collected)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal result '(sufficient)' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal next 'exec' in whitelist"}
+{"test":"L1-signal-whitelist:research","status":"PASS","detail":"research: signal checkpoint 'post-research' in whitelist"}
+{"test":"L1-signal-whitelist:verify","status":"PASS","detail":"verify: signal result '(pass)' in whitelist"}
+{"test":"L1-signal-whitelist:verify","status":"PASS","detail":"verify: signal next 'check' in whitelist"}
+{"test":"L1-signal-whitelist:verify","status":"PASS","detail":"verify: signal result '(pass)' in whitelist"}
+{"test":"L1-signal-whitelist:verify","status":"PASS","detail":"verify: signal next 'check' in whitelist"}
+{"test":"L1-signal-whitelist:verify","status":"PASS","detail":"verify: signal result '(pass)' in whitelist"}
+{"test":"L1-signal-whitelist:verify","status":"PASS","detail":"verify: signal next 'check' in whitelist"}
+{"test":"L1-naming-conventions:REFERENCE-INDEX.md","status":"PASS","detail":"REFERENCE-INDEX.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/annotation-format.md","status":"PASS","detail":"commands/references/annotation-format.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/changelog-consumption-protocol.md","status":"PASS","detail":"commands/references/changelog-consumption-protocol.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/concurrency.md","status":"PASS","detail":"commands/references/concurrency.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/depends-on-format.md","status":"PASS","detail":"commands/references/depends-on-format.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/directory-convention.md","status":"PASS","detail":"commands/references/directory-convention.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/git-details.md","status":"PASS","detail":"commands/references/git-details.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/library-write-protocol.md","status":"PASS","detail":"commands/references/library-write-protocol.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/lifecycle-hooks.md","status":"PASS","detail":"commands/references/lifecycle-hooks.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/model-routing.md","status":"PASS","detail":"commands/references/model-routing.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/state-matrix.md","status":"PASS","detail":"commands/references/state-matrix.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/summary-formats.md","status":"PASS","detail":"commands/references/summary-formats.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/type-field.md","status":"PASS","detail":"commands/references/type-field.md: valid filename"}
+{"test":"L1-naming-conventions:commands/references/verification-first-protocol.md","status":"PASS","detail":"commands/references/verification-first-protocol.md: valid filename"}
+{"test":"L1-naming-conventions:commands/task-ai.md","status":"PASS","detail":"commands/task-ai.md: valid filename"}
+{"test":"L1-naming-conventions:skills/annotate/SKILL.md","status":"PASS","detail":"skills/annotate/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/annotate/references/annotation-processing.md","status":"PASS","detail":"skills/annotate/references/annotation-processing.md: valid filename"}
+{"test":"L1-naming-conventions:skills/auto/SKILL.md","status":"PASS","detail":"skills/auto/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/auto/references/backend-api.md","status":"PASS","detail":"skills/auto/references/backend-api.md: valid filename"}
+{"test":"L1-naming-conventions:skills/auto/references/context-quota.md","status":"PASS","detail":"skills/auto/references/context-quota.md: valid filename"}
+{"test":"L1-naming-conventions:skills/auto/references/plugin-delegation.md","status":"PASS","detail":"skills/auto/references/plugin-delegation.md: valid filename"}
+{"test":"L1-naming-conventions:skills/auto/references/stall-detection.md","status":"PASS","detail":"skills/auto/references/stall-detection.md: valid filename"}
+{"test":"L1-naming-conventions:skills/cancel/SKILL.md","status":"PASS","detail":"skills/cancel/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/check/SKILL.md","status":"PASS","detail":"skills/check/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/check/references/six-dimension-audit.md","status":"PASS","detail":"skills/check/references/six-dimension-audit.md: valid filename"}
+{"test":"L1-naming-conventions:skills/exec/SKILL.md","status":"PASS","detail":"skills/exec/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/SKILL.md","status":"PASS","detail":"skills/init/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/.summary.md","status":"PASS","detail":"skills/init/references/seed-types/.summary.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/ai-skill.md","status":"PASS","detail":"skills/init/references/seed-types/ai-skill.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/chip-design.md","status":"PASS","detail":"skills/init/references/seed-types/chip-design.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/data-pipeline.md","status":"PASS","detail":"skills/init/references/seed-types/data-pipeline.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/documentation.md","status":"PASS","detail":"skills/init/references/seed-types/documentation.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/dsp.md","status":"PASS","detail":"skills/init/references/seed-types/dsp.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/image-processing.md","status":"PASS","detail":"skills/init/references/seed-types/image-processing.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/infrastructure.md","status":"PASS","detail":"skills/init/references/seed-types/infrastructure.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/literary.md","status":"PASS","detail":"skills/init/references/seed-types/literary.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/mechatronics.md","status":"PASS","detail":"skills/init/references/seed-types/mechatronics.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/ml.md","status":"PASS","detail":"skills/init/references/seed-types/ml.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/science.md","status":"PASS","detail":"skills/init/references/seed-types/science.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/screenwriting.md","status":"PASS","detail":"skills/init/references/seed-types/screenwriting.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/software.md","status":"PASS","detail":"skills/init/references/seed-types/software.md: valid filename"}
+{"test":"L1-naming-conventions:skills/init/references/seed-types/video-production.md","status":"PASS","detail":"skills/init/references/seed-types/video-production.md: valid filename"}
+{"test":"L1-naming-conventions:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/library/references/blocked-sources.md","status":"PASS","detail":"skills/library/references/blocked-sources.md: valid filename"}
+{"test":"L1-naming-conventions:skills/library/references/injection-rules.md","status":"PASS","detail":"skills/library/references/injection-rules.md: valid filename"}
+{"test":"L1-naming-conventions:skills/library/references/quality-rubric.md","status":"PASS","detail":"skills/library/references/quality-rubric.md: valid filename"}
+{"test":"L1-naming-conventions:skills/library/references/write-protocol.md","status":"PASS","detail":"skills/library/references/write-protocol.md: valid filename"}
+{"test":"L1-naming-conventions:skills/list/SKILL.md","status":"PASS","detail":"skills/list/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/merge/SKILL.md","status":"PASS","detail":"skills/merge/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/plan/SKILL.md","status":"PASS","detail":"skills/plan/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/plan/references/type-profiling.md","status":"PASS","detail":"skills/plan/references/type-profiling.md: valid filename"}
+{"test":"L1-naming-conventions:skills/report/SKILL.md","status":"PASS","detail":"skills/report/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/summarize/SKILL.md","status":"PASS","detail":"skills/summarize/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/verify/SKILL.md","status":"PASS","detail":"skills/verify/SKILL.md: valid filename"}
+{"test":"L1-naming-conventions:skills/annotate","status":"PASS","detail":"skills/annotate: valid directory name"}
+{"test":"L1-naming-conventions:skills/auto","status":"PASS","detail":"skills/auto: valid directory name"}
+{"test":"L1-naming-conventions:skills/cancel","status":"PASS","detail":"skills/cancel: valid directory name"}
+{"test":"L1-naming-conventions:skills/check","status":"PASS","detail":"skills/check: valid directory name"}
+{"test":"L1-naming-conventions:skills/exec","status":"PASS","detail":"skills/exec: valid directory name"}
+{"test":"L1-naming-conventions:skills/init","status":"PASS","detail":"skills/init: valid directory name"}
+{"test":"L1-naming-conventions:skills/library","status":"PASS","detail":"skills/library: valid directory name"}
+{"test":"L1-naming-conventions:skills/list","status":"PASS","detail":"skills/list: valid directory name"}
+{"test":"L1-naming-conventions:skills/merge","status":"PASS","detail":"skills/merge: valid directory name"}
+{"test":"L1-naming-conventions:skills/plan","status":"PASS","detail":"skills/plan: valid directory name"}
+{"test":"L1-naming-conventions:skills/report","status":"PASS","detail":"skills/report: valid directory name"}
+{"test":"L1-naming-conventions:skills/research","status":"PASS","detail":"skills/research: valid directory name"}
+{"test":"L1-naming-conventions:skills/summarize","status":"PASS","detail":"skills/summarize: valid directory name"}
+{"test":"L1-naming-conventions:skills/verify","status":"PASS","detail":"skills/verify: valid directory name"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .status.json"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .target.md"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .plan.md"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .summary.md"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .auto-signal"}
+{"test":"L1-naming-conventions:directory-convention","status":"PASS","detail":"directory-convention: documents .type-profile.md"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "planning" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "draft" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "cancelled" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "complete" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "re-planning" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "review" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "executing" found"}
+{"test":"L1-state-matrix:state-matrix","status":"PASS","detail":"state-matrix: state "blocked" found"}
+{"test":"L1-state-matrix:state-matrix.md","status":"PASS","detail":"state-matrix.md: 8 states found, 0 transitions parsed"}
+{"test":"L1-state-matrix:annotate","status":"PASS","detail":"annotate: State Transitions table valid (8 rows)"}
+{"test":"L1-state-matrix:cancel","status":"WARN","detail":"cancel: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:check","status":"WARN","detail":"check: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:exec","status":"PASS","detail":"exec: State Transitions table valid (3 rows)"}
+{"test":"L1-state-matrix:library","status":"WARN","detail":"library: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:list","status":"WARN","detail":"list: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:merge","status":"PASS","detail":"merge: State Transitions table valid (2 rows)"}
+{"test":"L1-state-matrix:plan","status":"PASS","detail":"plan: State Transitions table valid (8 rows)"}
+{"test":"L1-state-matrix:report","status":"WARN","detail":"report: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:research","status":"WARN","detail":"research: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:summarize","status":"WARN","detail":"summarize: State Transitions section has no parseable table"}
+{"test":"L1-state-matrix:verify","status":"WARN","detail":"verify: State Transitions section has no parseable table"}
+{"test":"L1-frontmatter-validation:annotate","status":"PASS","detail":"annotate: frontmatter valid"}
+{"test":"L1-frontmatter-validation:auto","status":"PASS","detail":"auto: frontmatter valid"}
+{"test":"L1-frontmatter-validation:cancel","status":"PASS","detail":"cancel: frontmatter valid"}
+{"test":"L1-frontmatter-validation:check","status":"PASS","detail":"check: frontmatter valid"}
+{"test":"L1-frontmatter-validation:exec","status":"PASS","detail":"exec: frontmatter valid"}
+{"test":"L1-frontmatter-validation:init","status":"PASS","detail":"init: frontmatter valid"}
+{"test":"L1-frontmatter-validation:library","status":"PASS","detail":"library: frontmatter valid"}
+{"test":"L1-frontmatter-validation:list","status":"PASS","detail":"list: frontmatter valid"}
+{"test":"L1-frontmatter-validation:merge","status":"PASS","detail":"merge: frontmatter valid"}
+{"test":"L1-frontmatter-validation:plan","status":"PASS","detail":"plan: frontmatter valid"}
+{"test":"L1-frontmatter-validation:report","status":"PASS","detail":"report: frontmatter valid"}
+{"test":"L1-frontmatter-validation:research","status":"PASS","detail":"research: frontmatter valid"}
+{"test":"L1-frontmatter-validation:summarize","status":"PASS","detail":"summarize: frontmatter valid"}
+{"test":"L1-frontmatter-validation:verify","status":"PASS","detail":"verify: frontmatter valid"}
+{"test":"L1-frontmatter-validation:annotate","status":"PASS","detail":"annotate: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:auto","status":"PASS","detail":"auto: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:cancel","status":"PASS","detail":"cancel: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:check","status":"PASS","detail":"check: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:exec","status":"PASS","detail":"exec: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:init","status":"PASS","detail":"init: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:library","status":"PASS","detail":"library: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:list","status":"PASS","detail":"list: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:merge","status":"PASS","detail":"merge: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:plan","status":"PASS","detail":"plan: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:report","status":"PASS","detail":"report: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:research","status":"PASS","detail":"research: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:summarize","status":"PASS","detail":"summarize: found in model-routing.md"}
+{"test":"L1-frontmatter-validation:verify","status":"PASS","detail":"verify: found in model-routing.md"}
+{"test":"L1-git-commit-conventions:git-details.md","status":"PASS","detail":"git-details.md: found 15 commit types: annotate cancel check exec feat fix init maintain merge plan refactor report research summarize verify"}
+{"test":"L1-git-commit-conventions:annotate","status":"PASS","detail":"annotate: commit type 'annotate' in whitelist"}
+{"test":"L1-git-commit-conventions:auto","status":"WARN","detail":"auto: no commit type patterns found in ## Git section"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:check","status":"PASS","detail":"check: commit type 'check' in whitelist"}
+{"test":"L1-git-commit-conventions:exec","status":"PASS","detail":"exec: commit type 'exec' in whitelist"}
+{"test":"L1-git-commit-conventions:exec","status":"PASS","detail":"exec: commit type 'feat' in whitelist"}
+{"test":"L1-git-commit-conventions:exec","status":"PASS","detail":"exec: commit type 'fix' in whitelist"}
+{"test":"L1-git-commit-conventions:exec","status":"PASS","detail":"exec: commit type 'exec' in whitelist"}
+{"test":"L1-git-commit-conventions:exec","status":"PASS","detail":"exec: commit type 'exec' in whitelist"}
+{"test":"L1-git-commit-conventions:init","status":"PASS","detail":"init: commit type 'init' in whitelist"}
+{"test":"L1-git-commit-conventions:library","status":"PASS","detail":"library: commit type 'maintain' in whitelist"}
+{"test":"L1-git-commit-conventions:library","status":"PASS","detail":"library: commit type 'maintain' in whitelist"}
+{"test":"L1-git-commit-conventions:list","status":"WARN","detail":"list: no commit type patterns found in ## Git section"}
+{"test":"L1-git-commit-conventions:merge","status":"PASS","detail":"merge: commit type 'refactor' in whitelist"}
+{"test":"L1-git-commit-conventions:merge","status":"PASS","detail":"merge: commit type 'merge' in whitelist"}
+{"test":"L1-git-commit-conventions:merge","status":"PASS","detail":"merge: commit type 'merge' in whitelist"}
+{"test":"L1-git-commit-conventions:merge","status":"PASS","detail":"merge: commit type 'merge' in whitelist"}
+{"test":"L1-git-commit-conventions:merge","status":"PASS","detail":"merge: commit type 'merge' in whitelist"}
+{"test":"L1-git-commit-conventions:plan","status":"PASS","detail":"plan: commit type 'plan' in whitelist"}
+{"test":"L1-git-commit-conventions:report","status":"PASS","detail":"report: commit type 'report' in whitelist"}
+{"test":"L1-git-commit-conventions:research","status":"PASS","detail":"research: commit type 'research' in whitelist"}
+{"test":"L1-git-commit-conventions:research","status":"PASS","detail":"research: commit type 'research' in whitelist"}
+{"test":"L1-git-commit-conventions:research","status":"PASS","detail":"research: commit type 'research' in whitelist"}
+{"test":"L1-git-commit-conventions:research","status":"PASS","detail":"research: commit type 'research' in whitelist"}
+{"test":"L1-git-commit-conventions:research","status":"PASS","detail":"research: commit type 'research' in whitelist"}
+{"test":"L1-git-commit-conventions:summarize","status":"PASS","detail":"summarize: commit type 'summarize' in whitelist"}
+{"test":"L1-git-commit-conventions:verify","status":"PASS","detail":"verify: commit type 'verify' in whitelist"}
+{"test":"L1-git-commit-conventions:verify","status":"PASS","detail":"verify: commit type 'verify' in whitelist"}
+{"test":"L1-git-commit-conventions:verify","status":"PASS","detail":"verify: commit type 'verify' in whitelist"}
+{"test":"L1-git-commit-conventions:verify","status":"PASS","detail":"verify: commit type 'verify' in whitelist"}
+{"test":"L2-terminology:terminology","status":"PASS","detail":"terminology: no old terms found across all .md files"}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: plan mentions artifact "vh-stubs""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec references artifact "vh-stubs""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: verify references artifact "vh-stubs""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check references artifact "vh-stubs""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: plan mentions artifact "vh-baseline.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec references artifact "vh-baseline.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: verify references artifact "vh-baseline.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check references artifact "vh-baseline.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: auto references artifact "vh-baseline.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: plan mentions artifact "[VH: ...] in .plan.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec references artifact "[VH: ...] in .plan.md""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec mentions artifact "cumulative-green.jsonl""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec references artifact "cumulative-green.jsonl""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check references artifact "cumulative-green.jsonl""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: auto references artifact "cumulative-green.jsonl""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec mentions artifact "hil-snapshots/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec references artifact "hil-snapshots/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check references artifact "hil-snapshots/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: exec mentions artifact "VFP Cycle Summary in .notes/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check references artifact "VFP Cycle Summary in .notes/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: auto references artifact "VFP Cycle Summary in .notes/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: verify mentions artifact "VFP Metrics in results""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check references artifact "VFP Metrics in results""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: check mentions artifact "VFP Compliance in .analysis/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: report references artifact "VFP Compliance in .analysis/""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: auto mentions artifact "vfp_cycles_completed in .auto-signal""}
+{"test":"L2-data-flow:data-flow","status":"PASS","detail":"data-flow: daemon references artifact "vfp_cycles_completed in .auto-signal""}
+{"test":"L2-seed-completeness:ai-skill","status":"WARN","detail":"ai-skill: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:chip-design","status":"WARN","detail":"chip-design: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:data-pipeline","status":"PASS","detail":"data-pipeline: has Verification Cycle section"}
+{"test":"L2-seed-completeness:documentation","status":"PASS","detail":"documentation: has Verification Cycle section"}
+{"test":"L2-seed-completeness:dsp","status":"WARN","detail":"dsp: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:image-processing","status":"WARN","detail":"image-processing: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:infrastructure","status":"PASS","detail":"infrastructure: has Verification Cycle section"}
+{"test":"L2-seed-completeness:literary","status":"WARN","detail":"literary: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:mechatronics","status":"WARN","detail":"mechatronics: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:ml","status":"PASS","detail":"ml: has Verification Cycle section"}
+{"test":"L2-seed-completeness:science","status":"WARN","detail":"science: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:screenwriting","status":"WARN","detail":"screenwriting: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-seed-completeness:software","status":"PASS","detail":"software: has Verification Cycle section"}
+{"test":"L2-seed-completeness:video-production","status":"WARN","detail":"video-production: missing Verification Cycle section (P3 — optional)"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: covers VFP pattern 'vh-stubs'"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: covers VFP pattern 'vh-baseline'"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: covers VFP pattern 'cumulative-green'"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: covers VFP pattern 'hil-snapshots'"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: covers VFP pattern 'vfp_cycles_completed'"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: has lock ordering table"}
+{"test":"L2-lock-coverage:concurrency","status":"PASS","detail":"concurrency: documents .working lock"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: value "needs-check" is valid"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: value "needs-plan" is valid"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: plan participates in phase management"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: check participates in phase management"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: exec participates in phase management"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: "needs-check" is both set and consumed"}
+{"test":"L2-phase-state-machine:phase","status":"PASS","detail":"phase: "needs-plan" is both set and consumed"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/annotation-format.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/changelog-consumption-protocol.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/concurrency.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/depends-on-format.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/directory-convention.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/git-details.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/library-write-protocol.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/lifecycle-hooks.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/model-routing.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/state-matrix.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/summary-formats.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/type-field.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists commands/references/verification-first-protocol.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/annotate/references/annotation-processing.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/backend-api.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/context-quota.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/plugin-delegation.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/auto/references/stall-detection.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/check/references/six-dimension-audit.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/ai-skill.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/chip-design.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/data-pipeline.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/documentation.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/dsp.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/image-processing.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/infrastructure.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/literary.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/mechatronics.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/ml.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/science.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/screenwriting.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/software.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/init/references/seed-types/video-production.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/library/references/blocked-sources.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/library/references/injection-rules.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/library/references/quality-rubric.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/library/references/write-protocol.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skills/plan/references/type-profiling.md"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'annotate'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'auto'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'cancel'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'check'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'exec'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'init'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'library'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'list'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'merge'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'plan'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'report'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'research'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'summarize'"}
+{"test":"L2-index-completeness:index","status":"PASS","detail":"index: lists skill 'verify'"}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: does not use old field "tdd_cycles_completed""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "result""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "compaction_count""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "step""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "iteration""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "vfp_cycles_completed""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "next""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "timestamp""}
+{"test":"L2-signal-field-names:auto/SKILL.md","status":"PASS","detail":"auto/SKILL.md: documents field "checkpoint""}
+{"test":"L2-injection-category-count:injection-rules.md","status":"PASS","detail":"injection-rules.md: 10 categories defined"}
+{"test":"L2-injection-category-count:injection-rules.md","status":"PASS","detail":"injection-rules.md: categories 1-10 sequential"}
+{"test":"L2-injection-category-count:REFERENCE-INDEX.md","status":"PASS","detail":"REFERENCE-INDEX.md: 'ten-category' matches actual count"}
+{"test":"L2-injection-category-count:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: 'ten active...categories' matches actual count"}
+{"test":"L2-injection-category-count:skills/library/SKILL.md","status":"PASS","detail":"skills/library/SKILL.md: 'ten-category' matches actual count"}
+{"test":"L2-injection-category-count:skills/library/references/blocked-sources.md","status":"PASS","detail":"skills/library/references/blocked-sources.md: 'ten-category' matches actual count"}
+{"test":"L2-injection-category-count:skills/library/references/blocked-sources.md","status":"PASS","detail":"skills/library/references/blocked-sources.md: 'all ten categories' matches actual count"}
+{"test":"L2-injection-category-count:skills/library/references/injection-rules.md","status":"PASS","detail":"skills/library/references/injection-rules.md: 'all ten categories' matches actual count"}
+{"test":"L2-injection-category-count:skills/library/references/injection-rules.md","status":"PASS","detail":"skills/library/references/injection-rules.md: 'all ten categories' matches actual count"}
+{"test":"L2-injection-category-count:skills/research/SKILL.md","status":"PASS","detail":"skills/research/SKILL.md: 'ten active...categories' matches actual count"}
+{"test":"L2-plugin-slot-consistency:slot-table","status":"PASS","detail":"slot-table: 7 named slots found: brainstorm, code-review, debugging, doc-parse, frontend-design, vh-generation, vh-verification"}
+{"test":"L2-plugin-slot-consistency:integration-summary","status":"PASS","detail":"integration-summary: 8 slot references found: brainstorm, code-review, debugging, doc-parse, domain-*, frontend-design, vh-generation, vh-verification"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "brainstorm" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "code-review" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "debugging" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "doc-parse" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "domain-*" matches wildcard pattern"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "frontend-design" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "vh-generation" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:consistency","status":"PASS","detail":"consistency: summary slot "vh-verification" defined in slot table"}
+{"test":"L2-plugin-slot-consistency:level-1-text","status":"PASS","detail":"level-1-text: "7 named slots" matches actual count"}
+{"test":"L2-plugin-slot-consistency:alias","status":"PASS","detail":"alias: "tdd" → "vh-verification" (target exists in slot table)"}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "re-planning" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "draft" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "complete" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "planning" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "executing" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "cancelled" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "review" is reachable from "draft""}
+{"test":"L3-state-machine-graph:reachability","status":"PASS","detail":"reachability: "blocked" is reachable from "draft""}
+{"test":"L3-state-machine-graph:terminal","status":"PASS","detail":"terminal: "complete" has no outgoing edges"}
+{"test":"L3-state-machine-graph:terminal","status":"PASS","detail":"terminal: "cancelled" has no outgoing edges"}
+{"test":"L3-state-machine-graph:deadlock","status":"PASS","detail":"deadlock: "re-planning" has 4 outgoing edge(s)"}
+{"test":"L3-state-machine-graph:deadlock","status":"PASS","detail":"deadlock: "draft" has 2 outgoing edge(s)"}
+{"test":"L3-state-machine-graph:deadlock","status":"PASS","detail":"deadlock: "planning" has 4 outgoing edge(s)"}
+{"test":"L3-state-machine-graph:deadlock","status":"PASS","detail":"deadlock: "executing" has 4 outgoing edge(s)"}
+{"test":"L3-state-machine-graph:deadlock","status":"PASS","detail":"deadlock: "review" has 3 outgoing edge(s)"}
+{"test":"L3-state-machine-graph:deadlock","status":"PASS","detail":"deadlock: "blocked" has 2 outgoing edge(s)"}
+{"test":"L3-state-machine-graph:termination","status":"PASS","detail":"termination: "re-planning" can reach a terminal state"}
+{"test":"L3-state-machine-graph:termination","status":"PASS","detail":"termination: "draft" can reach a terminal state"}
+{"test":"L3-state-machine-graph:termination","status":"PASS","detail":"termination: "planning" can reach a terminal state"}
+{"test":"L3-state-machine-graph:termination","status":"PASS","detail":"termination: "executing" can reach a terminal state"}
+{"test":"L3-state-machine-graph:termination","status":"PASS","detail":"termination: "review" can reach a terminal state"}
+{"test":"L3-state-machine-graph:termination","status":"PASS","detail":"termination: "blocked" can reach a terminal state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "re-planning" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "draft" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "complete" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "planning" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "executing" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "cancelled" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "review" in transitions is a known state"}
+{"test":"L3-state-machine-graph:states","status":"PASS","detail":"states: "blocked" in transitions is a known state"}
+{"test":"L3-protocol-compliance:protocol-compliance","status":"WARN","detail":"protocol-compliance: no § references found (protocol not yet integrated)"}
+{"test":"L3-signal-routing:signal-routing","status":"PASS","detail":"signal-routing: found 26 routing entries"}
+{"test":"L3-signal-routing:annotate","status":"PASS","detail":"annotate: result "(processed)" → next "verify" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "PASS" → next "exec" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "NEEDS_REVISION" → next "plan" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "BLOCKED" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:check","status":"WARN","detail":"check: result "CONTINUE" has no explicit routing entry"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "NEEDS_FIX" → next "exec" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "REPLAN" → next "plan" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "BLOCKED" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "ACCEPT" → next "merge" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "NEEDS_FIX" → next "exec" matches routing"}
+{"test":"L3-signal-routing:check","status":"PASS","detail":"check: result "REPLAN" → next "plan" matches routing"}
+{"test":"L3-signal-routing:exec","status":"PASS","detail":"exec: result "(done)" → next "verify" matches routing"}
+{"test":"L3-signal-routing:exec","status":"PASS","detail":"exec: result "(mid-exec)" → next "verify" matches routing"}
+{"test":"L3-signal-routing:exec","status":"PASS","detail":"exec: result "(step-N)" → next "verify" matches routing"}
+{"test":"L3-signal-routing:exec","status":"PASS","detail":"exec: result "(blocked)" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:merge","status":"PASS","detail":"merge: result "success" → next "report" matches routing"}
+{"test":"L3-signal-routing:merge","status":"PASS","detail":"merge: result "conflict" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:merge","status":"PASS","detail":"merge: result "rejected" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:merge","status":"PASS","detail":"merge: result "rejected" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:plan","status":"WARN","detail":"plan: result "(generated)" has no explicit routing entry"}
+{"test":"L3-signal-routing:report","status":"WARN","detail":"report: result "(generated)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"PASS","detail":"research: result "(o1-collected)" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:research","status":"PASS","detail":"research: result "(o2-collected)" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:research","status":"PASS","detail":"research: result "(o3-collected)" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:research","status":"PASS","detail":"research: result "(objective-complete)" → next "(stop)" matches routing"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)` / `(sufficient)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)` / `(sufficient)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)` / `(sufficient)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)` / `(sufficient)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)` / `(sufficient)" has no explicit routing entry"}
+{"test":"L3-signal-routing:research","status":"WARN","detail":"research: result "(collected)` / `(sufficient)" has no explicit routing entry"}
+{"test":"L3-signal-routing:verify","status":"WARN","detail":"verify: result "(pass)" has no explicit routing entry"}
+{"test":"L3-signal-routing:verify","status":"WARN","detail":"verify: result "(pass)" has no explicit routing entry"}
+{"test":"L3-signal-routing:verify","status":"WARN","detail":"verify: result "(pass)" has no explicit routing entry"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: REFERENCE-INDEX.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/annotation-format.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/changelog-consumption-protocol.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/concurrency.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/depends-on-format.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/directory-convention.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/git-details.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/library-write-protocol.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/lifecycle-hooks.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/model-routing.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/state-matrix.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/summary-formats.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/type-field.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/references/verification-first-protocol.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: commands/task-ai.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/annotate/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/annotate/references/annotation-processing.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/auto/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/auto/references/backend-api.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/auto/references/context-quota.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/auto/references/plugin-delegation.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/auto/references/stall-detection.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/cancel/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/check/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/check/references/six-dimension-audit.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/exec/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/.summary.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/ai-skill.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/chip-design.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/data-pipeline.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/documentation.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/dsp.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/image-processing.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/infrastructure.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/literary.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/mechatronics.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/ml.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/science.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/screenwriting.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/software.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/init/references/seed-types/video-production.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/library/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/library/references/blocked-sources.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/library/references/injection-rules.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/library/references/quality-rubric.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/library/references/write-protocol.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/list/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/merge/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/plan/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/plan/references/type-profiling.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/report/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/research/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/summarize/SKILL.md"}
+{"test":"Meta-self-check:covered","status":"PASS","detail":"covered: skills/verify/SKILL.md"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: cross-refs.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: data-flow.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: frontmatter-validation.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: git-commit-conventions.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: index-completeness.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: injection-category-count.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: lock-coverage.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: naming-conventions.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: phase-state-machine.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: plugin-slot-consistency.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: protocol-compliance.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: seed-completeness.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: self-check.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: signal-field-names.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: signal-routing.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: signal-whitelist.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: state-machine-graph.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: state-matrix.py"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: step-numbering.sh"}
+{"test":"Meta-self-check:contract exists","status":"PASS","detail":"contract exists: terminology.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: cross-refs.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: data-flow.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: frontmatter-validation.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: git-commit-conventions.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: index-completeness.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: injection-category-count.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: lock-coverage.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: naming-conventions.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: phase-state-machine.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: plugin-slot-consistency.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: protocol-compliance.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: seed-completeness.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: self-check.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: signal-field-names.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: signal-routing.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: signal-whitelist.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: state-machine-graph.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: state-matrix.py"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: step-numbering.sh"}
+{"test":"Meta-self-check:validate.sh lists","status":"PASS","detail":"validate.sh lists: terminology.sh"}

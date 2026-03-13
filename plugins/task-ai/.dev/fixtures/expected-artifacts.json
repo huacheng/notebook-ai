@@ -1,0 +1,14 @@
+{
+  "_meta": { "version": "1.0", "last_verified": "2026-02-24" },
+  "data_flow": [
+    { "producer": "plan",   "artifact": "vh-stubs",                          "consumers": ["exec","verify","check"] },
+    { "producer": "plan",   "artifact": "vh-baseline.md",                    "consumers": ["exec","verify","check","auto"] },
+    { "producer": "plan",   "artifact": "[VH: ...] in .plan.md",             "consumers": ["exec"] },
+    { "producer": "exec",   "artifact": "cumulative-green.jsonl",            "consumers": ["exec","check","auto"] },
+    { "producer": "exec",   "artifact": "hil-snapshots/",                    "consumers": ["exec","check"] },
+    { "producer": "exec",   "artifact": "VFP Cycle Summary in .notes/",     "consumers": ["check","auto"] },
+    { "producer": "verify", "artifact": "VFP Metrics in results",            "consumers": ["check"] },
+    { "producer": "check",  "artifact": "VFP Compliance in .analysis/",      "consumers": ["report"] },
+    { "producer": "auto",   "artifact": "vfp_cycles_completed in .auto-signal", "consumers": ["daemon"] }
+  ]
+}

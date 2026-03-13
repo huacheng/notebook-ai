@@ -1,10 +1,86 @@
-import { memo } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
 import type { Cell as CellData, PromptCell, ImageRef } from '@notebook-ai/shared';
 import { CellOutput } from './CellOutput';
 import { MarkdownBody } from './MarkdownBody';
 import { useT } from '../i18n';
 import { useCellLazyLoad, isCellStub, type CellStub } from '../hooks/useCellLazyLoad';
 import { useStore } from '../store';
+
+// ── Image lightbox (full-size view) ──────────────────────────────────────────
+
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  return (
+    <div className="image-lightbox-overlay" onClick={onClose}>
+      <img src={src} className="image-lightbox-img" onClick={(e) => e.stopPropagation()} alt="Full size" />
+      <button className="image-lightbox-close" onClick={onClose}>×</button>
+    </div>
+  );
+}
+
+// ── Single prompt image (fetches with auth, renders as blob URL) ─────────────
+
+interface PromptImageProps {
+  sessionId: string;
+  path: string;
+  index: number;
+}
+
+function PromptImage({ sessionId, path, index }: PromptImageProps) {
+  const authToken = useStore((s) => s.authToken);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
+
+  useEffect(() => {
+    let revoked = false;
+    const url = `/api/notebooks/${encodeURIComponent(sessionId)}/files/download?path=${encodeURIComponent(path)}`;
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    fetch(url, { headers })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load image: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (revoked) return;
+        setBlobUrl(URL.createObjectURL(blob));
+      })
+      .catch((err) => {
+        console.error(`[PromptImage] Failed to load ${path}:`, err);
+      });
+
+    return () => {
+      revoked = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [sessionId, path, authToken]);
+
+  const handleClose = useCallback(() => setShowLightbox(false), []);
+
+  if (!blobUrl) {
+    return <div className="cell-prompt-image cell-prompt-image--loading" />;
+  }
+
+  return (
+    <>
+      <img
+        src={blobUrl}
+        alt={`Prompt image ${index + 1}`}
+        className="cell-prompt-image"
+        onClick={() => setShowLightbox(true)}
+      />
+      {showLightbox && <ImageLightbox src={blobUrl} onClose={handleClose} />}
+    </>
+  );
+}
 
 // ── Cell prompt images (renders image_refs from .images/ directory) ─────────
 
@@ -19,13 +95,7 @@ const CellPromptImages = memo(function CellPromptImages({ imageRefs, sessionId }
   return (
     <div className="cell-prompt-images">
       {imageRefs.map((ref, i) => (
-        <img
-          key={i}
-          src={`/api/notebooks/${encodeURIComponent(sessionId)}/files/download?path=${encodeURIComponent(ref.path)}`}
-          alt={`Prompt image ${i + 1}`}
-          className="cell-prompt-image"
-          loading="lazy"
-        />
+        <PromptImage key={i} sessionId={sessionId} path={ref.path} index={i} />
       ))}
     </div>
   );
