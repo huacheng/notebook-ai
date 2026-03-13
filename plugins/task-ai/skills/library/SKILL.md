@@ -87,6 +87,8 @@ The sub-command executes one of the following operations based on the provided a
 
 Find relevant library files using **graph-enhanced search** with multi-factor scoring.
 
+> **Best Practice**: All sub-commands that retrieve knowledge from library (research, plan, check, exec, verify) SHOULD use `library search` rather than direct file reads. Search provides multi-factor scoring, graph-based recommendations, and token budget control. Unlike `library write` (which is mandatory for data integrity), direct reads are safe but miss optimization benefits.
+
 ```bash
 /task-ai:library search "<query>" [--type <type>] [--limit 10] [--no-recommend]
 ```
