@@ -79,14 +79,20 @@ topic_keywords: [keyword1, keyword2, ...]
 
 ## Step 7 — Write
 
-1. `mkdir -p $NB_WORKSPACES_LIBRARY/.memory/.experiences/<type>/`
-2. acquire `.memory/.experiences/.lock`
-3. write `.memory/.experiences/<type>/<slug>-adhoc.md` (create new or overwrite same-name file)
-4. acquire `.changelog.lock` → append: `<ts> | experience | .memory/.experiences/<type>/<slug>-adhoc.md | quality_status:provisional | source:highlight-adhoc` → release `.changelog.lock`
-5. update `<type>/.index.md` (append row)
-6. update `<type>/.summary.md` (overwrite rewrite)
-7. update top-level `.memory/.experiences/.summary.md` (overwrite rewrite)
-8. release `.memory/.experiences/.lock`
+**Use `library write` for all library writes**:
+
+```bash
+/task-ai:library write ".memory/.experiences/<type>/<slug>-adhoc.md" \
+  --content-file <content-file> \
+  --notebook <notebook-name>
+```
+
+The `library write` command handles the full 8-step protocol internally:
+- Lock acquisition, atomic write, changelog, index updates, relations, lock release, git commit
+
+After library write completes, update summaries:
+1. update `<type>/.summary.md` (overwrite rewrite)
+2. update top-level `.memory/.experiences/.summary.md` (overwrite rewrite)
 
 ## Step 8 — Git commit
 
