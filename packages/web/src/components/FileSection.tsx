@@ -209,8 +209,10 @@ export interface FileSectionProps {
   /** If provided, drag paths are computed relative to this directory (library mode). */
   workspaceDir?: string | null;
   onFileClick?: (subPath: string, filename: string) => void;
-  /** Initial sub-path to display (default: '.'). */
+  /** Root path for navigation boundary (default: '.'). */
   initialPath?: string;
+  /** Starting sub-path when component mounts. If not set, uses initialPath. */
+  startPath?: string;
   /** Files matching this filter are NOT draggable (e.g. notebook files in sidebar). */
   noDragFilter?: (filename: string) => boolean;
   /** Custom action buttons for specific file entries. Return non-null to replace defaults. */
@@ -237,6 +239,7 @@ export function FileSection({
   workspaceDir,
   onFileClick,
   initialPath = '.',
+  startPath,
   noDragFilter,
   renderItemActions,
   noDeleteFilter,
@@ -247,7 +250,7 @@ export function FileSection({
   onExists,
 }: FileSectionProps) {
   const t = useT();
-  const [subPath, setSubPath] = useState(initialPath);
+  const [subPath, setSubPath] = useState(startPath ?? initialPath);
 
   useEffect(() => {
     onSubPathChange?.(subPath);
@@ -322,7 +325,7 @@ export function FileSection({
     finally { if (!silent && fetchGuard.isCurrent(id)) setLoading(false); }
   }, [baseUrl, authToken, fetchGuard]);
 
-  useEffect(() => { setSubPath(initialPath); fetchFiles(initialPath); }, [baseUrl]); // eslint-disable-line
+  useEffect(() => { const p = startPath ?? initialPath; setSubPath(p); fetchFiles(p); }, [baseUrl]); // eslint-disable-line
 
   const prevPath = useRef<string | null>(null);
   useEffect(() => {
@@ -563,7 +566,7 @@ export function FileSection({
           {loading && <div className="fp-empty">{t('file.loading')}</div>}
 
           {/* Up directory */}
-          {!loading && subPath !== initialPath && subPath !== '.' && (
+          {!loading && subPath !== '.' && (
             <div className="fp-entry fp-entry-dir fp-entry-up" onClick={navigateUp}>
               <span className="fp-dir-up-icon">↩</span>
               <span className="fp-name">..</span>

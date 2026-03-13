@@ -8,8 +8,9 @@ describe('getDeliverablesPath', () => {
     expect(getDeliverablesPath(null, '/ws/project-a')).toBe('.deliverables');
   });
 
-  it('returns project-level .deliverables when no project is active', () => {
-    expect(getDeliverablesPath('/ws/project-a/.worktrees/task-nb', null)).toBe('.deliverables');
+  it('returns notebook-level .deliverables when workspaceDir has .worktrees pattern (even if project is null)', () => {
+    // Fallback: detect .worktrees/task-xxx pattern in workspaceDir
+    expect(getDeliverablesPath('/ws/project-a/.worktrees/task-nb', null)).toBe('.worktrees/task-nb/.deliverables');
   });
 
   it('returns worktree-level .deliverables when notebook is active inside project', () => {
