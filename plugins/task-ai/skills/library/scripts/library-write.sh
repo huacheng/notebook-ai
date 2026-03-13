@@ -78,8 +78,11 @@ if [[ -n "$CONTENT_FILE" ]]; then
     fi
     CONTENT=$(cat "$CONTENT_FILE")
 elif [[ -z "$CONTENT" ]]; then
-    # Read from stdin
-    CONTENT=$(cat)
+    # Read from stdin with timeout (5 seconds)
+    if ! CONTENT=$(timeout 5 cat 2>/dev/null); then
+        echo "[ERROR] stdin read timeout or empty input" >&2
+        exit 1
+    fi
 fi
 
 if [[ -z "$CONTENT" ]]; then
@@ -217,10 +220,14 @@ fi
 
 # Step 6: Update relations
 RELATIONS_SCRIPT="$SCRIPT_DIR/append-relations.py"
-if [[ -f "$RELATIONS_SCRIPT" ]]; then
+if [[ -f "$RELATIONS_SCRIPT" ]] && command -v python3 &>/dev/null; then
     NOTEBOOK_ARG=""
     [[ -n "$NOTEBOOK" ]] && NOTEBOOK_ARG="--notebook $NOTEBOOK"
-    python3 "$RELATIONS_SCRIPT" "$REL_PATH" $NOTEBOOK_ARG 2>/dev/null || true
+    if ! python3 "$RELATIONS_SCRIPT" "$REL_PATH" $NOTEBOOK_ARG 2>/dev/null; then
+        echo "[WARN] Relations update failed, continuing" >&2
+    fi
+elif [[ -f "$RELATIONS_SCRIPT" ]]; then
+    echo "[WARN] python3 not available, skipping relations update" >&2
 fi
 
 # Step 7: Release lock (done by trap)
@@ -228,10 +235,14 @@ echo "[library-write] Lock released"
 
 # Step 8: Git commit (unless --no-commit)
 if [[ "$NO_COMMIT" != "true" ]] && [[ -d "$LIB_PATH/.git" ]]; then
+    # Sanitize variables for commit message (remove shell metacharacters)
+    SAFE_CATEGORY=$(echo "$CATEGORY" | tr -cd 'a-zA-Z0-9._-')
+    SAFE_ACTION=$(echo "$ACTION" | tr -cd 'a-zA-Z0-9._-')
+    SAFE_TOPIC=$(echo "$TOPIC" | tr -cd 'a-zA-Z0-9._-')
     (
         cd "$LIB_PATH"
         git add "$REL_PATH" ".changelog" "$INDEX_PATH" ".master-index.md" ".relations.jsonl" 2>/dev/null || true
-        git commit -m "library($CATEGORY): $ACTION $TOPIC" --allow-empty 2>/dev/null || true
+        git commit -m "library($SAFE_CATEGORY): $SAFE_ACTION $SAFE_TOPIC" --allow-empty 2>/dev/null || true
     )
     echo "[library-write] Git committed"
 fi
