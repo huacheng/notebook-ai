@@ -338,6 +338,17 @@ export function createProjectsRouter(
         await rename(currentNotebookPath, newNotebookFilePath);
       }
 
+      // Update metadata.title inside the .notebook.json file
+      const { readFile, writeFile } = await import('fs/promises');
+      const nbContent = await readFile(newNotebookFilePath, 'utf-8');
+      const nbJson = JSON.parse(nbContent);
+      if (nbJson.metadata) {
+        nbJson.metadata.title = title.trim();
+      } else {
+        nbJson.metadata = { title: title.trim() };
+      }
+      await writeFile(newNotebookFilePath, JSON.stringify(nbJson, null, 2));
+
       // Update database if notebook exists there
       if (dbNotebook) {
         const updates: { title: string; notebook_path: string; workspace_dir?: string; slug?: string } = {

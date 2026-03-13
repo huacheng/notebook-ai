@@ -225,6 +225,90 @@ function MobileRenameModal({ currentName, onCancel, onConfirm, onDone }: {
   );
 }
 
+/** Mobile create modal - replaces browser prompt() for better mobile compatibility */
+function MobileCreateModal({ label, onCancel, onConfirm, onDone }: {
+  label: string;
+  onCancel: () => void;
+  onConfirm: (name: string) => Promise<void>;
+  onDone?: () => void;
+}) {
+  const [phase, setPhase] = useState<'editing' | 'creating' | 'done' | 'error'>('editing');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [name, setName] = useState('');
+
+  const nameError = useMemo(() => validateTitle(name), [name]);
+  const canCreate = name.trim().length > 0 && !nameError;
+
+  const handleConfirm = async () => {
+    if (!canCreate || phase === 'creating') return;
+    setPhase('creating');
+    try {
+      await onConfirm(name.trim());
+      setPhase('done');
+      setTimeout(() => onDone?.(), 600);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Create failed');
+      setPhase('error');
+    }
+  };
+
+  return (
+    <div className="annotation-modal-overlay" onClick={phase === 'editing' || phase === 'error' ? onCancel : undefined}>
+      <div className="annotation-modal" onClick={e => e.stopPropagation()}>
+        {phase === 'editing' && (
+          <>
+            <div className="annotation-modal-title">New {label}</div>
+            <div style={{ margin: '0 0 var(--space-lg)' }}>
+              <input
+                autoFocus
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && canCreate) handleConfirm(); if (e.key === 'Escape') onCancel(); }}
+                placeholder={`${label} name`}
+                maxLength={MAX_TITLE_LENGTH}
+                className="annotation-modal-input"
+              />
+              {nameError && <div className="create-form-error">{nameError}</div>}
+            </div>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Cancel</button>
+              <button className="annotation-modal-btn annotation-modal-confirm" onClick={handleConfirm} disabled={!canCreate}>Create</button>
+            </div>
+          </>
+        )}
+        {phase === 'creating' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div className="nb-delete-spinner" />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)' }}>
+              Creating {label}...
+            </p>
+          </div>
+        )}
+        {phase === 'done' && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-xl) 0' }}>
+            <div style={{ fontSize: '28px', marginBottom: 'var(--space-sm)' }}>&#10003;</div>
+            <p style={{ color: 'var(--color-completed)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              {label} created!
+            </p>
+          </div>
+        )}
+        {phase === 'error' && (
+          <>
+            <div className="annotation-modal-title" style={{ color: 'var(--color-error)' }}>Create Failed</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
+              {errorMsg}
+            </p>
+            <div className="annotation-modal-actions">
+              <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>Close</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Mobile Notebooks List (Level 2)
  * Shows notebooks in the selected project.
@@ -244,6 +328,7 @@ export function MobileNotebooksList() {
   const [menuOpenPath, setMenuOpenPath] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ path: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ path: string; name: string } | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -290,19 +375,9 @@ export function MobileNotebooksList() {
     }
   };
 
-  const handleNewNotebook = async () => {
+  const handleNewNotebook = () => {
     if (!activeProjectId) return;
-
-    const title = prompt('Notebook name:');
-    if (title?.trim()) {
-      try {
-        // Use unified hook - same as desktop
-        await createAndOpenNotebook(activeProjectId, title.trim());
-        setMobileView('notebook');
-      } catch {
-        // Error already handled by onError callback
-      }
-    }
+    setShowCreateModal(true);
   };
 
   const handleMenuClick = (e: React.MouseEvent, path: string) => {
@@ -416,6 +491,20 @@ export function MobileNotebooksList() {
             }
             setDeleteTarget(null);
             fetchNotebooks();
+          }}
+        />
+      )}
+
+      {showCreateModal && activeProjectId && (
+        <MobileCreateModal
+          label="Notebook"
+          onCancel={() => setShowCreateModal(false)}
+          onConfirm={async (name) => {
+            await createAndOpenNotebook(activeProjectId, name);
+          }}
+          onDone={() => {
+            setShowCreateModal(false);
+            setMobileView('notebook');
           }}
         />
       )}
