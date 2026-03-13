@@ -6319,6 +6319,16 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
+.session-status-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--border-default);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: tab-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
 @keyframes tab-spin {
   to { transform: rotate(360deg); }
 }

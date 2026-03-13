@@ -505,10 +505,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         tabNotifications: updatedNotifications,
       };
     });
-    // Subscribe to the new session to receive updates
-    if (newSessionId && typeof get().subscribeToSession === 'function') {
-      get().subscribeToSession(newSessionId);
-    }
+    // Note: useWebSocket hook auto-subscribes when openNotebooks changes
   },
 
   restoreOpenNotebookTabs: () => {

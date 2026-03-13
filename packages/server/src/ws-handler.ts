@@ -516,9 +516,17 @@ export function setupWebSocket(
             });
 
             // Signal that session is ready for commands (Claude process is running)
-            sendToClient(ws, {
-              type: 'session_ready',
-              session_id,
+            // Wait for spawn to complete before signaling ready
+            session._spawnReady.then(() => {
+              if (ws.readyState === ws.OPEN) {
+                sendToClient(ws, {
+                  type: 'session_ready',
+                  session_id,
+                });
+              }
+            }).catch(() => {
+              // Spawn failed — don't signal ready
+              console.warn(`[ws] Spawn failed for session ${session_id}, not sending session_ready`);
             });
 
           }

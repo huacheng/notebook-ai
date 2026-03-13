@@ -43,7 +43,6 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
   const authToken = useStore((s) => s.authToken);
   const ws = useStore((s) => s.ws);
   const openNotebookTab = useStore((s) => s.openNotebookTab);
-  const subscribeToSession = useStore((s) => s.subscribeToSession);
 
   const { onStart, onSuccess, onError } = options;
 
@@ -96,10 +95,9 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         const cellsOffset = result.totalCells - result.notebook.cells.length;
         useStore.setState({ cellsOffset, loadingOlderCells: false });
       }
-
-      subscribeToSession(result.sessionId);
+      // Note: useWebSocket hook auto-subscribes when openNotebooks changes
     },
-    [openNotebook, openNotebookTab, subscribeToSession]
+    [openNotebook, openNotebookTab]
   );
 
   /**

@@ -117,6 +117,7 @@ export interface NotebookStore {
   ws: WebSocket | null;
   wsStatus: 'disconnected' | 'connecting' | 'connected';
   sessionId: string | null;
+  sessionReadyStatus: Record<string, 'subscribing' | 'ready'>;
   restartPhase: 'idle' | 'restarting' | 'done' | 'error';
   restartError: string;
   lastEventIndex: Record<string, number>;

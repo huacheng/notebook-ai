@@ -227,7 +227,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       });
 
       _persistNotebook(data.notebookId, data.notebook);
-      get().subscribeToSession(data.sessionId);
+      // Note: useWebSocket hook auto-subscribes when openNotebooks changes
       get().fetchNotebookList();
     } catch (err) {
       console.error('[store] restoreNotebook error:', err);

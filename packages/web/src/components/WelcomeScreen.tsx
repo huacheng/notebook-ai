@@ -53,7 +53,6 @@ export function WelcomeScreen() {
   const createNotebook = useStore((s) => s.createNotebook);
   const importNotebookFile = useStore((s) => s.importNotebookFile);
   const openNotebookTab = useStore((s) => s.openNotebookTab);
-  const subscribeToSession = useStore((s) => s.subscribeToSession);
 
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,7 +99,7 @@ export function WelcomeScreen() {
           openNotebookTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
           // Queue auto command to be sent when session_ready is received
           useStore.setState({ pendingAutoCommand: { sessionId: data.sessionId, command: '/task-ai:auto load' } });
-          subscribeToSession(data.sessionId);
+          // Note: useWebSocket hook auto-subscribes when openNotebooks changes
         }
       } catch { /* notebook created but couldn't auto-open */ }
     }

@@ -637,7 +637,7 @@ function FileBrowser() {
       useStore.getState().deactivateFileTab();
       useStore.setState({ notebookLoading: true, gitTabOpen: false });
       try {
-        const { ws, openNotebookTab: openTab, subscribeToSession: sub, authToken: token } = useStore.getState();
+        const { ws, openNotebookTab: openTab, authToken: token } = useStore.getState();
 
         // Try WS first, fallback to REST
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -665,7 +665,7 @@ function FileBrowser() {
           const totalCells = opened.total_cells ?? opened.notebook.cells.length;
           const cellsOffset = totalCells - opened.notebook.cells.length;
           useStore.setState({ cellsOffset, loadingOlderCells: false });
-          sub(opened.session_id);
+          // Note: useWebSocket hook auto-subscribes when openNotebooks changes
         } else {
           // REST fallback
           const res = await fetch('/api/notebooks/open-by-path', {
@@ -685,7 +685,7 @@ function FileBrowser() {
               notebook = JSON.parse(new TextDecoder().decode(decompressed));
             }
             openTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
-            sub(data.sessionId);
+            // Note: useWebSocket hook auto-subscribes when openNotebooks changes
           }
         }
       } catch (err) {

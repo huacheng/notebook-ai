@@ -49,7 +49,6 @@ beforeEach(() => {
     openNotebookTab: vi.fn(),
     setActiveNotebookTab: vi.fn(),
     deactivateFileTab: vi.fn(),
-    subscribeToSession: vi.fn(),
   });
 });
 
@@ -84,7 +83,7 @@ describe('openNotebookByPath', () => {
     expect(mockSetState).toHaveBeenCalledWith(expect.objectContaining({ notebookLoading: true }));
     expect(globalThis.fetch).toHaveBeenCalled();
     expect(mockState.openNotebookTab).toHaveBeenCalledWith('nb-2', { cells: [] }, 's2', '/projects/test');
-    expect(mockState.subscribeToSession).toHaveBeenCalledWith('s2');
+    // Note: subscribeToSession is now handled by useWebSocket hook when openNotebooks changes
     // notebookLoading cleared
     expect(mockSetState).toHaveBeenCalledWith(expect.objectContaining({ notebookLoading: false }));
   });

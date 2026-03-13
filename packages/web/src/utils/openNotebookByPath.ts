@@ -36,7 +36,7 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
   useStore.setState({ notebookLoading: true });
 
   try {
-    const { ws, openNotebookTab: openTab, subscribeToSession: sub, authToken: token } = useStore.getState();
+    const { ws, openNotebookTab: openTab, authToken: token } = useStore.getState();
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
@@ -71,7 +71,7 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
 
       openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
       setActiveNotebookTab(opened.notebook_id);
-      sub(opened.session_id);
+      // Note: useWebSocket hook auto-subscribes when openNotebooks changes
       useStore.setState({ notebookLoading: false });
       return { opened: true, notebookId: opened.notebook_id };
     } else {
@@ -90,7 +90,7 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
       }
       openTab(data.notebook_id, notebook, data.session_id, data.workspace_dir);
       setActiveNotebookTab(data.notebook_id);
-      sub(data.session_id);
+      // Note: useWebSocket hook auto-subscribes when openNotebooks changes
       useStore.setState({ notebookLoading: false });
       return { opened: true, notebookId: data.notebook_id };
     }

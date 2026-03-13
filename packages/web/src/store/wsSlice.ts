@@ -20,7 +20,7 @@ import { applyAutoStatus } from './autoStatusSlice';
 let _pendingWs: WebSocket | null = null;
 
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'ws' | 'wsStatus' | 'sessionId' | 'restartPhase' | 'restartError'
+  | 'ws' | 'wsStatus' | 'sessionId' | 'sessionReadyStatus' | 'restartPhase' | 'restartError'
   | 'lastEventIndex' | 'updateLastEventIndex' | 'lastCompletedCellId' | 'lastAskQuestionCellId'
   | 'connectWebSocket' | 'disconnectWebSocket' | 'subscribeToSession'
   | 'unsubscribeFromSession' | 'executeCell' | 'saveNotebook'
@@ -35,6 +35,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   ws: null,
   wsStatus: 'disconnected',
   sessionId: null,
+  sessionReadyStatus: {},
   restartPhase: 'idle',
   restartError: '',
   lastEventIndex: {},
@@ -131,19 +132,15 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       _pendingWs = null;
       // D3-3: Clear stale stream buffers on reconnect (stream context is invalidated)
       set({ ws, wsStatus: 'connected', streamBuffer: {} });
-      // Re-subscribe to all open notebook sessions on reconnect
-      const { openNotebooks, sessionId, lastEventIndex } = get();
+      // Re-subscribe to all open notebook sessions on reconnect (via unified subscribeToSession)
+      const { openNotebooks, sessionId, subscribeToSession } = get();
       const subscribedIds = new Set(
         Object.values(openNotebooks).map((e) => e.sessionId).filter(Boolean),
       );
       // Also include the active sessionId for backward compat
       if (sessionId) subscribedIds.add(sessionId);
       for (const sid of subscribedIds) {
-        const msg: Record<string, unknown> = { type: 'subscribe', session_id: sid };
-        if (lastEventIndex[sid] !== undefined) {
-          msg.resume_after = lastEventIndex[sid];
-        }
-        ws.send(JSON.stringify(msg));
+        subscribeToSession(sid);
       }
       // Auto-restore timer mode if it was active before disconnect/restart
       const savedTimer = cacheGet<{ sessionId: string; intervalMs: number }>('nb-timer-mode', TTL.LAST_NOTEBOOK);
@@ -813,8 +810,15 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           break;
         }
         case 'session_ready': {
-          // Session is fully ready (Claude process running) — fire pending auto command
+          // Session is fully ready (Claude process running)
           const readySid = (parsed as any).session_id as string | undefined;
+          if (readySid) {
+            // Mark session as ready
+            set((state) => ({
+              sessionReadyStatus: { ...state.sessionReadyStatus, [readySid]: 'ready' },
+            }));
+          }
+          // Fire pending auto command if any
           const pending = get().pendingAutoCommand;
           if (pending && readySid === pending.sessionId) {
             // Use setTimeout to ensure state is settled before submitting
@@ -897,8 +901,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   subscribeToSession(sessionId) {
-    const { ws, lastEventIndex } = get();
+    const { ws, lastEventIndex, sessionReadyStatus } = get();
     if (ws && ws.readyState === WebSocket.OPEN) {
+      // Only set to 'subscribing' if no status exists (avoid overwriting 'subscribing' or 'ready')
+      if (!sessionReadyStatus[sessionId]) {
+        set((state) => ({
+          sessionReadyStatus: { ...state.sessionReadyStatus, [sessionId]: 'subscribing' },
+        }));
+      }
       const msg: Record<string, unknown> = { type: 'subscribe', session_id: sessionId };
       if (lastEventIndex[sessionId] !== undefined) {
         msg.resume_after = lastEventIndex[sessionId];
