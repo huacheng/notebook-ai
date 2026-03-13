@@ -393,6 +393,11 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
       _persistNotebookTabs(newOpen, notebookId);
       // Restore per-session auto status
       const savedAutoStatus = sessionId ? state.autoStatuses?.[sessionId] : null;
+      // Set session status to 'subscribing' immediately so spinner shows while connecting
+      const currentStatus = state.sessionReadyStatus ?? {};
+      const newSessionStatus = sessionId && !currentStatus[sessionId]
+        ? { ...currentStatus, [sessionId]: 'subscribing' as const }
+        : currentStatus;
       return {
         openNotebooks: newOpen,
         activeNotebookId: notebookId,
@@ -403,6 +408,7 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
         gitTabOpen: false,
         activeTab: 'notebook' as const,
         autoStatus: savedAutoStatus ?? { ...initialAutoStatus },
+        sessionReadyStatus: newSessionStatus,
       };
     });
     // Cache notebook data so it can be restored after page refresh
