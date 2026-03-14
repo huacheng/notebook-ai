@@ -11,9 +11,10 @@ All library writers MUST execute these steps in order:
 3. **Write file** — write content via `.tmp` + atomic `rename` (overwrite) or `O_APPEND` (append)
 4. **Changelog append** — append one line to `.changelog` via `.changelog.lock` (see format below)
 5. **Update index** — append/update row in directory `.index.md` and `.master-index.md`
-6. **Update relations** — extract `related_references` from frontmatter, append to `.relations.jsonl` (O_APPEND)
+6. **Update relations** — extract `related_references` from frontmatter, append to `.relations.jsonl` (O_APPEND, guarded by `.relations.lock`)
    - Run: `python3 append-relations.py <file_path> [--notebook <name>]`
    - Enables immediate graph search discovery of new file's associations
+   - `.relations.lock` (`fcntl.LOCK_EX`) prevents data loss during concurrent `rebuild-relations.py` full rebuild
 7. **Release lock** — close fd and remove `<dir>/.lock`
 8. **Git commit** — `cd $NB_WORKSPACES_LIBRARY && git add -A && git commit -m "library(<category>): <action> <topic>"`
    - `<category>`: `reference` | `experience` | `type-profile` | `pattern`
@@ -28,6 +29,7 @@ All library writers MUST execute these steps in order:
 | `.memory/.type-profiles/` | `.memory/.type-profiles/.lock` | `research`, `report` | Short (profile write) |
 | `.memory/.thinking/patterns/` | `.memory/.thinking/patterns/.lock` | `report` | Long (read raw/ + distil + write) |
 | `.changelog` | `.changelog.lock` | All library writers (step 4) | Very short (single O_APPEND) |
+| `.relations.jsonl` | `.relations.lock` | `append-relations.py`, `rebuild-relations.py` | Very short (append or tmp+rename) |
 
 `raw/` has **no lock file**: filenames are unique by design (`<notebook>-<step>-<date>.md`); index appends use O_APPEND (POSIX atomic). Do not add a lock to `.memory/.thinking/raw/`.
 
