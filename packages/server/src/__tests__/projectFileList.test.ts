@@ -57,7 +57,7 @@ describe('computeProjectFileList', () => {
     expect(names).not.toContain('.deliverables');
     expect(names).not.toContain('.lock');
     expect(names).toContain('.working');
-    expect(names).not.toContain('.claude');
+    expect(names).toContain('.claude');
     expect(names).toContain('.target.md');
     expect(names).toContain('readme.txt');
   });

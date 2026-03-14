@@ -171,7 +171,7 @@ describe('GET /:projectId/files — dotfile filter', () => {
     expect(names).toContain('test.notebook.json');
   });
 
-  it('hides .claude but shows .working directory', async () => {
+  it('shows .claude and .working directories', async () => {
     await mkdir(path.join(projectDir, '.claude'), { recursive: true });
     const res = await request(app)
       .get(`/api/projects/${PROJECT_ID}/files`)
@@ -179,7 +179,7 @@ describe('GET /:projectId/files — dotfile filter', () => {
 
     const names = res.body.files.map((f: any) => f.name);
     expect(names).toContain('.working');
-    expect(names).not.toContain('.claude');
+    expect(names).toContain('.claude');
   });
 
   it('shows non-dot files normally', async () => {

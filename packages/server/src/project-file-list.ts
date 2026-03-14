@@ -39,7 +39,7 @@ const DOTFILE_HIDDEN = new Set([
   '.images',  // prompt screenshots, not user-editable
 ]);
 const HIDDEN_TOPDIRS = new Set(['.worktrees', '.git', '.deliverables']);
-const ALWAYS_HIDDEN_DIRS = new Set(['.deliverables', '.git', '.claude']);
+const ALWAYS_HIDDEN_DIRS = new Set(['.deliverables', '.git']);
 
 export function isVisibleEntry(name: string, isTopLevel: boolean): boolean {
   if (!name.startsWith('.')) return true;

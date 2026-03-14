@@ -799,7 +799,6 @@ export function createProjectsRouter(
       db.deleteProject(project.id);
 
       // Remove project directory from disk
-      const { rm } = await import('fs/promises');
       await rm(project.path, { recursive: true, force: true }).catch(() => {});
 
       res.json({ ok: true });
