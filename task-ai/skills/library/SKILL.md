@@ -261,14 +261,15 @@ Full library maintenance — stale lock sweep + rebuild-index + rebuild-relation
 
 Periodic maintenance — timestamp-gated (24h interval), suitable for cron or auto loop post-report hook.
 
-**Runs six steps:**
+**Runs seven steps:**
 
 1. **Staleness check** — scan `.memory/.references/` for files older than 30 days, report stale count
 2. **T3→T4 production validation** — scan all `.skills/.active/` T3 skills, promote to T4 if `usage_count >= 3` and zero REPLAN failures (same logic as `--promote-skill`)
 3. **Security rules evolution** — invoke `core-rule-auto.sh cron-job` (Core: 7d / Extended: 1d, own timestamp gating)
 4. **Changelog auto-compact** — run `--compact` if last compact was ≥30 days ago (archives entries >90 days old)
 5. **Rebuild index** — run `--rebuild-index` (daily consistency repair)
-6. **Git commit** — commit all maintenance changes: `task-ai(library):maintain scheduled`
+6. **Rebuild relations** — run `--rebuild-relations` (daily `.relations.jsonl` rebuild from changelog + cross-references)
+7. **Git commit** — commit all maintenance changes: `library(scheduled): daily maintenance <date>`
 
 **Timestamp gating:**
 - Reads `.last-scheduled` (epoch seconds); skips if last run < 24h ago
@@ -422,7 +423,7 @@ External content is sanitised using 10 injection protection categories before st
 | `write` | `task-ai(library):<category> <action> <topic>` |
 | `maintain --compact` | `task-ai(library):maintain archive YYYY-MM` |
 | `maintain --rebuild-index` | `task-ai(library):maintain rebuild index` |
-| `maintain --scheduled` | No commit (T3→T4 changes are uncommitted; caller should commit if needed) |
+| `maintain --scheduled` | `library(scheduled): daily maintenance <date>` |
 | `maintain --install-cron` / `--uninstall-cron` | No commit (modifies system crontab only) |
 | `search`, `list`, `status`, `--check-staleness` | No commit |
 

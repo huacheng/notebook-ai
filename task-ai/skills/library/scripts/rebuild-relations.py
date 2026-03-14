@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import json
+import fcntl
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'core'))
@@ -58,13 +59,25 @@ def rebuild_relations():
             except (OSError, UnicodeDecodeError, ValueError) as e:
                 print(f"[WARN] Skipping {p}: {e}", file=sys.stderr)
 
-    # D3: Atomic write via tmp + rename (per write-protocol.md)
-    tmp_path = relations_path.parent / '.relations.jsonl.tmp'
-    with open(tmp_path, 'w', encoding='utf-8') as f:
-        for rel in relations:
-            f.write(json.dumps(rel) + '\n')
-    tmp_path.rename(relations_path)
-    print(f"Generated {len(relations)} relations.")
+    # D3: Atomic write via tmp + rename, with exclusive lock to prevent
+    # data loss from concurrent append-relations.py O_APPEND writes.
+    lock_path = relations_path.parent / '.relations.lock'
+    lock_fd = open(lock_path, 'w')
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        tmp_path = relations_path.parent / '.relations.jsonl.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            for rel in relations:
+                f.write(json.dumps(rel) + '\n')
+        tmp_path.rename(relations_path)
+        print(f"Generated {len(relations)} relations.")
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
 
 if __name__ == "__main__":
     rebuild_relations()

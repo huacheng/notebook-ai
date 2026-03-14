@@ -13,6 +13,7 @@ Appends to .relations.jsonl using O_APPEND for atomicity.
 import os
 import sys
 import json
+import fcntl
 from pathlib import Path
 
 # Import frontmatter parser from core
@@ -74,15 +75,26 @@ def append_relations(file_path: str, notebook: str = None):
             "w": 5
         })
 
-    # 3. Append to .relations.jsonl (O_APPEND for atomicity)
+    # 3. Append to .relations.jsonl (O_APPEND for atomicity, with shared lock
+    #    to prevent data loss during concurrent rebuild-relations.py full rebuild)
     if relations:
         # Ensure parent directory exists
         relations_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Use O_APPEND for atomic append
-        with open(relations_path, 'a', encoding='utf-8') as f:
-            for rel in relations:
-                f.write(json.dumps(rel) + '\n')
+        lock_path = relations_path.parent / '.relations.lock'
+        lock_fd = open(lock_path, 'w')
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            with open(relations_path, 'a', encoding='utf-8') as f:
+                for rel in relations:
+                    f.write(json.dumps(rel) + '\n')
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            lock_fd.close()
+            try:
+                lock_path.unlink()
+            except OSError:
+                pass
 
         print(f"[relations] Appended {len(relations)} relation(s) for {rel_path}")
     else:
