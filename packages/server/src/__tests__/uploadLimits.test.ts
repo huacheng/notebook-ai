@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_UPLOAD_SIZE, MAX_FILE_UPLOAD_SIZE } from '../constants.js';
 
 // D2: Upload limits configuration constants
-const MAX_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_EXTENSIONS = ['.zip', '.notebook.json', '.json'];
 
 describe('upload limits - D2', () => {
-  it('should have MAX_UPLOAD_SIZE set to 20MB', () => {
+  it('should have MAX_UPLOAD_SIZE set to 20MB (extract-zip)', () => {
     expect(MAX_UPLOAD_SIZE).toBe(20 * 1024 * 1024);
+  });
+
+  it('should have MAX_FILE_UPLOAD_SIZE set to 200MB (general uploads)', () => {
+    expect(MAX_FILE_UPLOAD_SIZE).toBe(200 * 1024 * 1024);
   });
 
   it('should allow only safe file extensions', () => {

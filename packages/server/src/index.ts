@@ -25,6 +25,7 @@ import { createTaskAutoRouter, recoverDaemons, setSessionManager } from './route
 import { setupWebSocket } from './ws-handler.js';
 import { authMiddleware } from './auth.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
+import multer from 'multer';
 
 // ── App setup ────────────────────────────────────────────────────────────────
 
@@ -164,6 +165,19 @@ app.use('/api/system', createSystemRouter());
 app.use('/api/commands', commandsRouter);
 app.use('/api/sessions', createTaskAutoRouter(db));
 app.use('/api/task-auto', createTaskAutoRouter(db));
+
+// ── Multer error handler (file-size limit → 413) ────────────────────────────
+app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ error: 'File too large. Maximum upload size is 200 MB.' });
+      return;
+    }
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  next(err);
+});
 
 // ── Watchers (push-based change detection) ──────────────────────────────────
 

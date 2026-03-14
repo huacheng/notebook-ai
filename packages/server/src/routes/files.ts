@@ -8,6 +8,7 @@ import { spawn } from 'child_process';
 import type { SessionManager } from '../session.js';
 import { listWorkspaceFiles, validateWorkspacePath } from '../workspace-files.js';
 import { ensureLibraryDir, MEMORY_FILENAME } from '../workspace.js';
+import { MAX_FILE_UPLOAD_SIZE } from '../constants.js';
 
 function isPathTraversal(err: unknown): boolean {
   return err instanceof Error && err.message === 'Path outside workspace';
@@ -31,7 +32,7 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
 
   const upload = multer({
     dest: path.join(os.tmpdir(), 'nb-uploads'),
-    limits: { fileSize: 100 * 1024 * 1024, files: 20 },
+    limits: { fileSize: MAX_FILE_UPLOAD_SIZE, files: 20 },
   });
 
   /**

@@ -6,8 +6,11 @@
 /** Number of cells to return on initial notebook load (rest are lazy-loaded) */
 export const CELL_PAGE_SIZE = 2;
 
-/** Maximum upload file size in bytes (20MB) */
+/** Maximum upload file size in bytes for notebook extract-zip (20MB) */
 export const MAX_UPLOAD_SIZE = 20 * 1024 * 1024;
+
+/** Maximum upload file size in bytes for general file uploads (200MB) */
+export const MAX_FILE_UPLOAD_SIZE = 200 * 1024 * 1024;
 
 /** Timeout for cell load requests in milliseconds (30s) */
 export const CELL_LOAD_TIMEOUT = 30_000;

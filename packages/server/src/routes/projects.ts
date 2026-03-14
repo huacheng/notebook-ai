@@ -15,6 +15,7 @@ import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
 import { validateWorkspacePath } from '../workspace-files.js';
 import { generateSlug, initWorkspaceMemory } from '../workspace.js';
 import { computeProjectFileList } from '../project-file-list.js';
+import { MAX_FILE_UPLOAD_SIZE } from '../constants.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -351,7 +352,7 @@ export function createProjectsRouter(
 
   const upload = multer({
     dest: path.join(os.tmpdir(), 'nb-uploads'),
-    limits: { fileSize: 100 * 1024 * 1024, files: 20 },
+    limits: { fileSize: MAX_FILE_UPLOAD_SIZE, files: 20 },
   });
 
   // List files within project directory
