@@ -306,7 +306,6 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const commands: { cmd: string; icon: string; args?: string; label?: string }[] = [
     { cmd: 'task-ai:auto', icon: '🤖', args: 'load' },
     { cmd: 'task-ai:research', icon: '🔍' },
-    { cmd: 'task-ai:target', icon: '🎯' },
     { cmd: 'task-ai:plan', icon: '📝' },
     { cmd: 'task-ai:read', icon: '📖' },
     { cmd: 'task-ai:highlight', icon: '💡' },
