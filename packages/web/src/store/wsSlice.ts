@@ -597,6 +597,18 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         case 'git_diff_error':
           window.dispatchEvent(new CustomEvent('nb:git-diff-error', { detail: parsed }));
           break;
+        case 'library-git-commit-files-response':
+          window.dispatchEvent(new CustomEvent('nb:library-git-commit-files-response', { detail: parsed }));
+          break;
+        case 'library-git-commit-files-error':
+          window.dispatchEvent(new CustomEvent('nb:library-git-commit-files-error', { detail: parsed }));
+          break;
+        case 'library-git-diff-response':
+          window.dispatchEvent(new CustomEvent('nb:library-git-diff-response', { detail: parsed }));
+          break;
+        case 'library-git-diff-error':
+          window.dispatchEvent(new CustomEvent('nb:library-git-diff-error', { detail: parsed }));
+          break;
         case 'autosave_error': {
           // D3-fix: Show autosave failure notification to user
           const errorMsg = (parsed as { error?: string }).error ?? 'Failed to save notebook';

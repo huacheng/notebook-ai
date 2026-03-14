@@ -12,7 +12,7 @@ describe('/auto command in toolbar', () => {
   it('should have task-ai:auto as the first command in toolbar', () => {
     const src = getInputBarSrc();
     // Extract the commands array
-    const match = src.match(/const commands = \[([\s\S]*?)\];/);
+    const match = src.match(/const commands[^=]*= \[([\s\S]*?)\];/);
     expect(match).toBeTruthy();
     const commandsBlock = match![1];
     // First entry should be task-ai:auto
@@ -23,7 +23,7 @@ describe('/auto command in toolbar', () => {
 
   it('should display as /auto in the button label', () => {
     const src = getInputBarSrc();
-    // The label extraction: cmd.split(':')[1] — for 'task-ai:auto' this yields 'auto'
+    // The label extraction: label ?? cmd.split(':')[1] — for 'task-ai:auto' this yields 'auto'
     expect(src).toMatch(/cmd\.split\(':'\)\[1\]/);
   });
 

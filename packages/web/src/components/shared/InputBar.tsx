@@ -303,7 +303,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   }, []);
 
   // Command shortcuts
-  const commands = [
+  const commands: { cmd: string; icon: string; args?: string; label?: string }[] = [
     { cmd: 'task-ai:auto', icon: '🤖' },
     { cmd: 'task-ai:research', icon: '🔍' },
     { cmd: 'task-ai:target', icon: '🎯' },
@@ -311,6 +311,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     { cmd: 'task-ai:read', icon: '📖' },
     { cmd: 'task-ai:highlight', icon: '💡' },
     { cmd: 'task-ai:check', icon: '✅' },
+    { cmd: 'task-ai:check', icon: '✅', args: '审查与修复', label: 'check+fix' },
   ];
 
   const containerClass = mobile
@@ -425,17 +426,21 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
       </div>
       <div className="nb-cmd-toolbar">
         <div className="nb-cmd-btns" ref={cmdBtnsRef}>
-          {commands.map(({ cmd, icon }) => (
-            <button
-              key={cmd}
-              className="nb-cmd-btn"
-              title={t(`cmd.${cmd}`)}
-              disabled={disabled}
-              onClick={() => cmd === 'task-ai:auto' ? directSubmitCommand(cmd) : insertCommand(cmd)}
-            >
-              {icon} <span className="nb-cmd-name">/{cmd.split(':')[1]}</span>
-            </button>
-          ))}
+          {commands.map(({ cmd, icon, args, label }) => {
+            const full = args ? `${cmd} ${args}` : cmd;
+            const key = args ? `${cmd}--${label ?? args}` : cmd;
+            return (
+              <button
+                key={key}
+                className="nb-cmd-btn"
+                title={args ? `/${full}` : t(`cmd.${cmd}`)}
+                disabled={disabled}
+                onClick={() => cmd === 'task-ai:auto' ? directSubmitCommand(cmd) : insertCommand(full)}
+              >
+                {icon} <span className="nb-cmd-name">/{label ?? cmd.split(':')[1]}</span>
+              </button>
+            );
+          })}
         </div>
         <div className="nb-input-actions">
           {voiceSupported && (

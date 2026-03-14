@@ -1460,6 +1460,57 @@ export function setupWebSocket(
           break;
         }
 
+        // ─── Library Git (commit files + diff) ───────────────────────────────
+
+        case 'library_git_commit_files_request': {
+          const { request_id, commit } = msg;
+          try {
+            const libDir = getLibraryDir();
+            const { stdout } = await execFileAsync(
+              'git', ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
+              { cwd: libDir, timeout: EXEC_TIMEOUT },
+            );
+            const files: { path: string; additions: number; deletions: number }[] = [];
+            for (const line of stdout.split('\n')) {
+              const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+              if (match) {
+                files.push({
+                  additions: match[1] === '-' ? 0 : parseInt(match[1], 10),
+                  deletions: match[2] === '-' ? 0 : parseInt(match[2], 10),
+                  path: unquoteGitPath(match[3]),
+                });
+              }
+            }
+            sendToClient(ws, { type: 'library-git-commit-files-response', request_id, files });
+          } catch (err) {
+            sendToClient(ws, { type: 'library-git-commit-files-error', request_id, error: sanitizeErrorForClient(err) });
+          }
+          break;
+        }
+
+        case 'library_git_diff_request': {
+          const { request_id, commit, file } = msg;
+          try {
+            const libDir = getLibraryDir();
+            if (file) {
+              await validateWorkspacePath(file, libDir);
+            }
+            let args: string[];
+            try {
+              await execFileAsync('git', ['rev-parse', `${commit}~1`], { cwd: libDir, timeout: EXEC_TIMEOUT });
+              args = ['diff', `${commit}~1`, commit];
+            } catch {
+              args = ['diff-tree', '-p', '--root', commit];
+            }
+            if (file) args.push('--', file);
+            const { stdout } = await execFileAsync('git', args, { cwd: libDir, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
+            sendToClient(ws, { type: 'library-git-diff-response', request_id, diff: stdout });
+          } catch (err) {
+            sendToClient(ws, { type: 'library-git-diff-error', request_id, error: sanitizeErrorForClient(err) });
+          }
+          break;
+        }
+
         // ─── Prompt Queue ───────────────────────────────────────────────────────
 
         case 'append_prompt': {

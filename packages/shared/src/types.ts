@@ -430,6 +430,21 @@ export const GitDiffRequestSchema = z.object({
   file: z.string().optional(),
 });
 
+// Client → Server: library git commit files via WebSocket (request-response)
+export const LibraryGitCommitFilesRequestSchema = z.object({
+  type: z.literal('library_git_commit_files_request'),
+  request_id: z.string(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/),
+});
+
+// Client → Server: library git diff via WebSocket (request-response)
+export const LibraryGitDiffRequestSchema = z.object({
+  type: z.literal('library_git_diff_request'),
+  request_id: z.string(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/),
+  file: z.string().optional(),
+});
+
 // ─── URL Capture ───
 
 export const UrlCaptureRequestSchema = z.object({
@@ -512,6 +527,8 @@ export const WSClientMessageSchema = z.discriminatedUnion('type', [
   GitLogRequestSchema,
   GitCommitFilesRequestSchema,
   GitDiffRequestSchema,
+  LibraryGitCommitFilesRequestSchema,
+  LibraryGitDiffRequestSchema,
   UrlCaptureRequestSchema,
   AppendPromptSchema,
   TimerStartSchema,
@@ -852,6 +869,36 @@ export const GitDiffErrorSchema = z.object({
   error: z.string(),
 });
 
+// Server → Client: library git commit files responses
+export const LibraryGitCommitFilesResponseSchema = z.object({
+  type: z.literal('library-git-commit-files-response'),
+  request_id: z.string(),
+  files: z.array(z.object({
+    path: z.string(),
+    additions: z.number(),
+    deletions: z.number(),
+  })),
+});
+
+export const LibraryGitCommitFilesErrorSchema = z.object({
+  type: z.literal('library-git-commit-files-error'),
+  request_id: z.string(),
+  error: z.string(),
+});
+
+// Server → Client: library git diff responses
+export const LibraryGitDiffResponseSchema = z.object({
+  type: z.literal('library-git-diff-response'),
+  request_id: z.string(),
+  diff: z.string(),
+});
+
+export const LibraryGitDiffErrorSchema = z.object({
+  type: z.literal('library-git-diff-error'),
+  request_id: z.string(),
+  error: z.string(),
+});
+
 // Server → Client: watch change notifications
 export const GitChangedSchema = z.object({
   type: z.literal('git_changed'),
@@ -1008,6 +1055,10 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   GitCommitFilesErrorSchema,
   GitDiffResponseSchema,
   GitDiffErrorSchema,
+  LibraryGitCommitFilesResponseSchema,
+  LibraryGitCommitFilesErrorSchema,
+  LibraryGitDiffResponseSchema,
+  LibraryGitDiffErrorSchema,
   UrlCaptureResultSchema,
   AutosaveErrorSchema,
   CellAppendedSchema,
