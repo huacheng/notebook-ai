@@ -416,7 +416,7 @@ while [[ $# -gt 0 ]]; do
 
     # ─────────────────────────────────────────────────────────────────────────
     # --scheduled: periodic auto-maintenance (cron-friendly, timestamp-gated)
-    # Runs: staleness check, T3→T4 validation, changelog compact check, security rules evolution
+    # Runs: staleness check, T3→T4 validation, security rules evolution, changelog compact, rebuild index, rebuild relations
     # Usage: maintain.sh --scheduled [--force]
     # ─────────────────────────────────────────────────────────────────────────
     --scheduled)
@@ -451,7 +451,7 @@ while [[ $# -gt 0 ]]; do
 
       # 1. Staleness check (references)
       echo ""
-      echo "--- [1/6] Staleness Check ---"
+      echo "--- [1/7] Staleness Check ---"
       REF_DIR="$LIB_PATH/.memory/.references"
       STALE_COUNT=0
       if [[ -d "$REF_DIR" ]]; then
@@ -474,7 +474,7 @@ while [[ $# -gt 0 ]]; do
 
       # 2. T3→T4 production validation for all active skills
       echo ""
-      echo "--- [2/6] T3→T4 Production Validation ---"
+      echo "--- [2/7] T3→T4 Production Validation ---"
       ACTIVE_DIR="$LIB_PATH/.skills/.active"
       T3_PROMOTED=0
       if [[ -d "$ACTIVE_DIR" ]]; then
@@ -498,7 +498,7 @@ while [[ $# -gt 0 ]]; do
 
       # 3. Security rules evolution check
       echo ""
-      echo "--- [3/6] Security Rules Evolution ---"
+      echo "--- [3/7] Security Rules Evolution ---"
       CORE_RULE_AUTO="$SCRIPT_DIR/core-rule-auto.sh"
       if [[ -f "$CORE_RULE_AUTO" ]]; then
           if ! bash "$CORE_RULE_AUTO" cron-job 2>&1; then
@@ -510,7 +510,7 @@ while [[ $# -gt 0 ]]; do
 
       # 4. Changelog auto-compact (monthly)
       echo ""
-      echo "--- [4/6] Changelog Auto-Compact ---"
+      echo "--- [4/7] Changelog Auto-Compact ---"
       COMPACT_TS_FILE="$LIB_PATH/.last-compact"
       COMPACT_INTERVAL=$((30 * 24 * 3600))  # 30 days in seconds
       NOW_EPOCH=$(date +%s)
@@ -531,7 +531,7 @@ while [[ $# -gt 0 ]]; do
 
       # 5. Rebuild index (daily)
       echo ""
-      echo "--- [5/6] Rebuild Index ---"
+      echo "--- [5/7] Rebuild Index ---"
       if [[ -f "$REBUILD_INDEX_PY" ]]; then
           if python3 "$REBUILD_INDEX_PY" 2>&1 | sed 's/^/  /'; then
               echo "  Index rebuilt successfully"
@@ -542,9 +542,22 @@ while [[ $# -gt 0 ]]; do
           echo "  [WARN] rebuild-index.py not found at $REBUILD_INDEX_PY"
       fi
 
-      # 6. Git commit (daily)
+      # 6. Rebuild relations (daily)
       echo ""
-      echo "--- [6/6] Git Commit ---"
+      echo "--- [6/7] Rebuild Relations ---"
+      if [[ -f "$REBUILD_RELATIONS_PY" ]]; then
+          if python3 "$REBUILD_RELATIONS_PY" 2>&1 | sed 's/^/  /'; then
+              echo "  Relations rebuilt successfully"
+          else
+              echo "  [WARN] rebuild-relations.py failed" >&2
+          fi
+      else
+          echo "  [WARN] rebuild-relations.py not found at $REBUILD_RELATIONS_PY"
+      fi
+
+      # 7. Git commit (daily)
+      echo ""
+      echo "--- [7/7] Git Commit ---"
       cd "$LIB_PATH" || { echo "  [ERROR] Cannot cd to $LIB_PATH" >&2; }
       if [[ -d ".git" ]]; then
           if git diff --quiet && git diff --cached --quiet; then
