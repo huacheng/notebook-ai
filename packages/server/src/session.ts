@@ -551,6 +551,7 @@ export class SessionManager {
    * (interruptCell, restartSession).
    */
   private _spawnAgent(session: NotebookSession, sessionId: string, resumeSessionId?: string): Promise<void> {
+    console.log(`[session ${sessionId}] _spawnAgent: resumeSessionId=${resumeSessionId ?? 'undefined'}`);
     const engine = session.agentProcess.engine;
     const model = session.agentProcess.model;
     session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model);
@@ -716,6 +717,7 @@ export class SessionManager {
 
     // Capture resume ID before killing — interrupt preserves conversation context
     const resumeSessionId = session.claudeSessionId;
+    console.log(`[session ${sessionId}] interruptCell: resumeSessionId=${resumeSessionId ?? 'undefined'}`);
     session.claudeSessionId = undefined;
 
     // Kill old process and wait for it to exit
@@ -1516,11 +1518,15 @@ export class SessionManager {
         // Claude CLI uses 'content' for local_command_output, 'message' for others
         const sysMsg = msg as { type: 'system'; subtype?: string; session_id?: string; message?: string; content?: string; hook_type?: string; hook_output?: string };
         // Capture session_id from init or hook_started (hook_started comes first, before any prompt)
-        if ((sysMsg.subtype === 'init' || sysMsg.subtype === 'hook_started') && sysMsg.session_id && !session.claudeSessionId) {
-          session.claudeSessionId = sysMsg.session_id;
-          console.log(`[session ${session.id}] Captured Claude session_id from ${sysMsg.subtype}: ${sysMsg.session_id}`);
-          // Persist to DB so server restart can --resume this session
-          this.onClaudeSessionId?.(session.id, sysMsg.session_id);
+        if ((sysMsg.subtype === 'init' || sysMsg.subtype === 'hook_started') && sysMsg.session_id) {
+          if (!session.claudeSessionId) {
+            session.claudeSessionId = sysMsg.session_id;
+            console.log(`[session ${session.id}] Captured Claude session_id from ${sysMsg.subtype}: ${sysMsg.session_id}`);
+            // Persist to DB so server restart can --resume this session
+            this.onClaudeSessionId?.(session.id, sysMsg.session_id);
+          } else {
+            console.log(`[session ${session.id}] Skipped session_id capture (already set: ${session.claudeSessionId}), new: ${sysMsg.session_id}`);
+          }
         }
         // Log hook events for debugging .MEMORY.md loading
         if (sysMsg.subtype === 'hook_started' || sysMsg.subtype === 'hook_completed') {

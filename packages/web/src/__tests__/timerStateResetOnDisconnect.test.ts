@@ -12,16 +12,17 @@ const wsSliceSrc = () =>
 describe('Timer state reset on disconnect', () => {
   it('should reset timerMode on ws disconnect', () => {
     const src = wsSliceSrc();
-    // Find the onclose handler that sets wsStatus: 'disconnected' with ws: null (the real close handler)
-    const oncloseBlock = src.match(/wsStatus:\s*'disconnected',\s*ws:\s*null[\s\S]*?\}/);
+    // Find the ws.onclose handler by looking for the full cleanup set() call
+    // Must contain loadingCellIds AND timerMode to be the real onclose cleanup
+    const oncloseBlock = src.match(/wsStatus:\s*'disconnected'[^;]*loadingCellIds[^;]*timerMode[^;]+;/);
     expect(oncloseBlock).toBeTruthy();
-    expect(oncloseBlock![0]).toContain('timerMode');
+    expect(oncloseBlock![0]).toContain('timerMode: false');
   });
 
   it('should reset timerIterationCount on ws disconnect', () => {
     const src = wsSliceSrc();
-    const oncloseBlock = src.match(/wsStatus:\s*'disconnected',\s*ws:\s*null[\s\S]*?\}/);
+    const oncloseBlock = src.match(/wsStatus:\s*'disconnected'[^;]*loadingCellIds[^;]*timerIterationCount[^;]+;/);
     expect(oncloseBlock).toBeTruthy();
-    expect(oncloseBlock![0]).toContain('timerIterationCount');
+    expect(oncloseBlock![0]).toContain('timerIterationCount: 0');
   });
 });

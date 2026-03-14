@@ -156,7 +156,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (get().ws === ws) {
         stopPing();
         // D3: Clear loadingCellIds on disconnect to avoid stuck loading states
-        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
+        // D3-4: Clear sessionReadyStatus so spinner shows during reconnect
+        set({ wsStatus: 'disconnected', ws: null, latency: null, loadingCellIds: new Set<string>(), sessionReadyStatus: {}, timerMode: false, timerIntervalSec: 0, timerIterationCount: 0, timerPaused: false, timerPausedResumeAt: 0 });
       }
     };
 
