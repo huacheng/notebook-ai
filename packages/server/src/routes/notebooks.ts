@@ -5,7 +5,7 @@ import os from 'os';
 import crypto from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { rm, readFile, mkdir, readdir } from 'fs/promises';
+import { rm, readFile, writeFile as fsWriteFile, mkdir, readdir } from 'fs/promises';
 import * as lz4 from 'lz4js';
 import {
   NotebookSchema,
@@ -492,7 +492,6 @@ export function createNotebooksRouter(
         const nbJson = JSON.parse(nbContent);
         if (nbJson.metadata) nbJson.metadata.title = title.trim();
         else nbJson.metadata = { title: title.trim() };
-        const { writeFile: fsWriteFile } = await import('fs/promises');
         await fsWriteFile(row.notebook_path, JSON.stringify(nbJson, null, 2));
       } catch {
         // Non-fatal: notebook file might not exist yet

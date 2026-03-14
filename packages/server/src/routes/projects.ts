@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, copyFile, unlink, stat, rm, readdir, realpath } from 'fs/promises';
+import { mkdir, readFile, writeFile, copyFile, unlink, stat, rm, readdir, realpath } from 'fs/promises';
 import { createReadStream, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -192,12 +192,11 @@ export function createProjectsRouter(
 
       // Update metadata.title inside .notebook.json
       try {
-        const { readFile: fsReadFile, writeFile: fsWriteFile } = await import('fs/promises');
-        const nbContent = await fsReadFile(notebookFilePath, 'utf-8');
+        const nbContent = await readFile(notebookFilePath, 'utf-8');
         const nbJson = JSON.parse(nbContent);
         if (nbJson.metadata) nbJson.metadata.title = title.trim();
         else nbJson.metadata = { title: title.trim() };
-        await fsWriteFile(notebookFilePath, JSON.stringify(nbJson, null, 2));
+        await writeFile(notebookFilePath, JSON.stringify(nbJson, null, 2));
       } catch {
         // Non-fatal
       }
