@@ -160,12 +160,23 @@ export function createProjectsRouter(
         return res.status(400).json({ error: 'title required' });
       }
 
-      // Resolve and validate path
-      const fullPath = path.isAbsolute(notebookPath)
+      // Resolve and validate path (D2: realpath for symlink-safe validation)
+      const resolved = path.isAbsolute(notebookPath)
         ? notebookPath
         : path.join(project.path, notebookPath);
-      if (!fullPath.startsWith(project.path)) {
+      if (!resolved.startsWith(project.path + path.sep) && resolved !== project.path) {
         return res.status(400).json({ error: 'Invalid path' });
+      }
+      let fullPath: string;
+      try {
+        const realBase = await realpath(project.path);
+        const realTarget = await realpath(resolved);
+        if (!realTarget.startsWith(realBase + path.sep) && realTarget !== realBase) {
+          return res.status(400).json({ error: 'Invalid path' });
+        }
+        fullPath = realTarget;
+      } catch {
+        fullPath = resolved; // path doesn't exist on disk — use resolved
       }
 
       // Find the .notebook.json file

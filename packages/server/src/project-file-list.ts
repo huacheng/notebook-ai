@@ -5,7 +5,7 @@
 
 import path from 'path';
 import { existsSync } from 'fs';
-import { readdir, stat } from 'fs/promises';
+import { readdir, stat, readFile } from 'fs/promises';
 import { listWorkspaceFiles, type ListResult } from './workspace-files.js';
 
 export interface CacheKeyContext {
@@ -63,14 +63,27 @@ export async function computeProjectFileList(
   const isTopLevel = subPath === '.' || subPath === '';
   result.files = result.files.filter(f => isVisibleEntry(f.name, isTopLevel));
 
-  // Mark directories containing {name}.notebook.json as notebook dirs
+  // Mark directories containing {name}.notebook.json as notebook dirs,
+  // and inject title for .notebook.json files
   const dirTarget = path.resolve(projectPath, subPath);
   for (const f of result.files) {
     if (f.type === 'directory') {
       const nbFile = path.join(dirTarget, f.name, `${f.name}.notebook.json`);
       if (existsSync(nbFile)) {
         f.isNotebook = true;
+        try {
+          const raw = await readFile(nbFile, 'utf-8');
+          const parsed = JSON.parse(raw);
+          if (parsed.metadata?.title) f.title = parsed.metadata.title;
+        } catch { /* ignore read errors */ }
       }
+    } else if (f.name.endsWith('.notebook.json')) {
+      // Read title for .notebook.json files inside notebook directories
+      try {
+        const raw = await readFile(path.join(dirTarget, f.name), 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed.metadata?.title) f.title = parsed.metadata.title;
+      } catch { /* ignore read errors */ }
     }
   }
 
@@ -84,9 +97,16 @@ export async function computeProjectFileList(
           if (!wt.isDirectory()) continue;
           const wtPath = path.join(wtRoot, wt.name);
           const wtFiles = await readdir(wtPath).catch(() => [] as string[]);
-          const hasNb = wtFiles.some(f => f.endsWith('.notebook.json'));
-          if (hasNb) {
+          const nbFileName = wtFiles.find(f => f.endsWith('.notebook.json'));
+          if (nbFileName) {
             const s = await stat(wtPath).catch(() => null);
+            // Read title from .notebook.json metadata
+            let title: string | undefined;
+            try {
+              const raw = await readFile(path.join(wtPath, nbFileName), 'utf-8');
+              const parsed = JSON.parse(raw);
+              if (parsed.metadata?.title) title = parsed.metadata.title;
+            } catch { /* ignore read errors */ }
             result.files.push({
               name: wt.name,
               type: 'directory',
@@ -94,6 +114,7 @@ export async function computeProjectFileList(
               modifiedAt: s?.mtime.toISOString() ?? new Date().toISOString(),
               isNotebook: true,
               worktreePath: `.worktrees/${wt.name}`,
+              ...(title ? { title } : {}),
             });
           }
         }

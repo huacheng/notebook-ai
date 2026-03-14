@@ -27,6 +27,7 @@ interface FileEntry {
   /** D6-5: Project file list may include these optional fields */
   isNotebook?: boolean;
   worktreePath?: string;
+  title?: string;
 }
 
 interface ListResult {
@@ -580,9 +581,9 @@ export function FileSection({
           {!loading && files.filter(f => !recentlyDeleted.has(f.name)).map((f) => {
             const isNbDir = f.type === 'directory' && f.isNotebook;
             const isNbFile = f.name.endsWith('.notebook.json');
-            // Strip task- prefix and .notebook.json suffix for notebook display names
+            // Use metadata title for notebooks, fall back to stripping task- prefix
             const displayName = (isNbDir || isNbFile)
-              ? f.name.replace('.notebook.json', '').replace(/^task-/, '')
+              ? (f.title || f.name.replace('.notebook.json', '').replace(/^task-/, ''))
               : f.name;
             return f.type === 'directory' ? (
             <div key={f.name} className="fp-entry fp-entry-dir" data-tooltip={f.name} onClick={async () => {

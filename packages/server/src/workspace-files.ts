@@ -14,6 +14,8 @@ export interface FileEntry {
   /** D6-4: Optional fields for project file listings */
   isNotebook?: boolean;
   worktreePath?: string;
+  /** Display title from .notebook.json metadata (e.g. "聪明钱包" instead of slug) */
+  title?: string;
 }
 
 export interface ListResult {
