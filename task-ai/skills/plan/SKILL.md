@@ -59,11 +59,11 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
 1. Read `.target.md` for requirements. **Stage awareness**: read `.status.json` `stage` field (default `{ current: 1, history: [] }` if missing). If `stage.current > 1` (multi-stage mode):
    - Only read the current `[ACTIVE]` stage's Objective/Requirements/Constraints from `.target.md` — plan scope is limited to the current stage
    - **Prior stage synthesis (CRITICAL for Stage N > 1)**:
-     a. Read `stage.history` from `.status.json` — get each completed stage's name, convergence score, and commit SHA
-     b. Read prior `[COMPLETE]` stages' `### Results` sections from `.target.md` — what was delivered
-     c. Read `.deliverables/` — inspect actual files/code produced by Stage 1..N-1
-     d. Read latest `.analysis/*-convergence.md` — which R# are met (ci=1.0) vs partially met vs unmet
-     e. Read prior stage reports if available (`.analysis/` files) — known issues, workarounds, architectural decisions
+     1.1. Read `stage.history` from `.status.json` — get each completed stage's name, convergence score, and commit SHA
+     1.2. Read prior `[COMPLETE]` stages' `### Results` sections from `.target.md` — what was delivered
+     1.3. Read `.deliverables/` — inspect actual files/code produced by Stage 1..N-1
+     1.4. Read latest `.analysis/*-convergence.md` — which R# are met (ci=1.0) vs partially met vs unmet
+     1.5. Read prior stage reports if available (`.analysis/` files) — known issues, workarounds, architectural decisions
    - **Plan generation rules for Stage N > 1**:
      - Build incrementally: extend/modify existing deliverables, do NOT re-implement what prior stages already delivered
      - Account for existing test coverage — add tests for new behavior, not duplicate existing tests
