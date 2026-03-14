@@ -6,13 +6,13 @@ Referenced from `auto/SKILL.md` §Detailed Loop Logic.
 
 | Current Status | First Step |
 |----------------|-----------|
-| `draft` | Phase 1 (conversational Overall Objective definition) — guide user to define objective, LLM decides whether to research, after confirmation write .target.md + .convergence-baseline.md, auto-generate Stage 1 target → planning |
-| `planning` | Phase 2 (plan → check) — Execute plan → verify → check (post-plan) |
-| `re-planning` | Phase 2 (plan → check, with check feedback) — Read `phase` field: if `needs-plan` → execute plan; if `needs-check` → execute verify → check (post-plan); if empty → default to plan |
-| `review` | Phase 3 (post-plan passed, exec) — Execute exec |
+| `draft` | Phase 1 (auto-extract objectives) — LLM updates `## Overall Objective` sub-items from conversation context. Each sub-item added/changed → immediately invoke `target` for incremental R# split. Single gate: PROMPT_TARGET_CONFIRMED → user confirms → generate `.convergence-baseline.md` from accumulated R# → Stage 1 → planning (full auto from here). If `.target.md` already has content (re-invocation) → present PROMPT_TARGET_CONFIRMED directly |
+| `planning` | Phase 2 (plan → check, full auto) — Execute plan → verify → check (post-plan). On PASS → auto-advance to Phase 3 |
+| `re-planning` | Phase 2 (plan → check, full auto, with check feedback) — Read `phase` field: if `needs-plan` → execute plan; if `needs-check` → execute verify → check (post-plan); if empty → default to plan |
+| `review` | Phase 3 entry — plan passed check, auto-advance to exec |
 | `executing` | Phase 3 (exec → check) — Execute verify → check (post-exec). **Note**: even if `completed_steps` < total, auto enters via post-exec verification first — check detects incomplete work and routes back to exec via NEEDS_FIX |
-| `evolving` | Phase 4 (convergence < 0.95 auto-advance / >= 0.95 wait for user) — read convergence score, < 0.95 auto-generate next sub-stage target → planning; >= 0.95 report and wait for user response |
-| `satisfied` | Report completion status, user can refine → evolving → auto-generate sub-stage → planning |
+| `evolving` | Phase 4 (full auto) — read convergence score. < 0.95 → auto-generate next sub-stage target → planning (continue toward Overall Objective). >= 0.95 → satisfied → final report (task complete) |
+| `satisfied` | Task complete. User can refine ("I also need X") → evolving → auto-generate sub-stage → planning |
 | `blocked` | Report blocking reason, wait for user intervention |
 | `cancelled` | Report task cancelled (terminal state) |
 
@@ -20,7 +20,7 @@ Referenced from `auto/SKILL.md` §Detailed Loop Logic.
 
 | step | result | next | checkpoint | Rationale |
 |------|--------|------|------------|-----------|
-| check | PASS | exec | post-plan | Plan approved, proceed to execution |
+| check | PASS | exec | post-plan | Plan approved, auto-advance to execution |
 | check | NEEDS_REVISION | plan | — | Plan needs revision |
 | check | ACCEPT | highlight | post-exec | D1-D6 + convergence gate passed, finalize |
 | check | ROLLBACK | (rollback) | post-exec | Convergence not improving, rollback |
@@ -45,13 +45,13 @@ Referenced from `auto/SKILL.md` §Detailed Loop Logic.
 | verify | (fail) | check | (from trigger context) | Verification done, check renders verdict |
 | verify | (partial) | check | (from trigger context) | Verification done, check renders verdict |
 | annotate | (processed) | `<by-layer>` | post-annotate | Layer-based: Requirement→plan/check, Planning→check, Eval-analysis→check, Eval-test→verify, Methodology→verify, Information/Comment-only→(none) |
-| report | (generated) | (evolving-entry) | — | Phase 4 complete → re-enter evolving decision (convergence < 0.95 → target; ≥ 0.95 → stop and wait) |
+| report | (generated) | (next-stage) | — | Phase 4 complete → next stage decision (automatic) |
 
-## Evolving Entry Decision (Internal Step)
+## Next Stage Decision (Internal Step)
 
-`(evolving-entry)` is an internal step in the auto loop, not a sub-command. Executes Phase 4 "evolving entry decision" (see §Phase 4 above):
+`(next-stage)` is an internal step in the auto loop, not a sub-command. Fully automatic — no user gate:
 - Read convergence score
-- >= 0.95 → `(stop)` wait for user
+- >= 0.95 → status → satisfied → final report → `(stop)` (Overall Objective achieved)
 - < 0.95 → invoke target (stage advance) → result `(stage-advanced)` → plan → Phase 2 continues loop
 
 ## Post-ROLLBACK Regeneration

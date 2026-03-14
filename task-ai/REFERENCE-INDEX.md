@@ -111,6 +111,7 @@
 |------|-------------|
 | `references/backend-api.md` | Backend API contract for auto orchestration |
 | `references/context-quota.md` | Token budget management for long-running sessions |
+| `references/objective-extraction.md` | Phase 1 sub-item extraction rules, format, update detection, incremental R# interface |
 | `references/plugin-delegation.md` | Plugin capability slots and delegation protocol |
 | `references/stall-detection.md` | Execution stall detection heuristics |
 

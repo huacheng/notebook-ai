@@ -2,31 +2,39 @@
 
 Referenced from `auto/SKILL.md` §Four-Phase Flow.
 
-## Phase 1: Overall Objective (status=draft) — Human in the loop
+## Phase 1: Overall Objective (status=draft) — Auto-extract, then confirm
 
-1. Conversational refine: guide user to define Overall Objective
-   - .target.md shows `## Overall Objective` with itemized goals (no markers — all items under discussion)
+1. **Auto-extract from context**: On first entry or when user provides intent, LLM immediately writes `.target.md` with structured `## Overall Objective` — itemized goals extracted from conversation context
    - Each item is a separate bullet point, e.g., `- Build JWT auth system`
-2. Research (LLM decides):
+   - Present the extracted objectives to user: "Based on your description, here are the objectives I've extracted: ... Please confirm, or tell me what to adjust."
+2. **Incremental R# splitting**: Each time a sub-item is added or changed, immediately invoke `target` sub-command to define that sub-item's R# requirements. R# accumulates incrementally during the multi-round dialog — NOT batched at the end
+3. Research (LLM decides):
    - Objective clear, domain familiar → skip research
    - Objective vague or domain unfamiliar → auto-complete research full flow (O1→O2→O3 in one pass), present results
    - User can explicitly request research
-3. After user confirms specific items:
-   - Add `[CONFIRMED]` to each confirmed item, e.g., `- Build JWT auth system [CONFIRMED]`
-   - Items without markers remain in discussion (excluded from plan scope)
-   - Generate .convergence-baseline.md from `[CONFIRMED]` items only
-4. Auto-generate Stage 1 target:
-   - .target.md: remove `[CONFIRMED]`, add `## Stage 1: <name> [ACTIVE]`
-   - status → planning
+4. **Objective confirmation gate** (PROMPT_TARGET_CONFIRMED):
+   - When objectives are ready (explicit "OK" / implicit re-invocation with `.target.md` content):
+   - Output **PROMPT_TARGET_CONFIRMED** — list extracted sub-items with their R# counts, ask user to confirm or adjust
+   - If user adjusts → update sub-items → invoke `target` for changed items → re-present PROMPT_TARGET_CONFIRMED
+   - If user confirms → step 5
+5. **Auto-execution begins** (Phase 2-4 all automatic from here):
+   - Generate `.convergence-baseline.md` from accumulated R# requirements
+   - Auto-generate Stage 1 target: .target.md add `## Stage 1: <name> [ACTIVE]`
+   - status → planning → Phase 2 (fully automatic)
 
-## Phase 2: Planning (status=planning) — Full auto + user can intervene
+## Phase 2: Planning (status=planning) — Full auto
 
-- Optional: research for technical references (implementation-level, not objective research)
-- Execute plan → verify(post-plan) → check(post-plan) (no code output — verify validates plan document quality)
-- Plan generation updates .target.md: each `[CONFIRMED]` item covered by plan → `[PROCESSED]`
-- check D1-D6 ≥ 0.70 → auto-advance to Phase 3
-- score < threshold → auto-replan based on failing dimensions → re-check
-- User can intervene: "step 3 unnecessary" → modify .plan.md, re-check
+1. **Prior stage context loading** (Stage N where N > 1):
+   - Read `stage.history` from `.status.json` — get completed stages and their convergence scores
+   - Read `.deliverables/` — understand what has already been built
+   - Read previous stage reports (`.analysis/*-convergence.md`) — identify which R# are met vs unmet
+   - Plan MUST account for: existing code/deliverables from Stage 1..N-1, their test coverage, known issues, and remaining R# gaps
+   - Avoid re-implementing what prior stages already delivered; build incrementally on top of existing work
+2. Optional: research for technical references (implementation-level, not objective research)
+3. Execute plan → verify(post-plan) → check(post-plan) (no code output — verify validates plan document quality)
+   - Plan generation updates .target.md: each `[CONFIRMED]` item covered by plan → `[PROCESSED]`
+   - score < threshold → auto-replan based on failing dimensions → re-check
+4. check D1-D6 ≥ threshold → auto-advance to Phase 3 (no user gate)
 
 ## Phase 3: Execution (status=executing) — Full auto + user can intervene
 
@@ -49,23 +57,25 @@ Referenced from `auto/SKILL.md` §Four-Phase Flow.
 - Step 2: Convergence gate (within check)
   - check evaluates convergence score vs previous baseline
   - convergence > previous → ACCEPT
-    - auto sets status → evolving → highlight → report → evolving entry decision
+    - auto sets status → evolving → highlight → report → next stage decision
   - convergence ≤ previous → ROLLBACK
 
 No merge. No pre-merge check.
 
-## Evolving Entry Decision
+## Next Stage Decision (Automatic)
+
+After each stage completes (highlight → report), auto decides next action **without waiting for user**:
 
 1. Read latest convergence score (from `.analysis/*-convergence.md`)
 2. **convergence >= 0.95**:
-   - Report: "convergence {score}, objective largely achieved. If satisfied: /task-ai:target --satisfy; If more needed: tell me what else you need"
-   - Wait for user response (no auto-advance)
+   - status → satisfied → generate final report (task complete)
+   - No user gate — Overall Objective has been achieved
 3. **convergence < 0.95**:
    - Auto-generate next sub-stage target:
      a. Collect inputs: unmet R# (ci < 1.0), coverage trends, completed deliverables, failed exclusion list, deliverable status
      b. LLM reasoning: cluster R#, select subset (prioritize critical + low coverage), cross-check exclusion list, granularity control
      c. Invoke target to write new Stage → .target.md
-     d. Auto-enter Phase 2 (Planning)
+     d. Auto-enter Phase 2 (Planning) — continue toward Overall Objective
 
 ## Satisfied Re-entry
 

@@ -68,8 +68,8 @@ Semantic understanding of user message → execute phase-appropriate action
 
 | Phase | Progression | Reason |
 |-------|------------|--------|
-| Phase 1 (Target) | **User dialog confirms** | "What to build" — only user can define; LLM self-review creates coherence bias |
-| Phases 2-4 (Plan/Exec/Final) | **LLM auto-review** | "Is it correct?" — check(D1-D6) provides objective evaluation |
+| Phase 1 (Target) | **LLM auto-extracts, incremental R# split, user confirms once** | LLM updates `## Overall Objective` sub-items from conversation. Each sub-item defined → immediately invoke `target` to split into R#. Single gate: PROMPT_TARGET_CONFIRMED — user confirms → Stage 1 → auto-execution |
+| Phases 2-4 (Plan/Exec/Final) | **Full auto** | After user confirms: `plan` → `exec` → `check` all run automatically. R# already defined during Phase 1 dialog. check(D1-D6) provides objective evaluation |
 
 Auto-review mechanism:
 ```
@@ -114,7 +114,7 @@ Thresholds and retry limits are **adaptive**: read from `.type-profile.md` `## A
 
 check evaluates deliverables against `.target.md`, `.convergence-baseline.md`, and `.plan.md` per D1-D6 dimension. See `check/SKILL.md` §Four-File Anchored Review for the full dimension-anchor mapping table.
 
-> **See `references/phases.md`** for detailed phase flow (Phase 1-4), evolving entry decision, and satisfied re-entry.
+> **See `references/phases.md`** for detailed phase flow (Phase 1-4), next stage decision, and satisfied re-entry.
 
 ## Dialog Behavior
 
@@ -122,17 +122,19 @@ check evaluates deliverables against `.target.md`, `.convergence-baseline.md`, a
 
 No intent classification or rule matching. Claude reads current phase SKILL.md + user message, acts through semantic understanding — like a pair programming partner.
 
-Phase 1 (Overall Objective) — waits for user confirmation (only users can validate objectives — LLM self-confirmation creates coherence bias):
+Phase 1 (Overall Objective) — auto-extract then confirm. LLM updates `## Overall Objective` sub-items only; R# requirement splitting is `target` sub-command's responsibility. See `references/objective-extraction.md` for extraction rules, sub-item format, update detection, and incremental R# interface:
 
 | User says | Claude does |
 |-----------|------------|
-| "I need WebSocket auth with token refresh" | Write/update .target.md |
-| "Also needs backward compatibility" | Append requirement to .target.md |
+| "I need WebSocket auth with token refresh" | **Auto-extract**: write/update `## Overall Objective` sub-items in `.target.md`, present to user. **Incremental R# split**: for each new/changed sub-item, immediately invoke `target` to define its R# requirements |
+| "Also needs backward compatibility" | Append sub-item to `## Overall Objective`, invoke `target` to define R# for the new sub-item, re-present |
 | "Help me research this area" | Execute research full flow (O1→O2→O3 in one pass), present results |
-| "OK looks good" / "Confirmed" | Write .target.md + .convergence-baseline.md → auto-generate Stage 1 target → Phase 2 |
-| Silence | **Do not advance** — wait for user confirmation |
+| "OK looks good" (during discussion) | Output **PROMPT_TARGET_CONFIRMED** (objective summary) → **wait for final confirmation** |
+| "No, change X to Y" | Update sub-items per feedback, re-present |
+| Silence / "Continue" / re-invoke `/task-ai:auto` | If `.target.md` has content → output **PROMPT_TARGET_CONFIRMED** → **wait for final confirmation**. If `.target.md` empty → prompt user to describe what they want to build |
+| "OK" / "Confirmed" (after seeing PROMPT_TARGET_CONFIRMED) | All sub-items' R# already defined (via incremental target calls) → generate `.convergence-baseline.md` → auto-generate Stage 1 → Phase 2-4 full auto |
 
-Phases 2-4 — full auto, user can intervene:
+Phases 2-4 — full auto after user authorized, user can intervene:
 
 | User says | Claude does |
 |-----------|------------|
@@ -140,6 +142,36 @@ Phases 2-4 — full auto, user can intervene:
 | "What does this error mean?" | Explain + fix, continue |
 | "Run tests again" | Trigger verify |
 | "Continue" / Silence | Continue next step |
+
+### Standardized Prompts
+
+All phase-transition prompts use fixed templates. LLM MUST output these exactly (filling `{variables}` only), no improvisation.
+
+**PROMPT_TARGET_CONFIRMED** — Target extracted, presenting for confirmation:
+```
+---
+📋 Objectives extracted — {objective_count} items, {total_r_count} requirements:
+
+{numbered_list_of_objective_sub_items_with_r_counts}
+
+→ Confirm: say **"OK"** or **"confirmed"**
+→ Adjust: tell me what to change
+---
+```
+
+Example:
+```
+---
+📋 Objectives extracted — 3 items, 8 requirements:
+
+1. JWT token authentication for login (R: 3)
+2. Refresh token support for session extension (R: 2)
+3. Integration with existing user database (R: 3)
+
+→ Confirm: say **"OK"** or **"confirmed"**
+→ Adjust: tell me what to change
+---
+```
 
 ### Explicit Override (Sub-command)
 
@@ -200,7 +232,7 @@ User returns and says "continue":
 
 ### Cross-Stage Continuation
 
-When status is `evolving` with convergence < 0.95, auto automatically generates the next sub-stage target and proceeds to planning without waiting. When convergence ≥ 0.95, auto reports and waits for user input — user can `/task-ai:target --satisfy` or provide new direction (which triggers satisfied → evolving → auto-generate sub-stage → planning).
+Once user confirms Overall Objective (Phase 1, R# already defined incrementally during dialog), auto drives all stages automatically toward convergence. When status is `evolving` with convergence < 0.95, auto generates the next sub-stage target and proceeds to planning without waiting. When convergence ≥ 0.95, auto marks task as satisfied and generates final report — Overall Objective achieved. User can later refine in satisfied state ("I also need X") → evolving → auto-generate sub-stage → planning.
 
 ### "Silent Continue" Mechanism
 
@@ -228,16 +260,18 @@ Reasons: `"timeout"`, `"max_iterations"`, `"user_stop"`, `"stall_limit"`, `"reas
 ```
 AUTO LOOP (4 phases — all within single Claude session)
 
-Phase 1: Overall Objective (human-in-loop)
-  Conversational refine → LLM decides research (skip / O1→O2→O3 in one pass)
-  After confirmation write .target.md + .convergence-baseline.md → auto-generate Stage 1 target → [Phase 2]
+Phase 1: Overall Objective (human-in-loop, single confirmation gate)
+  Multi-round dialog → LLM updates Overall Objective sub-items
+  Each sub-item defined → immediately invoke target (sub-item → R# split)
+  → PROMPT_TARGET_CONFIRMED → user confirms
+  → .convergence-baseline.md (from accumulated R#) + Stage 1 → [Phase 2]
 
-Phase 2: Planning (auto-review)
+Phase 2: Planning (full auto)
   plan ──→ verify ──→ check(post-plan, threshold=0.70) ─── PASS ──→ [Phase 3]
                               │
                               NEEDS_REVISION ──→ plan (retry, max 3)
 
-Phase 3: Execution (auto-review)
+Phase 3: Execution (full auto)
   exec ─┬─ (mid-exec) ──→ verify ──→ check(mid-exec, threshold=0.60) ─── CONTINUE ──→ exec (resume)
         │                                    │
         │                               NEEDS_FIX ──→ exec (fix, max 2)
@@ -248,20 +282,19 @@ Phase 3: Execution (auto-review)
                                          │
                                     NEEDS_FIX / REPLAN (max 3)
 
-Phase 4: Acceptance + Auto Advance (auto)
+Phase 4: Acceptance + Auto Advance (full auto, stages toward Overall Objective)
   check(post-exec, D1-D6, threshold=0.75) ─── ACCEPT ──→ convergence gate
             │                                                │
             NEEDS_FIX ──→ exec(fix) → re-check (max 3)     ├─ convergence > previous ──→ ACCEPT
-            │                                                │   status → evolving → highlight → report → evolving entry decision
+            │                                                │   status → evolving → highlight → report → next stage decision
             Max exceeded ──→ rollback → re-planning         │
                                                              └─ convergence ≤ previous ──→ ROLLBACK
                                                                  highlight records failure → exclusion list → regenerate sub-stage target → Phase 2
                                                                  (all directions exhausted → stop and report to user)
 
-  Entry on evolving:
-    convergence >= 0.95 → report + wait for user (--satisfy or refine)
-    convergence < 0.95 → auto-generate next sub-stage target → planning → Phase 2
-  Entry on satisfied: report completion status; user refine → evolving → auto-generate sub-stage → planning
+  Next stage decision (automatic):
+    convergence >= 0.95 → satisfied → final report (task complete)
+    convergence < 0.95 → auto-generate next sub-stage target → Phase 2 (continue toward Overall Objective)
 
 Terminal: BLOCKED at any check → (stop, status → blocked)
 ```

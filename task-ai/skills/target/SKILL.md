@@ -22,6 +22,12 @@ arguments:
   - name: --refine
     description: "Append a refinement to existing target (used by agent during target-refinement phase). Requires a value argument: --refine \"content\""
     required: false
+  - name: --refine-item
+    description: "Incremental R# splitting for a single Overall Objective sub-item. Called by auto during Phase 1 dialog. Decomposes the sub-item into atomic R# requirements and writes to .target.md ## Requirements section. Value: the sub-item text."
+    required: false
+  - name: --refine-item-delete
+    description: "Remove a sub-item's R# entries from .target.md ## Requirements section and re-number remaining R# globally. Called by auto when user drops a sub-item. Value: the sub-item text to match."
+    required: false
   - name: --satisfy
     description: "Mark task as satisfied (only valid in evolving status). Non-terminal — can re-enter evolution later via /task-ai:target"
     required: false
@@ -158,6 +164,37 @@ When the user expresses intent to modify the target during `planning` status, th
      - Write back with Edit tool
      - **VERIFY**: After write, read `.status.json` again to confirm `status` is `satisfied`. If unchanged, retry or abort
    - Git commit `task-ai(<notebook>):target mark satisfied`, output message "Task marked as satisfied."
+
+2b. **If `--refine-item` is provided** (Incremental R# Splitting):
+   - **Precondition**: status == `draft` (Phase 1 dialog). If status != `draft` → REJECT with error "Incremental R# splitting is only valid during Phase 1 (draft status)."
+   - Read `.target.md` `## Requirements` section
+   - Decompose the sub-item text into atomic R# requirements (same atomization rules as step 3e):
+     - **Atomic**: One verifiable behavior per R#
+     - **Testable**: Concrete acceptance criteria
+     - **Independent**: Can be scored 0.0-1.0 independently
+   - Assign weight: critical = 3, important = 2, optional = 1
+   - **If sub-item already has R# entries** (re-split on update):
+     - Find the sub-heading matching the sub-item under `## Requirements`
+     - Remove all existing R# entries under that sub-heading
+     - Write new R# entries
+     - Re-number all R# globally (R1, R2, ... sequential across all sub-items)
+   - **If new sub-item**:
+     - Append new sub-heading + R# table under `## Requirements`
+     - Number R# continuing from the last existing R#
+   - Update `(R: N)` annotation on the matching sub-item in `## Overall Objective`
+   - **Do NOT generate `.convergence-baseline.md`** — that happens at final confirmation (see `auto/references/objective-extraction.md` §Final Confirmation)
+   - **Do NOT change `.status.json` status** — remains `draft`
+   - No git commit (lightweight operation during dialog; committed at confirmation)
+   - Output: brief confirmation — "Sub-item '{sub-item}' → {N} requirements (R{start}-R{end})"
+
+2c. **If `--refine-item-delete` is provided** (Sub-item R# Deletion):
+   - **Precondition**: status == `draft`. If status != `draft` → REJECT.
+   - Find the sub-heading matching the sub-item text under `## Requirements`
+   - Remove the sub-heading and all R# entries beneath it
+   - Re-number remaining R# globally (R1, R2, ... sequential)
+   - **Do NOT change `.status.json` status** — remains `draft`
+   - No git commit
+   - Output: brief confirmation — "Sub-item '{sub-item}' R# entries removed. {remaining} requirements remain."
 
 3. **If `objective` is provided (Write Mode)** — three-branch routing:
 
@@ -298,6 +335,8 @@ After write mode completes, output the exact next step based on the resulting st
 | :--- | :--- |
 | `target` | `task-ai(<notebook>):target update objective` |
 | `target --refine` | `task-ai(<notebook>):target refine objective` |
+| `target --refine-item` | No commit (lightweight Phase 1 dialog operation) |
+| `target --refine-item-delete` | No commit (lightweight Phase 1 dialog operation) |
 | `target` (stage advance) | `task-ai(<notebook>):target stage <N+1> defined` |
 | `target --satisfy` | `task-ai(<notebook>):target mark satisfied` |
 | `target` (re-enter from satisfied) | `task-ai(<notebook>):target re-enter evolution` |

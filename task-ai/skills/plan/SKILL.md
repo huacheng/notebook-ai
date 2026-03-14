@@ -58,7 +58,17 @@ The agent maintains phase awareness via `.status.json` (see Phase Awareness Prot
 
 1. Read `.target.md` for requirements. **Stage awareness**: read `.status.json` `stage` field (default `{ current: 1, history: [] }` if missing). If `stage.current > 1` (multi-stage mode):
    - Only read the current `[ACTIVE]` stage's Objective/Requirements/Constraints from `.target.md` — plan scope is limited to the current stage
-   - Also read prior `[COMPLETE]` stages' `### Results` sections as context (already-implemented capabilities)
+   - **Prior stage synthesis (CRITICAL for Stage N > 1)**:
+     a. Read `stage.history` from `.status.json` — get each completed stage's name, convergence score, and commit SHA
+     b. Read prior `[COMPLETE]` stages' `### Results` sections from `.target.md` — what was delivered
+     c. Read `.deliverables/` — inspect actual files/code produced by Stage 1..N-1
+     d. Read latest `.analysis/*-convergence.md` — which R# are met (ci=1.0) vs partially met vs unmet
+     e. Read prior stage reports if available (`.analysis/` files) — known issues, workarounds, architectural decisions
+   - **Plan generation rules for Stage N > 1**:
+     - Build incrementally: extend/modify existing deliverables, do NOT re-implement what prior stages already delivered
+     - Account for existing test coverage — add tests for new behavior, not duplicate existing tests
+     - Address known issues from prior stages if they affect current stage scope
+     - If prior stage introduced architectural patterns, follow them for consistency
    - Library context loading (steps 10-12) naturally includes prior-stage experience files distilled by highlight
    - If `stage.current == 1`: read entire `.target.md` as before (backward compatible)
    - **BLOCKING CHECK**: If `.target.md` has no objective items with `[CONFIRMED]` or `[PROCESSED]` markers AND no `## Stage` sections exist, REJECT with error: "Cannot generate plan — no confirmed objectives. Run `/task-ai:target` to confirm at least one objective item first." (Plan only covers `[CONFIRMED]` items; unconfirmed items are excluded from scope)
