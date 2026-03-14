@@ -321,7 +321,7 @@ The auto skill runs this loop within a single Claude session:
 4. Post-loop maintenance: run `maintain.sh --scheduled` (timestamp-gated, skips if < 24h since last run — zero overhead in most cases)
 5. Cleanup: delete .auto-stop if exists, report final status
 
-> **See `references/loop-logic.md`** for detailed loop logic, including entry point (status-based routing), result-based routing, evolving entry decision, post-ROLLBACK regeneration, and context advantage.
+> **See `references/loop-logic.md`** for detailed loop logic, including entry point (status-based routing), result-based routing, next stage decision, post-ROLLBACK regeneration, and context advantage.
 
 ## Stall Detection & Recovery
 
