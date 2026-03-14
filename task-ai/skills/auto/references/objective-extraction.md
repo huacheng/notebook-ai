@@ -149,12 +149,12 @@ When a sub-item is removed, auto:
 
 ## Final Confirmation → `.convergence-baseline.md`
 
-When user confirms PROMPT_TARGET_CONFIRMED:
+When user confirms PROMPT_TARGET_CONFIRMED, auto invokes `target` to finalize:
 
-1. Read all accumulated R# from `.target.md` `## Requirements` section
-2. Generate `.convergence-baseline.md` with the standard format (see `target/SKILL.md` §3e)
-3. All sub-items marked `[CONFIRMED]`
-4. Auto-generate Stage 1 target
-5. status → planning → Phase 2
+1. `target` reads all accumulated R# from `.target.md` `## Requirements` section
+2. `target` generates `.convergence-baseline.md` with the standard format (same logic as `target/SKILL.md` §3e)
+3. `target` marks all sub-items `[CONFIRMED]`
+4. `target` auto-generates Stage 1 target (add `## Stage 1: <name> [ACTIVE]`)
+5. `target` sets status → planning → Phase 2
 
 This separation ensures `.convergence-baseline.md` is only generated once from a complete, confirmed set of R# — not incrementally during discussion.

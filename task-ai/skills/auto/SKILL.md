@@ -228,7 +228,7 @@ User returns and says "continue":
 1. Read `.status.json` → status, stage
 2. Read `.summary.md` → context summary
    - If `.summary.md` absent → read `.target.md` + `.plan.md` to rebuild minimal context
-4. Resume from interruption point
+3. Resume from interruption point
 
 ### Cross-Stage Continuation
 

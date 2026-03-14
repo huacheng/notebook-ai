@@ -18,8 +18,8 @@ Referenced from `auto/SKILL.md` §Four-Phase Flow.
    - If user adjusts → update sub-items → invoke `target` for changed items → re-present PROMPT_TARGET_CONFIRMED
    - If user confirms → step 5
 5. **Auto-execution begins** (Phase 2-4 all automatic from here):
-   - Generate `.convergence-baseline.md` from accumulated R# requirements
-   - Auto-generate Stage 1 target: .target.md add `## Stage 1: <name> [ACTIVE]`
+   - Invoke `target` to generate `.convergence-baseline.md` from accumulated R# (same logic as `target/SKILL.md` §3e)
+   - Invoke `target` to auto-generate Stage 1: mark all sub-items `[CONFIRMED]`, add `## Stage 1: <name> [ACTIVE]` to `.target.md`
    - status → planning → Phase 2 (fully automatic)
 
 ## Phase 2: Planning (status=planning) — Full auto

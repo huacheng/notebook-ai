@@ -189,7 +189,8 @@ When the user expresses intent to modify the target during `planning` status, th
 
 2c. **If `--refine-item-delete` is provided** (Sub-item R# Deletion):
    - **Precondition**: status == `draft`. If status != `draft` → REJECT.
-   - Find the sub-heading matching the sub-item text under `## Requirements`
+   - Find the sub-heading matching the sub-item text under `## Requirements` (semantic match, same as `--refine-item`)
+   - If no matching sub-heading found → output "No R# entries found for '{sub-item}' — nothing to delete." and return
    - Remove the sub-heading and all R# entries beneath it
    - Re-number remaining R# globally (R1, R2, ... sequential)
    - **Do NOT change `.status.json` status** — remains `draft`
