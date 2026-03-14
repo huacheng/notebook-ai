@@ -79,6 +79,9 @@ const GITIGNORE_ENTRIES = [
   '**/.working/.library-state.json',
   '**/.lock',
   '**/.lock.stale.*',
+  '',
+  '# env file',
+  '.env',
 ];
 
 const GITIGNORE_MARKER = '# task-ai temp files';
