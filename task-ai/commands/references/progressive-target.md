@@ -19,8 +19,7 @@ The progressive evolution model replaces predefined multi-stage planning with em
 Stage 1: target → plan → exec → check ACCEPT → auto sets evolving → highlight → report
   ↓ convergence < 0.95 → LLM auto-generates next substage target (see auto/SKILL.md Phase 4)
 Stage 2: target → plan → exec → check ACCEPT → auto sets evolving → highlight → report
-  ↓ convergence ≥ 0.95 → wait for user
-target --satisfy → satisfied
+  ↓ convergence ≥ 0.95 → satisfied → final report (task complete, automatic)
   ↓ later, user refines Overall Objective
 satisfied → evolving → auto-generates substage → planning → ...
 ```
