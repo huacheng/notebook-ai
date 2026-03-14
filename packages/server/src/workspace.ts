@@ -120,8 +120,12 @@ export async function initWorkspaceMemory(workspaceDir: string, projectPath?: st
     `# MEMORY\n\n` +
     `## Task-AI Work Directory ($TASKAI_WORK_DIR)\n` +
     `Path: \`.working\` → \`${workingDir}\`\n` +
-    `State files: .status.json, .target.md, .plan.md, .summary.md, .convergence-baseline.md\n` +
     `Note: /task-ai:* commands reference .working/.status.json, not worktree root.\n\n` +
+    `### Core State Files\n` +
+    `- **.status.json** — Task status hub: status/phase/completed_steps/stage/depends_on, sync point for all sub-commands\n` +
+    `- **.target.md** — Objective + Acceptance Criteria + Constraints, anchor for D1 Correctness review\n` +
+    `- **.plan.md** — Step-by-step plan with \`Covers: R#\` annotations, basis for exec and check\n` +
+    `- **.summary.md** — Compressed context (≤200 lines): state/progress/decisions/issues, used for context recovery after compression\n\n` +
     `## Shared Library (read/write, shared across notebooks)\n` +
     `Path: \`${libRelPath}\` → \`${libraryDir}\`\n\n` +
     `## Deliverables\n` +
