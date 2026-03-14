@@ -140,6 +140,10 @@ export class NotebookDb {
       CREATE INDEX IF NOT EXISTS idx_projects_updated ON projects(updated_at DESC);
     `);
 
+    // Unique slug constraints (ASCII slug architecture)
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_notebooks_slug_unique ON notebooks(slug)`);
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_slug_unique ON projects(slug)`);
+
     // Migration: add project_id to notebooks
     try {
       this.db.exec(`ALTER TABLE notebooks ADD COLUMN project_id TEXT REFERENCES projects(id)`);

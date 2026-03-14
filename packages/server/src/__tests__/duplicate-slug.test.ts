@@ -1,9 +1,8 @@
 /**
- * Duplicate slug rejection tests (409 Conflict).
+ * Duplicate title tests — both creations should succeed.
  *
- * RED if:
- * - POST /projects with duplicate title still succeeds (no 409)
- * - POST /projects/:id/notebooks with duplicate title still appends UUID suffix (no 409)
+ * With ASCII slug architecture, each creation generates a unique random slug
+ * (proj-{8hex} or nb-{8hex}), so duplicate titles are allowed.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -49,6 +48,7 @@ function createMockSessionManager() {
       cwd,
       notebook: { version: 1, metadata: {}, cells: [], slide: { generated: false, sections: [] }, annotations: [], assets: { intermediate_files: [] } },
     })),
+    executeCell: vi.fn(async () => {}),
     getSession: () => null,
     deleteSession: () => {},
   };
@@ -92,30 +92,30 @@ afterEach(async () => {
   await rm(tmpRoot, { recursive: true, force: true });
 });
 
-describe('duplicate project name → 409', () => {
-  it('rejects creating a project with a slug that already exists as a directory', async () => {
-    // First creation should succeed
+describe('duplicate project title succeeds (unique random slugs)', () => {
+  it('creates two projects with the same title, each with a different slug', async () => {
     const res1 = await request(app)
       .post('/projects')
       .send({ title: '测试项目' })
       .expect(200);
 
-    expect(res1.body.title).toBe('测试项目');
-
-    // Second creation with same title should return 409
     const res2 = await request(app)
       .post('/projects')
-      .send({ title: '测试项目' });
+      .send({ title: '测试项目' })
+      .expect(200);
 
-    expect(res2.status).toBe(409);
-    expect(res2.body.error).toMatch(/exist|duplicate|conflict/i);
+    expect(res1.body.title).toBe('测试项目');
+    expect(res2.body.title).toBe('测试项目');
+    expect(res1.body.slug).not.toBe(res2.body.slug);
+    expect(res1.body.slug).toMatch(/^proj-[0-9a-f]{8}$/);
+    expect(res2.body.slug).toMatch(/^proj-[0-9a-f]{8}$/);
   });
 });
 
-describe('duplicate notebook name → 409', () => {
-  it('rejects creating a notebook with same slug under the same project', async () => {
+describe('duplicate notebook title succeeds (unique random slugs)', () => {
+  it('creates two notebooks with the same title under the same project', async () => {
     // Set up project directory with git
-    const projectSlug = 'test-proj';
+    const projectSlug = 'proj-11223344';
     const projectPath = path.join(tmpRoot, projectSlug);
     await mkdir(path.join(projectPath, '.deliverables'), { recursive: true });
     execSync('git init && git add -A && git commit -m "init" --allow-empty', {
@@ -134,21 +134,23 @@ describe('duplicate notebook name → 409', () => {
     };
     db.projects.push(project);
 
-    // First notebook creation should succeed
-    const res1 = await request(app)
+    await request(app)
       .post('/projects/proj-1/notebooks')
-      .send({ title: '我的笔记' });
+      .send({ title: '我的笔记' })
+      .expect(200);
 
-    // The current code appends UUID suffix on collision — it should NOT
-    // But for the first one, it should just succeed
-    expect(res1.status).toBe(200);
-
-    // Second notebook with same title should return 409 (not append UUID)
-    const res2 = await request(app)
+    await request(app)
       .post('/projects/proj-1/notebooks')
-      .send({ title: '我的笔记' });
+      .send({ title: '我的笔记' })
+      .expect(200);
 
-    expect(res2.status).toBe(409);
-    expect(res2.body.error).toMatch(/exist|duplicate|conflict/i);
+    // Both notebooks should be in DB with the same title but different slugs
+    const nbs = db.notebooks.filter((n) => n.project_id === 'proj-1');
+    expect(nbs).toHaveLength(2);
+    expect(nbs[0].title).toBe('我的笔记');
+    expect(nbs[1].title).toBe('我的笔记');
+    expect(nbs[0].slug).not.toBe(nbs[1].slug);
+    expect(nbs[0].slug).toMatch(/^nb-[0-9a-f]{8}$/);
+    expect(nbs[1].slug).toMatch(/^nb-[0-9a-f]{8}$/);
   });
 });

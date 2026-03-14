@@ -1,5 +1,6 @@
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { mkdirSync, existsSync, constants } from 'fs';
 import { writeFile, chmod, access } from 'fs/promises';
 import { GitManager } from './git.js';
@@ -41,8 +42,17 @@ export async function ensureLibraryGit(): Promise<string> {
 }
 
 /**
+ * Generate a random ASCII-only slug: prefix + 8-char hex.
+ * Used for filesystem paths — ensures pure ASCII for Claude CLI compatibility.
+ */
+export function generateSlug(prefix: 'proj' | 'nb' = 'nb'): string {
+  return `${prefix}-${crypto.randomBytes(4).toString('hex')}`;
+}
+
+/**
  * Converts a title string into a URL-safe slug.
  * Preserves Unicode letters (CJK, Japanese, Korean, etc.) and digits.
+ * @deprecated Use generateSlug() for new creations. Kept for migration/tests.
  */
 export function titleToSlug(title: string): string {
   return title

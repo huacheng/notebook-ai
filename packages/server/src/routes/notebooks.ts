@@ -16,8 +16,7 @@ import type { SessionManager } from '../session.js';
 import type { NotebookDb } from '../db.js';
 import { NotebookStore } from '../notebook-store.js';
 import {
-  titleToSlug,
-  uniqueSlug,
+  generateSlug,
   ensureWorkspaceDir,
   getNotebookFilePath,
   initWorkspaceMemory,
@@ -265,8 +264,7 @@ export function createNotebooksRouter(
     }
 
     try {
-      const baseSlug = titleToSlug(title.trim());
-      const slug = uniqueSlug(baseSlug, userId);
+      const slug = generateSlug('nb');
       const workspaceDir = ensureWorkspaceDir(slug, userId);
       const notebookPath = getNotebookFilePath(workspaceDir, slug);
       const notebookId = crypto.randomUUID();
@@ -467,45 +465,39 @@ export function createNotebooksRouter(
 
   /**
    * PATCH /api/notebooks/:notebookId
-   * Updates notebook metadata (title, etc.).
+   * Updates notebook metadata (title only — slug/path unchanged).
    */
   router.patch('/:notebookId', async (req: Request, res: Response) => {
     const { notebookId } = req.params as { notebookId: string };
     const { title } = req.body as { title?: string };
 
     try {
+      if (!title || typeof title !== 'string' || !title.trim()) {
+        res.status(400).json({ error: '"title" must be a non-empty string.' });
+        return;
+      }
+
       const row = db.getNotebook(notebookId);
       if (!row) {
         res.status(404).json({ error: `Notebook "${notebookId}" not found.` });
         return;
       }
 
-      const updates: Partial<{ title: string; notebook_path: string }> = {};
+      // ASCII slug architecture: only update display title, never rename files/dirs
+      const updated = db.updateNotebook(notebookId, { title: title.trim() });
 
-      if (typeof title === 'string' && title.trim()) {
-        updates.title = title.trim();
-
-        const newSlug = titleToSlug(title.trim());
-        const newNotebookPath = path.join(row.workspace_dir, `${newSlug}.notebook.json`);
-
-        if (newNotebookPath !== row.notebook_path) {
-          try {
-            const { rename } = await import('fs/promises');
-            await rename(row.notebook_path, newNotebookPath);
-            updates.notebook_path = newNotebookPath;
-
-            const activeSessionRow = db.getActiveSession(notebookId);
-            if (activeSessionRow) {
-              const session = sessionManager.getSession(activeSessionRow.tmux_session);
-              if (session) session.notebookPath = newNotebookPath;
-            }
-          } catch (err) {
-            console.warn('[PATCH] Could not rename notebook file:', err);
-          }
-        }
+      // Also update metadata.title inside .notebook.json
+      try {
+        const nbContent = await readFile(row.notebook_path, 'utf-8');
+        const nbJson = JSON.parse(nbContent);
+        if (nbJson.metadata) nbJson.metadata.title = title.trim();
+        else nbJson.metadata = { title: title.trim() };
+        const { writeFile: fsWriteFile } = await import('fs/promises');
+        await fsWriteFile(row.notebook_path, JSON.stringify(nbJson, null, 2));
+      } catch {
+        // Non-fatal: notebook file might not exist yet
       }
 
-      const updated = db.updateNotebook(notebookId, updates);
       res.json({ notebook: updated });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error.' });

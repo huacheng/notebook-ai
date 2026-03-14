@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, copyFile, readFile, unlink, stat, rm, readdir, realpath, chmod, access } from 'fs/promises';
-import { createReadStream, existsSync, constants } from 'fs';
+import { mkdir, writeFile, copyFile, unlink, stat, rm, readdir, realpath } from 'fs/promises';
+import { createReadStream, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import multer from 'multer';
@@ -13,38 +13,10 @@ import type { NotebookStore } from '../notebook-store.js';
 import { GitManager } from '../git.js';
 import { initTaskWorkingDir, ensureLibrarySkeleton } from '../task-init.js';
 import { validateWorkspacePath } from '../workspace-files.js';
-import { titleToSlug, initWorkspaceMemory } from '../workspace.js';
+import { generateSlug, initWorkspaceMemory } from '../workspace.js';
 import { computeProjectFileList } from '../project-file-list.js';
 
 const execFileAsync = promisify(execFile);
-
-/** Files that may contain absolute paths and need rewriting after project rename. */
-const PATH_REWRITE_FILES = new Set(['settings.json', '.MEMORY.md']);
-
-/**
- * Recursively find and rewrite files that contain the old absolute path.
- * Only touches known config files (settings.json, .MEMORY.md).
- */
-async function rewriteAbsolutePaths(dir: string, oldPrefix: string, newPrefix: string): Promise<void> {
-  let entries;
-  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await rewriteAbsolutePaths(fullPath, oldPrefix, newPrefix);
-    } else if (PATH_REWRITE_FILES.has(entry.name)) {
-      try {
-        const content = await readFile(fullPath, 'utf-8');
-        if (!content.includes(oldPrefix)) continue;
-        const updated = content.replaceAll(oldPrefix, newPrefix);
-        // Handle read-only files (.MEMORY.md, settings.json are 444)
-        try { await access(fullPath, constants.W_OK); } catch { await chmod(fullPath, 0o644); }
-        await writeFile(fullPath, updated, 'utf-8');
-        await chmod(fullPath, 0o444);
-      } catch { /* skip unreadable files */ }
-    }
-  }
-}
 
 export function createProjectsRouter(
   db: NotebookDb,
@@ -68,7 +40,7 @@ export function createProjectsRouter(
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
 
-      const slug = titleToSlug(title);
+      const slug = generateSlug('proj');
       projectPath = path.join(workspacesRoot, slug);
 
       // Reject duplicate project slug
@@ -115,7 +87,7 @@ export function createProjectsRouter(
     res.json(project);
   });
 
-  // Rename project (title + directory + notebook paths + settings.json)
+  // Rename project (title only — ASCII slug/path unchanged)
   router.patch('/:projectId', async (req, res) => {
     const { title } = req.body;
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -125,75 +97,11 @@ export function createProjectsRouter(
     const project = db.getProject(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project not found' });
 
-    const trimmedTitle = title.trim();
-    const newSlug = titleToSlug(trimmedTitle);
-    const oldPath = project.path;
-    let newPath = path.join(workspacesRoot, newSlug);
+    // ASCII slug architecture: only update display title, never rename dirs
+    const updated = db.updateProject(req.params.projectId, { title: title.trim() });
+    if (!updated) return res.status(500).json({ error: 'Failed to update project' });
 
-    // If slug hasn't changed, just update the title
-    if (newPath === oldPath) {
-      const updated = db.updateProject(req.params.projectId, { title: trimmedTitle });
-      if (!updated) return res.status(500).json({ error: 'Failed to update project' });
-      return res.json(updated);
-    }
-
-    // Resolve slug conflict by appending project ID prefix
-    if (existsSync(newPath)) {
-      newPath = path.join(workspacesRoot, `${newSlug}-${req.params.projectId.slice(0, 6)}`);
-      if (existsSync(newPath)) {
-        return res.status(409).json({ error: `Project directory "${newSlug}" already exists` });
-      }
-    }
-
-    try {
-      // 1. Rename directory on disk
-      const { rename: fsRename } = await import('fs/promises');
-      await fsRename(oldPath, newPath);
-
-      // 2. Update project record in DB (title + slug + path)
-      const updated = db.updateProject(req.params.projectId, {
-        title: trimmedTitle,
-        slug: newSlug,
-        path: newPath,
-      });
-      if (!updated) return res.status(500).json({ error: 'Failed to update project' });
-
-      // 3. Update notebook DB records
-      const notebooks = db.listProjectNotebooks(req.params.projectId);
-      for (const nb of notebooks) {
-        if (!nb.workspace_dir) continue;
-        const relDir = path.relative(oldPath, nb.workspace_dir);
-        const newWorkspaceDir = path.join(newPath, relDir);
-
-        const nbUpdates: Record<string, string> = { workspace_dir: newWorkspaceDir };
-        if (existsSync(newWorkspaceDir)) {
-          const { readdirSync } = await import('fs');
-          const notebookFiles = readdirSync(newWorkspaceDir).filter((f: string) => f.endsWith('.notebook.json'));
-          if (notebookFiles.length > 0) {
-            nbUpdates.notebook_path = path.join(newWorkspaceDir, notebookFiles[0]);
-          }
-        }
-        db.updateNotebook(nb.id, nbUpdates);
-      }
-
-      // 4. Rewrite all files containing old absolute paths
-      //    (.claude/settings.json, .MEMORY.md, etc.)
-      await rewriteAbsolutePaths(newPath, oldPath, newPath);
-
-      res.json(updated);
-    } catch (err: unknown) {
-      console.error('[projects] Error renaming project:', err);
-      // Rollback: if directory was already moved, move it back
-      if (existsSync(newPath) && !existsSync(oldPath)) {
-        try {
-          const { rename: fsRename } = await import('fs/promises');
-          await fsRename(newPath, oldPath);
-        } catch (rollbackErr) {
-          console.error('[projects] Rollback failed:', rollbackErr);
-        }
-      }
-      res.status(500).json({ error: 'Failed to rename project directory' });
-    }
+    res.json(updated);
   });
 
   // List notebooks within project
@@ -238,7 +146,7 @@ export function createProjectsRouter(
     }
   });
 
-  // Rename notebook by path (with worktree directory and branch sync)
+  // Rename notebook (title only — ASCII slug/path/branch unchanged)
   router.patch('/:projectId/notebooks/rename', async (req, res) => {
     try {
       const project = db.getProject(req.params.projectId);
@@ -252,138 +160,49 @@ export function createProjectsRouter(
         return res.status(400).json({ error: 'title required' });
       }
 
-      // Resolve the full path and validate it's within the project
+      // Resolve and validate path
       const fullPath = path.isAbsolute(notebookPath)
         ? notebookPath
         : path.join(project.path, notebookPath);
-
       if (!fullPath.startsWith(project.path)) {
         return res.status(400).json({ error: 'Invalid path' });
       }
 
-      // Find the .notebook.json file and its parent directory
+      // Find the .notebook.json file
       let notebookFilePath: string;
-      let worktreeDir: string | null = null;
       const stats = await stat(fullPath).catch(() => null);
-      if (!stats) {
-        return res.status(404).json({ error: 'Path not found' });
-      }
+      if (!stats) return res.status(404).json({ error: 'Path not found' });
 
       if (stats.isDirectory()) {
-        // Find .notebook.json in the directory
         const files = await readdir(fullPath);
         const nbFile = files.find((f) => f.endsWith('.notebook.json'));
-        if (!nbFile) {
-          return res.status(404).json({ error: 'No notebook found in directory' });
-        }
+        if (!nbFile) return res.status(404).json({ error: 'No notebook found in directory' });
         notebookFilePath = path.join(fullPath, nbFile);
-        worktreeDir = fullPath;
       } else if (fullPath.endsWith('.notebook.json')) {
         notebookFilePath = fullPath;
-        worktreeDir = path.dirname(fullPath);
       } else {
         return res.status(400).json({ error: 'Not a notebook path' });
       }
 
-      // Look up notebook in database
+      // ASCII slug architecture: only update display title, never rename dirs/branches
       const dbNotebook = db.getNotebookByPath(notebookFilePath);
-
-      // Compute new slug and paths
-      const newSlug = titleToSlug(title.trim());
-      const newNotebookFileName = `${newSlug}.notebook.json`;
-
-      // Check if this is a worktree directory (under .worktrees/task-xxx)
-      const worktreesBase = path.join(project.path, '.worktrees');
-      const isWorktree = worktreeDir && worktreeDir.startsWith(worktreesBase);
-      const oldWorktreeName = worktreeDir ? path.basename(worktreeDir) : null;
-      const newWorktreeName = `task-${newSlug}`;
-
-      let newWorktreeDir = worktreeDir;
-      let newNotebookFilePath = path.join(worktreeDir || path.dirname(notebookFilePath), newNotebookFileName);
-
-      // If worktree directory name changes, rename it
-      if (isWorktree && oldWorktreeName && oldWorktreeName !== newWorktreeName) {
-        const newWorktreePath = path.join(worktreesBase, newWorktreeName);
-
-        // Check if target already exists
-        if (existsSync(newWorktreePath)) {
-          return res.status(409).json({ error: `Notebook "${title}" already exists in this project` });
-        }
-
-        // Rename worktree directory using git worktree move
-        const git = new GitManager(project.path);
-        await git.moveWorktree(worktreeDir!, newWorktreePath);
-        newWorktreeDir = newWorktreePath;
-
-        // Update notebook file path to new location
-        newNotebookFilePath = path.join(newWorktreePath, newNotebookFileName);
-
-        // Rename git branch if it follows task/{slug} pattern
-        const oldBranchName = `task/${oldWorktreeName.replace(/^task-/, '')}`;
-        const newBranchName = `task/${newSlug}`;
-        try {
-          await git.renameBranch(oldBranchName, newBranchName);
-        } catch {
-          // Branch might not exist or have different name, ignore
-        }
-      }
-
-      // Rename the .notebook.json file within the (possibly moved) directory
-      const currentNotebookPath = isWorktree && newWorktreeDir !== worktreeDir
-        ? path.join(newWorktreeDir!, path.basename(notebookFilePath))
-        : notebookFilePath;
-
-      if (newNotebookFilePath !== currentNotebookPath) {
-        const { rename } = await import('fs/promises');
-        await rename(currentNotebookPath, newNotebookFilePath);
-      }
-
-      // Update metadata.title inside the .notebook.json file
-      const { readFile, writeFile } = await import('fs/promises');
-      const nbContent = await readFile(newNotebookFilePath, 'utf-8');
-      const nbJson = JSON.parse(nbContent);
-      if (nbJson.metadata) {
-        nbJson.metadata.title = title.trim();
-      } else {
-        nbJson.metadata = { title: title.trim() };
-      }
-      await writeFile(newNotebookFilePath, JSON.stringify(nbJson, null, 2));
-
-      // Update database if notebook exists there
       if (dbNotebook) {
-        const updates: { title: string; notebook_path: string; workspace_dir?: string; slug?: string } = {
-          title: title.trim(),
-          notebook_path: newNotebookFilePath,
-        };
-        if (isWorktree && newWorktreeDir !== worktreeDir) {
-          updates.workspace_dir = newWorktreeDir!;
-          updates.slug = newSlug;
-        }
-        db.updateNotebook(dbNotebook.id, updates);
-
-        // Update active session if any
-        const activeSession = db.getActiveSession(dbNotebook.id);
-        if (activeSession) {
-          const session = sessionManager.getSession(activeSession.tmux_session);
-          if (session) {
-            session.notebookPath = newNotebookFilePath;
-            if (isWorktree && newWorktreeDir !== worktreeDir) {
-              session.cwd = newWorktreeDir!;
-              // Restart agentProcess to apply new system prompt with updated path
-              // skipResume: true because the old session context has stale paths
-              await sessionManager.restartSession(session.id, { skipResume: true });
-            }
-          }
-        }
+        db.updateNotebook(dbNotebook.id, { title: title.trim() });
       }
 
-      // Update .claude/settings.json with new absolute path for .MEMORY.md
-      // This regenerates the settings file with correct paths after directory rename
-      if (isWorktree && newWorktreeDir && newWorktreeDir !== worktreeDir) {
-        await initWorkspaceMemory(newWorktreeDir, project.path);
+      // Update metadata.title inside .notebook.json
+      try {
+        const { readFile: fsReadFile, writeFile: fsWriteFile } = await import('fs/promises');
+        const nbContent = await fsReadFile(notebookFilePath, 'utf-8');
+        const nbJson = JSON.parse(nbContent);
+        if (nbJson.metadata) nbJson.metadata.title = title.trim();
+        else nbJson.metadata = { title: title.trim() };
+        await fsWriteFile(notebookFilePath, JSON.stringify(nbJson, null, 2));
+      } catch {
+        // Non-fatal
       }
 
-      res.json({ success: true, newPath: newNotebookFilePath, newWorktreeDir });
+      res.json({ success: true, newPath: notebookFilePath });
     } catch (err: unknown) {
       console.error('[projects] Error renaming notebook:', err);
       res.status(500).json({ error: 'Internal server error.' });
@@ -405,7 +224,7 @@ export function createProjectsRouter(
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
 
-      const nbSlug = titleToSlug(title);
+      const nbSlug = generateSlug('nb');
       branchName = `task/${nbSlug}`;
       worktreePath = path.join(project.path, '.worktrees', `task-${nbSlug}`);
 
@@ -757,15 +576,11 @@ export function createProjectsRouter(
       const title = orig.replace(/\.(tar\.gz|tgz)$/i, '');
 
       // Create new project
-      const slug = titleToSlug(title);
+      const slug = generateSlug('proj');
       const id = randomUUID();
       const now = new Date().toISOString();
 
-      // Ensure unique directory
-      let projectPath = path.join(workspacesRoot, slug);
-      if (existsSync(projectPath)) {
-        projectPath = path.join(workspacesRoot, `${slug}-${id.slice(0, 6)}`);
-      }
+      const projectPath = path.join(workspacesRoot, slug);
 
       // Copy extracted files to project directory (exclude .git, .worktrees)
       await mkdir(projectPath, { recursive: true });

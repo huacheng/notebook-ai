@@ -1,19 +1,18 @@
 /**
  * Notebook rename — TDD tests
  *
- * When a notebook is renamed via PATCH /:projectId/notebooks/rename:
- * 1. The worktree directory should be renamed (task-oldSlug → task-newSlug)
- * 2. The .notebook.json file should be renamed (oldSlug.notebook.json → newSlug.notebook.json)
- * 3. The metadata.title INSIDE the .notebook.json file should be updated
- * 4. DB notebook record should be updated
- * 5. Git branch should be renamed (task/oldSlug → task/newSlug)
+ * With ASCII slug architecture, rename only updates:
+ * 1. The title in the DB notebook record
+ * 2. The metadata.title INSIDE the .notebook.json file
+ *
+ * No directory renames, no file renames, no branch renames, no slug changes.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { mkdtemp, rm, mkdir, writeFile, readFile } from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
+import { mkdtemp, rm, writeFile, readFile } from 'fs/promises';
+import { mkdirSync } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
@@ -68,7 +67,7 @@ let app: ReturnType<typeof express>;
 let db: ReturnType<typeof createMockDb>;
 const PROJECT_ID = 'proj-nb-rename-1';
 const OLD_TITLE = 'My Notebook';
-const OLD_SLUG = 'my-notebook';
+const OLD_SLUG = 'nb-aabbccdd';
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(path.join(os.tmpdir(), 'nb-test-nb-rename-'));
@@ -129,53 +128,14 @@ describe('PATCH /api/projects/:projectId/notebooks/rename', () => {
       .send({ notebookPath: worktreeDir, title: newTitle })
       .expect(200);
 
-    // Find the new notebook file path
-    const newSlug = 'renamed-notebook';
-    const newWorktreeDir = path.join(projectDir, '.worktrees', `task-${newSlug}`);
-    const newNotebookFilePath = path.join(newWorktreeDir, `${newSlug}.notebook.json`);
-
-    expect(existsSync(newNotebookFilePath)).toBe(true);
-
-    // Read and verify metadata.title is updated
-    const content = await readFile(newNotebookFilePath, 'utf-8');
+    // File stays at the SAME path (no rename)
+    const content = await readFile(notebookFilePath, 'utf-8');
     const notebook = JSON.parse(content);
     expect(notebook.metadata.title).toBe(newTitle);
   });
 
-  it('renames worktree directory', async () => {
+  it('updates db notebook title only (slug and paths unchanged)', async () => {
     const newTitle = 'Renamed Notebook';
-    const newSlug = 'renamed-notebook';
-
-    await request(app)
-      .patch(`/api/projects/${PROJECT_ID}/notebooks/rename`)
-      .send({ notebookPath: worktreeDir, title: newTitle })
-      .expect(200);
-
-    const newWorktreeDir = path.join(projectDir, '.worktrees', `task-${newSlug}`);
-    expect(existsSync(newWorktreeDir)).toBe(true);
-    expect(existsSync(worktreeDir)).toBe(false);
-  });
-
-  it('renames the .notebook.json file', async () => {
-    const newTitle = 'Renamed Notebook';
-    const newSlug = 'renamed-notebook';
-
-    await request(app)
-      .patch(`/api/projects/${PROJECT_ID}/notebooks/rename`)
-      .send({ notebookPath: worktreeDir, title: newTitle })
-      .expect(200);
-
-    const newWorktreeDir = path.join(projectDir, '.worktrees', `task-${newSlug}`);
-    const newNotebookFilePath = path.join(newWorktreeDir, `${newSlug}.notebook.json`);
-    const oldNotebookFilePath = path.join(newWorktreeDir, `${OLD_SLUG}.notebook.json`);
-
-    expect(existsSync(newNotebookFilePath)).toBe(true);
-    expect(existsSync(oldNotebookFilePath)).toBe(false);
-  });
-
-  it('updates db notebook record', async () => {
-    const newTitle = 'Renamed Notebook';
-    const newSlug = 'renamed-notebook';
 
     await request(app)
       .patch(`/api/projects/${PROJECT_ID}/notebooks/rename`)
@@ -183,10 +143,11 @@ describe('PATCH /api/projects/:projectId/notebooks/rename', () => {
       .expect(200);
 
     const nb = db._notebooks[0];
-    const newWorktreeDir = path.join(projectDir, '.worktrees', `task-${newSlug}`);
     expect(nb.title).toBe(newTitle);
-    expect(nb.workspace_dir).toBe(newWorktreeDir);
-    expect(nb.slug).toBe(newSlug);
+    // Slug and paths remain unchanged
+    expect(nb.slug).toBe(OLD_SLUG);
+    expect(nb.workspace_dir).toBe(worktreeDir);
+    expect(nb.notebook_path).toBe(notebookFilePath);
   });
 
   it('preserves other metadata fields when updating title', async () => {
@@ -204,11 +165,8 @@ describe('PATCH /api/projects/:projectId/notebooks/rename', () => {
       .send({ notebookPath: worktreeDir, title: newTitle })
       .expect(200);
 
-    const newSlug = 'renamed-notebook';
-    const newWorktreeDir = path.join(projectDir, '.worktrees', `task-${newSlug}`);
-    const newNotebookFilePath = path.join(newWorktreeDir, `${newSlug}.notebook.json`);
-
-    const content = await readFile(newNotebookFilePath, 'utf-8');
+    // File stays at the SAME path
+    const content = await readFile(notebookFilePath, 'utf-8');
     const notebook = JSON.parse(content);
 
     expect(notebook.metadata.title).toBe(newTitle);
@@ -244,20 +202,5 @@ describe('PATCH /api/projects/:projectId/notebooks/rename', () => {
       .patch(`/api/projects/${PROJECT_ID}/notebooks/rename`)
       .send({ notebookPath: path.join(projectDir, 'nonexistent'), title: 'New Title' })
       .expect(404);
-  });
-
-  it('returns 409 when target notebook already exists', async () => {
-    // Create another notebook with target name
-    const existingWorktreeDir = path.join(projectDir, '.worktrees', 'task-existing-notebook');
-    mkdirSync(existingWorktreeDir, { recursive: true });
-    await writeFile(
-      path.join(existingWorktreeDir, 'existing-notebook.notebook.json'),
-      JSON.stringify({ metadata: { title: 'Existing Notebook' }, cells: [] })
-    );
-
-    await request(app)
-      .patch(`/api/projects/${PROJECT_ID}/notebooks/rename`)
-      .send({ notebookPath: worktreeDir, title: 'Existing Notebook' })
-      .expect(409);
   });
 });

@@ -3,6 +3,9 @@
  *
  * Bug: If DB insert fails after worktree creation, orphan worktree remains.
  * Fix: Rollback (remove worktree + delete branch) on failure.
+ *
+ * Since slugs are now random (nb-{8hex}), we scan the .worktrees directory
+ * to verify no worktree directories remain after rollback.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
@@ -37,7 +40,7 @@ describe('Notebook creation rollback on failure', () => {
   it('should remove worktree if DB insert throws', async () => {
     const { createProjectsRouter } = await import('../routes/projects.js');
 
-    const worktreePath = path.join(projectPath, '.worktrees', 'task-testnotebook');
+    const worktreesDir = path.join(projectPath, '.worktrees');
     let worktreeExistedBeforeDbCall = false;
 
     const mockDb = {
@@ -46,7 +49,11 @@ describe('Notebook creation rollback on failure', () => {
         path: projectPath,
       }),
       createNotebook: vi.fn().mockImplementation(() => {
-        worktreeExistedBeforeDbCall = fs.existsSync(worktreePath);
+        // Check if any worktree directory was created before DB call
+        const entries = fs.readdirSync(worktreesDir);
+        worktreeExistedBeforeDbCall = entries.some((e) =>
+          fs.statSync(path.join(worktreesDir, e)).isDirectory()
+        );
         throw new Error('DB insert failed');
       }),
       listProjects: vi.fn().mockReturnValue([]),
@@ -91,7 +98,10 @@ describe('Notebook creation rollback on failure', () => {
     // Should return 500
     expect(mockRes.status).toHaveBeenCalledWith(500);
 
-    // Worktree directory should NOT exist (rolled back)
-    expect(fs.existsSync(worktreePath)).toBe(false);
+    // No worktree directories should remain (all rolled back)
+    const remaining = fs.readdirSync(worktreesDir).filter((e) =>
+      fs.statSync(path.join(worktreesDir, e)).isDirectory()
+    );
+    expect(remaining).toHaveLength(0);
   });
 });

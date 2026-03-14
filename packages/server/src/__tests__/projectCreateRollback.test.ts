@@ -3,6 +3,9 @@
  *
  * Bug: If DB insert fails after directory creation, orphan directory remains.
  * Fix: Rollback (delete directory) on any failure after directory creation.
+ *
+ * Since slugs are now random (proj-{8hex}), we scan tmpDir for any proj-*
+ * directories to verify none remain after rollback.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
@@ -27,15 +30,16 @@ describe('Project creation rollback on DB failure', () => {
     const { createProjectsRouter } = await import('../routes/projects.js');
 
     let dirExistedBeforeDbCall = false;
-    // titleToSlug converts 'TestProject' to 'testproject'
-    const projectPath = path.join(tempDir, 'testproject');
 
     const mockDb = {
       listProjects: vi.fn().mockReturnValue([]),
       pruneOrphanedNotebooks: vi.fn(),
       createProject: vi.fn().mockImplementation(() => {
-        // Check if directory exists at the moment DB is called
-        dirExistedBeforeDbCall = fs.existsSync(projectPath);
+        // Check if any proj-* directory exists at the moment DB is called
+        const entries = fs.readdirSync(tempDir);
+        dirExistedBeforeDbCall = entries.some((e) =>
+          e.startsWith('proj-') && fs.statSync(path.join(tempDir, e)).isDirectory()
+        );
         throw new Error('DB insert failed');
       }),
       getProject: vi.fn(),
@@ -69,7 +73,10 @@ describe('Project creation rollback on DB failure', () => {
     // Should return 500
     expect(mockRes.status).toHaveBeenCalledWith(500);
 
-    // Directory should NOT exist after error (rolled back)
-    expect(fs.existsSync(projectPath)).toBe(false);
+    // No proj-* directories should remain after error (rolled back)
+    const remaining = fs.readdirSync(tempDir).filter((e) =>
+      e.startsWith('proj-') && fs.statSync(path.join(tempDir, e)).isDirectory()
+    );
+    expect(remaining).toHaveLength(0);
   });
 });
