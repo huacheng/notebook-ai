@@ -291,15 +291,19 @@ Where `files`, `lines`, `dirs` come from `git diff --stat`, and `type_bonus` is 
 | All gates PASS on round 1 AND files ≤ 3 | Stop after round 1 — trivial change |
 | `max_rounds` reached | Stop |
 
-### Integration with Lifecycle Checks
+### Self-Computed Budget
 
-When auto mode invokes check, it passes `max_rounds` computed by `audit_budget.py`. Each check round:
-1. Evaluate D1-D6 dimensions
-2. If issues found → apply fixes (per RED→GREEN protocol) → next round
-3. After each round, call `audit_budget.py should-stop` to check termination
-4. When stopped → render final verdict based on cumulative results
+check computes `max_rounds` itself on every invocation — no external input needed:
 
-For standalone check invocations (no auto context), default to `max_rounds = 3`.
+1. **Compute change scope**: Run `git diff --stat <baseline-commit> HEAD | python3 core/audit_budget.py from-diff - --type <task-type>`
+   - `<baseline-commit>`: for post-plan → plan generation commit; for mid/post-exec → last check commit or stage start commit
+   - `<task-type>`: read from `.status.json` `type` field
+2. **Receive `max_rounds`** (2-10) from `audit_budget.py`
+3. **Each round**: Evaluate D1-D6 dimensions. If issues found → apply fixes (per RED→GREEN protocol) → next round
+4. **After each round**: call `audit_budget.py should-stop --round <N> --max <max_rounds> --consecutive-pass <count> --files <files> [--round1-all-pass]` to check termination
+5. **When stopped** → render final verdict based on cumulative results
+
+For scope=context (no git diff available), default to `max_rounds = 3`.
 
 ## Convergence Evaluation
 
@@ -345,7 +349,7 @@ Before step 1, determine scope from invocation:
 8. **Gap check** (intelligence support): if `.type-profile.md` lacks evaluation criteria OR `.references/` lacks domain evaluation standards/benchmarks for the task `type`, trigger `research --scope gap --caller check` to collect missing references before proceeding
 9. **Incorporate verify results**: If fresh verification results exist in `.test/` (from a prior `verify` run, same day and matching checkpoint), read and incorporate them. Otherwise, run verification procedures inline as part of evaluation — inline scope is limited to the criteria in the latest `.test/` criteria file only (build + test + acceptance). For comprehensive domain-adapted verification, invoke `verify` explicitly before `check`
 10. **Evaluate** against criteria (multi-round, budget-controlled)
-    - **Audit round budget**: Use `max_rounds` from auto context (step 1b) or default 3. Each evaluation round covers D1-D6. After each round, check early termination via `audit_budget.py should-stop`. Track `consecutive_pass` count (rounds with zero fixes). When stopped, render final verdict
+    - **Audit round budget**: Compute `max_rounds` via `git diff --stat <baseline-commit> HEAD | python3 core/audit_budget.py from-diff - --type <task-type>` (see §Adaptive Audit Round Budget). For scope=context, default to `max_rounds = 3`. Each evaluation round covers D1-D6. After each round, check early termination via `audit_budget.py should-stop`. Track `consecutive_pass` count (rounds with zero fixes). When stopped, render final verdict
     - **Security Audit (Pre-hook)** (post-plan checkpoint only): Invoke `/task-ai:security audit-plan` before D1-D6 evaluation — security issues caught early avoid wasted effort on plans that will be rejected. If verdict is `BLOCKED` or `HIGH_RISK`, render `REPLAN` immediately with the security report attached.
     - **Optional delegation — code-review** (post-exec checkpoint only): Follow `auto/references/plugin-delegation.md` to attempt matching the `code-review` capability slot. If matched, invoke via Task subagent with a git diff summary as input — review results serve as supplementary evaluation evidence. No match or failure → continue standard inline evaluation
     - **Regression Test Protocol (HARD GATE)**: When check directly applies fixes (not just rendering a verdict), follow the same RED→GREEN protocol defined in §S1 Mode 2 (steps 1-7). The protocol ensures each fix is verified before and after — false-green scenarios are caught immediately rather than propagating to downstream execution. Exemptions and scope rules: see [Regression Test Applicability](#regression-test-applicability)

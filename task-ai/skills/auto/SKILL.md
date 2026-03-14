@@ -305,15 +305,7 @@ The auto skill runs this loop within a single Claude session:
 
 1. Read .status.json → derive phase (status-based routing). For `draft` status: also read `.target.md` to assess objective clarity and determine if research is needed
 1a. **Load adaptive parameters**: Read `.type-profile.md` `## Auto Adaptation` section. Extract `thresholds`, `retry_limits`, `mid_exec_check_interval`, and `compaction_threshold`. If `.type-profile.md` is absent or lacks the section → use fallback defaults (thresholds from table above, check interval = 3, compaction = 82%)
-1b. **Compute audit budget**: Before each check invocation, compute the adaptive D1-D6 evaluation round budget based on change scope. Run:
-   ```bash
-   git diff --stat <baseline-commit> HEAD | python3 core/audit_budget.py from-diff - --type <task-type>
-   ```
-   This returns `max_rounds` (2-10) based on: `clamp(ceil(files/5) + ceil(lines/200) + ceil(dirs/3) + type_bonus, 2, 10)`. Pass `max_rounds` to check as context for multi-round evaluation. Between rounds, call:
-   ```bash
-   python3 core/audit_budget.py should-stop --round <N> --max <max_rounds> --consecutive-pass <count> --files <files> [--round1-all-pass]
-   ```
-   Early termination: 2 consecutive PASS (zero fixes) → stop. All gates PASS on round 1 AND files ≤ 3 → stop after round 1.
+   - **Note**: Audit round budget (`max_rounds`) is computed by check itself — auto does not pass it. See `check/SKILL.md` §Adaptive Audit Round Budget.
 2. LOOP:
    2.1. Check for .auto-stop file → if exists, break loop
    2.2. Context check: if context window usage ≥ `compaction_threshold` (adaptive from `.type-profile.md`, fallback 82%) AND `compaction_count == 0`, construct and send **Structured Compaction Prompt** (see template below). Increment `compaction_count`. (Only the first compaction is active — see Compaction frequency limit)
