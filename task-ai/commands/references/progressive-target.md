@@ -133,7 +133,7 @@ satisfied → evolving → auto-generates substage → planning → ...
 |------|-----|-----|------|
 | `executing` | `evolving` | auto (check ACCEPT) | Auto handles: update .target.md, .status.json, push stage.history |
 | `evolving` | `planning` | target | LLM auto-generates next substage target (convergence < 0.95) |
-| `evolving` | `satisfied` | target --satisfy | User says "enough" (convergence ≥ 0.95) |
+| `evolving` | `satisfied` | auto (convergence ≥ 0.95) or `target --satisfy` | Automatic when convergence ≥ 0.95; or user manually says "enough" at any convergence level |
 | `satisfied` | `evolving` | target (refine) | User refines Overall Objective → convergence drops |
 | `satisfied` | `planning` | target | Direct re-entry (shortcut: satisfied → evolving → planning) |
 | `satisfied` | `cancelled` | cancel | Permanent abandonment |
