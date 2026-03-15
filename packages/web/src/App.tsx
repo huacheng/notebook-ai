@@ -13,6 +13,7 @@ import { RegisterPage } from './components/RegisterPage';
 import { PreflightBanner } from './components/PreflightBanner';
 import { PluginManager } from './components/PluginManager';
 import { ModelManager } from './components/ModelManager';
+import { LoginPanel } from './components/LoginPanel';
 import { MobileApp } from './components/mobile/MobileApp';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -117,6 +118,7 @@ function AuthenticatedApp() {
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
   const modelPanelOpen = useStore((s) => s.modelPanelOpen);
   const modelSwitching = useStore((s) => s.modelSwitching);
+  const loginPanelOpen = useStore((s) => s.loginPanelOpen);
   const checkPluginStatus = useStore((s) => s.checkPluginStatus);
   const openPluginPanel = useStore((s) => s.openPluginPanel);
   const dismissPluginBanner = useStore((s) => s.dismissPluginBanner);
@@ -318,6 +320,8 @@ function AuthenticatedApp() {
                 <PluginManager />
               ) : modelPanelOpen ? (
                 <ModelManager />
+              ) : loginPanelOpen ? (
+                <LoginPanel />
               ) : gitTabOpen && activeProjectId ? (
                 null  /* GitHistoryPanel rendered below as keep-alive */
               ) : notebookLoading ? (

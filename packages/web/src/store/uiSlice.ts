@@ -54,6 +54,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'checkPluginStatus' | 'installPlugin' | 'uninstallPlugin' | 'addMarketplace' | 'removeMarketplace' | 'updateMarketplace' | 'updatePlugin'
   | 'dismissPluginBanner' | 'openPluginPanel' | 'closePluginPanel'
   | 'modelPanelOpen' | 'modelSwitching' | 'openModelPanel' | 'closeModelPanel' | 'changeModel'
+  | 'loginPanelOpen' | 'loginPhase' | 'loginUrl' | 'loginError' | 'loginStatus'
+  | 'openLoginPanel' | 'closeLoginPanel' | 'claudeLogin' | 'claudeLoginSubmitCode' | 'claudeLoginCancel' | 'claudeLogout' | 'fetchClaudeStatus'
   | 'language' | 'setLanguage'
 >> = (set, get) => ({
   activeTab: 'notebook',
@@ -78,6 +80,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   pluginOverlay: null,
   modelPanelOpen: false,
   modelSwitching: false,
+  loginPanelOpen: false,
+  loginPhase: 'options' as const,
+  loginUrl: null,
+  loginError: null,
+  loginStatus: null,
   language: (() => {
     if (typeof localStorage === 'undefined') return 'en';
     const stored = localStorage.getItem('nb-lang');
@@ -374,6 +381,89 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     if (active?.sessionId) {
       set({ modelSwitching: true, modelPanelOpen: false });
       ws.send(JSON.stringify({ type: 'change_model', session_id: active.sessionId, model }));
+    }
+  },
+
+  openLoginPanel() {
+    set({ loginPanelOpen: true, loginPhase: 'options', loginUrl: null, loginError: null, pluginPanelOpen: false, modelPanelOpen: false });
+    // Fetch current status
+    get().fetchClaudeStatus();
+  },
+
+  closeLoginPanel() {
+    set({ loginPanelOpen: false, loginPhase: 'options', loginUrl: null, loginError: null });
+    // Cancel any in-progress login
+    fetch('/api/auth/claude/login-cancel', { method: 'POST', headers: { Authorization: `Bearer ${get().authToken}` } }).catch(() => {});
+  },
+
+  async fetchClaudeStatus() {
+    try {
+      const res = await fetch('/api/auth/claude/status', { headers: { Authorization: `Bearer ${get().authToken}` } });
+      const data = await res.json();
+      set({ loginStatus: data });
+    } catch {
+      set({ loginStatus: null });
+    }
+  },
+
+  async claudeLogin(method: 'claude' | 'sso') {
+    set({ loginPhase: 'waiting', loginError: null });
+    try {
+      const res = await fetch('/api/auth/claude/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${get().authToken}` },
+        body: JSON.stringify({ method }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        set({ loginPhase: 'code', loginUrl: data.url });
+      } else {
+        set({ loginPhase: 'error', loginError: data.error ?? 'Failed to start login' });
+      }
+    } catch (err) {
+      set({ loginPhase: 'error', loginError: String(err) });
+    }
+  },
+
+  async claudeLoginSubmitCode(code: string) {
+    set({ loginPhase: 'submitting', loginError: null });
+    try {
+      const res = await fetch('/api/auth/claude/login-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${get().authToken}` },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        set({ loginPhase: 'success', loginStatus: data.status ?? null });
+      } else {
+        set({ loginPhase: 'error', loginError: data.error ?? 'Login failed' });
+      }
+    } catch (err) {
+      set({ loginPhase: 'error', loginError: String(err) });
+    }
+  },
+
+  claudeLoginCancel() {
+    fetch('/api/auth/claude/login-cancel', { method: 'POST', headers: { Authorization: `Bearer ${get().authToken}` } }).catch(() => {});
+    set({ loginPhase: 'options', loginUrl: null, loginError: null });
+  },
+
+  async claudeLogout() {
+    set({ loginPhase: 'waiting' });
+    try {
+      const res = await fetch('/api/auth/claude/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${get().authToken}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        set({ loginPhase: 'options', loginStatus: { loggedIn: false } });
+      } else {
+        set({ loginPhase: 'error', loginError: data.error ?? 'Logout failed' });
+      }
+    } catch (err) {
+      set({ loginPhase: 'error', loginError: String(err) });
     }
   },
 

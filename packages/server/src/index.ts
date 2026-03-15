@@ -11,7 +11,7 @@ import { readdir, readFile } from 'fs/promises';
 import { SessionManager } from './session.js';
 import { NotebookStore } from './notebook-store.js';
 import { NotebookDb } from './db.js';
-import { createAuthRouter } from './routes/auth.js';
+import { createAuthRouter, createClaudeAuthRouter } from './routes/auth.js';
 import { createNotebooksRouter } from './routes/notebooks.js';
 import { createFilesRouter } from './routes/files.js';
 import { createLibraryRouter } from './routes/library.js';
@@ -154,6 +154,7 @@ app.get('/api/health', (_req, res) => {
 
 // ── REST: Routers ────────────────────────────────────────────────────────────
 
+app.use('/api/auth/claude', createClaudeAuthRouter());
 app.use('/api/notebooks', createNotebooksRouter(db, sessionManager, notebookStore));
 app.use('/api/notebooks', createFilesRouter(sessionManager));
 app.use('/api/library', createLibraryRouter());
