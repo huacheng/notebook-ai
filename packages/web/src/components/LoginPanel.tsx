@@ -8,13 +8,10 @@ export function LoginPanel() {
   const loginStatus = useStore((s) => s.loginStatus);
   const closeLoginPanel = useStore((s) => s.closeLoginPanel);
   const claudeLogin = useStore((s) => s.claudeLogin);
-  const claudeLoginSubmitCode = useStore((s) => s.claudeLoginSubmitCode);
   const claudeLoginCancel = useStore((s) => s.claudeLoginCancel);
   const claudeLogout = useStore((s) => s.claudeLogout);
 
-  const [authCode, setAuthCode] = useState('');
   const [copied, setCopied] = useState(false);
-  const [codeSubmitted, setCodeSubmitted] = useState(false);
 
   const handleCopy = () => {
     if (loginUrl) {
@@ -22,15 +19,6 @@ export function LoginPanel() {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       });
-    }
-  };
-
-  const handleSubmitCode = () => {
-    const code = authCode.trim();
-    if (code) {
-      claudeLoginSubmitCode(code);
-      setAuthCode('');
-      setCodeSubmitted(true);
     }
   };
 
@@ -99,10 +87,10 @@ export function LoginPanel() {
         </div>
       )}
 
-      {/* Phase: code (Layer 2) — URL + code input + auto-polling */}
+      {/* Phase: code (Layer 2) — URL + auto-polling for PKCE callback */}
       {loginPhase === 'code' && loginUrl && (
         <div className="lp-body">
-          <p className="lp-hint">Step 1: Open this URL in your browser</p>
+          <p className="lp-hint">Open this URL in your browser to sign in:</p>
           <div className="lp-url-box">
             <input
               className="lp-url-input"
@@ -115,32 +103,13 @@ export function LoginPanel() {
             </button>
           </div>
 
-          <p className="lp-hint">Step 2: Complete login in browser, then paste the code below</p>
-          <div className="lp-code-box">
-            <input
-              className="lp-code-input"
-              value={authCode}
-              onChange={(e) => setAuthCode(e.target.value)}
-              placeholder="Paste auth code here..."
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitCode(); }}
-              disabled={codeSubmitted}
-              autoFocus
-            />
-            <button
-              className="lp-submit-btn"
-              onClick={handleSubmitCode}
-              disabled={!authCode.trim() || codeSubmitted}
-            >
-              {codeSubmitted ? 'Submitted' : 'Submit'}
-            </button>
+          <div className="lp-waiting">
+            <div className="lp-spinner" />
+            <p>Waiting for browser authentication...</p>
+            <p className="lp-waiting-hint">Complete the sign-in in your browser. This page will update automatically.</p>
           </div>
 
-          <div className="lp-waiting-inline">
-            <div className="lp-spinner-small" />
-            <span>{codeSubmitted ? 'Authenticating...' : 'Waiting for authentication...'}</span>
-          </div>
-
-          <button className="lp-cancel-link" onClick={() => { claudeLoginCancel(); setCodeSubmitted(false); }}>Cancel</button>
+          <button className="lp-cancel-link" onClick={claudeLoginCancel}>Cancel</button>
         </div>
       )}
 
@@ -164,7 +133,7 @@ export function LoginPanel() {
         <div className="lp-body lp-center">
           <div className="lp-error-icon">&#x274C;</div>
           <p className="lp-error-text">{loginError}</p>
-          <button className="lp-done-btn" onClick={() => { useStore.setState({ loginPhase: 'options' }); setCodeSubmitted(false); }}>
+          <button className="lp-done-btn" onClick={() => useStore.setState({ loginPhase: 'options' })}>
             Try Again
           </button>
         </div>
