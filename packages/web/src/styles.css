@@ -4921,7 +4921,7 @@ button:focus-visible {
 /* FileViewer takes left portion via CSS custom property */
 .notebook-area--split .file-viewer {
   flex: none;
-  width: calc(var(--split-ratio, 0.4) * 100%);
+  width: calc(var(--split-ratio, 0.45) * 100%);
   min-width: 160px;
   border-right: 1px solid var(--border-default);
 }
