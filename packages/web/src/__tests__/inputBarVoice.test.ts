@@ -100,7 +100,7 @@ describe('InputBar existing functionality (regression)', () => {
   it('should still have command buttons', () => {
     const src = getSrc();
     expect(src).toContain('task-ai:highlight');
-    expect(src).toContain('task-ai:plan');
+    expect(src).toContain('task-ai:research');
   });
 
   it('should still support paste handler', () => {

@@ -3,19 +3,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Regression test: multiple appendPrompt should still allow cell completion
+ * Regression test: appendPrompt deferred completion
  *
- * BUG: When _pendingAppends > 0, completeCell decrements and returns.
- * But when _pendingAppends becomes 0 after decrement, it should NOT return
- * but instead continue to complete the cell.
+ * When _pendingAppends > 0, completeCell should ALWAYS defer (return)
+ * after decrementing — even when counter reaches 0. The first result
+ * is for the ORIGINAL prompt, not the appended one. The appended prompt's
+ * result will call completeCell again with counter = 0 → complete normally.
  *
- * Current buggy code:
+ * Correct code:
  *   if (session._pendingAppends > 0 && !isError) {
  *     session._pendingAppends--;
- *     return;  // BUG: returns even when _pendingAppends just became 0
+ *     return;  // always defer — append result hasn't arrived yet
  *   }
- *
- * Fix: Only return if _pendingAppends is STILL > 0 after decrement
  */
 describe('appendPrompt multiple prompts completion', () => {
   const sessionSrc = fs.readFileSync(
@@ -23,34 +22,22 @@ describe('appendPrompt multiple prompts completion', () => {
     'utf-8'
   );
 
-  it('completeCell should continue (not return) when _pendingAppends decrements to 0', () => {
-    // Extract the completeCell pendingAppends handling block
-    const pendingAppendsBlock = sessionSrc.match(
-      /if\s*\(session\._pendingAppends\s*>\s*0[\s\S]*?return;[\s\S]*?\}/
+  it('completeCell should always defer when _pendingAppends > 0 (even after decrement to 0)', () => {
+    // The block: if _pendingAppends > 0 → decrement → return (unconditionally)
+    const block = sessionSrc.match(
+      /if\s*\(session\._pendingAppends\s*>\s*0[\s\S]*?return;\s*\}/
     );
-    expect(pendingAppendsBlock).toBeTruthy();
+    expect(block).toBeTruthy();
 
-    const block = pendingAppendsBlock![0];
-
-    // The fix: after decrementing, should check if _pendingAppends is STILL > 0
-    // Pattern: decrement, then check > 0 before returning
-    // e.g., session._pendingAppends--; if (session._pendingAppends > 0) { return; }
-    // or: if (--session._pendingAppends > 0) { return; }
-
-    // The block should NOT have a pattern where return immediately follows decrement
-    // without a secondary check for > 0
-    const buggyPattern = /session\._pendingAppends--;\s*(?:console\.log\([^)]+\);\s*)?return;/;
-    const hasBug = buggyPattern.test(block);
-
-    // This test should FAIL on current buggy code
-    expect(hasBug).toBe(false);
+    // Should NOT have a secondary check "if (_pendingAppends > 0)" before return
+    // That was the old bug — it would fall through to complete when counter hit 0
+    const oldBugPattern = /session\._pendingAppends--;\s*if\s*\(session\._pendingAppends\s*>\s*0\)\s*\{/;
+    expect(oldBugPattern.test(block![0])).toBe(false);
   });
 
-  it('should only return when _pendingAppends remains > 0 after decrement', () => {
-    // Look for the correct pattern: decrement then conditionally return
-    const correctPattern = /session\._pendingAppends--[\s\S]*?if\s*\(session\._pendingAppends\s*>\s*0\)[\s\S]*?return/;
-    const hasCorrectPattern = correctPattern.test(sessionSrc);
-
-    expect(hasCorrectPattern).toBe(true);
+  it('should decrement and unconditionally return', () => {
+    // Correct pattern: decrement then return (no conditional)
+    const correctPattern = /session\._pendingAppends--;\s*(?:console\.log\([^)]+\);\s*)?return;/;
+    expect(correctPattern.test(sessionSrc)).toBe(true);
   });
 });
