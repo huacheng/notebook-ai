@@ -55,7 +55,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'dismissPluginBanner' | 'openPluginPanel' | 'closePluginPanel'
   | 'modelPanelOpen' | 'modelSwitching' | 'openModelPanel' | 'closeModelPanel' | 'changeModel'
   | 'loginPanelOpen' | 'loginPhase' | 'loginUrl' | 'loginError' | 'loginStatus'
-  | 'openLoginPanel' | 'closeLoginPanel' | 'claudeLogin' | 'claudeLoginSubmitCode' | 'claudeLoginCancel' | 'claudeLogout' | 'fetchClaudeStatus'
+  | 'openLoginPanel' | 'closeLoginPanel' | 'claudeLogin' | 'claudeLoginStartPolling' | 'claudeLoginSubmitCode' | 'claudeLoginCancel' | 'claudeLogout' | 'fetchClaudeStatus'
   | 'language' | 'setLanguage'
 >> = (set, get) => ({
   activeTab: 'notebook',
@@ -417,6 +417,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       const data = await res.json();
       if (data.url) {
         set({ loginPhase: 'code', loginUrl: data.url });
+        get().claudeLoginStartPolling();
       } else {
         set({ loginPhase: 'error', loginError: data.error ?? 'Failed to start login' });
       }
@@ -425,22 +426,40 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     }
   },
 
+  claudeLoginStartPolling() {
+    // Poll every 3s to check if OAuth completed
+    const poll = async () => {
+      const { loginPhase } = get();
+      if (loginPhase !== 'code') return; // stopped
+      try {
+        const res = await fetch('/api/auth/claude/login-poll', {
+          headers: { Authorization: `Bearer ${get().authToken}` },
+        });
+        const data = await res.json();
+        if (data.pending) {
+          setTimeout(poll, 3000); // keep polling
+        } else if (data.success) {
+          set({ loginPhase: 'success', loginStatus: data.status ?? null });
+        } else if (data.error) {
+          set({ loginPhase: 'error', loginError: data.error });
+        }
+      } catch {
+        setTimeout(poll, 3000); // retry on network error
+      }
+    };
+    setTimeout(poll, 3000); // first poll after 3s
+  },
+
   async claudeLoginSubmitCode(code: string) {
-    set({ loginPhase: 'submitting', loginError: null });
     try {
-      const res = await fetch('/api/auth/claude/login-code', {
+      await fetch('/api/auth/claude/login-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${get().authToken}` },
         body: JSON.stringify({ code }),
       });
-      const data = await res.json();
-      if (data.success) {
-        set({ loginPhase: 'success', loginStatus: data.status ?? null });
-      } else {
-        set({ loginPhase: 'error', loginError: data.error ?? 'Login failed' });
-      }
-    } catch (err) {
-      set({ loginPhase: 'error', loginError: String(err) });
+      // Result will come via polling — don't change phase here
+    } catch {
+      // Ignore — polling will pick up result or error
     }
   },
 

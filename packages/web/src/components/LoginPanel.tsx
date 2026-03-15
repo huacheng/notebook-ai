@@ -14,6 +14,7 @@ export function LoginPanel() {
 
   const [authCode, setAuthCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [codeSubmitted, setCodeSubmitted] = useState(false);
 
   const handleCopy = () => {
     if (loginUrl) {
@@ -29,6 +30,7 @@ export function LoginPanel() {
     if (code) {
       claudeLoginSubmitCode(code);
       setAuthCode('');
+      setCodeSubmitted(true);
     }
   };
 
@@ -97,7 +99,7 @@ export function LoginPanel() {
         </div>
       )}
 
-      {/* Phase: code (Layer 2) */}
+      {/* Phase: code (Layer 2) — URL + code input + auto-polling */}
       {loginPhase === 'code' && loginUrl && (
         <div className="lp-body">
           <p className="lp-hint">Step 1: Open this URL in your browser</p>
@@ -112,7 +114,8 @@ export function LoginPanel() {
               {copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
-          <p className="lp-hint">Step 2: Complete login, then paste the code below</p>
+
+          <p className="lp-hint">Step 2: Complete login in browser, then paste the code below</p>
           <div className="lp-code-box">
             <input
               className="lp-code-input"
@@ -120,25 +123,24 @@ export function LoginPanel() {
               onChange={(e) => setAuthCode(e.target.value)}
               placeholder="Paste auth code here..."
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitCode(); }}
+              disabled={codeSubmitted}
               autoFocus
             />
             <button
               className="lp-submit-btn"
               onClick={handleSubmitCode}
-              disabled={!authCode.trim()}
+              disabled={!authCode.trim() || codeSubmitted}
             >
-              Submit
+              {codeSubmitted ? 'Submitted' : 'Submit'}
             </button>
           </div>
-          <button className="lp-cancel-link" onClick={claudeLoginCancel}>Cancel</button>
-        </div>
-      )}
 
-      {/* Phase: submitting */}
-      {loginPhase === 'submitting' && (
-        <div className="lp-body lp-center">
-          <div className="lp-spinner" />
-          <p>Authenticating...</p>
+          <div className="lp-waiting-inline">
+            <div className="lp-spinner-small" />
+            <span>{codeSubmitted ? 'Authenticating...' : 'Waiting for authentication...'}</span>
+          </div>
+
+          <button className="lp-cancel-link" onClick={() => { claudeLoginCancel(); setCodeSubmitted(false); }}>Cancel</button>
         </div>
       )}
 
@@ -162,7 +164,7 @@ export function LoginPanel() {
         <div className="lp-body lp-center">
           <div className="lp-error-icon">&#x274C;</div>
           <p className="lp-error-text">{loginError}</p>
-          <button className="lp-done-btn" onClick={() => useStore.setState({ loginPhase: 'options' })}>
+          <button className="lp-done-btn" onClick={() => { useStore.setState({ loginPhase: 'options' }); setCodeSubmitted(false); }}>
             Try Again
           </button>
         </div>

@@ -80,17 +80,49 @@ export function createClaudeAuthRouter(): IRouter {
       }
     }, 15000);
 
-    proc.on('close', () => {
+    proc.on('close', async (exitCode) => {
       clearTimeout(timer);
       if (loginProc === proc) loginProc = null;
       if (!responded) {
         responded = true;
         res.status(500).json({ error: 'Login process exited unexpectedly', output });
+      } else {
+        // URL was already returned — store result for polling
+        if (exitCode === 0) {
+          try {
+            const { stdout } = await execFile('claude', ['auth', 'status'], { timeout: 10000 });
+            loginResult = { success: true, status: JSON.parse(stdout) };
+          } catch {
+            loginResult = { success: true };
+          }
+        } else {
+          loginResult = { success: false, error: output || 'Login failed' };
+        }
       }
     });
   });
 
-  // POST /api/auth/login-code — submit auth code to waiting process
+  // Track login process completion
+  let loginResult: { success: boolean; status?: unknown; error?: string } | null = null;
+
+  // GET /api/auth/login-poll — check if login process completed
+  router.get('/login-poll', async (_req: Request, res: Response) => {
+    if (loginResult) {
+      const result = loginResult;
+      loginResult = null;
+      res.json(result);
+      return;
+    }
+    if (!loginProc) {
+      // No process and no result — nothing is running
+      res.json({ pending: false, error: 'No login in progress' });
+      return;
+    }
+    // Process still running
+    res.json({ pending: true });
+  });
+
+  // POST /api/auth/login-code — submit auth code to waiting process stdin
   // Body: { code: string }
   router.post('/login-code', (req: Request, res: Response) => {
     const code = (req.body as { code?: string })?.code;
@@ -102,33 +134,11 @@ export function createClaudeAuthRouter(): IRouter {
       res.status(400).json({ error: 'No login process running' });
       return;
     }
-
-    const proc = loginProc;
-    let output = '';
-
-    // Collect remaining output after submitting code
-    const onData = (chunk: Buffer) => { output += chunk.toString(); };
-    proc.stdout?.on('data', onData);
-    proc.stderr?.on('data', onData);
-
-    proc.on('close', async (exitCode) => {
-      if (loginProc === proc) loginProc = null;
-      if (exitCode === 0) {
-        // Fetch fresh status
-        try {
-          const { stdout } = await execFile('claude', ['auth', 'status'], { timeout: 10000 });
-          res.json({ success: true, status: JSON.parse(stdout) });
-        } catch {
-          res.json({ success: true, output });
-        }
-      } else {
-        res.json({ success: false, error: output || 'Login failed' });
-      }
-    });
-
-    // Write auth code to stdin
-    proc.stdin?.write(code + '\n');
-    proc.stdin?.end();
+    // Write code to process stdin — process reads it at "Paste code here if prompted >"
+    loginProc.stdin?.write(code.trim() + '\n');
+    // Don't end stdin — let process decide when to exit
+    // Result will be available via login-poll
+    res.json({ ok: true });
   });
 
   // POST /api/auth/login-cancel — kill the login process

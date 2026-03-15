@@ -66,7 +66,7 @@ export interface NotebookStore {
   modelPanelOpen: boolean;
   modelSwitching: boolean;
   loginPanelOpen: boolean;
-  loginPhase: 'options' | 'waiting' | 'code' | 'submitting' | 'success' | 'error';
+  loginPhase: 'options' | 'waiting' | 'code' | 'success' | 'error';
   loginUrl: string | null;
   loginError: string | null;
   loginStatus: { loggedIn: boolean; email?: string; subscriptionType?: string; authMethod?: string } | null;
@@ -216,6 +216,7 @@ export interface NotebookStore {
   openLoginPanel(): void;
   closeLoginPanel(): void;
   claudeLogin(method: 'claude' | 'sso'): Promise<void>;
+  claudeLoginStartPolling(): void;
   claudeLoginSubmitCode(code: string): Promise<void>;
   claudeLoginCancel(): void;
   claudeLogout(): Promise<void>;
