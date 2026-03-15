@@ -838,6 +838,17 @@ export class SessionManager {
       resolvedImages = await this.loadImageRefs(session.cwd, imageRefs);
     }
 
+    // Send to Claude stdin FIRST — if process is dead, throw before mutating state.
+    // This prevents _pendingAppends from being incremented without a matching result.
+    if (resolvedImages && resolvedImages.length > 0) {
+      session.agentProcess.sendPrompt(source, resolvedImages);
+    } else {
+      session.agentProcess.sendPrompt(source);
+    }
+
+    // Track pending append — completeCell will defer until Claude consumes it
+    session._pendingAppends++;
+
     // Append segment to cell (store image_refs for persistence, not base64)
     const segment: PromptSegment = {
       text: source,
@@ -853,16 +864,6 @@ export class SessionManager {
         c.id === cellId ? { ...c, segments } : c,
       ),
     };
-
-    // Track pending append — completeCell will defer until Claude consumes it
-    session._pendingAppends++;
-
-    // Send to Claude stdin immediately
-    if (resolvedImages && resolvedImages.length > 0) {
-      session.agentProcess.sendPrompt(source, resolvedImages);
-    } else {
-      session.agentProcess.sendPrompt(source);
-    }
 
     // Broadcast to all clients
     this.broadcast(session, {
