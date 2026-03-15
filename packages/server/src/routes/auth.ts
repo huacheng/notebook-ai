@@ -45,11 +45,16 @@ export function createClaudeAuthRouter(): IRouter {
   let loginOutput = '';
   let loginResult: { success: boolean; status?: unknown; error?: string } | null = null;
   let loginPhase: 'starting' | 'menu' | 'url' | 'paste' | 'done' = 'starting';
+  let activeIdleTimer: ReturnType<typeof setTimeout> | null = null;
 
   function killLogin() {
     if (loginPty) {
       try { loginPty.kill(); } catch { /* ignore */ }
       loginPty = null;
+    }
+    if (activeIdleTimer) {
+      clearTimeout(activeIdleTimer);
+      activeIdleTimer = null;
     }
     loginOutput = '';
     loginPhase = 'starting';
@@ -78,7 +83,7 @@ export function createClaudeAuthRouter(): IRouter {
     let responded = false;
     let sentLogin = false;
     let sentSelect = false;
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    // activeIdleTimer is tracked at module scope (activeIdleTimer) for killLogin() cleanup
 
     // Strip ANSI escape sequences for text matching
     const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '');
@@ -114,7 +119,7 @@ export function createClaudeAuthRouter(): IRouter {
         loginPhase = 'url';
         clearTimeout(urlTimer);
         // Timeout 2: 1 minute to complete auth after URL is shown
-        idleTimer = setTimeout(() => {
+        activeIdleTimer = setTimeout(() => {
           loginResult = { success: false, error: 'Login timed out — no auth code submitted within 1 minute.' };
           killLogin();
         }, 60 * 1000);
@@ -129,7 +134,7 @@ export function createClaudeAuthRouter(): IRouter {
 
     proc.onExit(async ({ exitCode }) => {
       clearTimeout(urlTimer);
-      if (idleTimer) clearTimeout(idleTimer);
+      if (activeIdleTimer) clearTimeout(activeIdleTimer);
       if (loginPty === proc) loginPty = null;
       loginPhase = 'done';
       if (!responded) {
