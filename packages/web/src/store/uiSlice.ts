@@ -67,7 +67,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   leftSidebarSplitRatio: 0.5,
   openFiles: {},
   activeFileTabId: null,
-  sidebarWidth: 272,
+  sidebarWidth: 240,
   editMode: false,
   pendingDeletes: new Set<string>(),
   editSavePhase: 'idle',

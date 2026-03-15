@@ -237,9 +237,9 @@ describe('openFileTab with projectId', () => {
 // ── sidebarWidth ────────────────────────────────────────────────────────
 
 describe('sidebarWidth', () => {
-  it('defaults to 272', () => {
+  it('defaults to 240', () => {
     const { state } = createTestSlice();
-    expect(state.sidebarWidth).toBe(272);
+    expect(state.sidebarWidth).toBe(240);
   });
 
   it('setSidebarWidth sets to valid value', () => {

@@ -170,7 +170,7 @@ function AuthenticatedApp() {
   const contentRef = useRef<HTMLElement | null>(null);
   const draggingRef = useRef<'left' | 'split' | null>(null);
   const notebookSplitRef = useRef<HTMLDivElement | null>(null);
-  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [splitRatio, setSplitRatio] = useState(0.4);
 
   // ── Column divider drag ──────────────────────────────────────────────
   const startLeftDrag = useCallback((e: React.MouseEvent) => {
