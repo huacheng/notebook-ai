@@ -78,6 +78,7 @@ export function createClaudeAuthRouter(): IRouter {
     let responded = false;
     let sentLogin = false;
     let sentSelect = false;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Strip ANSI escape sequences for text matching
     const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '');
@@ -111,6 +112,12 @@ export function createClaudeAuthRouter(): IRouter {
       if (urlMatch && !responded) {
         responded = true;
         loginPhase = 'url';
+        clearTimeout(urlTimer);
+        // Timeout 2: 1 minute to complete auth after URL is shown
+        idleTimer = setTimeout(() => {
+          loginResult = { success: false, error: 'Login timed out — no auth code submitted within 1 minute.' };
+          killLogin();
+        }, 60 * 1000);
         res.json({ url: urlMatch[1] });
       }
 
@@ -121,6 +128,8 @@ export function createClaudeAuthRouter(): IRouter {
     });
 
     proc.onExit(async ({ exitCode }) => {
+      clearTimeout(urlTimer);
+      if (idleTimer) clearTimeout(idleTimer);
       if (loginPty === proc) loginPty = null;
       loginPhase = 'done';
       if (!responded) {
@@ -141,8 +150,8 @@ export function createClaudeAuthRouter(): IRouter {
       }
     });
 
-    // Timeout: 30s to reach URL
-    setTimeout(() => {
+    // Timeout 1: 30s to reach URL (startup phase)
+    const urlTimer = setTimeout(() => {
       if (!responded) {
         responded = true;
         killLogin();
