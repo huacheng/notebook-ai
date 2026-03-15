@@ -111,8 +111,7 @@ function AuthenticatedApp() {
   const fetchProjects = useStore((s) => s.fetchProjects);
   const gitTabOpen = useStore((s) => s.gitTabOpen);
   const activeProjectId = useStore((s) => s.activeProjectId);
-  const activeFileTabId = useStore((s) => s.activeFileTabId);
-  const fileViewerMaximized = useStore((s) => s.fileViewerMaximized);
+  // activeFileTabId no longer needed — FileViewer always rendered
   const pluginStatus = useStore((s) => s.pluginStatus);
   const pluginDismissed = useStore((s) => s.pluginDismissed);
   const pluginPanelOpen = useStore((s) => s.pluginPanelOpen);
@@ -167,7 +166,6 @@ function AuthenticatedApp() {
   // D3-3 fix: Removed duplicate visibilitychange listener - notify() handles this internally
 
   const contentRef = useRef<HTMLElement | null>(null);
-  const savedScrollRef = useRef<number>(0);
   const draggingRef = useRef<'left' | 'split' | null>(null);
   const notebookSplitRef = useRef<HTMLDivElement | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
@@ -206,14 +204,11 @@ function AuthenticatedApp() {
   // Initiate WebSocket connection only when we have a sessionId.
   useWebSocket(sessionId);
 
-  const hasActiveFile = activeFileTabId !== null;
   const hasNotebook = notebook !== null;
-  const inSplitView = hasActiveFile && hasNotebook
-    && !pluginPanelOpen && !modelPanelOpen && !fileViewerMaximized;
 
   // Persist and restore scroll position across notebook switches and browser tab switches.
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
-  useScrollRestoration(activeNotebookTabId ?? activeNotebookId, inSplitView ? notebookSplitRef : contentRef);
+  useScrollRestoration(activeNotebookTabId ?? activeNotebookId, notebookSplitRef);
 
   // Fetch projects on mount
   useEffect(() => {
@@ -257,26 +252,6 @@ function AuthenticatedApp() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Save/restore scroll position when FileViewer opens/closes (R1).
-  // Only needed when notebook is NOT mounted (no split view — notebook disappears entirely).
-  const prevHasFileRef = useRef(hasActiveFile);
-  useEffect(() => {
-    const wasOpen = prevHasFileRef.current;
-    const isOpen = hasActiveFile;
-    prevHasFileRef.current = hasActiveFile;
-
-    if (!hasNotebook) {
-      if (!wasOpen && isOpen && contentRef.current) {
-        savedScrollRef.current = contentRef.current.scrollTop;
-      } else if (wasOpen && !isOpen && contentRef.current) {
-        requestAnimationFrame(() => {
-          if (contentRef.current) {
-            contentRef.current.scrollTop = savedScrollRef.current;
-          }
-        });
-      }
-    }
-  }, [hasActiveFile, hasNotebook]);
 
   return (
     <I18nProvider value={t}>
@@ -325,48 +300,42 @@ function AuthenticatedApp() {
         );
       })()}
       <PreflightBanner />
-      <div className={`app-body${hasActiveFile && fileViewerMaximized ? ' app-body--fv-maximized' : ''}`}>
+      <div className="app-body">
         <ProjectSidebar />
         <div className="app-divider" onMouseDown={startLeftDrag} />
-        <main ref={contentRef} className={`app-content${inSplitView ? ' app-content--split' : ''}`}>
-          <NotebookTabs inSplitView={inSplitView} splitRatio={splitRatio} />
+        <main ref={contentRef} className="app-content app-content--split">
+          <NotebookTabs inSplitView splitRatio={splitRatio} />
           <div
-            className={`notebook-area${inSplitView ? ' notebook-area--split' : ''}`}
-            style={inSplitView ? { '--split-ratio': splitRatio } as React.CSSProperties : undefined}
+            className="notebook-area notebook-area--split"
+            style={{ '--split-ratio': splitRatio } as React.CSSProperties}
           >
-            {pluginPanelOpen ? (
-              <PluginManager />
-            ) : modelPanelOpen ? (
-              <ModelManager />
-            ) : gitTabOpen && activeProjectId ? (
-              null  /* GitHistoryPanel rendered below as keep-alive */
-            ) : hasActiveFile ? (
-              <>
-                <FileViewer />
-                {inSplitView && (
-                  <>
-                    <div className="split-divider" onMouseDown={startSplitDrag} />
-                    <div className="notebook-split-pane" ref={notebookSplitRef}>
-                      <Notebook />
-                    </div>
-                  </>
-                )}
-              </>
-            ) : notebookLoading ? (
-              <NotebookLoadingScreen />
-            ) : creatingNotebook ? (
-              <NotebookCreationPanel />
-            ) : hasNotebook ? (
-              <Notebook />
-            ) : (
-              <WelcomeScreen />
-            )}
-            {/* Keep-alive: GitHistoryPanel stays mounted once activated, hidden via CSS */}
-            {activeProjectId && (
-              <div style={{ display: gitTabOpen && !pluginPanelOpen && !modelPanelOpen ? undefined : 'none' }}>
-                <GitHistoryPanel projectId={activeProjectId} />
-              </div>
-            )}
+            {/* Left pane: FileViewer (always visible) */}
+            <FileViewer />
+            <div className="split-divider" onMouseDown={startSplitDrag} />
+            {/* Right pane: Notebook / panels */}
+            <div className="notebook-split-pane" ref={notebookSplitRef}>
+              {pluginPanelOpen ? (
+                <PluginManager />
+              ) : modelPanelOpen ? (
+                <ModelManager />
+              ) : gitTabOpen && activeProjectId ? (
+                null  /* GitHistoryPanel rendered below as keep-alive */
+              ) : notebookLoading ? (
+                <NotebookLoadingScreen />
+              ) : creatingNotebook ? (
+                <NotebookCreationPanel />
+              ) : hasNotebook ? (
+                <Notebook />
+              ) : (
+                <WelcomeScreen />
+              )}
+              {/* Keep-alive: GitHistoryPanel stays mounted once activated, hidden via CSS */}
+              {activeProjectId && (
+                <div style={{ display: gitTabOpen && !pluginPanelOpen && !modelPanelOpen ? undefined : 'none' }}>
+                  <GitHistoryPanel projectId={activeProjectId} />
+                </div>
+              )}
+            </div>
           </div>
         </main>
       </div>

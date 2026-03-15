@@ -6,32 +6,18 @@ import {
   splitRightPaneContent,
 } from '../utils/splitView';
 
-describe('computeSplitView', () => {
+describe('computeSplitView (always true — persistent split layout)', () => {
   const base = {
     hasActiveFile: true,
     hasNotebook: true,
-    fileViewerMaximized: false,
     pluginPanelOpen: false,
     modelPanelOpen: false,
   };
 
-  it('true when file + notebook active, nothing else open', () => {
+  it('always returns true', () => {
     expect(computeSplitView(base)).toBe(true);
-  });
-  it('false when no active file', () => {
-    expect(computeSplitView({ ...base, hasActiveFile: false })).toBe(false);
-  });
-  it('false when no notebook', () => {
-    expect(computeSplitView({ ...base, hasNotebook: false })).toBe(false);
-  });
-  it('false when maximized', () => {
-    expect(computeSplitView({ ...base, fileViewerMaximized: true })).toBe(false);
-  });
-  it('false when plugin panel open', () => {
-    expect(computeSplitView({ ...base, pluginPanelOpen: true })).toBe(false);
-  });
-  it('false when model panel open', () => {
-    expect(computeSplitView({ ...base, modelPanelOpen: true })).toBe(false);
+    expect(computeSplitView({ ...base, hasActiveFile: false })).toBe(true);
+    expect(computeSplitView({ ...base, hasNotebook: false })).toBe(true);
   });
 });
 

@@ -1,12 +1,11 @@
-export function computeSplitView(args: {
+/** @deprecated Split view is now always active. Kept for test compatibility. */
+export function computeSplitView(_args: {
   hasActiveFile: boolean;
   hasNotebook: boolean;
-  fileViewerMaximized: boolean;
   pluginPanelOpen: boolean;
   modelPanelOpen: boolean;
 }): boolean {
-  return args.hasActiveFile && args.hasNotebook
-    && !args.fileViewerMaximized && !args.pluginPanelOpen && !args.modelPanelOpen;
+  return true;
 }
 
 /** Compute the initial panel width when entering split view. */

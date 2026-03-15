@@ -4960,11 +4960,6 @@ button:focus-visible {
   padding: var(--space-md) var(--space-lg);
 }
 
-/* ── FileViewer maximized — hide sidebars ──────────────────────────── */
-.app-body--fv-maximized .sidebar,
-.app-body--fv-maximized .app-divider {
-  display: none;
-}
 
 /* ── FileViewer Container ────────────────────────────────────────────── */
 .file-viewer {
@@ -4977,6 +4972,32 @@ button:focus-visible {
   overflow: hidden;
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
+}
+
+.file-viewer--empty {
+  align-items: center;
+  justify-content: center;
+}
+.fv-empty-state {
+  text-align: center;
+  color: var(--text-secondary);
+}
+.fv-empty-icon {
+  font-size: 48px;
+  opacity: 0.4;
+  display: block;
+  margin-bottom: 12px;
+}
+.fv-empty-text {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 4px;
+  color: var(--text-secondary);
+}
+.fv-empty-hint {
+  font-size: 13px;
+  margin: 0;
+  opacity: 0.7;
 }
 
 /* ── FileViewerStatusBar ─────────────────────────────────────────────── */

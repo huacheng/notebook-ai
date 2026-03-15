@@ -4,9 +4,7 @@ interface FileViewerStatusBarProps {
   filename: string;
   format: FileFormat | null;
   mode: 'render' | 'edit';
-  maximized: boolean;
   onToggleMode: () => void;
-  onToggleMaximize: () => void;
   onClose: () => void;
   pdfPage?: number;
   pdfPages?: number;
@@ -20,7 +18,7 @@ const FORMAT_LABEL: Partial<Record<FileFormat, string>> = {
 };
 
 export function FileViewerStatusBar({
-  filename, format, mode, maximized, onToggleMode, onToggleMaximize, onClose,
+  filename, format, mode, onToggleMode, onClose,
   pdfPage, pdfPages, scale, onZoomIn, onZoomOut,
 }: FileViewerStatusBarProps) {
   const canEdit = format !== null && !format.endsWith('-binary') && format !== 'unsupported';
@@ -47,9 +45,6 @@ export function FileViewerStatusBar({
             {mode === 'edit' ? 'Preview' : 'Edit'}
           </button>
         )}
-        <button className="fv-statusbar__btn" onClick={onToggleMaximize} title={maximized ? 'Restore' : 'Maximize'}>
-          {maximized ? '⊡' : '⛶'}
-        </button>
         <button className="fv-statusbar__btn fv-statusbar__close" onClick={onClose} title="Close">✕</button>
       </div>
     </div>

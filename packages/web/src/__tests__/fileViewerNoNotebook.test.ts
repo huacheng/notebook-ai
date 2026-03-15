@@ -18,15 +18,15 @@ describe('FileViewer without active notebook', () => {
     expect(src).not.toContain("if (!useStore.getState().activeNotebookTabId) return;");
   });
 
-  it('App.tsx should render FileViewer when hasActiveFile is true regardless of notebook', () => {
+  it('App.tsx should always render FileViewer (persistent split layout)', () => {
     const src = readFileSync(
       path.resolve(__dirname, '../App.tsx'),
       'utf-8'
     );
 
-    // FileViewer should be rendered when hasActiveFile is true
-    // The condition should be `hasActiveFile ? ( <FileViewer />` not dependent on hasNotebook
-    expect(src).toContain('hasActiveFile ? (');
+    // FileViewer is always rendered in the split layout (no conditional)
     expect(src).toContain('<FileViewer />');
+    // Should NOT have conditional hasActiveFile gating
+    expect(src).not.toContain('hasActiveFile ? (');
   });
 });

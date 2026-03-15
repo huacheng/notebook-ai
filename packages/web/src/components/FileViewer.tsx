@@ -12,9 +12,7 @@ export function FileViewer() {
   const openFiles = useStore((s) => s.openFiles);
   const activeFileTabId = useStore((s) => s.activeFileTabId);
   const activeFile = activeFileTabId ? openFiles[activeFileTabId] ?? null : null;
-  const fileViewerMaximized = useStore((s) => s.fileViewerMaximized);
   const closeFileTab = useStore((s) => s.closeFileTab);
-  const toggleFileViewerMaximized = useStore((s) => s.toggleFileViewerMaximized);
   const setFileTabLoading = useStore((s) => s.setFileTabLoading);
   const activeNotebookId = useStore((s) => s.activeNotebookId);
   /** Send annotation text to the prompt textarea (nb:appendPrompt) instead of executing directly. */
@@ -76,7 +74,17 @@ export function FileViewer() {
   const handleZoomIn = useCallback(() => setContentScale((s) => clampScale(s + ZOOM_STEP)), [clampScale]);
   const handleZoomOut = useCallback(() => setContentScale((s) => clampScale(s - ZOOM_STEP)), [clampScale]);
 
-  if (!activeFile) return null;
+  if (!activeFile) {
+    return (
+      <div className="file-viewer file-viewer--empty">
+        <div className="fv-empty-state">
+          <span className="fv-empty-icon">📄</span>
+          <p className="fv-empty-text">No file open</p>
+          <p className="fv-empty-hint">Click a file in the sidebar to view it here</p>
+        </div>
+      </div>
+    );
+  }
 
   const filename = activeFile.path.split('/').pop() ?? activeFile.path;
   const absolutePath = resolveAbsolutePath(
@@ -93,9 +101,7 @@ export function FileViewer() {
         filename={filename}
         format={fileState.format}
         mode={mode}
-        maximized={fileViewerMaximized}
         onToggleMode={() => { if (canEdit) setMode((m) => m === 'render' ? 'edit' : 'render'); }}
-        onToggleMaximize={toggleFileViewerMaximized}
         onClose={() => closeFileTab(activeFileTabId!)}
         pdfPage={isPdf ? pdfPage : undefined}
         pdfPages={isPdf ? pdfPages : undefined}

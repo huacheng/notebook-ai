@@ -187,19 +187,6 @@ describe('filesPanelOpen removal', () => {
 // ── Interaction contract regression ─────────────────────────────────────
 
 describe('interaction contract regression', () => {
-  it('fileViewerMaximized defaults to false', () => {
-    const { state } = createTestSlice();
-    expect(state.fileViewerMaximized).toBe(false);
-  });
-
-  it('toggleFileViewerMaximized flips the flag', () => {
-    const { state, getAction } = createTestSlice();
-    getAction('toggleFileViewerMaximized')();
-    expect(state.fileViewerMaximized).toBe(true);
-    getAction('toggleFileViewerMaximized')();
-    expect(state.fileViewerMaximized).toBe(false);
-  });
-
   it('openFiles defaults to empty and activeFileTabId defaults to null', () => {
     const { state } = createTestSlice();
     expect(state.openFiles).toEqual({});

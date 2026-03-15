@@ -309,7 +309,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     { cmd: 'task-ai:plan', icon: '📝' },
     { cmd: 'task-ai:read', icon: '📖' },
     { cmd: 'task-ai:highlight', icon: '💡' },
-    { cmd: 'task-ai:check', icon: '✅', args: '审查与修复', label: 'check+fix' },
+    { cmd: 'task-ai:check', icon: '✅', args: 'Audit-and-Fix', label: 'check+fix' },
   ];
 
   const containerClass = mobile

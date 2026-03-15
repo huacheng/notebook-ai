@@ -52,7 +52,6 @@ export interface NotebookStore {
   openFiles: Record<string, { path: string; source: 'workspace' | 'library' | 'deliverables'; sessionId: string; projectId?: string; loading?: boolean }>;
   activeFileTabId: string | null;
   leftSidebarSplitRatio: number;
-  fileViewerMaximized: boolean;
   sidebarWidth: number;
   editMode: boolean;
   pendingDeletes: Set<string>;
@@ -192,7 +191,6 @@ export interface NotebookStore {
   setFileTabLoading(tabId: string, loading: boolean): void;
   restoreOpenFileTabs(): void;
   setLeftSidebarSplitRatio(ratio: number): void;
-  toggleFileViewerMaximized(): void;
   setSidebarWidth(px: number): void;
   setEditMode(on: boolean): void;
   togglePendingDelete(cellId: string): void;

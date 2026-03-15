@@ -43,9 +43,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'setActiveTab' | 'openGitTab' | 'closeGitTab'
   | 'clearSessionNotice' | 'setLatency'
   | 'setWsReconnectExhausted'
-  | 'openFiles' | 'activeFileTabId' | 'fileViewerMaximized'
+  | 'openFiles' | 'activeFileTabId'
   | 'openFileTab' | 'closeFileTab' | 'setActiveFileTab' | 'deactivateFileTab' | 'closeAllFileTabs' | 'closeProjectFileTabs' | 'closeDeletedFileTabs' | 'setFileTabLoading' | 'restoreOpenFileTabs'
-  | 'toggleFileViewerMaximized'
   | 'leftSidebarSplitRatio' | 'setLeftSidebarSplitRatio'
   | 'sidebarWidth'
   | 'setSidebarWidth'
@@ -66,7 +65,6 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   leftSidebarSplitRatio: 0.5,
   openFiles: {},
   activeFileTabId: null,
-  fileViewerMaximized: false,
   sidebarWidth: 272,
   editMode: false,
   pendingDeletes: new Set<string>(),
@@ -202,10 +200,6 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       openFiles[tab.tabId] = { path: tab.path, source: tab.source, sessionId: '', ...(tab.projectId ? { projectId: tab.projectId } : {}), loading: true };
     }
     set({ openFiles, activeFileTabId: saved.activeId });
-  },
-
-  toggleFileViewerMaximized() {
-    set((s) => ({ fileViewerMaximized: !s.fileViewerMaximized }));
   },
 
   setLeftSidebarSplitRatio(ratio) {
