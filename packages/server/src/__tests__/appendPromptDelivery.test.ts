@@ -17,10 +17,10 @@ describe('appendPrompt delivery to Claude', () => {
 
   it('appendPrompt should increment _pendingAppends', () => {
     const src = sessionSrc();
-    // Find appendPrompt method — should increment counter
-    const appendBlock = src.match(/appendPrompt\([\s\S]*?console\.log/);
+    // The appendPrompt method should increment _pendingAppends
+    const appendBlock = src.match(/appendPrompt\([\s\S]*?broadcast\(session/);
     expect(appendBlock).toBeTruthy();
-    expect(appendBlock![0]).toContain('_pendingAppends');
+    expect(appendBlock![0]).toContain('_pendingAppends++');
   });
 
   it('completeCell should skip completion when _pendingAppends > 0', () => {

@@ -821,8 +821,15 @@ export class SessionManager {
     if (!session) throw new Error(`Session "${sessionId}" not found.`);
 
     const cell = session.notebook.cells.find((c) => c.id === cellId);
-    if (!cell || cell.status !== 'running') {
-      throw new Error(`Cell "${cellId}" is not running.`);
+    if (!cell) {
+      throw new Error(`Cell "${cellId}" not found.`);
+    }
+
+    // If cell already completed (race condition: backend finished before frontend noticed),
+    // signal the client to create a new cell instead.
+    if (cell.status !== 'running') {
+      console.log(`[session ${sessionId}] appendPrompt: cell "${cellId}" already "${cell.status}", signaling CELL_COMPLETED`);
+      throw Object.assign(new Error('CELL_COMPLETED'), { code: 'CELL_COMPLETED', source });
     }
 
     // Resolve images: prefer image_refs (file paths) over embedded base64

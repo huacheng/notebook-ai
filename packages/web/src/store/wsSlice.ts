@@ -630,6 +630,13 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
           }
           break;
         }
+        case 'append_prompt_redirect': {
+          // Cell already completed — create a new cell and execute the prompt
+          const redirectMsg = parsed as { source: string; images?: unknown[]; image_refs?: unknown[] };
+          console.log('[ws] append_prompt_redirect: cell completed, submitting as new cell');
+          get().submitPrompt(redirectMsg.source, redirectMsg.images as never, redirectMsg.image_refs as never);
+          break;
+        }
         // ── Heartbeat events ──────────────────────────────────────────────────
         case 'process_dead': {
           const deadMsg = parsed as { cell_id: string };

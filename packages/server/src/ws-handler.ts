@@ -1518,8 +1518,20 @@ export function setupWebSocket(
           if (!checkSessionPermission(session_id)) break;
           try {
             await sessionManager.appendPrompt(session_id, cell_id, source, images, image_refs);
-          } catch (err) {
-            sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
+          } catch (err: unknown) {
+            if (err instanceof Error && (err as Error & { code?: string }).code === 'CELL_COMPLETED') {
+              // Cell already completed — tell frontend to create a new cell
+              sendToClient(ws, {
+                type: 'append_prompt_redirect',
+                session_id,
+                cell_id,
+                source,
+                ...(images ? { images } : {}),
+                ...(image_refs ? { image_refs } : {}),
+              });
+            } else {
+              sendToClient(ws, { type: 'error', session_id, message: sanitizeErrorForClient(err) });
+            }
           }
           break;
         }

@@ -937,6 +937,15 @@ export const CellAppendedSchema = z.object({
   segment: PromptSegmentSchema,
 });
 
+export const AppendPromptRedirectSchema = z.object({
+  type: z.literal('append_prompt_redirect'),
+  session_id: z.string(),
+  cell_id: z.string(),
+  source: z.string(),
+  images: z.array(z.unknown()).optional(),
+  image_refs: z.array(z.unknown()).optional(),
+});
+
 // ─── Heartbeat Events ───
 
 export const ProcessDeadSchema = z.object({
@@ -1062,6 +1071,7 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   UrlCaptureResultSchema,
   AutosaveErrorSchema,
   CellAppendedSchema,
+  AppendPromptRedirectSchema,
   ProcessDeadSchema,
   StuckExhaustedSchema,
   ToolLongRunningSchema,
