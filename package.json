@@ -15,7 +15,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "better-sqlite3"
+      "better-sqlite3",
+      "node-pty"
     ]
   },
   "devDependencies": {
@@ -23,6 +24,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "node-pty": "^1.1.0",
     "playwright": "^1.58.2"
   }
 }

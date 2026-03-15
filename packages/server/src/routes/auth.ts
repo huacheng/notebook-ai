@@ -38,11 +38,12 @@ export function createClaudeAuthRouter(): IRouter {
   // POST /api/auth/login — start login, returns auth URL
   // Body: { method: 'claude' | 'console' | 'sso' }
   router.post('/login', (req: Request, res: Response) => {
-    // Kill any previous login process
+    // Kill any previous login process and clear stale result
     if (loginProc) {
       loginProc.kill();
       loginProc = null;
     }
+    loginResult = null;
 
     const method = (req.body as { method?: string })?.method ?? 'claude';
     const args = ['auth', 'login'];
