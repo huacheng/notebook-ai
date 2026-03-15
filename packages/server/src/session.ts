@@ -156,8 +156,6 @@ interface NotebookSession {
   _heartbeatTimer: ReturnType<typeof setInterval> | null;
   /** Heartbeat: tool_use IDs awaiting tool_result (tool execution in progress). */
   _pendingToolUseIds: Set<string>;
-  /** Count of appended prompts sent to stdin but not yet consumed by a result. */
-  _pendingAppends: number;
   /** Heartbeat: flag to prevent repeated tool_long_running notifications. */
   _toolLongRunningNotified: boolean;
   /** Debounced auto-save timer — persists running cell output to disk periodically. */
@@ -298,7 +296,6 @@ export class SessionManager {
       _autoSaveTimer: null,
       _heartbeatTimer: null,
       _pendingToolUseIds: new Set(),
-      _pendingAppends: 0,
       _toolLongRunningNotified: false,
       _timerMode: false,
       _timerHandle: null,
@@ -497,7 +494,7 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return true;
     const runningCellId = findRunningCellId(session.notebook);
-    return !runningCellId && session._pendingAppends === 0 && session._pendingToolUseIds.size === 0;
+    return !runningCellId && session._pendingToolUseIds.size === 0;
   }
 
   /**
@@ -839,15 +836,11 @@ export class SessionManager {
     }
 
     // Send to Claude stdin FIRST — if process is dead, throw before mutating state.
-    // This prevents _pendingAppends from being incremented without a matching result.
     if (resolvedImages && resolvedImages.length > 0) {
       session.agentProcess.sendPrompt(source, resolvedImages);
     } else {
       session.agentProcess.sendPrompt(source);
     }
-
-    // Track pending append — completeCell will defer until Claude consumes it
-    session._pendingAppends++;
 
     // Append segment to cell (store image_refs for persistence, not base64)
     const segment: PromptSegment = {
@@ -872,7 +865,7 @@ export class SessionManager {
       segment,
     });
 
-    console.log(`[session ${sessionId}] Appended prompt to cell "${cellId}" (_pendingAppends=${session._pendingAppends}): "${source.slice(0, 50)}..."`);
+    console.log(`[session ${sessionId}] Appended prompt to cell "${cellId}": "${source.slice(0, 50)}..."`);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
@@ -908,19 +901,6 @@ export class SessionManager {
     // Guard: only complete if the cell is still running.
     const cell = session.notebook.cells.find((c) => c.id === cellId);
     if (!cell || cell.status !== 'running') return;
-
-    // Defer completion if there are appended prompts waiting for Claude to consume.
-    // Each appendPrompt increments the counter by 1. Each result triggers completeCell.
-    // The FIRST result here is for the original prompt — the append hasn't been processed yet.
-    // So we always defer (return) when counter > 0, then decrement. The append's own result
-    // will arrive later and call completeCell again with counter = 0 → proceed to complete.
-    if (session._pendingAppends > 0 && !isError) {
-      session._pendingAppends--;
-      console.log(`[session ${session.id}] completeCell deferred: _pendingAppends=${session._pendingAppends} remaining`);
-      return;
-    }
-    // Reset counter on final completion
-    session._pendingAppends = 0;
 
     // Cancel debounced running-cell auto-save (completion will do its own save)
     if (session._autoSaveTimer) {
