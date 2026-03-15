@@ -79,8 +79,12 @@ export function createClaudeAuthRouter(): IRouter {
     let sentLogin = false;
     let sentSelect = false;
 
+    // Strip ANSI escape sequences for text matching
+    const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '');
+
     proc.onData((data: string) => {
       loginOutput += data;
+      const clean = stripAnsi(loginOutput);
 
       // Phase 1: detect prompt '>', send /login
       if (!sentLogin && loginOutput.includes('>')) {
@@ -90,8 +94,8 @@ export function createClaudeAuthRouter(): IRouter {
       }
 
       // Phase 2: detect menu, send selection
-      // Ink renders without spaces in stripped output, so check raw for partial keywords
-      if (sentLogin && !sentSelect && loginOutput.includes('login method')) {
+      // Ink strips spaces in ANSI output, so match without spaces
+      if (sentLogin && !sentSelect && clean.includes('loginmethod')) {
         sentSelect = true;
         setTimeout(() => {
           // Option 1 is pre-selected (❯). For option 2/3, press down arrow first.
@@ -102,8 +106,8 @@ export function createClaudeAuthRouter(): IRouter {
         }, 1000);
       }
 
-      // Phase 3: detect URL
-      const urlMatch = loginOutput.match(/(https:\/\/[^\s\x1b]+authorize[^\s\x1b]+)/);
+      // Phase 3: detect URL (use stripped output to avoid ANSI in URL)
+      const urlMatch = clean.match(/(https:\/\/\S+authorize\S+)/);
       if (urlMatch && !responded) {
         responded = true;
         loginPhase = 'url';
@@ -111,7 +115,7 @@ export function createClaudeAuthRouter(): IRouter {
       }
 
       // Phase 4: detect paste prompt
-      if (loginOutput.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').includes('Pastecodehereifprompted')) {
+      if (clean.includes('Pastecodehereifprompted')) {
         loginPhase = 'paste';
       }
     });
