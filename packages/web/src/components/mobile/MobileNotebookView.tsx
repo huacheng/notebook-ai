@@ -165,12 +165,14 @@ export function MobileNotebookView() {
   }, [cellsOffset]);
 
   // IntersectionObserver: auto-load older cells when sentinel becomes visible
+  // IMPORTANT: root must be the scrollable container, not viewport (default)
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || cellsOffset <= 0) return;
+    const container = contentRef.current;
+    if (!el || !container || cellsOffset <= 0) return;
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) handleLoadMore(); },
-      { threshold: 0.1 },
+      { threshold: 0.1, root: container },
     );
     observer.observe(el);
     return () => observer.disconnect();
