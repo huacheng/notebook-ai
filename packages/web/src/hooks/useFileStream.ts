@@ -26,7 +26,7 @@ const INITIAL_STATE: FileStreamState = {
 
 const THROTTLE_MS = 200;
 
-import { b64ToUint8Array } from '../utils/b64';
+import { b64ToUint8Array, uint8ArrayToBase64 } from '../utils/b64';
 
 export function useFileStream(
   sessionId: string | null,
@@ -169,7 +169,7 @@ export function useFileStream(
             const decompressed = lz4.decompress(compressedBytes);
             if (encoding === 'base64') {
               // Binary file: convert decompressed bytes back to base64 for existing flow
-              const b64 = btoa(String.fromCharCode(...decompressed));
+              const b64 = uint8ArrayToBase64(decompressed);
               b64ChunksRef.current.push(b64);
             } else {
               // Text file: decode as UTF-8
@@ -253,7 +253,7 @@ export function useFileStream(
             const compressedBytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
             const decompressed = lz4.decompress(compressedBytes);
             if (encoding === 'base64') {
-              const b64 = btoa(String.fromCharCode(...decompressed));
+              const b64 = uint8ArrayToBase64(decompressed);
               b64ChunksRef.current.push(b64);
             } else {
               const text = new TextDecoder().decode(decompressed);
