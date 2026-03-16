@@ -7,6 +7,7 @@ import { shouldShowScrollBtn } from '../utils/scrollToBottom';
 import { InputBar } from './shared/InputBar';
 import { PhaseProgressBar, ScorePanel } from './TimerStatusBar';
 import { TimerStartDialog } from './TimerStartDialog';
+import { cacheGet, cacheSet, TTL } from '../utils/localCache';
 
 // ── Notebook status bar ─────────────────────────────────────────────────────
 
@@ -515,6 +516,54 @@ export function Notebook() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [cellsOffset, handleLoadMore]);
+
+  // ── Scroll position restoration for notebook switching ────────────────────
+  // The actual scrolling happens in .notebook-cells (cellsContainerRef), not
+  // the parent .notebook-split-pane, so we save/restore scroll position here.
+  const scrollSaveTimerRef = useRef<number | null>(null);
+
+  // Restore scroll position when notebook changes
+  useEffect(() => {
+    if (!activeNotebookTabId) return;
+    const el = cellsContainerRef.current;
+    if (!el) return;
+    const cacheKey = `scroll-cells-${activeNotebookTabId}`;
+    const savedPos = cacheGet<number>(cacheKey, TTL.SCROLL);
+    if (savedPos !== null && savedPos > 0) {
+      // Use requestAnimationFrame to ensure DOM is ready after notebook switch
+      requestAnimationFrame(() => {
+        if (cellsContainerRef.current) {
+          cellsContainerRef.current.scrollTop = savedPos;
+        }
+      });
+    }
+  }, [activeNotebookTabId]);
+
+  // Save scroll position on scroll events (debounced)
+  useEffect(() => {
+    if (!activeNotebookTabId) return;
+    const el = cellsContainerRef.current;
+    if (!el) return;
+    const cacheKey = `scroll-cells-${activeNotebookTabId}`;
+    const handleScroll = () => {
+      if (scrollSaveTimerRef.current !== null) {
+        clearTimeout(scrollSaveTimerRef.current);
+      }
+      scrollSaveTimerRef.current = window.setTimeout(() => {
+        scrollSaveTimerRef.current = null;
+        if (cellsContainerRef.current) {
+          cacheSet(cacheKey, cellsContainerRef.current.scrollTop, TTL.SCROLL);
+        }
+      }, 200);
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      if (scrollSaveTimerRef.current !== null) {
+        clearTimeout(scrollSaveTimerRef.current);
+      }
+    };
+  }, [activeNotebookTabId]);
 
   return (
     <div className="notebook-container">
