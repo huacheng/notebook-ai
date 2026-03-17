@@ -391,15 +391,18 @@ export class SessionManager {
             outputs: [],
             execution_count: 0,
             status: 'idle' as const,
+            created_at: new Date().toISOString(),
           },
         ],
       };
       // Broadcast cell_created to all subscribers for multi-device sync
+      const createdCell = session.notebook.cells.find((c) => c.id === cellId);
       this.broadcast(session, {
         type: 'cell_created',
         cell_id: cellId,
         source,
         image_refs: imageRefs,  // Include for multi-device sync
+        created_at: createdCell?.created_at,
       });
     }
 

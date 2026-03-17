@@ -494,7 +494,7 @@ export function Notebook() {
   const handleLoadMore = useCallback(() => {
     const { ws, sessionId, loadingOlderCells: isLoading } = useStore.getState();
     if (isLoading || !ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
-    const BATCH = 2; // D4: Load 2 cells at a time for smoother scroll experience
+    const BATCH = 10; // Load 10 cells at a time for faster history loading
     const newOffset = Math.max(0, cellsOffset - BATCH);
     const limit = cellsOffset - newOffset;
     if (limit <= 0) return;
