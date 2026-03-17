@@ -663,7 +663,7 @@ function FileBrowser() {
           });
           openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
           const totalCells = opened.total_cells ?? opened.notebook.cells.length;
-          const cellsOffset = totalCells - opened.notebook.cells.length;
+          const cellsOffset = Math.max(0, totalCells - opened.notebook.cells.length);
           useStore.setState({ cellsOffset, loadingOlderCells: false });
           // Note: useWebSocket hook auto-subscribes when openNotebooks changes
         } else {

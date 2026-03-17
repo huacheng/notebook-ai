@@ -190,7 +190,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       };
 
       const totalCells = data.totalCells ?? data.notebook.cells.length;
-      const cellsOffset = totalCells - data.notebook.cells.length;
+      const cellsOffset = Math.max(0, totalCells - data.notebook.cells.length);
 
       set((state) => {
         // Check if user switched to a different notebook while we were loading.

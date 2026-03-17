@@ -71,8 +71,11 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
 
       openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
       setActiveNotebookTab(opened.notebook_id);
+      // Calculate cellsOffset from total_cells (snake_case from WS), clamp to 0
+      const totalCells = opened.total_cells ?? opened.notebook.cells.length;
+      const cellsOffset = Math.max(0, totalCells - opened.notebook.cells.length);
       // Note: useWebSocket hook auto-subscribes when openNotebooks changes
-      useStore.setState({ notebookLoading: false });
+      useStore.setState({ notebookLoading: false, cellsOffset, loadingOlderCells: false });
       return { opened: true, notebookId: opened.notebook_id };
     } else {
       // REST fallback
@@ -90,8 +93,11 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
       }
       openTab(data.notebook_id, notebook, data.session_id, data.workspace_dir);
       setActiveNotebookTab(data.notebook_id);
+      // Calculate cellsOffset from totalCells (camelCase from REST), clamp to 0
+      const totalCells = data.totalCells ?? notebook.cells.length;
+      const cellsOffset = Math.max(0, totalCells - notebook.cells.length);
       // Note: useWebSocket hook auto-subscribes when openNotebooks changes
-      useStore.setState({ notebookLoading: false });
+      useStore.setState({ notebookLoading: false, cellsOffset, loadingOlderCells: false });
       return { opened: true, notebookId: data.notebook_id };
     }
   } catch (err: any) {

@@ -154,4 +154,103 @@ describe('openNotebookByPath', () => {
     const result = await openNotebookByPath('/proj/b/new.notebook.json');
     expect(result).toEqual({ opened: true, notebookId: 'nb-new' });
   });
+
+  test('sets cellsOffset correctly based on totalCells from REST response', async () => {
+    // Server returns totalCells=100 but only 2 cells (last page)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        notebook_id: 'nb-paged',
+        notebook: { cells: [{ id: 'c1' }, { id: 'c2' }] },
+        session_id: 's-paged',
+        workspace_dir: '/proj/paged',
+        totalCells: 100,
+      }),
+    });
+
+    await openNotebookByPath('/proj/paged/big.notebook.json');
+
+    // cellsOffset should be 100 - 2 = 98
+    expect(mockSetState).toHaveBeenCalledWith(expect.objectContaining({
+      cellsOffset: 98,
+      loadingOlderCells: false,
+    }));
+  });
+
+  test('sets cellsOffset to 0 when totalCells equals cells.length', async () => {
+    // All cells returned — no pagination needed
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        notebook_id: 'nb-small',
+        notebook: { cells: [{ id: 'c1' }] },
+        session_id: 's-small',
+        workspace_dir: '/proj/small',
+        totalCells: 1,
+      }),
+    });
+
+    await openNotebookByPath('/proj/small/small.notebook.json');
+
+    expect(mockSetState).toHaveBeenCalledWith(expect.objectContaining({
+      cellsOffset: 0,
+    }));
+  });
+
+  test('sets cellsOffset via WS total_cells field', async () => {
+    // Mock WS
+    const mockWs = {
+      readyState: WebSocket.OPEN,
+      send: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    mockState.ws = mockWs;
+
+    const promise = openNotebookByPath('/proj/ws/nb.notebook.json');
+
+    // Simulate WS response with total_cells (snake_case from server)
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const onOpened = windowListeners['nb:notebook-opened']?.[0];
+    expect(onOpened).toBeTruthy();
+    onOpened(new CustomEvent('nb:notebook-opened', {
+      detail: {
+        request_id: mockWs.send.mock.calls[0][0] && JSON.parse(mockWs.send.mock.calls[0][0]).request_id,
+        notebook_id: 'nb-ws',
+        notebook: { cells: [{ id: 'c1' }, { id: 'c2' }] },
+        session_id: 's-ws',
+        workspace_dir: '/proj/ws',
+        total_cells: 50,
+      },
+    }));
+
+    await promise;
+
+    // cellsOffset should be 50 - 2 = 48
+    expect(mockSetState).toHaveBeenCalledWith(expect.objectContaining({
+      cellsOffset: 48,
+      loadingOlderCells: false,
+    }));
+  });
+
+  test('clamps cellsOffset to 0 when totalCells is less than cells.length', async () => {
+    // Edge case: server returns fewer totalCells than actual cells (data inconsistency)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        notebook_id: 'nb-edge',
+        notebook: { cells: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }] },
+        session_id: 's-edge',
+        workspace_dir: '/proj/edge',
+        totalCells: 1, // Less than cells.length (3)
+      }),
+    });
+
+    await openNotebookByPath('/proj/edge/edge.notebook.json');
+
+    // cellsOffset should be clamped to 0, not negative (-2)
+    expect(mockSetState).toHaveBeenCalledWith(expect.objectContaining({
+      cellsOffset: 0,
+    }));
+  });
 });

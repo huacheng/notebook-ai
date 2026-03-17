@@ -90,9 +90,9 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         result.workspaceDir
       );
 
-      // Set cells offset if paginated
+      // Set cells offset if paginated (clamp to 0 for safety)
       if (result.totalCells !== undefined) {
-        const cellsOffset = result.totalCells - result.notebook.cells.length;
+        const cellsOffset = Math.max(0, result.totalCells - result.notebook.cells.length);
         useStore.setState({ cellsOffset, loadingOlderCells: false });
       }
       // Note: useWebSocket hook auto-subscribes when openNotebooks changes
