@@ -4997,29 +4997,37 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--toolbar-bg);
-  border-bottom: 1px solid var(--toolbar-border);
+  padding: 0 12px;
+  height: var(--statusbar-height);
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-default);
   flex-shrink: 0;
 }
 .fv-git-title {
   font-weight: 600;
-  font-size: 13px;
-  color: var(--toolbar-text);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 .fv-git-close {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
   background: transparent;
-  border: none;
-  color: var(--toolbar-text);
-  font-size: 18px;
-  line-height: 1;
-  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.15s;
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
 }
 .fv-git-close:hover {
-  opacity: 1;
+  background: var(--bg-cell-hover);
+  color: var(--text-primary);
 }
 .file-viewer--git .git-history-panel {
   flex: 1;
