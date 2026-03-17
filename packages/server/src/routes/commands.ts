@@ -27,6 +27,8 @@ const COMMANDS: Command[] = [
   // code quality
   { name: 'simplify', label: 'Review and simplify code for clarity and efficiency' },
   { name: 'code-review:code-review', label: 'Code review a pull request against standards' },
+  // automation loops
+  { name: 'ralph-loop:ralph-loop', label: 'Start Ralph Loop autonomous task execution' },
 ];
 
 router.get('/', (_req, res) => {
