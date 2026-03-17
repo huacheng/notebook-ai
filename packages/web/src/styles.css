@@ -1334,6 +1334,17 @@ textarea.cell-input {
   padding-right: 2px;
 }
 
+/* Cell timestamp */
+.cell-timestamp {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  text-align: right;
+  margin-top: 2px;
+  padding-right: 4px;
+}
+
 /* Prompt bubble */
 .cell-prompt-source {
   max-width: 82%;

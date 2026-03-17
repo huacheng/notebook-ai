@@ -160,6 +160,17 @@ export function Cell({ cell, index, editMode, pendingDelete, onToggleDelete }: C
         <span className="cell-index">[{execNum}]</span>
         <MarkdownBody content={cell.source} className="cell-prompt-source" />
       </div>
+      {cell.created_at && (
+        <div className="cell-timestamp">
+          {new Date(cell.created_at).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })}
+        </div>
+      )}
 
       {/* ── Prompt images (from .images/ directory) ── */}
       {imageRefs && imageRefs.length > 0 && (
