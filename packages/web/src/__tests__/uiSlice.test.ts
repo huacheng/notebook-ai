@@ -396,3 +396,44 @@ describe('closeDeletedFileTabs', () => {
     expect(Object.keys(state.openFiles).length).toBe(1);
   });
 });
+
+// ── Git source types ─────────────────────────────────────────────────────
+
+describe('openFileTab with git sources', () => {
+  it('accepts project-git source with projectId', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: '', source: 'project-git', sessionId: '', projectId: 'proj-abc' });
+    const tabId = 'project-git::proj-abc';
+    expect(state.openFiles[tabId]).toBeDefined();
+    expect(state.openFiles[tabId].source).toBe('project-git');
+    expect(state.openFiles[tabId].projectId).toBe('proj-abc');
+    expect(state.activeFileTabId).toBe(tabId);
+  });
+
+  it('accepts library-git source', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: '', source: 'library-git', sessionId: '' });
+    const tabId = 'library-git::library';
+    expect(state.openFiles[tabId]).toBeDefined();
+    expect(state.openFiles[tabId].source).toBe('library-git');
+    expect(state.activeFileTabId).toBe(tabId);
+  });
+
+  it('re-opening same git tab activates existing without duplicating', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: '', source: 'project-git', sessionId: '', projectId: 'proj-1' });
+    getAction('openFileTab')({ path: 'file.txt', source: 'workspace', sessionId: 's1' });
+    getAction('openFileTab')({ path: '', source: 'project-git', sessionId: '', projectId: 'proj-1' });
+    expect(Object.keys(state.openFiles)).toHaveLength(2);
+    expect(state.activeFileTabId).toBe('project-git::proj-1');
+  });
+
+  it('different project-git tabs are separate', () => {
+    const { state, getAction } = createTestSlice();
+    getAction('openFileTab')({ path: '', source: 'project-git', sessionId: '', projectId: 'proj-a' });
+    getAction('openFileTab')({ path: '', source: 'project-git', sessionId: '', projectId: 'proj-b' });
+    expect(Object.keys(state.openFiles)).toHaveLength(2);
+    expect(state.openFiles['project-git::proj-a']).toBeDefined();
+    expect(state.openFiles['project-git::proj-b']).toBeDefined();
+  });
+});

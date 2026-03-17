@@ -116,7 +116,12 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   openFileTab(file) {
-    const tabId = `${file.source}::${file.path}`;
+    // Generate tabId based on source type
+    const tabId = file.source === 'project-git'
+      ? `project-git::${file.projectId}`
+      : file.source === 'library-git'
+        ? 'library-git::library'
+        : `${file.source}::${file.path}`;
     set(s => {
       const newFiles = { ...s.openFiles, [tabId]: { ...file, loading: true } };
       _persistFileTabs(newFiles, tabId);
@@ -198,11 +203,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
 
   restoreOpenFileTabs() {
     const saved = cacheGet<{
-      tabs: { tabId: string; path: string; source: 'workspace' | 'library' | 'deliverables'; projectId?: string }[];
+      tabs: { tabId: string; path: string; source: 'workspace' | 'library' | 'deliverables' | 'project-git' | 'library-git'; projectId?: string }[];
       activeId: string | null;
     }>('nb-open-files', TTL.LAST_NOTEBOOK);
     if (!saved || saved.tabs.length === 0) return;
-    const openFiles: Record<string, { path: string; source: 'workspace' | 'library' | 'deliverables'; sessionId: string; projectId?: string; loading?: boolean }> = {};
+    const openFiles: Record<string, { path: string; source: 'workspace' | 'library' | 'deliverables' | 'project-git' | 'library-git'; sessionId: string; projectId?: string; loading?: boolean }> = {};
     for (const tab of saved.tabs) {
       openFiles[tab.tabId] = { path: tab.path, source: tab.source, sessionId: '', ...(tab.projectId ? { projectId: tab.projectId } : {}), loading: true };
     }

@@ -49,7 +49,7 @@ export interface NotebookStore {
   latency: number | null;
   creatingNotebook: boolean;
   wsReconnectExhausted: boolean;
-  openFiles: Record<string, { path: string; source: 'workspace' | 'library' | 'deliverables'; sessionId: string; projectId?: string; loading?: boolean }>;
+  openFiles: Record<string, { path: string; source: 'workspace' | 'library' | 'deliverables' | 'project-git' | 'library-git'; sessionId: string; projectId?: string; loading?: boolean }>;
   activeFileTabId: string | null;
   leftSidebarSplitRatio: number;
   sidebarWidth: number;
@@ -186,7 +186,7 @@ export interface NotebookStore {
   clearSessionNotice(): void;
   setLatency(ms: number | null): void;
   setWsReconnectExhausted(v: boolean): void;
-  openFileTab(file: { path: string; source: 'workspace' | 'library' | 'deliverables'; sessionId: string; projectId?: string }): void;
+  openFileTab(file: { path: string; source: 'workspace' | 'library' | 'deliverables' | 'project-git' | 'library-git'; sessionId: string; projectId?: string }): void;
   closeFileTab(tabId: string): void;
   setActiveFileTab(tabId: string): void;
   deactivateFileTab(): void;

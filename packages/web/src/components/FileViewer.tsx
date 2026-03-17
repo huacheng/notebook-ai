@@ -7,6 +7,7 @@ import { EMPTY_FILE_ANNOTATIONS, resolveAbsolutePath, canEditFile } from '../typ
 import { FileViewerStatusBar } from './FileViewerStatusBar';
 import { FileViewerRender } from './FileViewerRender';
 import { FileViewerEditor } from './FileViewerEditor';
+import { GitHistoryPanel } from './GitHistoryPanel';
 
 export function FileViewer() {
   const openFiles = useStore((s) => s.openFiles);
@@ -31,11 +32,16 @@ export function FileViewer() {
   const [pdfPages, setPdfPages] = useState(0);
   const [contentScale, setContentScale] = useState(1.0);
 
+  // Git sources don't use file streaming - cast to narrow type for non-git sources
+  const fileSource = (activeFile?.source === 'project-git' || activeFile?.source === 'library-git')
+    ? 'workspace' // placeholder, won't be used since we return early for git sources
+    : (activeFile?.source ?? 'workspace') as 'workspace' | 'library' | 'deliverables';
+
   const fileState = useFileStream(
     activeFile?.sessionId ?? null,
     activeNotebookId,
     activeFile?.path ?? null,
-    activeFile?.source ?? 'workspace',
+    fileSource,
     activeFile?.projectId ?? null,
     mode === 'edit', // suppressChanges: ignore file-changed notifications while editing
   );
@@ -86,9 +92,33 @@ export function FileViewer() {
     );
   }
 
+  // Git sources render GitHistoryPanel instead of normal file viewer
+  if (activeFile.source === 'project-git' || activeFile.source === 'library-git') {
+    return (
+      <div className="file-viewer file-viewer--git">
+        <div className="fv-git-header">
+          <span className="fv-git-title">
+            {activeFile.source === 'project-git' ? 'Project Git History' : 'Library Git History'}
+          </span>
+          <button
+            className="fv-git-close"
+            onClick={() => closeFileTab(activeFileTabId!)}
+            title="Close"
+          >
+            ×
+          </button>
+        </div>
+        <GitHistoryPanel
+          projectId={activeFile.source === 'project-git' ? activeFile.projectId : undefined}
+          source={activeFile.source === 'library-git' ? 'library' : undefined}
+        />
+      </div>
+    );
+  }
+
   const filename = activeFile.path.split('/').pop() ?? activeFile.path;
   const absolutePath = resolveAbsolutePath(
-    activeFile.source, activeFile.path, workspaceDir, activeProjectPath,
+    fileSource, activeFile.path, workspaceDir, activeProjectPath,
   );
   const canEdit = canEditFile(fileState.format, absolutePath);
   const isPdf = fileState.format === 'pdf-binary';
@@ -144,7 +174,7 @@ export function FileViewer() {
           format={fileState.format === 'html' ? 'html' : 'text'}
           sessionId={activeFile.sessionId}
           filePath={activeFile.path}
-          source={activeFile.source}
+          source={fileSource}
           projectId={activeFile.projectId}
         />
       )}

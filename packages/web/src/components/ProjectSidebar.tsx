@@ -3,7 +3,6 @@ import * as lz4 from 'lz4js';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { FileSection } from './FileSection';
-import { GitHistoryPanel } from './GitHistoryPanel';
 import { runDeleteFlow } from './deleteFlow';
 import { runRenameFlow, type RenamePhase } from './renameFlow';
 import { runCreateFlow, type CreatePhase } from './createFlow';
@@ -564,7 +563,7 @@ function FileBrowser() {
 
   const sessionId = useStore(s => s.sessionId);
 
-  const [l2Tab, setL2Tab] = useState<'files' | 'git' | 'deliverables'>('files');
+  const [l2Tab, setL2Tab] = useState<'files' | 'deliverables'>('files');
   const [showNbCreate, setShowNbCreate] = useState(false);
   const [nbTitle, setNbTitle] = useState('');
   const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
@@ -794,8 +793,8 @@ function FileBrowser() {
           {t('sidebar.files')}
         </button>
         <button
-          className={`sidebar-l2-tab${l2Tab === 'git' ? ' sidebar-l2-tab--active' : ''}`}
-          onClick={() => setL2Tab('git')}
+          className="sidebar-l2-tab"
+          onClick={() => openFileTab({ source: 'project-git', path: 'git', sessionId: sessionId ?? '', projectId: activeProjectId ?? undefined })}
         >
           {t('git.title')}
         </button>
@@ -834,9 +833,6 @@ function FileBrowser() {
             }}
           />
         </>
-      )}
-      {l2Tab === 'git' && activeProjectId && (
-        <GitHistoryPanel projectId={activeProjectId} />
       )}
       {l2Tab === 'deliverables' && (
         <FileSection
@@ -944,7 +940,7 @@ export function ProjectSidebar() {
   const sidebarWidth = useStore(s => s.sidebarWidth);
 
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
-  const [libraryTab, setLibraryTab] = useState<'files' | 'git'>('files');
+  const [libraryTab, setLibraryTab] = useState<'files'>('files');
   const sidebarRef = useRef<HTMLElement>(null);
   const dragging = useRef(false);
 
@@ -994,8 +990,8 @@ export function ProjectSidebar() {
             {t('sidebar.files')}
           </button>
           <button
-            className={`sidebar-l2-tab${libraryTab === 'git' ? ' sidebar-l2-tab--active' : ''}`}
-            onClick={() => setLibraryTab('git')}
+            className="sidebar-l2-tab"
+            onClick={() => openFileTab({ source: 'library-git', path: 'git', sessionId: sessionId ?? '' })}
           >
             {t('git.title')}
           </button>
@@ -1023,9 +1019,6 @@ export function ProjectSidebar() {
               openFileTab({ path: relPath, source: 'library', sessionId: sessionId ?? '' });
             }}
           />
-        )}
-        {libraryTab === 'git' && (
-          <GitHistoryPanel source="library" />
         )}
       </div>
     </aside>
