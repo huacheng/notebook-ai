@@ -287,6 +287,14 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   // Line numbers derived from text content
   const lineNumbers = text.split('\n').length;
 
+  // Current timestamp (updates every minute)
+  const [timestamp, setTimestamp] = useState(() => new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setTimestamp(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+  const formattedTime = timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
   // Convert vertical scroll to horizontal scroll on command toolbar
   // Must use native event listener with { passive: false } to allow preventDefault
   useEffect(() => {
@@ -317,6 +325,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
 
   return (
     <div className={containerClass}>
+      <div className="nb-input-timestamp">{formattedTime}</div>
       {uploadStatus && (
         <div className={`upload-status upload-status-${uploadStatus.phase}`}>
           {uploadStatus.phase === 'uploading' && (
