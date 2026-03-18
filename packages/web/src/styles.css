@@ -4404,6 +4404,14 @@ button:focus-visible {
 }
 .fp-entry-dir .fp-name { color: var(--text-secondary); font-weight: 500; }
 .fp-entry-up .fp-name { color: var(--text-secondary); opacity: 0.45; }
+.fp-size {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Custom tooltip for file names (faster than native title) ── */
 /* Placed on .fp-entry (not .fp-name) so overflow:hidden on .fp-name won't clip the tooltip. */

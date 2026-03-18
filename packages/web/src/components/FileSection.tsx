@@ -56,6 +56,15 @@ export function fileType(name: string): string {
   return EXT_TYPE[ext] ?? (ext.slice(0, 4) || '···');
 }
 
+/** Format file size to human-readable string */
+export function formatSize(bytes: number): string {
+  if (bytes == null || bytes < 0 || Number.isNaN(bytes)) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 // ── SVG Icons ──────────────────────────────────────────────────────────────
 
 function IconUpload() {
@@ -623,6 +632,7 @@ export function FileSection({
               style={{ cursor: onFileClick ? 'pointer' : undefined }}
             >
               <span className="fp-name">{displayName}</span>
+              <span className="fp-size">{formatSize(f.size)}</span>
               <FileIcon name={f.name} />
               {renderItemActions?.(f, subPath) ?? (
               <div className="fp-actions" onClick={(e) => e.stopPropagation()}>
