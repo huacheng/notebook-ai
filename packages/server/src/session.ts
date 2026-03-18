@@ -1434,8 +1434,32 @@ export class SessionManager {
       case 'user': {
         // Claude CLI stream-json sends tool results as:
         // { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id, content }] } }
+        // Also handles local-command-stderr for skill/command execution errors
         const userMsg = msg as any;
-        const blocks = userMsg.message?.content;
+        const content = userMsg.message?.content;
+
+        // Handle local-command-stderr (string content from skill/command failures)
+        if (typeof content === 'string' && content.includes('<local-command-stderr>')) {
+          const match = content.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
+          if (match) {
+            const errorMsg = match[1].trim();
+            const cellId = findRunningCellId(session.notebook) ?? session._lastCellId;
+            if (cellId) {
+              this.broadcast(session, {
+                type: 'cell_output',
+                cell_id: cellId,
+                output: {
+                  type: 'error',
+                  message: errorMsg,
+                  timestamp: new Date().toISOString(),
+                },
+              });
+            }
+          }
+          break;
+        }
+
+        const blocks = content;
         if (!Array.isArray(blocks)) break;
 
         for (const block of blocks) {
@@ -1486,12 +1510,17 @@ export class SessionManager {
 
         const delta = payload.delta;
         if (delta?.type === 'text_delta' && delta.text) {
-          this.broadcast(session, {
-            type: 'cell_stream',
-            cell_id: cellId,
-            delta: delta.text,
-            block_type: 'text',
-          });
+          // Filter out invisible/zero-width characters that Claude outputs to "say nothing"
+          // \u200b=ZWS, \u200c=ZWNJ, \u200d=ZWJ, \ufeff=BOM
+          const visibleText = delta.text.replace(/[\u200b\u200c\u200d\ufeff]/g, '');
+          if (visibleText) {
+            this.broadcast(session, {
+              type: 'cell_stream',
+              cell_id: cellId,
+              delta: visibleText,
+              block_type: 'text',
+            });
+          }
         } else if (delta?.type === 'thinking_delta' && delta.thinking) {
           this.broadcast(session, {
             type: 'cell_stream',
