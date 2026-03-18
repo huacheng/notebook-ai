@@ -278,6 +278,12 @@ function AuthenticatedApp() {
           </button>
         </div>
       )}
+      {!wsReconnectExhausted && wsStatus !== 'connected' && (
+        <div className={`ws-reconnect-banner ${wsStatus}`}>
+          {wsStatus === 'connecting' && <span className="ws-reconnect-spinner" />}
+          <span>{wsStatus === 'connecting' ? t('app.connecting') : t('app.reconnecting')}</span>
+        </div>
+      )}
       {pluginStatus && !pluginDismissed && (() => {
         const TARGET_MARKETPLACES = ['anthropic-agent-skills', 'claude-code-plugins', 'claude-plugins-official', 'moonview'];
         const existingNames = new Set(pluginStatus.marketplaces.map(m => m.name));

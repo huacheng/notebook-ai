@@ -132,6 +132,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       _pendingWs = null;
       // D3-3: Clear stale stream buffers on reconnect (stream context is invalidated)
       set({ ws, wsStatus: 'connected', streamBuffer: {} });
+      // D3: Clear connection-related notices on successful reconnect
+      const notice = get().sessionNotice;
+      if (notice?.includes('Waiting for reconnect') || notice?.includes('Session connecting')) {
+        set({ sessionNotice: null });
+      }
       // Re-subscribe to all open notebook sessions on reconnect (via unified subscribeToSession)
       const { openNotebooks, sessionId, subscribeToSession } = get();
       const subscribedIds = new Set(
@@ -837,6 +842,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             set((state) => ({
               sessionReadyStatus: { ...state.sessionReadyStatus, [readySid]: 'ready' },
             }));
+            // Clear "Session connecting" notice
+            if (get().sessionNotice?.includes('Session connecting')) {
+              set({ sessionNotice: null });
+            }
           }
           // Fire pending auto command if any
           const pending = get().pendingAutoCommand;
@@ -879,12 +888,19 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               store.appendCellOutput(parsed.cell_id, errorOutput);
             }
           } else {
-            // Non-cell error (e.g. "Not subscribed", permission denied)
+            // Non-cell error (e.g. "Not subscribed", permission denied, session not found)
             // Surface via restartPhase overlay so user sees the failure
             const { restartPhase } = get();
             if (restartPhase === 'restarting' || !parsed.cell_id) {
               set({ restartPhase: 'error', restartError: parsed.message ?? 'Operation failed' });
             }
+          }
+          // Clear sessionReadyStatus on session-related errors to stop spinner
+          if (msgSessionId && get().sessionReadyStatus[msgSessionId] === 'subscribing') {
+            set((state) => {
+              const { [msgSessionId]: _, ...rest } = state.sessionReadyStatus;
+              return { sessionReadyStatus: rest };
+            });
           }
           // Clear model switching overlay on any error (e.g. change_model failure)
           if (get().modelSwitching) set({ modelSwitching: false });
@@ -976,11 +992,21 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       };
     });
 
+    const sessionId = get().sessionId ?? '';
+    const sessionStatus = get().sessionReadyStatus[sessionId];
+
     if (ws && ws.readyState === WebSocket.OPEN) {
+      // Check if session is ready
+      if (sessionStatus === 'subscribing') {
+        // Session still connecting - revert to pending (consistent with WS not ready case)
+        get().setCellStatus(cellId, 'pending');
+        set({ sessionNotice: 'Session connecting. Please wait...' });
+        return;
+      }
       ws.send(
         JSON.stringify({
           type: 'execute_request',
-          session_id: get().sessionId ?? '',
+          session_id: sessionId,
           cell_id: cellId,
           source: cell.source,
           ...('images' in cell && cell.images ? { images: cell.images } : {}),
@@ -988,12 +1014,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         })
       );
     } else {
-      get().setCellStatus(cellId, 'error');
-      get().appendCellOutput(cellId, {
-        type: 'error',
-        message: 'WebSocket not connected. Cannot execute cell.',
-        timestamp: new Date().toISOString(),
-      });
+      // WebSocket not ready - revert cell to pending so user can retry
+      get().setCellStatus(cellId, 'pending');
+      // Don't append error output - just show a notice
+      const state = ws ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ws.readyState] : 'disconnected';
+      set({ sessionNotice: `Connection ${state.toLowerCase()}. Waiting for reconnect...` });
     }
   },
 

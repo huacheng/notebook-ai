@@ -1524,7 +1524,7 @@ export class SessionManager {
         }
         // Forward non-init/hook system messages to frontend (e.g. context compaction, local_command_output)
         // Use _lastCellId as fallback since local_command_output may arrive after result completes the cell
-        if (sysMsg.subtype && sysMsg.subtype !== 'init' && sysMsg.subtype !== 'hook_started' && sysMsg.subtype !== 'hook_completed') {
+        if (sysMsg.subtype && sysMsg.subtype !== 'init' && sysMsg.subtype !== 'hook_started' && sysMsg.subtype !== 'hook_completed' && sysMsg.subtype !== 'hook_response') {
           this.broadcast(session, {
             type: 'system_message',
             subtype: sysMsg.subtype,

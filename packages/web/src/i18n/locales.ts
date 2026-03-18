@@ -177,6 +177,8 @@ export const messages: Record<Language, Record<string, string>> = {
     'app.closeBanner': 'Close',
     'app.switchingModel': 'Switching model…',
     'app.gitActive': 'Git History is active. Switch to a notebook tab to continue',
+    'app.connecting': 'Connecting...',
+    'app.reconnecting': 'Reconnecting...',
 
     // ── FileSection ──────────────────────────────────────────────────────
     'file.upload': 'Upload files',
@@ -472,6 +474,8 @@ export const messages: Record<Language, Record<string, string>> = {
     'app.closeBanner': '关闭',
     'app.switchingModel': '正在切换模型…',
     'app.gitActive': 'Git 历史已激活。切换到 notebook 标签页以继续',
+    'app.connecting': '连接中...',
+    'app.reconnecting': '重连中...',
 
     // ── FileSection ──────────────────────────────────────────────────────
     'file.upload': '上传文件',

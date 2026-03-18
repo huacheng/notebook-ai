@@ -297,9 +297,23 @@ export class AgentProcess {
         }
       };
 
-      this.rl!.once('line', () => {
+      this.rl!.once('line', (firstLine) => {
         if (settled) return;
         clearTimeout(timer);
+
+        // Check if first line is an error result (resume failed)
+        try {
+          const msg = JSON.parse(firstLine);
+          if (msg.type === 'result' && msg.is_error) {
+            settled = true;
+            this.proc?.removeListener('exit', exitHandler);
+            reject(new Error(`${this.engine} returned error: ${msg.errors?.[0] ?? 'unknown'}`));
+            return;
+          }
+        } catch {
+          // Not JSON, continue
+        }
+
         // Grace period: wait briefly to detect immediate exit after first output.
         // When --resume fails, Claude outputs an error result then exits with code 1.
         // Without this delay, we'd resolve before the exit event fires.
@@ -309,7 +323,7 @@ export class AgentProcess {
             this.proc?.removeListener('exit', exitHandler);
             resolve();
           }
-        }, 150);
+        }, 300);  // Increased from 150ms to 300ms
       });
 
       this.proc!.on('exit', exitHandler);
