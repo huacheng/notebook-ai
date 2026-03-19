@@ -94,7 +94,8 @@ const CODE_EXT_MAP: Record<string, string> = {
   yml: 'yaml',
 };
 
-function getCodeLanguage(filename: string): string | null {
+function getCodeLanguage(filename: string | null | undefined): string | null {
+  if (!filename) return null;
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   return CODE_EXT_MAP[ext] ?? null;
 }
@@ -266,9 +267,9 @@ function PptxPlaceholder({ buffer, filename }: { buffer: Uint8Array; filename: s
 }
 
 // ── Image Renderer ───────────────────────────────────────────────────────
-function ImageRenderer({ buffer, filename }: { buffer: Uint8Array; filename: string }) {
+function ImageRenderer({ buffer, filename }: { buffer: Uint8Array; filename: string | null }) {
   const objectUrl = useMemo(() => {
-    const ext = filename.split('.').pop()?.toLowerCase() ?? 'png';
+    const ext = filename?.split('.').pop()?.toLowerCase() ?? 'png';
     const mime = ext === 'svg' ? 'image/svg+xml'
       : ext === 'gif' ? 'image/gif'
       : ext === 'webp' ? 'image/webp'
@@ -287,7 +288,7 @@ function ImageRenderer({ buffer, filename }: { buffer: Uint8Array; filename: str
 
   return (
     <div className="fv-render__image">
-      <img src={objectUrl} alt={filename} style={{ maxWidth: '100%', display: 'block' }} />
+      <img src={objectUrl} alt={filename || 'image'} style={{ maxWidth: '100%', display: 'block' }} />
     </div>
   );
 }
@@ -456,7 +457,7 @@ export function FileViewerRender({
       onPdfVisiblePage(Math.min(...set));
     }
   }, [onPdfVisiblePage]);
-  const isMd = filename.endsWith('.md');
+  const isMd = filename?.endsWith('.md') ?? false;
   const isJson = isJsonFile(filename);
   const codeLanguage = getCodeLanguage(filename);
 

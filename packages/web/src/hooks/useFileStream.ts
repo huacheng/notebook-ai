@@ -88,7 +88,7 @@ export function useFileStream(
       cachedContent = cached.content;
       cachedFormat = cached.format;
       formatRef.current = cached.format;
-      if (!(cached.format.endsWith('-binary') || cached.format === 'image')) {
+      if (!(cached.format?.endsWith('-binary') || cached.format === 'image')) {
         contentChunksRef.current = [cached.content];
       }
       // Show cached content immediately — status stays 'loading' but content is
@@ -96,7 +96,7 @@ export function useFileStream(
       setState({
         status: 'loading',
         format: cached.format,
-        content: cached.format.endsWith('-binary') || cached.format === 'image' ? '' : cached.content,
+        content: cached.format?.endsWith('-binary') || cached.format === 'image' ? '' : cached.content,
         binaryBuffer: null,
         mtime: cached.mtime,
         error: null,
@@ -120,7 +120,7 @@ export function useFileStream(
           formatRef.current = format;
           // If mtime matches cache, skip streaming — use cached content
           if (mtime === cachedMtime && cachedContent && cachedFormat === format) {
-            if (format.endsWith('-binary') || format === 'image') {
+            if (format?.endsWith('-binary') || format === 'image') {
               skipStreamRef.current = true;
               b64ToUint8Array(cachedContent).then((buf) => {
                 if (stale) return;

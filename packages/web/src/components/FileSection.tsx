@@ -50,7 +50,8 @@ const EXT_TYPE: Record<string, string> = {
   xlsx: 'xls', xls: 'xls',
 };
 
-export function fileType(name: string): string {
+export function fileType(name: string | null | undefined): string {
+  if (!name) return '···';
   if (name.endsWith('.notebook.json')) return 'nb';
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   return EXT_TYPE[ext] ?? (ext.slice(0, 4) || '···');
