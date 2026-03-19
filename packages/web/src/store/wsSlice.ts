@@ -120,8 +120,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     let pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
     let pingSentAt = 0;
 
-    const PING_INTERVAL = 30_000;  // Increased to 30s for slow networks with large notebooks
-    const PONG_TIMEOUT  = 15_000;  // Increased to 15s for slow networks
+    const PING_INTERVAL = 45_000;  // 45s for slow networks with large notebooks
+    const PONG_TIMEOUT  = 60_000;  // 60s for very slow networks
 
     function sendPing() {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -846,6 +846,65 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               }
               return updates;
             });
+          }
+          break;
+        }
+        case 'session_state_chunk': {
+          // Chunked notebook state for large notebooks
+          const chunkMsg = parsed as unknown as {
+            session_id: string;
+            chunk_index: number;
+            total_chunks: number;
+            data: string;
+            compression: string;
+          };
+
+          // Accumulate chunks in a temporary buffer
+          const bufferKey = `_chunk_buffer_${chunkMsg.session_id}`;
+          const buffer = (window as any)[bufferKey] || { chunks: [], totalChunks: 0, startTime: Date.now() };
+          buffer.chunks[chunkMsg.chunk_index] = chunkMsg.data;
+          buffer.totalChunks = chunkMsg.total_chunks;
+          (window as any)[bufferKey] = buffer;
+
+          // Check if all chunks received
+          const receivedCount = buffer.chunks.filter(Boolean).length;
+          if (chunkMsg.chunk_index === 0) {
+            console.log(`[ws] Receiving chunked notebook: ${chunkMsg.total_chunks} chunks`);
+          }
+          if (receivedCount === buffer.totalChunks) {
+            const elapsed = Date.now() - buffer.startTime;
+            console.log(`[ws] All ${buffer.totalChunks} chunks received in ${elapsed}ms`);
+            // Reassemble and decompress
+            try {
+              const fullB64 = buffer.chunks.join('');
+              const compressed = Uint8Array.from(atob(fullB64), c => c.charCodeAt(0));
+              const decompressed = lz4.decompress(compressed);
+              const notebook = JSON.parse(new TextDecoder().decode(decompressed)) as Notebook;
+
+              // Clean up buffer
+              delete (window as any)[bufferKey];
+
+              // Merge notebook (same as session_state)
+              set((state) => {
+                const updates: Partial<typeof state> = {};
+                const mergeInto = (localNb: Notebook): Notebook =>
+                  mergeServerCells(localNb, notebook.cells);
+                const updatedOpen = { ...state.openNotebooks };
+                for (const [nbId, entry] of Object.entries(updatedOpen)) {
+                  if (entry.sessionId === chunkMsg.session_id) {
+                    updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
+                  }
+                }
+                updates.openNotebooks = updatedOpen;
+                if (state.sessionId === chunkMsg.session_id && state.notebook) {
+                  updates.notebook = mergeInto(state.notebook);
+                }
+                return updates;
+              });
+            } catch (e) {
+              console.error('[ws] Failed to reassemble chunked session_state:', e);
+              delete (window as any)[bufferKey];
+            }
           }
           break;
         }

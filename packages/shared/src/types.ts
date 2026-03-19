@@ -1129,7 +1129,17 @@ export const WSServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('session_state'),
     session_id: z.string(),
-    notebook: NotebookSchema,
+    notebook: NotebookSchema.optional(),
+    notebook_compressed: z.string().optional(),
+    compression: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('session_state_chunk'),
+    session_id: z.string(),
+    chunk_index: z.number(),
+    total_chunks: z.number(),
+    data: z.string(),
+    compression: z.string(),
   }),
   z.object({
     type: z.literal('session_ready'),

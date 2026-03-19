@@ -312,7 +312,8 @@ export function setupWebSocket(
     wsUserMap.set(ws, userId);
 
     const clientId = crypto.randomUUID();
-    console.log(`[ws] Client ${clientId} connected`);
+    const remoteIp = req.socket?.remoteAddress ?? 'unknown';
+    console.log(`[ws] Client ${clientId} connected from ${remoteIp} (user: ${userId})`);
 
     // Per-connection subscription map: sessionId → removeListener
     const subscriptions = new Map<string, () => void>();
@@ -506,18 +507,60 @@ export function setupWebSocket(
             // Send full notebook state unless frontend already has it (skip_full_state)
             // This optimization prevents re-sending large notebooks on reconnect
             if (!msg.skip_full_state) {
-              // Send full notebook state so new device has complete cell content
-              // (including running cell's accumulated outputs from mid-stream)
-              // Use LZ4 compression consistent with notebook_sync
-              const stateJson = JSON.stringify(session.notebook);
-              const stateCompressed = Buffer.from(lz4.compress(Buffer.from(stateJson, 'utf-8')));
+            // Send notebook state - use chunked transfer for large notebooks
+            // to avoid blocking the connection
+            const stateJson = JSON.stringify(session.notebook);
+            const stateBytes = Buffer.from(stateJson, 'utf-8');
+            const stateCompressed = Buffer.from(lz4.compress(stateBytes));
+            const CHUNK_SIZE = 32 * 1024; // 32KB chunks for better interleaving on slow networks
+
+            if (stateCompressed.length <= CHUNK_SIZE) {
+              // Small notebook - send in one message
               sendToClient(ws, {
                 type: 'session_state',
                 session_id,
                 notebook_compressed: stateCompressed.toString('base64'),
                 compression: 'lz4',
               });
+            } else {
+              // Large notebook - send in chunks with small delays
+              const totalChunks = Math.ceil(stateCompressed.length / CHUNK_SIZE);
+              console.log(`[ws] Large notebook ${session_id}: ${stateCompressed.length} bytes (${(stateCompressed.length/1024).toFixed(0)}KB), ${totalChunks} chunks`);
+              let chunkIndex = 0;
+              const chunkStartTime = Date.now();
+
+              const sendNextChunk = () => {
+                if (ws.readyState !== ws.OPEN) {
+                  console.log(`[ws] Chunk transfer aborted: WS closed at chunk ${chunkIndex}/${totalChunks}`);
+                  return;
+                }
+
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, stateCompressed.length);
+                const chunk = stateCompressed.subarray(start, end);
+
+                sendToClient(ws, {
+                  type: 'session_state_chunk',
+                  session_id,
+                  chunk_index: chunkIndex,
+                  total_chunks: totalChunks,
+                  data: chunk.toString('base64'),
+                  compression: 'lz4',
+                });
+
+                chunkIndex++;
+                if (chunkIndex < totalChunks) {
+                  // Small delay between chunks to allow ping/pong
+                  setTimeout(sendNextChunk, 10);
+                } else {
+                  const elapsed = Date.now() - chunkStartTime;
+                  console.log(`[ws] Chunk transfer complete: ${totalChunks} chunks in ${elapsed}ms`);
+                }
+              };
+
+              sendNextChunk();
             }
+            }  // end if (!msg.skip_full_state)
 
             // Signal that session is ready for commands (Claude process is running)
             // Wait for spawn to complete before signaling ready
