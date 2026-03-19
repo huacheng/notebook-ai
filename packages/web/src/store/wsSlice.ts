@@ -19,6 +19,21 @@ import { applyAutoStatus } from './autoStatusSlice';
 // Prevents race conditions when connectWebSocket is called multiple times.
 let _pendingWs: WebSocket | null = null;
 
+/**
+ * Safe WebSocket send - checks readyState before sending to avoid
+ * "WebSocket is already in CLOSING or CLOSED state" errors.
+ * Returns true if message was sent, false otherwise.
+ */
+export function wsSafeSend(ws: WebSocket | null, message: unknown): boolean {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  try {
+    ws.send(JSON.stringify(message));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
   | 'ws' | 'wsStatus' | 'sessionId' | 'sessionReadyStatus' | 'restartPhase' | 'restartError'
   | 'lastEventIndex' | 'updateLastEventIndex' | 'lastCompletedCellId' | 'lastAskQuestionCellId'
@@ -149,7 +164,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       }
       // Auto-restore timer mode if it was active before disconnect/restart
       const savedTimer = cacheGet<{ sessionId: string; intervalMs: number }>('nb-timer-mode', TTL.LAST_NOTEBOOK);
-      if (savedTimer && subscribedIds.has(savedTimer.sessionId)) {
+      if (savedTimer && subscribedIds.has(savedTimer.sessionId) && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'timer_start', session_id: savedTimer.sessionId, interval_ms: savedTimer.intervalMs }));
       }
       sendPing();
@@ -755,7 +770,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             const localLastId = localNb && localNb.cells.length > 0
               ? localNb.cells[localNb.cells.length - 1].id
               : null;
-            if (localLastId !== digestMsg.last_cell_id) {
+            if (localLastId !== digestMsg.last_cell_id && ws.readyState === WebSocket.OPEN) {
               // Stale: request full notebook sync
               ws.send(JSON.stringify({
                 type: 'notebook_sync_request',
