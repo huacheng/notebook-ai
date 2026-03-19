@@ -120,8 +120,8 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     let pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
     let pingSentAt = 0;
 
-    const PING_INTERVAL = 10_000;
-    const PONG_TIMEOUT  =  4_000;
+    const PING_INTERVAL = 30_000;  // Increased to 30s for slow networks with large notebooks
+    const PONG_TIMEOUT  = 15_000;  // Increased to 15s for slow networks
 
     function sendPing() {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -954,7 +954,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   subscribeToSession(sessionId) {
     // Guard against empty sessionId (e.g., restored tabs before backend session created)
     if (!sessionId) return;
-    const { ws, lastEventIndex, sessionReadyStatus } = get();
+    const { ws, lastEventIndex, sessionReadyStatus, openNotebooks, notebook } = get();
     if (ws && ws.readyState === WebSocket.OPEN) {
       // Only set to 'subscribing' if no status exists (avoid overwriting 'subscribing' or 'ready')
       if (!sessionReadyStatus[sessionId]) {
@@ -965,6 +965,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       const msg: Record<string, unknown> = { type: 'subscribe', session_id: sessionId };
       if (lastEventIndex[sessionId] !== undefined) {
         msg.resume_after = lastEventIndex[sessionId];
+      }
+      // Skip full state sync if frontend already has notebook content for this session
+      // This prevents re-sending large notebooks on reconnect (saves bandwidth)
+      const hasNotebook = Object.values(openNotebooks).some(
+        (entry) => entry.sessionId === sessionId && (entry.notebook?.cells?.length ?? 0) > 0
+      ) || ((notebook?.cells?.length ?? 0) > 0);
+      if (hasNotebook) {
+        msg.skip_full_state = true;
       }
       ws.send(JSON.stringify(msg));
       ws.send(JSON.stringify({ type: 'task_status_subscribe', session_id: sessionId }));

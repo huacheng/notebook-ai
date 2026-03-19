@@ -254,6 +254,7 @@ export const SubscribeSchema = z.object({
   type: z.literal('subscribe'),
   session_id: z.string(),
   resume_after: z.number().int().optional(),
+  skip_full_state: z.boolean().optional(),  // Skip sending full session_state on reconnect
 });
 
 export const UnsubscribeSchema = z.object({

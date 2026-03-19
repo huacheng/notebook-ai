@@ -503,17 +503,21 @@ export function setupWebSocket(
               last_cell_id: cells.length > 0 ? cells[cells.length - 1].id : null,
             });
 
-            // Send full notebook state so new device has complete cell content
-            // (including running cell's accumulated outputs from mid-stream)
-            // Use LZ4 compression consistent with notebook_sync
-            const stateJson = JSON.stringify(session.notebook);
-            const stateCompressed = Buffer.from(lz4.compress(Buffer.from(stateJson, 'utf-8')));
-            sendToClient(ws, {
-              type: 'session_state',
-              session_id,
-              notebook_compressed: stateCompressed.toString('base64'),
-              compression: 'lz4',
-            });
+            // Send full notebook state unless frontend already has it (skip_full_state)
+            // This optimization prevents re-sending large notebooks on reconnect
+            if (!msg.skip_full_state) {
+              // Send full notebook state so new device has complete cell content
+              // (including running cell's accumulated outputs from mid-stream)
+              // Use LZ4 compression consistent with notebook_sync
+              const stateJson = JSON.stringify(session.notebook);
+              const stateCompressed = Buffer.from(lz4.compress(Buffer.from(stateJson, 'utf-8')));
+              sendToClient(ws, {
+                type: 'session_state',
+                session_id,
+                notebook_compressed: stateCompressed.toString('base64'),
+                compression: 'lz4',
+              });
+            }
 
             // Signal that session is ready for commands (Claude process is running)
             // Wait for spawn to complete before signaling ready
@@ -524,9 +528,16 @@ export function setupWebSocket(
                   session_id,
                 });
               }
-            }).catch(() => {
-              // Spawn failed — don't signal ready
-              console.warn(`[ws] Spawn failed for session ${session_id}, not sending session_ready`);
+            }).catch((err) => {
+              // Spawn failed — notify client so it can clear spinner
+              console.warn(`[ws] Spawn failed for session ${session_id}:`, err);
+              if (ws.readyState === ws.OPEN) {
+                sendToClient(ws, {
+                  type: 'error',
+                  session_id,
+                  message: `Session spawn failed: ${err?.message ?? 'unknown error'}`,
+                });
+              }
             });
 
           }
