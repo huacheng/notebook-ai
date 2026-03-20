@@ -7,6 +7,18 @@ const certDir = path.resolve(__dirname, '../../certs');
 
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8'));
 
+// Only load certs for dev server (not during build)
+function loadHttpsConfig() {
+  try {
+    return {
+      key: fs.readFileSync(path.join(certDir, 'key.pem')),
+      cert: fs.readFileSync(path.join(certDir, 'cert.pem')),
+    };
+  } catch {
+    return undefined; // Certs not available (e.g., Docker build)
+  }
+}
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -15,10 +27,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
-    https: {
-      key: fs.readFileSync(path.join(certDir, 'key.pem')),
-      cert: fs.readFileSync(path.join(certDir, 'cert.pem')),
-    },
+    https: loadHttpsConfig(),
     hmr: {
       timeout: 5000,
     },

@@ -88,7 +88,10 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   language: (() => {
     if (typeof localStorage === 'undefined') return 'en';
     const stored = localStorage.getItem('nb-lang');
-    return stored === 'zh' ? 'zh' : 'en';
+    if (stored === 'zh' || stored === 'en') return stored;
+    // Default language from build-time env or fallback to 'en'
+    const defaultLang = (import.meta as any).env?.VITE_DEFAULT_LANG;
+    return defaultLang === 'zh' ? 'zh' : 'en';
   })(),
 
   setActiveTab(tab) {
