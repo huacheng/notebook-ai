@@ -279,54 +279,55 @@ export class AgentProcess {
     return this.proc !== null && this.proc.exitCode === null && !this.proc.killed;
   }
 
-  private _waitForFirstOutput(timeoutMs = AGENT_START_TIMEOUT_MS): Promise<void> {
+  /**
+   * Wait for process to stabilize. Changed from waiting for first output to waiting
+   * for a brief "alive" period. This is necessary because Claude CLI with --input-format
+   * stream-json only outputs after receiving the first prompt, and hooks may not be
+   * configured (especially in Docker containers).
+   *
+   * Strategy: Wait briefly (1s) and check if process is still alive. If it exits
+   * during this period, it's an error (spawn failure, permission issues, etc.).
+   */
+  private _waitForFirstOutput(timeoutMs = 1000): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          reject(new Error(`Timed out waiting for ${this.engine} to start.`));
-        }
-      }, timeoutMs);
 
       const exitHandler = (code: number | null) => {
         if (!settled) {
           settled = true;
-          clearTimeout(timer);
           reject(new Error(`${this.engine} exited early with code ${code}`));
         }
       };
 
-      this.rl!.once('line', (firstLine) => {
-        if (settled) return;
-        clearTimeout(timer);
+      this.proc!.once('exit', exitHandler);
 
-        // Check if first line is an error result (resume failed)
+      // Also listen for error result in case of resume failure
+      const lineHandler = (line: string) => {
+        if (settled) return;
         try {
-          const msg = JSON.parse(firstLine);
+          const msg = JSON.parse(line.trim());
           if (msg.type === 'result' && msg.is_error) {
             settled = true;
             this.proc?.removeListener('exit', exitHandler);
+            this.rl?.removeListener('line', lineHandler);
             reject(new Error(`${this.engine} returned error: ${msg.errors?.[0] ?? 'unknown'}`));
-            return;
           }
         } catch {
-          // Not JSON, continue
+          // Not JSON, ignore
         }
+      };
+      this.rl!.on('line', lineHandler);
 
-        // Grace period: wait briefly to detect immediate exit after first output.
-        // When --resume fails, Claude outputs an error result then exits with code 1.
-        // Without this delay, we'd resolve before the exit event fires.
-        setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            this.proc?.removeListener('exit', exitHandler);
-            resolve();
-          }
-        }, 300);  // Increased from 150ms to 300ms
-      });
-
-      this.proc!.on('exit', exitHandler);
+      // Wait for stabilization period
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.proc?.removeListener('exit', exitHandler);
+          this.rl?.removeListener('line', lineHandler);
+          // Process is still alive after the grace period - consider it ready
+          resolve();
+        }
+      }, timeoutMs);
     });
   }
 }

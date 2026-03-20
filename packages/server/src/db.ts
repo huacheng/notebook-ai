@@ -413,14 +413,15 @@ export class NotebookDb {
     `).all() as ProjectRow[];
   }
 
-  getProject(id: string): ProjectRow | undefined {
+  getProject(idOrSlug: string): ProjectRow | undefined {
+    // Support lookup by id (UUID) or slug (proj-xxxxx)
     return this.db.prepare(`
       SELECT p.*, COALESCE(nb_cnt, 0) AS notebook_count
       FROM projects p
       LEFT JOIN (SELECT project_id, COUNT(*) AS nb_cnt FROM notebooks WHERE status = 'active' GROUP BY project_id) n
         ON n.project_id = p.id
-      WHERE p.id = ?
-    `).get(id) as ProjectRow | undefined;
+      WHERE p.id = ? OR p.slug = ?
+    `).get(idOrSlug, idOrSlug) as ProjectRow | undefined;
   }
 
   updateProject(id: string, updates: Partial<Pick<ProjectRow, 'title' | 'slug' | 'path' | 'status' | 'notebook_count'>>): ProjectRow | undefined {
