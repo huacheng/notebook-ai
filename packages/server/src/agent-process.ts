@@ -121,7 +121,7 @@ export class AgentProcess {
 
     // Wait for the process to emit its first line of output to confirm it's ready.
     try {
-      await this._waitForFirstOutput();
+      await this._waitForProcessReady();
     } catch (err) {
       // If resume failed (expired session etc.), retry without --resume as fallback
       if (resumeSessionId) {
@@ -166,7 +166,7 @@ export class AgentProcess {
           }
         });
 
-        await this._waitForFirstOutput();
+        await this._waitForProcessReady();
       } else {
         throw err;
       }
@@ -288,13 +288,14 @@ export class AgentProcess {
    * Strategy: Wait briefly (1s) and check if process is still alive. If it exits
    * during this period, it's an error (spawn failure, permission issues, etc.).
    */
-  private _waitForFirstOutput(timeoutMs = 1000): Promise<void> {
+  private _waitForProcessReady(timeoutMs = 1000): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
 
       const exitHandler = (code: number | null) => {
         if (!settled) {
           settled = true;
+          this.rl?.removeListener('line', lineHandler);
           reject(new Error(`${this.engine} exited early with code ${code}`));
         }
       };
