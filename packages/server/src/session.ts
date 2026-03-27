@@ -551,10 +551,12 @@ export class SessionManager {
    * process is ready. Callers can await it (executeCell) or fire-and-forget
    * (interruptCell, restartSession).
    */
-  private _spawnAgent(session: NotebookSession, sessionId: string, resumeSessionId?: string): Promise<void> {
+  private async _spawnAgent(session: NotebookSession, sessionId: string, resumeSessionId?: string): Promise<void> {
     console.log(`[session ${sessionId}] _spawnAgent: resumeSessionId=${resumeSessionId ?? 'undefined'}`);
     const engine = session.agentProcess.engine;
-    const model = session.agentProcess.model;
+    // Re-read model from settings.json on every spawn so restarts pick up changes
+    const model = await getClaudeDefaultModel() ?? session.agentProcess.model;
+    session.notebook.metadata.model = model;
     session.agentProcess = new AgentProcess(engine, session.cwd, buildMemorySystemPrompt(session.cwd), model);
 
     const ready = session.agentProcess.start(
