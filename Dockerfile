@@ -91,6 +91,7 @@ RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 # Environment
 ENV NODE_ENV=production
 ENV NB_WORKSPACES_ROOT=/data/workspaces
+ENV NB_DB_PATH=/data/notebook.db
 ENV PORT=3000
 ENV HOME=/home/node
 

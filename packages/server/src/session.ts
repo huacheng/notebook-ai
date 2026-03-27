@@ -516,6 +516,7 @@ export class SessionManager {
     // Capture Claude session ID for --resume before stopping.
     const resumeSessionId = opts?.skipResume ? undefined : session.claudeSessionId;
 
+
     // Reset claudeSessionId so the new process's session_id will be captured
     session.claudeSessionId = undefined;
 

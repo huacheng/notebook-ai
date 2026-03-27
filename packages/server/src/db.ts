@@ -62,8 +62,9 @@ export interface TaskAutoRow {
 
 // ── Database ─────────────────────────────────────────────────────────────────
 
-const DB_DIR = path.join(os.homedir(), '.notebook-ai');
-const DB_PATH = path.join(DB_DIR, 'notebook.db');
+// Support NB_DB_PATH env var for Docker deployments
+const DB_DIR = process.env['NB_DB_DIR'] ?? path.join(os.homedir(), '.notebook-ai');
+const DB_PATH = process.env['NB_DB_PATH'] ?? path.join(DB_DIR, 'notebook.db');
 
 /** D6: Default max age in days for file annotation cleanup */
 export const DEFAULT_ANNOTATION_MAX_AGE_DAYS = 7;
