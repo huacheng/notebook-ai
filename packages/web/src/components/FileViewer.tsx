@@ -163,6 +163,7 @@ export function FileViewer() {
           onSendToPrompt={appendToPrompt}
           absolutePath={absolutePath}
           sessionId={activeFile.sessionId}
+          projectId={activeFile.projectId}
           pdfScale={contentScale}
           onPdfPagesLoaded={setPdfPages}
           onPdfVisiblePage={setPdfPage}

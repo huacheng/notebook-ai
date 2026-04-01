@@ -28,6 +28,26 @@ const THROTTLE_MS = 200;
 
 import { b64ToUint8Array, uint8ArrayToBase64 } from '../utils/b64';
 
+/** Decode a base64 string to Uint8Array (synchronous, for individual chunks). */
+function b64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/** Concatenate multiple Uint8Array chunks into one. */
+function concatBytes(chunks: Uint8Array[]): Uint8Array {
+  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+  const result = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
 export function useFileStream(
   sessionId: string | null,
   notebookId: string | null,
@@ -41,7 +61,7 @@ export function useFileStream(
   const [state, setState] = useState<FileStreamState>(INITIAL_STATE);
 
   const contentChunksRef = useRef<string[]>([]);
-  const b64ChunksRef = useRef<string[]>([]);
+  const binaryChunksRef = useRef<Uint8Array[]>([]);
   const formatRef = useRef<FileFormat | null>(null);
   const throttleRef = useRef<number | null>(null);
   const skipStreamRef = useRef(false);
@@ -71,7 +91,7 @@ export function useFileStream(
     const effectiveSessionId = sessionId || (projectId ? `__project_${projectId}__` : '__library__');
 
     contentChunksRef.current = [];
-    b64ChunksRef.current = [];
+    binaryChunksRef.current = [];
     formatRef.current = null;
     skipStreamRef.current = false;
     let stale = false;
@@ -131,7 +151,7 @@ export function useFileStream(
                 cacheRemove(cacheKey);
                 skipStreamRef.current = false;
                 contentChunksRef.current = [];
-                b64ChunksRef.current = [];
+                binaryChunksRef.current = [];
                 const retryMsg: Record<string, string> = { type: 'file-open', session_id: effectiveSessionId, path: filePath!, source };
                 if (projectId) retryMsg.project_id = projectId;
                 ws?.send(JSON.stringify(retryMsg));
@@ -142,7 +162,7 @@ export function useFileStream(
             }
           } else {
             contentChunksRef.current = [];
-            b64ChunksRef.current = [];
+            binaryChunksRef.current = [];
           }
           break;
         }
@@ -150,7 +170,7 @@ export function useFileStream(
           if (skipStreamRef.current) break;
           const { data, encoding } = msg as unknown as { data: string; encoding: 'utf8' | 'base64' };
           if (encoding === 'base64') {
-            b64ChunksRef.current.push(data);
+            binaryChunksRef.current.push(b64ToBytes(data));
           } else {
             contentChunksRef.current.push(data);
           }
@@ -164,13 +184,12 @@ export function useFileStream(
             encoding: 'utf8' | 'base64';
           };
           try {
-            const compressedBytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+            const compressedBytes = b64ToBytes(data);
             // LZ4 decompression (server always sends LZ4 for chunked compression)
             const decompressed = lz4.decompress(compressedBytes);
             if (encoding === 'base64') {
-              // Binary file: convert decompressed bytes back to base64 for existing flow
-              const b64 = uint8ArrayToBase64(decompressed);
-              b64ChunksRef.current.push(b64);
+              // Binary file: accumulate raw bytes directly
+              binaryChunksRef.current.push(new Uint8Array(decompressed));
             } else {
               // Text file: decode as UTF-8
               const text = new TextDecoder().decode(decompressed);
@@ -178,7 +197,6 @@ export function useFileStream(
             }
           } catch (e) {
             console.error('[useFileStream] Failed to decompress:', e);
-            // D3: Update state to notify user of decompression failure
             setState((prev) => ({ ...prev, status: 'error', error: `Decompression failed: ${String(e)}` }));
           }
           break;
@@ -189,15 +207,10 @@ export function useFileStream(
           const fmt = formatRef.current;
           const mtime = (msg as unknown as { mtime: number }).mtime;
           if (fmt?.endsWith('-binary') || fmt === 'image') {
-            const b64 = b64ChunksRef.current.join('');
-            b64ToUint8Array(b64).then((buffer) => {
-              if (stale) return;
-              cacheSet(cacheKey, { content: b64, mtime, format: fmt });
-              setState({ status: 'complete', format: fmt, content: '', binaryBuffer: buffer, mtime, error: null });
-            }).catch((err) => {
-              if (stale) return;
-              setState((prev) => ({ ...prev, status: 'error', error: `Failed to decode binary data: ${String(err)}` }));
-            });
+            const buffer = concatBytes(binaryChunksRef.current);
+            const b64ForCache = uint8ArrayToBase64(buffer);
+            cacheSet(cacheKey, { content: b64ForCache, mtime, format: fmt });
+            setState({ status: 'complete', format: fmt, content: '', binaryBuffer: buffer, mtime, error: null });
           } else {
             cacheSet(cacheKey, { content: contentChunksRef.current.join(''), mtime, format: fmt });
             setState({ status: 'complete', format: fmt ?? 'text', content: contentChunksRef.current.join(''), binaryBuffer: null, mtime, error: null });
@@ -220,7 +233,7 @@ export function useFileStream(
           if (changedPath !== filePath) break;
           // Reset chunks for incoming update
           contentChunksRef.current = [];
-          b64ChunksRef.current = [];
+          binaryChunksRef.current = [];
           formatRef.current = format;
           skipStreamRef.current = false;
           // Set loading status to indicate refresh in progress
@@ -233,7 +246,7 @@ export function useFileStream(
           const { path: changedPath, data, encoding } = msg as unknown as { path: string; data: string; encoding: 'utf8' | 'base64' };
           if (changedPath !== filePath) break;
           if (encoding === 'base64') {
-            b64ChunksRef.current.push(data);
+            binaryChunksRef.current.push(b64ToBytes(data));
           } else {
             contentChunksRef.current.push(data);
           }
@@ -250,18 +263,16 @@ export function useFileStream(
           };
           if (changedPath !== filePath) break;
           try {
-            const compressedBytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+            const compressedBytes = b64ToBytes(data);
             const decompressed = lz4.decompress(compressedBytes);
             if (encoding === 'base64') {
-              const b64 = uint8ArrayToBase64(decompressed);
-              b64ChunksRef.current.push(b64);
+              binaryChunksRef.current.push(new Uint8Array(decompressed));
             } else {
               const text = new TextDecoder().decode(decompressed);
               contentChunksRef.current.push(text);
             }
           } catch (e) {
             console.error('[useFileStream] Failed to decompress file-changed chunk:', e);
-            // D3: Update state to notify user of decompression failure
             setState((prev) => ({ ...prev, status: 'error', error: `Decompression failed: ${String(e)}` }));
           }
           break;
@@ -274,15 +285,10 @@ export function useFileStream(
           if (throttleRef.current !== null) { clearTimeout(throttleRef.current); throttleRef.current = null; }
           const fmt = formatRef.current;
           if (fmt?.endsWith('-binary') || fmt === 'image') {
-            const b64 = b64ChunksRef.current.join('');
-            b64ToUint8Array(b64).then((buffer) => {
-              if (stale) return;
-              cacheSet(cacheKey, { content: b64, mtime, format: fmt });
-              setState({ status: 'complete', format: fmt, content: '', binaryBuffer: buffer, mtime, error: null });
-            }).catch((err) => {
-              if (stale) return;
-              setState((prev) => ({ ...prev, status: 'error', error: `Failed to decode binary data: ${String(err)}` }));
-            });
+            const buffer = concatBytes(binaryChunksRef.current);
+            const b64ForCache = uint8ArrayToBase64(buffer);
+            cacheSet(cacheKey, { content: b64ForCache, mtime, format: fmt });
+            setState({ status: 'complete', format: fmt, content: '', binaryBuffer: buffer, mtime, error: null });
           } else {
             const newContent = contentChunksRef.current.join('');
             cacheSet(cacheKey, { content: newContent, mtime, format: fmt });

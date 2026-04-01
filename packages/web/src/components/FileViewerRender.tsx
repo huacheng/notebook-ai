@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from 'rea
 import { cacheSet, cacheGet, TTL } from '../utils/localCache';
 import { useT } from '../i18n';
 import ReactMarkdown from 'react-markdown';
+import { AuthImage } from './AuthImage';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
@@ -356,13 +357,14 @@ interface FileViewerRenderProps {
   onSendToPrompt: (text: string) => void;
   absolutePath: string;
   sessionId?: string | null;
+  projectId?: string | null;
   pdfScale?: number;
   onPdfPagesLoaded?: (n: number) => void;
   onPdfVisiblePage?: (n: number) => void;
 }
 
 export function FileViewerRender({
-  format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath, sessionId,
+  format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath, sessionId, projectId,
   pdfScale = 1.0, onPdfPagesLoaded, onPdfVisiblePage,
 }: FileViewerRenderProps) {
   const t = useT();
@@ -484,20 +486,25 @@ export function FileViewerRender({
       }
       return <code className={className} {...rest}>{children}</code>;
     };
-    // Custom img: resolve relative paths via /api/notebooks/:sessionId/files/raw
+    // Custom img: resolve relative paths via raw file endpoint.
+    // Uses AuthImage (fetch + blob URL) instead of token-in-URL to prevent credential leakage.
     const MdImage = ({ src, alt, ...rest }: any) => {
-      if (!src || !sessionId) return <img src={src} alt={alt} {...rest} />;
-      // Skip external URLs
+      if (!src) return <img src={src} alt={alt} {...rest} />;
+      // Skip external URLs and data URIs — render directly
       if (/^https?:\/\/|^data:/.test(src)) return <img src={src} alt={alt} {...rest} />;
+      // Need either sessionId or projectId to construct the API URL
+      if (!sessionId && !projectId) return <img src={src} alt={alt} {...rest} />;
       // Resolve relative path against current file's directory
       const resolvedPath = src.startsWith('/')
         ? src
         : fileDir ? `${fileDir}/${src}` : src;
-      const rawUrl = `/api/notebooks/${sessionId}/files/raw?path=${encodeURIComponent(resolvedPath)}`;
-      return <img src={rawUrl} alt={alt ?? ''} style={{ maxWidth: '100%' }} {...rest} />;
+      const rawUrl = projectId
+        ? `/api/projects/${projectId}/files/raw?path=${encodeURIComponent(resolvedPath)}`
+        : `/api/notebooks/${sessionId}/files/raw?path=${encodeURIComponent(resolvedPath)}`;
+      return <AuthImage src={rawUrl} alt={alt ?? ''} style={{ maxWidth: '100%' }} {...rest} />;
     };
     return { ...comps, code: MermaidCodeBlock, img: MdImage };
-  }, [sessionId, fileDir]);
+  }, [sessionId, projectId, fileDir]);
   useMermaidRender(mdRef, content);
   const handleTocToggle = useCallback(() => {
     setTocOpen(v => {
