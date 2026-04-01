@@ -162,6 +162,7 @@ export function FileViewer() {
           onAnnotationsChange={setAnnotations}
           onSendToPrompt={appendToPrompt}
           absolutePath={absolutePath}
+          sessionId={activeFile.sessionId}
           pdfScale={contentScale}
           onPdfPagesLoaded={setPdfPages}
           onPdfVisiblePage={setPdfPage}

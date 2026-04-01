@@ -161,6 +161,44 @@ export function createFilesRouter(sessionManager: SessionManager): IRouter {
   });
 
   /**
+   * GET /api/notebooks/:sessionId/files/raw?path=<relative-path>
+   * Serves a file inline with correct MIME type (for embedding images in markdown etc.).
+   */
+  router.get('/:sessionId/files/raw', async (req: Request, res: Response) => {
+    const { sessionId } = req.params as { sessionId: string };
+    const filePath = typeof req.query['path'] === 'string' ? req.query['path'] : '';
+
+    const session = sessionManager.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: `Session "${sessionId}" not found.` });
+      return;
+    }
+
+    try {
+      const resolved = await validateWorkspacePath(filePath, session.cwd);
+      const fileStat = await stat(resolved);
+      if (fileStat.isDirectory()) {
+        res.status(400).json({ error: 'Cannot serve a directory.' });
+        return;
+      }
+      const ext = path.extname(resolved).toLowerCase().slice(1);
+      const mimeMap: Record<string, string> = {
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+        bmp: 'image/bmp', ico: 'image/x-icon',
+      };
+      const mime = mimeMap[ext] ?? 'application/octet-stream';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Length', fileStat.size);
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      createReadStream(resolved).pipe(res);
+    } catch (err) {
+      const status = isPathTraversal(err) ? 403 : 400;
+      res.status(status).json({ error: isPathTraversal(err) ? 'Path outside workspace' : 'File not found.' });
+    }
+  });
+
+  /**
    * GET /api/notebooks/:sessionId/files/download?path=<relative-path>
    * Streams a single file from the workspace as a download.
    */

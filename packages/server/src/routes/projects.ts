@@ -488,6 +488,39 @@ export function createProjectsRouter(
     }
   });
 
+  // Serve file inline with correct MIME type (for markdown image embedding)
+  router.get('/:projectId/files/raw', async (req, res) => {
+    const project = db.getProject(req.params.projectId);
+    if (!project) { res.status(404).json({ error: 'not found' }); return; }
+
+    const filePath = typeof req.query['path'] === 'string' ? req.query['path'] : '';
+    try {
+      const resolved = await validateWorkspacePath(filePath, project.path);
+      const fileStat = await stat(resolved);
+      if (fileStat.isDirectory()) {
+        res.status(400).json({ error: 'Cannot serve a directory.' });
+        return;
+      }
+      const ext = path.extname(resolved).toLowerCase().slice(1);
+      const mimeMap: Record<string, string> = {
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+        bmp: 'image/bmp', ico: 'image/x-icon',
+      };
+      const mime = mimeMap[ext] ?? 'application/octet-stream';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Length', fileStat.size);
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      createReadStream(resolved).pipe(res);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Path outside workspace') {
+        res.status(403).json({ error: 'Path outside workspace' });
+      } else {
+        res.status(400).json({ error: 'File not found.' });
+      }
+    }
+  });
+
   // Download single file
   router.get('/:projectId/files/download', async (req, res) => {
     const project = db.getProject(req.params.projectId);

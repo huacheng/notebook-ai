@@ -355,13 +355,14 @@ interface FileViewerRenderProps {
   onAnnotationsChange: (a: FileAnnotations) => void;
   onSendToPrompt: (text: string) => void;
   absolutePath: string;
+  sessionId?: string | null;
   pdfScale?: number;
   onPdfPagesLoaded?: (n: number) => void;
   onPdfVisiblePage?: (n: number) => void;
 }
 
 export function FileViewerRender({
-  format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath,
+  format, content, binaryBuffer, filename, annotations, filePath, onAnnotationsChange, onSendToPrompt, absolutePath, sessionId,
   pdfScale = 1.0, onPdfPagesLoaded, onPdfVisiblePage,
 }: FileViewerRenderProps) {
   const t = useT();
@@ -467,6 +468,13 @@ export function FileViewerRender({
     try { return localStorage.getItem('fv-toc-open') === '1'; } catch { return false; }
   });
   const mdHeadings = useMemo(() => isMd ? extractHeadings(content) : [], [isMd, content]);
+  // Resolve relative image paths in markdown to raw file endpoint
+  const fileDir = useMemo(() => {
+    const parts = filePath.split('/');
+    parts.pop();
+    return parts.join('/');
+  }, [filePath]);
+
   const mdComponents = useMemo(() => {
     const comps = headingComponents();
     // MermaidCodeBlock: render mermaid fences as-is so the hook can find them
@@ -476,8 +484,20 @@ export function FileViewerRender({
       }
       return <code className={className} {...rest}>{children}</code>;
     };
-    return { ...comps, code: MermaidCodeBlock };
-  }, []);
+    // Custom img: resolve relative paths via /api/notebooks/:sessionId/files/raw
+    const MdImage = ({ src, alt, ...rest }: any) => {
+      if (!src || !sessionId) return <img src={src} alt={alt} {...rest} />;
+      // Skip external URLs
+      if (/^https?:\/\/|^data:/.test(src)) return <img src={src} alt={alt} {...rest} />;
+      // Resolve relative path against current file's directory
+      const resolvedPath = src.startsWith('/')
+        ? src
+        : fileDir ? `${fileDir}/${src}` : src;
+      const rawUrl = `/api/notebooks/${sessionId}/files/raw?path=${encodeURIComponent(resolvedPath)}`;
+      return <img src={rawUrl} alt={alt ?? ''} style={{ maxWidth: '100%' }} {...rest} />;
+    };
+    return { ...comps, code: MermaidCodeBlock, img: MdImage };
+  }, [sessionId, fileDir]);
   useMermaidRender(mdRef, content);
   const handleTocToggle = useCallback(() => {
     setTocOpen(v => {
