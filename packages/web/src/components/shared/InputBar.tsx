@@ -309,7 +309,8 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
     { cmd: 'task-ai:read', icon: '📖' },
     { cmd: 'task-ai:highlight', icon: '💡' },
     { cmd: 'task-ai:check', icon: '✅', args: 'Audit-and-Fix', label: 'check+fix' },
-    { cmd: 'ralph-loop:ralph-loop', icon: '🔄', label: 'ralph' },
+    { cmd: 'ralph-loop:ralph-loop', icon: '🔄', label: 'ralph-loop' },
+    { cmd: 'ralph-loop:cancel-ralph', icon: '🚫', label: 'ralph-cancel' },
   ];
 
   const containerClass = mobile
