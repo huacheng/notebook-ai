@@ -1120,6 +1120,7 @@ export function setupWebSocket(
             break;
           }
           const cells = session.notebook.cells.slice(offset, offset + limit);
+          console.log('[load_cells] session=%s totalCells=%d offset=%d limit=%d returned=%d', session_id, session.notebook.cells.length, offset, limit, cells.length);
           // Use LZ4 compression for cells_loaded (same as notebook_opened)
           const cellsJson = JSON.stringify(cells);
           const compressed = Buffer.from(lz4.compress(Buffer.from(cellsJson, 'utf-8')));

@@ -448,8 +448,10 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               break;
             }
           }
+          console.log('[cells_loaded] offset=%d cellCount=%d currentOffset=%d', msg.offset, cells?.length ?? 0, get().cellsOffset);
           if (cells && Array.isArray(cells) && cells.length > 0) {
             store.prependCells(cells as Cell[], msg.offset);
+            console.log('[cells_loaded] prependCells done, newOffset=%d', get().cellsOffset);
           }
           set({ loadingOlderCells: false });
           break;
@@ -760,8 +762,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         }
         case 'notebook_digest': {
           // Cross-device sync: compare server cell state with local
-          // Only compare last_cell_id — cell_count differs in paginated mode
-          // (local has last N cells, server has all cells)
           const digestMsg = parsed as unknown as { session_id: string; cell_count: number; last_cell_id: string | null };
           if (digestMsg.session_id) {
             const localNb = Object.values(get().openNotebooks).find(
@@ -770,6 +770,14 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             const localLastId = localNb && localNb.cells.length > 0
               ? localNb.cells[localNb.cells.length - 1].id
               : null;
+            // Recalculate cellsOffset from server's authoritative cell_count
+            // Fixes stale offset after WS reconnect to a different/restored session
+            if (localNb && digestMsg.cell_count > 0) {
+              const correctOffset = Math.max(0, digestMsg.cell_count - localNb.cells.length);
+              if (correctOffset !== get().cellsOffset) {
+                set({ cellsOffset: correctOffset });
+              }
+            }
             if (localLastId !== digestMsg.last_cell_id && ws.readyState === WebSocket.OPEN) {
               // Stale: request full notebook sync
               ws.send(JSON.stringify({
