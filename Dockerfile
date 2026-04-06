@@ -41,7 +41,7 @@ RUN pnpm run build
 # ── Stage 2: Production ──────────────────────────────────────────────────────
 FROM node:20-slim
 
-RUN apt-get update && apt-get install -y git tini python3 make g++ curl openssl cron && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git tini python3 make g++ curl openssl cron gosu && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 # Install Claude Code CLI
@@ -94,9 +94,6 @@ ENV NB_WORKSPACES_ROOT=/data/workspaces
 ENV NB_DB_PATH=/data/notebook.db
 ENV PORT=3000
 ENV HOME=/home/node
-
-# Install gosu for dropping privileges
-RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
 
 # Production mode: backend serves API + static files on single port
 WORKDIR /app/packages/server

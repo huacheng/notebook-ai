@@ -493,6 +493,7 @@ export function Notebook() {
 
   const handleLoadMore = useCallback(() => {
     const { ws, sessionId, loadingOlderCells: isLoading } = useStore.getState();
+    console.log('[load-more] cellsOffset=%d isLoading=%s ws=%s sessionId=%s', cellsOffset, isLoading, ws?.readyState, sessionId);
     if (isLoading || !ws || ws.readyState !== WebSocket.OPEN || !sessionId) return;
     const BATCH = 2; // Load 2 cells at a time for smoother scroll experience
     const newOffset = Math.max(0, cellsOffset - BATCH);
@@ -508,9 +509,13 @@ export function Notebook() {
   useEffect(() => {
     const el = sentinelRef.current;
     const container = cellsContainerRef.current;
+    console.log('[observer] setup cellsOffset=%d sentinel=%s container=%s', cellsOffset, !!el, !!container);
     if (!el || !container || cellsOffset <= 0) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) handleLoadMore(); },
+      ([entry]) => {
+        console.log('[observer] isIntersecting=%s', entry.isIntersecting);
+        if (entry.isIntersecting) handleLoadMore();
+      },
       { threshold: 0.1, root: container },
     );
     observer.observe(el);
