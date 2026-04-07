@@ -446,18 +446,16 @@ function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone 
   );
 }
 
-function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, onClose, onDeleted, onRequestRename, anchorRect }: {
-  projectId: string; relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean;
-  onClose: () => void; onDeleted?: () => void; onRequestRename?: () => void;
+function NotebookItemMenu({ relPath, baseUrl, authToken, showExport, onClose, onRequestRename, onRequestDelete, anchorRect }: {
+  relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean;
+  onClose: () => void; onRequestRename?: () => void;
+  onRequestDelete?: () => void;
   anchorRect?: DOMRect;
 }) {
   const t = useT();
-  const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (showDeleteModal) return;
     // Delay adding listener to avoid capturing the click that just closed the modal
     const timeoutId = setTimeout(() => {
       const handler = (e: MouseEvent) => {
@@ -474,7 +472,7 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
         delete (window as any).__nbMenuHandler;
       }
     };
-  }, [onClose, showDeleteModal]);
+  }, [onClose]);
 
   const handleExport = async () => {
     const url = `${baseUrl}/files/zip?path=${encodeURIComponent(relPath)}`;
@@ -491,14 +489,6 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
     onClose();
   };
 
-  const displayName = relPath.split('/').pop() || relPath;
-  const isWorktree = relPath.includes('.worktrees/');
-
-  // Infer branch name from worktree path: .worktrees/task-xxx → task/xxx
-  const branchName = isWorktree
-    ? 'task/' + (displayName.startsWith('task-') ? displayName.slice(5) : displayName)
-    : '';
-
   // Use fixed positioning when anchorRect is provided
   const style: React.CSSProperties = anchorRect ? {
     position: 'fixed',
@@ -506,46 +496,12 @@ function NotebookItemMenu({ projectId, relPath, baseUrl, authToken, showExport, 
     right: window.innerWidth - anchorRect.right,
   } : {};
 
-  const handleDeleteDone = () => {
-    const store = useStore.getState();
-    store.closeProjectFileTabs(projectId, relPath.endsWith('/') ? relPath : relPath + '/');
-    // Close the notebook tab if its workspaceDir matches the deleted path
-    const projPath = store.activeProjectPath;
-    if (projPath) {
-      const fullPath = relPath.startsWith('/') ? relPath : `${projPath}/${relPath}`;
-      store.closeNotebookTabByPath(fullPath);
-    }
-    setShowDeleteModal(false);
-    onClose();
-    onDeleted?.();
-  };
-
   return (
-    <>
-      <div className="project-item-menu" ref={menuRef} style={style}>
-        {onRequestRename && <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>}
-        {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
-        <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => setShowDeleteModal(true)}>{t('sidebar.delete')}</button>
-      </div>
-      {showDeleteModal && isWorktree && (
-        <NotebookDeleteModal
-          name={displayName}
-          branchName={branchName}
-          onMergeDelete={() => deleteProjectNotebook(projectId, relPath, true)}
-          onDeleteOnly={() => deleteProjectNotebook(projectId, relPath, false)}
-          onCancel={() => { setShowDeleteModal(false); onClose(); }}
-          onDone={handleDeleteDone}
-        />
-      )}
-      {showDeleteModal && !isWorktree && (
-        <ConfirmDeleteModal
-          name={displayName}
-          onCancel={() => { setShowDeleteModal(false); onClose(); }}
-          onConfirm={() => deleteProjectNotebook(projectId, relPath)}
-          onDone={handleDeleteDone}
-        />
-      )}
-    </>
+    <div className="project-item-menu" ref={menuRef} style={style}>
+      {onRequestRename && <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>}
+      {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
+      <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete?.(); }}>{t('sidebar.delete')}</button>
+    </div>
   );
 }
 
@@ -557,6 +513,7 @@ function FileBrowser() {
   const authToken = useStore(s => s.authToken);
   const openFileTab = useStore(s => s.openFileTab);
   const importProjectNotebook = useStore(s => s.importProjectNotebook);
+  const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
   const workspaceDir = useStore(s => s.workspaceDir);
 
   const projectTitle = useStore(s => s.projects.find(p => p.id === s.activeProjectId)?.title ?? 'Project');
@@ -571,10 +528,23 @@ function FileBrowser() {
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
   const [nbMenuAnchorRect, setNbMenuAnchorRect] = useState<DOMRect | null>(null);
   const [nbRenameTarget, setNbRenameTarget] = useState<{ path: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ relPath: string; displayName: string; isWorktree: boolean; projectPath: string } | null>(null);
   const [currentSubPath, setCurrentSubPath] = useState('.');
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
   const nbImportRef = useRef<HTMLInputElement>(null);
   const isInsideNotebook = currentSubPath !== '.';
+
+  const handleDeleteDone = useCallback(() => {
+    if (!deleteTarget || !activeProjectId) return;
+    const store = useStore.getState();
+    store.closeProjectFileTabs(activeProjectId, deleteTarget.relPath.endsWith('/') ? deleteTarget.relPath : deleteTarget.relPath + '/');
+    if (deleteTarget.projectPath) {
+      const fullPath = deleteTarget.relPath.startsWith('/') ? deleteTarget.relPath : `${deleteTarget.projectPath}/${deleteTarget.relPath}`;
+      store.closeNotebookTabByPath(fullPath);
+    }
+    setDeleteTarget(null);
+    setFileRefreshKey(k => k + 1);
+  }, [deleteTarget, activeProjectId]);
 
   // When navigating in Files tab, reset workspaceDir if leaving a worktree directory
   const handleSubPathChange = useCallback((newPath: string) => {
@@ -764,14 +734,18 @@ function FileBrowser() {
         >⋯</button>
         {nbMenuPath === relPath && activeProjectId && (
           <NotebookItemMenu
-            projectId={activeProjectId}
             relPath={relPath}
             baseUrl={`/api/projects/${activeProjectId}`}
             authToken={authToken}
             showExport={isNbDir}
             anchorRect={nbMenuAnchorRect ?? undefined}
             onClose={() => { setNbMenuPath(null); setNbMenuAnchorRect(null); }}
-            onDeleted={() => setFileRefreshKey(k => k + 1)}
+            onRequestDelete={() => setDeleteTarget({
+              relPath,
+              displayName,
+              isWorktree: relPath.includes('.worktrees/'),
+              projectPath: activeProjectPath ?? '',
+            })}
             onRequestRename={() => setNbRenameTarget({ path: relPath, name: displayName })}
           />
         )}
@@ -893,6 +867,26 @@ function FileBrowser() {
             />
           )}
         </>
+      )}
+
+      {/* Notebook delete modal — rendered at FileBrowser level so file list refreshes don't unmount it */}
+      {deleteTarget && activeProjectId && deleteTarget.isWorktree && (
+        <NotebookDeleteModal
+          name={deleteTarget.displayName}
+          branchName={'task/' + (deleteTarget.displayName.startsWith('task-') ? deleteTarget.displayName.slice(5) : deleteTarget.displayName)}
+          onMergeDelete={() => deleteProjectNotebook(activeProjectId, deleteTarget.relPath, true)}
+          onDeleteOnly={() => deleteProjectNotebook(activeProjectId, deleteTarget.relPath, false)}
+          onCancel={() => setDeleteTarget(null)}
+          onDone={handleDeleteDone}
+        />
+      )}
+      {deleteTarget && activeProjectId && !deleteTarget.isWorktree && (
+        <ConfirmDeleteModal
+          name={deleteTarget.displayName}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => deleteProjectNotebook(activeProjectId, deleteTarget.relPath)}
+          onDone={handleDeleteDone}
+        />
       )}
 
       {/* Notebook rename modal */}
