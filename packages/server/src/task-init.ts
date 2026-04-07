@@ -82,6 +82,14 @@ const GITIGNORE_ENTRIES = [
   '',
   '# env file',
   '.env',
+  '',
+  '# large data files',
+  '*.duckdb',
+  '*.db',
+  '',
+  '# runtime directories',
+  '__pycache__/',
+  'node_modules/',
 ];
 
 const GITIGNORE_MARKER = '# task-ai temp files';
