@@ -69,30 +69,25 @@ export async function initTaskWorkingDir(opts: {
   return index;
 }
 
-const GITIGNORE_ENTRIES = [
-  '.claude/',
-  '**/.images/',
-  '**/.working/.auto-signal',
-  '**/.working/.auto-signal.tmp',
-  '**/.working/.auto-stop',
-  '**/.working/.lock',
-  '**/.working/.library-state.json',
-  '**/.lock',
-  '**/.lock.stale.*',
-  '',
-  '# env file',
-  '.env',
-  '',
-  '# large data files',
-  '*.duckdb',
-  '*.db',
-  '',
-  '# runtime directories',
-  '__pycache__/',
-  'node_modules/',
-];
-
 const GITIGNORE_MARKER = '# task-ai temp files';
+
+// Resolve template path relative to this file's compiled location (dist/)
+// so it works in both dev (src/) and prod (dist/) contexts.
+const GITIGNORE_TEMPLATE_PATH = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  '..', 'gitignore.template',
+);
+
+/** Read gitignore entries from template file at runtime (hot-updatable). */
+async function getGitignoreBlock(): Promise<string> {
+  try {
+    const content = await readFile(GITIGNORE_TEMPLATE_PATH, 'utf-8');
+    return `\n${GITIGNORE_MARKER}\n${content.endsWith('\n') ? content : content + '\n'}`;
+  } catch {
+    // Fallback if template file is missing
+    return `\n${GITIGNORE_MARKER}\n.claude/\n.env\n`;
+  }
+}
 
 export async function ensureLibrarySkeleton(
   workspacesRoot: string,
@@ -137,9 +132,7 @@ export async function ensureLibrarySkeleton(
   if (!existing.includes(GITIGNORE_MARKER)) {
     const block =
       (existing && !existing.endsWith('\n') ? '\n' : '') +
-      `\n${GITIGNORE_MARKER}\n` +
-      GITIGNORE_ENTRIES.join('\n') +
-      '\n';
+      await getGitignoreBlock();
     await appendFile(gitignorePath, block, 'utf-8');
   }
 }

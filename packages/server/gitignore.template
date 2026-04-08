@@ -1,0 +1,21 @@
+# task-ai temp files
+.claude/
+**/.images/
+**/.working/.auto-signal
+**/.working/.auto-signal.tmp
+**/.working/.auto-stop
+**/.working/.lock
+**/.working/.library-state.json
+**/.lock
+**/.lock.stale.*
+
+# env file
+.env
+
+# large data files
+*.duckdb
+*.db
+
+# runtime directories
+__pycache__/
+node_modules/
