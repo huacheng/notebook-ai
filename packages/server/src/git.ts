@@ -199,6 +199,12 @@ export class GitManager {
     return 'master';
   }
 
+  /** Return the short name of the currently checked-out branch (via symbolic-ref HEAD). */
+  async getCurrentBranch(): Promise<string> {
+    const out = await this.git.raw(['symbolic-ref', '--short', 'HEAD']);
+    return out.trim();
+  }
+
   /** Delete a local branch (force) */
   async deleteBranch(_repoDir: string, branchName: string): Promise<void> {
     await this.git.branch(['-D', branchName]);
