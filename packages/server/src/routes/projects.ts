@@ -69,6 +69,25 @@ export function createProjectsRouter(
         status: 'active', created_at: now, updated_at: now,
       });
 
+      // Create default notebook on project's current branch (no worktree)
+      const { createDefaultNotebook } = await import('../default-notebook.js');
+      const defRes = await createDefaultNotebook({ projectPath, title });
+      db.createNotebook({
+        id: randomUUID(),
+        user_id: null,
+        title,
+        slug: defRes.nbSlug,
+        workspace_dir: projectPath,
+        notebook_path: defRes.notebookPath,
+        project_id: id,
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      });
+      try {
+        await git.commitAll(`project(${slug}): initialize default notebook`);
+      } catch { /* best-effort */ }
+
       res.json(project);
     } catch (err: unknown) {
       // Rollback: delete created directory if it exists
@@ -111,8 +130,37 @@ export function createProjectsRouter(
       const project = db.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ error: 'project not found' });
 
+      // Scan project root for default *.notebook.json files
+      const rootEntries = await readdir(project.path).catch(() => [] as string[]);
+      const rootNbFiles: string[] = [];
+      for (const entry of rootEntries) {
+        if (!entry.endsWith('.notebook.json')) continue;
+        if (entry.endsWith('.notebook.json.bak')) continue;
+        try {
+          const st = await stat(path.join(project.path, entry));
+          if (st.isFile()) rootNbFiles.push(entry);
+        } catch { /* skip */ }
+      }
+      rootNbFiles.sort();
+
+      let defaultNotebook: { id: string | null; name: string; path: string; is_default: true } | null = null;
+      if (rootNbFiles.length >= 1) {
+        const chosen = rootNbFiles[0]!;
+        const absPath = path.join(project.path, chosen);
+        const dbNb = db.getNotebookByPath(absPath);
+        defaultNotebook = {
+          id: dbNb?.id ?? null,
+          name: chosen.replace('.notebook.json', ''),
+          path: absPath,
+          is_default: true,
+        };
+        if (rootNbFiles.length > 1) {
+          console.warn(`[projects] Multiple root-level notebook.json in ${project.path}; using ${chosen}, ignoring: ${rootNbFiles.slice(1).join(', ')}`);
+        }
+      }
+
       const worktreesDir = path.join(project.path, '.worktrees');
-      const notebooks: { id: string | null; name: string; path: string }[] = [];
+      const notebooks: { id: string | null; name: string; path: string; is_default: boolean }[] = [];
 
       // Check if .worktrees directory exists
       if (existsSync(worktreesDir)) {
@@ -135,12 +183,14 @@ export function createProjectsRouter(
               id: dbNotebook?.id ?? null,
               name,
               path: notebookPath,
+              is_default: false,
             });
           }
         }
       }
 
-      res.json({ notebooks });
+      const ordered = defaultNotebook ? [defaultNotebook, ...notebooks] : notebooks;
+      res.json({ notebooks: ordered });
     } catch (err: unknown) {
       console.error('[projects] Error listing notebooks:', err);
       res.status(500).json({ error: 'Internal server error.' });
