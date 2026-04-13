@@ -281,9 +281,11 @@ function ProjectList() {
   );
 }
 
-function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onDone }: {
+function ConfirmDeleteModal({ name, label = 'Notebook', isDefault = false, onCancel, onConfirm, onDone }: {
   name: string;
   label?: string;
+  /** When true, show reset semantics ("重置") instead of delete ("删除"). */
+  isDefault?: boolean;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
   /** Called after successful delete + success display. Use for state cleanup. */
@@ -308,13 +310,17 @@ function ConfirmDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onD
       <div className="annotation-modal" onClick={e => e.stopPropagation()}>
         {phase === 'confirm' && (
           <>
-            <div className="annotation-modal-title">{t('sidebar.deleteLabel', label)}</div>
+            <div className="annotation-modal-title">
+              {isDefault ? t('sidebar.resetLabel', label) : t('sidebar.deleteLabel', label)}
+            </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', margin: '0 0 var(--space-lg)' }}>
-              {t('sidebar.deleteConfirm', name)}
+              {isDefault ? t('sidebar.resetConfirm', name) : t('sidebar.deleteConfirm', name)}
             </p>
             <div className="annotation-modal-actions">
               <button className="annotation-modal-btn annotation-modal-cancel" onClick={onCancel}>{t('sidebar.cancel')}</button>
-              <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={handleConfirm}>{t('sidebar.delete')}</button>
+              <button className="annotation-modal-btn annotation-modal-btn--danger" onClick={handleConfirm}>
+                {isDefault ? '重置' : t('sidebar.delete')}
+              </button>
             </div>
           </>
         )}
@@ -446,8 +452,8 @@ function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone 
   );
 }
 
-function NotebookItemMenu({ relPath, baseUrl, authToken, showExport, onClose, onRequestRename, onRequestDelete, anchorRect }: {
-  relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean;
+function NotebookItemMenu({ relPath, baseUrl, authToken, showExport, isDefault, onClose, onRequestRename, onRequestDelete, anchorRect }: {
+  relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; isDefault?: boolean;
   onClose: () => void; onRequestRename?: () => void;
   onRequestDelete?: () => void;
   anchorRect?: DOMRect;
@@ -500,7 +506,9 @@ function NotebookItemMenu({ relPath, baseUrl, authToken, showExport, onClose, on
     <div className="project-item-menu" ref={menuRef} style={style}>
       {onRequestRename && <button className="project-item-menu-item" onClick={() => { onClose(); onRequestRename(); }}>{t('sidebar.rename')}</button>}
       {showExport !== false && <button className="project-item-menu-item" onClick={handleExport}>{t('sidebar.export')}</button>}
-      <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete?.(); }}>{t('sidebar.delete')}</button>
+      <button className="project-item-menu-item project-item-menu-item--danger" onClick={() => { onClose(); onRequestDelete?.(); }}>
+        {isDefault ? '重置' : t('sidebar.delete')}
+      </button>
     </div>
   );
 }
@@ -528,7 +536,7 @@ function FileBrowser() {
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
   const [nbMenuAnchorRect, setNbMenuAnchorRect] = useState<DOMRect | null>(null);
   const [nbRenameTarget, setNbRenameTarget] = useState<{ path: string; name: string } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ relPath: string; displayName: string; isWorktree: boolean; projectPath: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ relPath: string; displayName: string; isWorktree: boolean; projectPath: string; isDefault?: boolean } | null>(null);
   const [currentSubPath, setCurrentSubPath] = useState('.');
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
   const nbImportRef = useRef<HTMLInputElement>(null);
@@ -738,6 +746,7 @@ function FileBrowser() {
             baseUrl={`/api/projects/${activeProjectId}`}
             authToken={authToken}
             showExport={isNbDir}
+            isDefault={!!(file as any).is_default}
             anchorRect={nbMenuAnchorRect ?? undefined}
             onClose={() => { setNbMenuPath(null); setNbMenuAnchorRect(null); }}
             onRequestDelete={() => setDeleteTarget({
@@ -745,6 +754,7 @@ function FileBrowser() {
               displayName,
               isWorktree: relPath.includes('.worktrees/'),
               projectPath: activeProjectPath ?? '',
+              isDefault: !!(file as any).is_default,
             })}
             onRequestRename={() => setNbRenameTarget({ path: relPath, name: displayName })}
           />
@@ -874,6 +884,7 @@ function FileBrowser() {
         <NotebookDeleteModal
           name={deleteTarget.displayName}
           branchName={'task/' + (deleteTarget.displayName.startsWith('task-') ? deleteTarget.displayName.slice(5) : deleteTarget.displayName)}
+          isDefault={deleteTarget.isDefault}
           onMergeDelete={() => deleteProjectNotebook(activeProjectId, deleteTarget.relPath, true)}
           onDeleteOnly={() => deleteProjectNotebook(activeProjectId, deleteTarget.relPath, false)}
           onCancel={() => setDeleteTarget(null)}
@@ -883,6 +894,7 @@ function FileBrowser() {
       {deleteTarget && activeProjectId && !deleteTarget.isWorktree && (
         <ConfirmDeleteModal
           name={deleteTarget.displayName}
+          isDefault={deleteTarget.isDefault}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => deleteProjectNotebook(activeProjectId, deleteTarget.relPath)}
           onDone={handleDeleteDone}

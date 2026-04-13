@@ -13,6 +13,8 @@ import { runDeleteFlow, type DeletePhase } from './deleteFlow';
 export interface NotebookDeleteModalProps {
   name: string;
   branchName: string;
+  /** When true, show reset semantics ("重置") instead of delete ("删除"). */
+  isDefault?: boolean;
   onMergeDelete: () => Promise<void>;
   onDeleteOnly: () => Promise<void>;
   onCancel: () => void;
@@ -22,6 +24,7 @@ export interface NotebookDeleteModalProps {
 export function NotebookDeleteModal({
   name,
   branchName,
+  isDefault = false,
   onMergeDelete,
   onDeleteOnly,
   onCancel,
@@ -99,7 +102,7 @@ export function NotebookDeleteModal({
     <div className="annotation-modal-overlay" onClick={onCancel}>
       <div className="annotation-modal nb-delete-modal" onClick={(e) => e.stopPropagation()}>
         <h3 className="annotation-modal-title">
-          {t('delete.confirmTitle', name)}
+          {isDefault ? `重置 "${name}"？` : t('delete.confirmTitle', name)}
         </h3>
         <p className="nb-delete-desc">
           This notebook has an associated branch: <code>{branchName}</code>

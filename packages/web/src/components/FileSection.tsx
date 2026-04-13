@@ -28,6 +28,8 @@ interface FileEntry {
   isNotebook?: boolean;
   worktreePath?: string;
   title?: string;
+  /** Task 12: true when this is the root-level default notebook */
+  is_default?: boolean;
 }
 
 interface ListResult {
