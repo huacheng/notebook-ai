@@ -782,6 +782,46 @@ export function createProjectsRouter(
         }
       }
 
+      // Detect whether this is the default notebook (lives directly in project root)
+      const { isDefaultNotebook } = await import('../default-notebook.js');
+      const nbFilePath = absPath.endsWith('.notebook.json') ? absPath : null;
+      const isDefault = nbFilePath !== null && isDefaultNotebook(nbFilePath, project.path);
+
+      if (isDefault) {
+        // Close active session if any
+        if (nbRow) {
+          const activeSession = db.getActiveSession(nbRow.id);
+          if (activeSession) {
+            await sessionManager.closeSession(activeSession.tmux_session);
+          }
+        }
+
+        // Preserve title and created from existing notebook
+        let currentTitle = project.title;
+        let currentCreated: string | undefined;
+        try {
+          const existing = await notebookStore.load(nbFilePath);
+          currentTitle = existing.metadata.title;
+          currentCreated = existing.metadata.created;
+        } catch {
+          // If load fails, fall back to project title
+        }
+
+        // Write a fresh notebook with empty cells, preserving created timestamp
+        const fresh = notebookStore.createNew(currentTitle, project.path);
+        const freshWithCreated = currentCreated
+          ? { ...fresh, metadata: { ...fresh.metadata, created: currentCreated } }
+          : fresh;
+        await notebookStore.save(nbFilePath, freshWithCreated);
+
+        // Update DB row: keep it, just reset cell_count
+        if (nbRow) {
+          db.updateNotebook(nbRow.id, { cell_count: 0, updated_at: new Date().toISOString() });
+        }
+
+        return res.status(204).send();
+      }
+
       if (nbRow) {
         // Close active session
         const activeSession = db.getActiveSession(nbRow.id);
