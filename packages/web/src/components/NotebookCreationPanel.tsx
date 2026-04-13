@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
+import { validateNotebookTitle } from '../utils/validateNotebookTitle';
 
 export function NotebookCreationPanel() {
   const t = useT();
@@ -13,15 +14,25 @@ export function NotebookCreationPanel() {
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const validationError = useMemo(() => validateNotebookTitle(title), [title]);
+
   async function handleCreate() {
-    const t = title.trim() || 'Untitled Notebook';
+    if (validationError) return;
+    const trimmed = title.trim() || 'Untitled Notebook';
     if (creating) return;
     setCreating(true);
-    await createNewNotebook(t);
-    setCreating(false);
-    setCreatingNotebook(false);
+    setCreateError(null);
+    try {
+      await createNewNotebook(trimmed);
+      setCreatingNotebook(false);
+    } catch (err: any) {
+      setCreateError(err?.message || '创建失败');
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleFile(file: File) {
@@ -59,16 +70,23 @@ export function NotebookCreationPanel() {
         <div className="welcome-create-form">
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => { setTitle(e.target.value); setCreateError(null); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
             placeholder={t('nbCreate.notebookName')}
             disabled={creating}
+            className={validationError ? 'input-error' : ''}
             autoFocus
           />
-          <button onClick={handleCreate} disabled={creating}>
+          <button onClick={handleCreate} disabled={creating || !!validationError}>
             {creating ? t('nbCreate.creating') : t('nbCreate.create')}
           </button>
         </div>
+        {validationError && (
+          <div className="create-form-error" role="alert">{validationError}</div>
+        )}
+        {createError && !validationError && (
+          <div className="create-form-error" role="alert">{createError}</div>
+        )}
 
         <div className="welcome-divider">{t('welcome.or')}</div>
 

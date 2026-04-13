@@ -107,7 +107,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       if (!res.ok) {
         const err = (await res.json()) as { error: string };
         console.error('[store] createNewNotebook failed:', err.error);
-        return;
+        throw new Error(err.error || 'Create failed');
       }
       const data = (await res.json()) as {
         notebook: Notebook;
