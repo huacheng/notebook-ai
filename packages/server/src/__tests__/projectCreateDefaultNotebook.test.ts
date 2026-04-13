@@ -92,16 +92,7 @@ describe('POST /api/projects — DB registration', () => {
     const projectId: string = res.body.id;
     const projectPath: string = res.body.path;
 
-    // Query DB directly
-    const dbNb = db.getNotebookByPath(
-      // We don't know the slug; look up via project notebooks list
-      (() => {
-        // getNotebookByPath requires full path — use listNotebooks approach
-        return null;
-      })()!
-    );
-
-    // Instead: use the notebooks list endpoint to get the path, then verify DB record
+    // Use the notebooks list endpoint to get the path, then verify DB record
     const nbRes = await request(app)
       .get(`/api/projects/${projectId}/notebooks`)
       .expect(200);
