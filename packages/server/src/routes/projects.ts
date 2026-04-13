@@ -37,6 +37,7 @@ export function createProjectsRouter(
   // Create project
   router.post('/', async (req, res) => {
     let projectPath: string | null = null;
+    let createdProjectId: string | null = null;
     try {
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
@@ -68,6 +69,7 @@ export function createProjectsRouter(
         id, title, slug, path: projectPath,
         status: 'active', created_at: now, updated_at: now,
       });
+      createdProjectId = id;
 
       // Create default notebook on project's current branch (no worktree)
       const { createDefaultNotebook } = await import('../default-notebook.js');
@@ -90,7 +92,12 @@ export function createProjectsRouter(
 
       res.json(project);
     } catch (err: unknown) {
-      // Rollback: delete created directory if it exists
+      // Rollback: delete project row (if inserted) and remove directory (if created).
+      // Order: DB first — the row references the path, so the row must go first to avoid
+      // a window where GET /projects returns a row pointing at a directory being removed.
+      if (createdProjectId) {
+        try { db.deleteProject(createdProjectId); } catch { /* ignore */ }
+      }
       if (projectPath && existsSync(projectPath)) {
         try {
           await rm(projectPath, { recursive: true, force: true });
