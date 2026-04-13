@@ -110,50 +110,57 @@ export function uniqueSlug(baseSlug: string, userId?: string | null): string {
  * Safe to call multiple times — overwrites any existing .MEMORY.md.
  * This file is protected: users/Claude cannot modify it via API.
  */
-export async function initWorkspaceMemory(workspaceDir: string, projectPath?: string, opts?: { skipClaudeSettings?: boolean }): Promise<void> {
+export async function initWorkspaceMemory(
+  workspaceDir: string,
+  projectPath?: string,
+  opts?: { skipClaudeSettings?: boolean; skipMemoryWrite?: boolean }
+): Promise<void> {
   mkdirSync(workspaceDir, { recursive: true });
-  const libraryDir = getLibraryDir();
-  const libRelPath = path.relative(workspaceDir, libraryDir);
-  const workingDir = path.join(workspaceDir, '.working');
 
-  let content =
-    `# MEMORY\n\n` +
-    `## Task-AI Work Directory ($TASKAI_WORK_DIR)\n` +
-    `Path: \`.working\` → \`${workingDir}\`\n` +
-    `Note: /task-ai:* commands reference .working/.status.json, not worktree root.\n\n` +
-    `### Core State Files\n` +
-    `- **.status.json** — Task status hub: status/phase/completed_steps/stage/depends_on, sync point for all sub-commands\n` +
-    `- **.target.md** — Objective + Acceptance Criteria + Constraints, anchor for D1 Correctness review\n` +
-    `- **.plan.md** — Step-by-step plan with \`Covers: R#\` annotations, basis for exec and check\n` +
-    `- **.summary.md** — Compressed context (≤200 lines): state/progress/decisions/issues, used for context recovery after compression\n\n` +
-    `## Shared Library (read/write, shared across notebooks)\n` +
-    `Path: \`${libRelPath}\` → \`${libraryDir}\`\n\n` +
-    `## Deliverables\n` +
-    `Path: \`.deliverables\` → \`${path.join(workspaceDir, '.deliverables')}\`\n` +
-    `Write generated code, data, scripts, and other non-system outputs here.\n`;
+  if (!opts?.skipMemoryWrite) {
+    const libraryDir = getLibraryDir();
+    const libRelPath = path.relative(workspaceDir, libraryDir);
+    const workingDir = path.join(workspaceDir, '.working');
 
-  if (projectPath) {
-    const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
-    content +=
-      `\n## Project Deliverables\n` +
-      `Path: \`${projDelRel}\` → \`${path.join(projectPath, '.deliverables')}\`\n` +
-      `Write cross-notebook outputs here (shared datasets, reports, artifacts).\n`;
+    let content =
+      `# MEMORY\n\n` +
+      `## Task-AI Work Directory ($TASKAI_WORK_DIR)\n` +
+      `Path: \`.working\` → \`${workingDir}\`\n` +
+      `Note: /task-ai:* commands reference .working/.status.json, not worktree root.\n\n` +
+      `### Core State Files\n` +
+      `- **.status.json** — Task status hub: status/phase/completed_steps/stage/depends_on, sync point for all sub-commands\n` +
+      `- **.target.md** — Objective + Acceptance Criteria + Constraints, anchor for D1 Correctness review\n` +
+      `- **.plan.md** — Step-by-step plan with \`Covers: R#\` annotations, basis for exec and check\n` +
+      `- **.summary.md** — Compressed context (≤200 lines): state/progress/decisions/issues, used for context recovery after compression\n\n` +
+      `## Shared Library (read/write, shared across notebooks)\n` +
+      `Path: \`${libRelPath}\` → \`${libraryDir}\`\n\n` +
+      `## Deliverables\n` +
+      `Path: \`.deliverables\` → \`${path.join(workspaceDir, '.deliverables')}\`\n` +
+      `Write generated code, data, scripts, and other non-system outputs here.\n`;
+
+    if (projectPath) {
+      const projDelRel = path.relative(workspaceDir, path.join(projectPath, '.deliverables'));
+      content +=
+        `\n## Project Deliverables\n` +
+        `Path: \`${projDelRel}\` → \`${path.join(projectPath, '.deliverables')}\`\n` +
+        `Write cross-notebook outputs here (shared datasets, reports, artifacts).\n`;
+    }
+
+    const memoryPath = path.join(workspaceDir, MEMORY_FILENAME);
+
+    // If file exists and is read-only, temporarily make it writable
+    try {
+      await access(memoryPath, constants.F_OK);
+      await chmod(memoryPath, 0o644); // Make writable before overwriting
+    } catch {
+      // File doesn't exist yet, that's fine
+    }
+
+    await writeFile(memoryPath, content, 'utf-8');
+
+    // Set file to read-only (444 = r--r--r--)
+    await chmod(memoryPath, 0o444);
   }
-
-  const memoryPath = path.join(workspaceDir, MEMORY_FILENAME);
-
-  // If file exists and is read-only, temporarily make it writable
-  try {
-    await access(memoryPath, constants.F_OK);
-    await chmod(memoryPath, 0o644); // Make writable before overwriting
-  } catch {
-    // File doesn't exist yet, that's fine
-  }
-
-  await writeFile(memoryPath, content, 'utf-8');
-
-  // Set file to read-only (444 = r--r--r--)
-  await chmod(memoryPath, 0o444);
 
   // Create .claude/settings.json with SessionStart hook to auto-load .MEMORY.md
   // Skip for project-level init (only needed in notebook worktrees)
