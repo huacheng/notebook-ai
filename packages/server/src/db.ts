@@ -456,10 +456,10 @@ export class NotebookDb {
     })();
   }
 
-  listProjectNotebooks(projectId: string): { id: string; workspace_dir: string }[] {
+  listProjectNotebooks(projectId: string): { id: string; workspace_dir: string; title: string }[] {
     return this.db.prepare(
-      `SELECT id, workspace_dir FROM notebooks WHERE project_id = ?`
-    ).all(projectId) as { id: string; workspace_dir: string }[];
+      `SELECT id, workspace_dir, title FROM notebooks WHERE project_id = ?`
+    ).all(projectId) as { id: string; workspace_dir: string; title: string }[];
   }
 
   /**

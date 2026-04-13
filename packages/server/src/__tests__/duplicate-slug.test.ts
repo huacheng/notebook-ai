@@ -112,8 +112,8 @@ describe('duplicate project title succeeds (unique random slugs)', () => {
   });
 });
 
-describe('duplicate notebook title succeeds (unique random slugs)', () => {
-  it('creates two notebooks with the same title under the same project', async () => {
+describe('duplicate notebook title rejected (409) per project uniqueness', () => {
+  it('rejects second notebook with the same title under the same project', async () => {
     // Set up project directory with git
     const projectSlug = 'proj-11223344';
     const projectPath = path.join(tmpRoot, projectSlug);
@@ -134,23 +134,25 @@ describe('duplicate notebook title succeeds (unique random slugs)', () => {
     };
     db.projects.push(project);
 
+    // First notebook with title succeeds
     await request(app)
       .post('/projects/proj-1/notebooks')
       .send({ title: '我的笔记' })
       .expect(200);
 
-    await request(app)
+    // Second notebook with the same title is rejected with 409
+    const res = await request(app)
       .post('/projects/proj-1/notebooks')
       .send({ title: '我的笔记' })
-      .expect(200);
+      .expect(409);
 
-    // Both notebooks should be in DB with the same title but different slugs
+    expect(res.body).toHaveProperty('error');
+    expect(res.body.error).toMatch(/already exists/i);
+
+    // Only one notebook should be in DB
     const nbs = db.notebooks.filter((n) => n.project_id === 'proj-1');
-    expect(nbs).toHaveLength(2);
+    expect(nbs).toHaveLength(1);
     expect(nbs[0].title).toBe('我的笔记');
-    expect(nbs[1].title).toBe('我的笔记');
-    expect(nbs[0].slug).not.toBe(nbs[1].slug);
     expect(nbs[0].slug).toMatch(/^nb-[0-9a-f]{8}$/);
-    expect(nbs[1].slug).toMatch(/^nb-[0-9a-f]{8}$/);
   });
 });

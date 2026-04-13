@@ -248,16 +248,23 @@ export function createProjectsRouter(
 
       // ASCII slug architecture: only update display title, never rename dirs/branches
       const dbNotebook = db.getNotebookByPath(notebookFilePath);
+      const newTitle = title.trim();
+      if (dbNotebook && newTitle !== dbNotebook.title) {
+        const siblings = db.listProjectNotebooks(project.id);
+        if (siblings.some((n) => n.id !== dbNotebook.id && n.title === newTitle)) {
+          return res.status(409).json({ error: `Notebook with title "${newTitle}" already exists in this project` });
+        }
+      }
       if (dbNotebook) {
-        db.updateNotebook(dbNotebook.id, { title: title.trim() });
+        db.updateNotebook(dbNotebook.id, { title: newTitle });
       }
 
       // Update metadata.title inside .notebook.json
       try {
         const nbContent = await readFile(notebookFilePath, 'utf-8');
         const nbJson = JSON.parse(nbContent);
-        if (nbJson.metadata) nbJson.metadata.title = title.trim();
-        else nbJson.metadata = { title: title.trim() };
+        if (nbJson.metadata) nbJson.metadata.title = newTitle;
+        else nbJson.metadata = { title: newTitle };
         await writeFile(notebookFilePath, JSON.stringify(nbJson, null, 2));
       } catch {
         // Non-fatal
@@ -284,6 +291,11 @@ export function createProjectsRouter(
       projectPath = project.path;
       const { title } = req.body;
       if (!title) return res.status(400).json({ error: 'title required' });
+
+      const projectNotebooks = db.listProjectNotebooks(project.id);
+      if (projectNotebooks.some((n) => n.title === title)) {
+        return res.status(409).json({ error: `Notebook with title "${title}" already exists in this project` });
+      }
 
       const nbSlug = generateSlug('nb');
       branchName = `task/${nbSlug}`;
