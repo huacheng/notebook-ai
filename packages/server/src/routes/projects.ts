@@ -708,28 +708,127 @@ export function createProjectsRouter(
         status: 'active', created_at: now, updated_at: now,
       });
 
-      // Scan for .notebook.json files and register in DB (best-effort)
+      // Scan root for top-level *.notebook.json files (best-effort)
       try {
-        const entries = await readdir(projectPath, { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.isDirectory() && !entry.name.startsWith('.')) {
-            const subEntries = await readdir(path.join(projectPath, entry.name));
-            for (const sub of subEntries) {
-              if (sub.endsWith('.notebook.json')) {
-                const nbPath = path.join(projectPath, entry.name, sub);
-                const nbId = randomUUID();
-                const nbSlug = sub.replace('.notebook.json', '');
-                db.createNotebook({
-                  id: nbId, user_id: null, title: nbSlug, slug: nbSlug,
-                  workspace_dir: projectPath, notebook_path: nbPath,
-                  project_id: id,
-                  status: 'active', created_at: now, updated_at: now,
-                });
-              }
+        const { createDefaultNotebook } = await import('../default-notebook.js');
+
+        // Step 1: Scan project root for top-level *.notebook.json files
+        const rootEntries = await readdir(projectPath).catch(() => [] as string[]);
+        const rootNbFiles: string[] = [];
+        for (const entry of rootEntries) {
+          if (!entry.endsWith('.notebook.json') || entry.endsWith('.notebook.json.bak')) continue;
+          try {
+            const st = await stat(path.join(projectPath, entry));
+            if (st.isFile()) rootNbFiles.push(entry);
+          } catch { /* skip */ }
+        }
+        rootNbFiles.sort();
+
+        // Step 2: Detect if user-authored .MEMORY.md already exists
+        const hasMemory = existsSync(path.join(projectPath, '.MEMORY.md'));
+
+        if (rootNbFiles.length === 0) {
+          // Step 3: No root-level notebook.json — create default
+
+          // Collect titles from existing .worktrees/*/*.notebook.json to avoid collision
+          const usedTitles = new Set<string>();
+          const worktreesDir = path.join(projectPath, '.worktrees');
+          try {
+            const wtEntries = await readdir(worktreesDir, { withFileTypes: true });
+            for (const wt of wtEntries) {
+              if (!wt.isDirectory()) continue;
+              try {
+                const wtFiles = await readdir(path.join(worktreesDir, wt.name));
+                for (const f of wtFiles) {
+                  if (!f.endsWith('.notebook.json')) continue;
+                  try {
+                    const raw = await readFile(path.join(worktreesDir, wt.name, f), 'utf-8');
+                    const parsed = JSON.parse(raw);
+                    if (parsed?.metadata?.title) usedTitles.add(parsed.metadata.title);
+                  } catch { /* skip */ }
+                }
+              } catch { /* skip */ }
             }
+          } catch { /* skip */ }
+
+          // Determine final title (avoid collisions with worktree notebook titles)
+          let finalTitle = title;
+          let suffix = 2;
+          while (usedTitles.has(finalTitle)) {
+            finalTitle = `${title}-${suffix}`;
+            suffix++;
+          }
+
+          const defRes = await createDefaultNotebook({ projectPath, title: finalTitle, skipMemoryWrite: hasMemory });
+          db.createNotebook({
+            id: randomUUID(), user_id: null, title: finalTitle, slug: defRes.nbSlug,
+            workspace_dir: projectPath, notebook_path: defRes.notebookPath,
+            project_id: id, status: 'active', created_at: now, updated_at: now,
+          });
+        } else {
+          // Step 4: Root-level notebook.json exists — use the first as default
+          const chosen = rootNbFiles[0]!;
+          const chosenPath = path.join(projectPath, chosen);
+
+          if (rootNbFiles.length > 1) {
+            console.warn(`[projects/import] Multiple root-level notebook.json in ${projectPath}; using ${chosen}, ignoring: ${rootNbFiles.slice(1).join(', ')}`);
+          }
+
+          // Read title from metadata (fallback to basename-slug)
+          let nbTitle = chosen.replace('.notebook.json', '');
+          try {
+            const raw = await readFile(chosenPath, 'utf-8');
+            const parsed = JSON.parse(raw);
+            if (parsed?.metadata?.title) nbTitle = parsed.metadata.title;
+          } catch { /* fallback to slug */ }
+
+          const nbSlug = chosen.replace('.notebook.json', '');
+
+          // Register if not already in DB
+          if (!db.getNotebookByPath(chosenPath)) {
+            db.createNotebook({
+              id: randomUUID(), user_id: null, title: nbTitle, slug: nbSlug,
+              workspace_dir: projectPath, notebook_path: chosenPath,
+              project_id: id, status: 'active', created_at: now, updated_at: now,
+            });
+          }
+
+          // If user has .MEMORY.md, ensure .claude/settings.json exists without overwriting memory
+          if (hasMemory) {
+            await initWorkspaceMemory(projectPath, undefined, { skipClaudeSettings: false, skipMemoryWrite: true });
           }
         }
-      } catch (_err: unknown) { /* ignore scan errors */ }
+
+        // Step 5: Scan .worktrees/ and register worktree notebooks (skip duplicates)
+        const worktreesDir = path.join(projectPath, '.worktrees');
+        try {
+          const wtEntries = await readdir(worktreesDir, { withFileTypes: true });
+          for (const wt of wtEntries) {
+            if (!wt.isDirectory()) continue;
+            const wtPath = path.join(worktreesDir, wt.name);
+            try {
+              const wtFiles = await readdir(wtPath);
+              for (const f of wtFiles) {
+                if (!f.endsWith('.notebook.json') || f.endsWith('.notebook.json.bak')) continue;
+                const nbPath = path.join(wtPath, f);
+                if (db.getNotebookByPath(nbPath)) continue; // skip duplicates
+                let nbTitle = f.replace('.notebook.json', '');
+                try {
+                  const raw = await readFile(nbPath, 'utf-8');
+                  const parsed = JSON.parse(raw);
+                  if (parsed?.metadata?.title) nbTitle = parsed.metadata.title;
+                } catch { /* fallback */ }
+                const nbSlug = f.replace('.notebook.json', '');
+                db.createNotebook({
+                  id: randomUUID(), user_id: null, title: nbTitle, slug: nbSlug,
+                  workspace_dir: wtPath, notebook_path: nbPath,
+                  project_id: id, status: 'active', created_at: now, updated_at: now,
+                });
+              }
+            } catch { /* skip */ }
+          }
+        } catch { /* .worktrees may not exist */ }
+      } catch (_err: unknown) { console.error('[projects/import] notebook scan error:', _err); }
 
       res.json(project);
     } catch (err: unknown) {
