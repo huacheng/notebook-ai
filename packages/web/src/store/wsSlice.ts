@@ -971,9 +971,11 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
           } else {
             // Non-cell error (e.g. "Not subscribed", permission denied, session not found)
-            // Surface via restartPhase overlay so user sees the failure
+            // Only surface as restart failure if a restart was actually in progress.
+            // (The `|| !parsed.cell_id` guard was always true here — it caused any tab-switch
+            //  "Not subscribed" error to incorrectly appear as "重启失败".)
             const { restartPhase } = get();
-            if (restartPhase === 'restarting' || !parsed.cell_id) {
+            if (restartPhase === 'restarting') {
               set({ restartPhase: 'error', restartError: parsed.message ?? 'Operation failed' });
             }
           }
