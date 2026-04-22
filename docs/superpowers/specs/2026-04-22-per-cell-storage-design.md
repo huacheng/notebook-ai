@@ -117,7 +117,8 @@ private async migrateV1ToV2(notebookPath: string, v1: Notebook): Promise<void>
 
 **`save(notebookPath, notebook)`**
 - 原：JSON.stringify 全量写一个文件
-- 新：并行写所有 cell 文件（`saveCell`）+ 写 index（`saveIndex`）
+- 新：`mkdir -p cellDir` → 并行写所有 cell 文件（`saveCell`）→ 写 index（`saveIndex`）
+- 幂等：cellDir 已存在不报错，已有 cell 文件直接覆盖
 - 用于：初始创建、显式 save_notebook、全量同步场景
 
 **`load(notebookPath)`**
@@ -126,7 +127,10 @@ private async migrateV1ToV2(notebookPath: string, v1: Notebook): Promise<void>
   1. 读文件，检测 `version`
   2. `version === 1` → 调用 `migrateV1ToV2`，再走步骤 3
   3. `version === 2` → 读 index + 并行读 `cell_ids` 对应的所有 cell 文件 → 拼成 `Notebook` 返回
+- **缺失 cell 文件处理**：若某 `cell_id` 对应的 cell 文件不存在，记录 warning 日志，跳过该 cell 并将其从 index 的 `cell_ids` 中移除（写回 index）。不抛错，让 notebook 仍可正常打开。
 - 对外签名不变：`async load(filePath: string): Promise<Notebook>`
+
+> **注意 — 读性能**：v2 的 `load()` 执行 1+N 次文件读（1 次 index + N 次 cell 文件），而 v1 只需 1 次顺序读。性能收益集中在**写路径**（auto-save 从全量降到单 cell）；读路径在 cell 数量较多时可配合前端已有的 lazy loading 优化，暂不在本次范围内。
 
 **`list(directory)`** 不变（只读 metadata.title，现在更快了）。
 
@@ -145,7 +149,7 @@ private async migrateV1ToV2(notebookPath: string, v1: Notebook): Promise<void>
 4. 返回完整 Notebook
 ```
 
-**失败处理：** 步骤 2/3 任一失败 → 抛错，不修改原始 notebook.json（仍为 v1，下次 load 重试迁移）。
+**失败处理：** 步骤 2/3 任一失败 → 抛错，不修改原始 notebook.json（仍为 v1，下次 load 重试迁移）。重试时直接覆盖已存在的 cell 文件（幂等，无数据风险）。
 
 ---
 
@@ -161,7 +165,22 @@ private async migrateV1ToV2(notebookPath: string, v1: Notebook): Promise<void>
 | 删除 cell | `store.save()`（全量） | `store.removeCell(path, index, cellId)` |
 | 显式 save_notebook | `store.save()`（全量） | `store.save()`（全量，不变） |
 
-`session` 内部需缓存当前 `NotebookIndex`（轻量，不含 cells），以便 `addCell`/`removeCell` 调用时传入，避免每次重新 load index。
+**`NotebookIndex` 派生方式（推荐）：** session 不维护独立的 `NotebookIndex` 缓存，而是在每次调用 `addCell`/`removeCell` 前通过辅助函数从 `session.notebook` 派生：
+
+```typescript
+function toIndex(notebook: Notebook): NotebookIndex {
+  return {
+    version: 2,
+    metadata: notebook.metadata,
+    cell_ids: notebook.cells.map((c) => c.id),
+    slide: notebook.slide,
+    annotations: notebook.annotations,
+    assets: notebook.assets,
+  };
+}
+```
+
+使用示例：`store.addCell(path, toIndex(session.notebook), cell)`。此方式消除独立 index 状态，不存在缓存失同步问题。若因性能原因改用缓存方案，则 index 须在 `load()` 后初始化，并在每次 `addCell`/`removeCell` 成功返回后同步更新。
 
 ---
 
