@@ -20,14 +20,18 @@ export class NotebookStore {
       },
     });
 
-    const tmpPath = `${filePath}.tmp`;
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     try {
       await writeFile(tmpPath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
+    } catch (err) {
+      try { await unlink(tmpPath); } catch { /* ignore */ }
+      throw new Error(`Failed to write notebook tmp file "${tmpPath}": ${String(err)}`);
+    }
+    try {
       await rename(tmpPath, filePath);
     } catch (err) {
-      // Best-effort cleanup of orphaned tmp file
       try { await unlink(tmpPath); } catch { /* ignore */ }
-      throw new Error(`Failed to save notebook to "${filePath}": ${String(err)}`);
+      throw new Error(`Failed to rename "${tmpPath}" to "${filePath}": ${String(err)}`);
     }
   }
 

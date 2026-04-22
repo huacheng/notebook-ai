@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile, readdir, readFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { NotebookStore } from '../notebook-store.js';
+import { NotebookSchema } from '@notebook-ai/shared';
 
 let tmpDir: string;
 let store: NotebookStore;
@@ -45,7 +46,6 @@ describe('createNew', () => {
     const nb = store.createNew('Schema Test', '/tmp');
     // If createNew used NotebookSchema.parse internally and it threw, this test
     // would not reach this point. We double check by round-tripping.
-    const { NotebookSchema } = require('@notebook-ai/shared');
     const result = NotebookSchema.safeParse(nb);
     expect(result.success).toBe(true);
   });
@@ -258,5 +258,37 @@ describe('save atomicity', () => {
     const raw = await readFile(filePath, 'utf8');
     expect(() => JSON.parse(raw)).not.toThrow();
     expect(JSON.parse(raw).metadata.title).toBe('ValidJSON');
+  });
+
+  it('cleans up tmp file and preserves existing file when writeFile fails', async () => {
+    // Create a read-only subdirectory so that writing a tmp file fails
+    const { mkdir, chmod } = await import('fs/promises');
+    const roDir = path.join(tmpDir, 'readonly');
+    await mkdir(roDir);
+
+    // Save a valid notebook into the parent dir first (as a reference)
+    const nb = store.createNew('Existing', '/tmp');
+    const goodPath = path.join(tmpDir, 'existing.notebook.json');
+    await store.save(goodPath, nb);
+
+    // Now make the subdirectory read-only so any write inside it fails
+    await chmod(roDir, 0o555);
+
+    const nb2 = store.createNew('New', '/tmp');
+    const roPath = path.join(roDir, 'target.notebook.json');
+
+    // Saving into a read-only dir should throw (can't create tmp file)
+    await expect(store.save(roPath, nb2)).rejects.toThrow('Failed to write notebook tmp file');
+
+    // Restore permissions so afterEach cleanup can remove the dir
+    await chmod(roDir, 0o755);
+
+    // No .tmp files should remain inside the read-only dir
+    const entries = await readdir(roDir);
+    expect(entries.some((e) => e.endsWith('.tmp'))).toBe(false);
+
+    // The original good file in the parent dir is still intact
+    const loaded = await store.load(goodPath);
+    expect(loaded.metadata.title).toBe('Existing');
   });
 });
