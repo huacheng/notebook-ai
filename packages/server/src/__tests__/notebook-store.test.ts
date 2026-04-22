@@ -617,3 +617,19 @@ describe('save atomicity', () => {
     expect(loaded.metadata.title).toBe('Existing');
   });
 });
+
+// ── list() v2 compatibility ───────────────────────────────────────────────────
+
+describe('list() with v2 notebooks', () => {
+  it('lists v2 notebooks correctly', async () => {
+    const nb1 = store.createNew('Alpha', '/tmp');
+    const nb2 = store.createNew('Beta', '/tmp');
+    await store.save(path.join(tmpDir, 'alpha.notebook.json'), nb1);
+    await store.save(path.join(tmpDir, 'beta.notebook.json'), nb2);
+
+    const result = await store.list(tmpDir);
+    const titles = result.map((r) => r.title);
+    expect(titles).toContain('Alpha');
+    expect(titles).toContain('Beta');
+  });
+});
