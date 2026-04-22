@@ -1,12 +1,83 @@
-import { readFile, writeFile, rename, unlink, readdir } from 'fs/promises';
+import { readFile, writeFile, rename, unlink, readdir, mkdir } from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import {
   NotebookSchema,
+  NotebookIndexSchema,
+  CellSchema,
   type Notebook,
+  type NotebookIndex,
+  type Cell,
 } from '@notebook-ai/shared';
 
 export class NotebookStore {
+  // ── Path helpers ─────────────────────────────────────────────────────────
+
+  static cellDir(notebookPath: string): string {
+    return path.join(
+      path.dirname(notebookPath),
+      '.cells',
+      path.basename(notebookPath, '.notebook.json'),
+    );
+  }
+
+  static cellPath(notebookPath: string, cellId: string): string {
+    return path.join(NotebookStore.cellDir(notebookPath), `${cellId}.json`);
+  }
+
+  // ── Per-cell atomic write ─────────────────────────────────────────────────
+
+  async saveCell(notebookPath: string, cell: Cell): Promise<void> {
+    const validated = CellSchema.parse(cell);
+    const filePath = NotebookStore.cellPath(notebookPath, cell.id);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await writeFile(tmpPath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
+    } catch (err) {
+      try { await unlink(tmpPath); } catch { /* ignore */ }
+      throw new Error(`Failed to write cell tmp "${tmpPath}": ${String(err)}`);
+    }
+    try {
+      await rename(tmpPath, filePath);
+    } catch (err) {
+      try { await unlink(tmpPath); } catch { /* ignore */ }
+      throw new Error(`Failed to rename cell tmp to "${filePath}": ${String(err)}`);
+    }
+  }
+
+  async loadCell(notebookPath: string, cellId: string): Promise<Cell> {
+    const filePath = NotebookStore.cellPath(notebookPath, cellId);
+    let raw: string;
+    try {
+      raw = await readFile(filePath, 'utf8');
+    } catch (err) {
+      throw new Error(`Failed to read cell "${cellId}" from "${filePath}": ${String(err)}`);
+    }
+    const result = CellSchema.safeParse(JSON.parse(raw));
+    if (!result.success) {
+      throw new Error(`Cell "${cellId}" failed schema validation: ${result.error.message}`);
+    }
+    return result.data;
+  }
+
+  async saveIndex(notebookPath: string, index: NotebookIndex): Promise<void> {
+    const validated = NotebookIndexSchema.parse(index);
+    const tmpPath = `${notebookPath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await writeFile(tmpPath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
+    } catch (err) {
+      try { await unlink(tmpPath); } catch { /* ignore */ }
+      throw new Error(`Failed to write index tmp "${tmpPath}": ${String(err)}`);
+    }
+    try {
+      await rename(tmpPath, notebookPath);
+    } catch (err) {
+      try { await unlink(tmpPath); } catch { /* ignore */ }
+      throw new Error(`Failed to rename index tmp to "${notebookPath}": ${String(err)}`);
+    }
+  }
+
   /**
    * Validates and writes a notebook to disk as JSON.
    * Uses atomic write-then-rename pattern to ensure data integrity.

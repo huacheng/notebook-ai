@@ -239,6 +239,90 @@ describe('titleToFilename', () => {
   });
 });
 
+// ── per-cell path helpers ────────────────────────────────────────────────────
+
+describe('cellDir / cellPath', () => {
+  it('cellDir returns .cells/<slug> under notebook directory', () => {
+    const nbPath = '/workspace/project/my-notebook.notebook.json';
+    expect(NotebookStore.cellDir(nbPath)).toBe(
+      '/workspace/project/.cells/my-notebook',
+    );
+  });
+
+  it('cellPath returns .cells/<slug>/<cellId>.json', () => {
+    const nbPath = '/workspace/project/my-notebook.notebook.json';
+    expect(NotebookStore.cellPath(nbPath, 'abc123')).toBe(
+      '/workspace/project/.cells/my-notebook/abc123.json',
+    );
+  });
+});
+
+// ── saveCell / loadCell ──────────────────────────────────────────────────────
+
+describe('saveCell / loadCell', () => {
+  it('round-trips a cell through saveCell + loadCell', async () => {
+    const nb = store.createNew('CellTest', '/tmp');
+    const nbPath = path.join(tmpDir, 'celltest.notebook.json');
+
+    const cell = {
+      id: 'c-test-1',
+      type: 'markdown' as const,
+      source: '# Hello',
+      execution_count: 0,
+      status: 'idle' as const,
+    };
+    await store.saveCell(nbPath, cell);
+    const loaded = await store.loadCell(nbPath, 'c-test-1');
+    expect(loaded.id).toBe('c-test-1');
+    expect(loaded.source).toBe('# Hello');
+  });
+
+  it('leaves no .tmp file after saveCell', async () => {
+    const nbPath = path.join(tmpDir, 'celltest2.notebook.json');
+
+    const cell = {
+      id: 'c-test-2',
+      type: 'markdown' as const,
+      source: 'content',
+      execution_count: 0,
+      status: 'idle' as const,
+    };
+    await store.saveCell(nbPath, cell);
+    const entries = await readdir(NotebookStore.cellDir(nbPath));
+    expect(entries.every((e) => !e.endsWith('.tmp'))).toBe(true);
+    expect(entries).toContain('c-test-2.json');
+  });
+
+  it('loadCell throws on missing cell file', async () => {
+    const nbPath = path.join(tmpDir, 'missing.notebook.json');
+    await expect(store.loadCell(nbPath, 'nonexistent')).rejects.toThrow();
+  });
+});
+
+// ── saveIndex ────────────────────────────────────────────────────────────────
+
+describe('saveIndex', () => {
+  it('writes a valid NotebookIndex file', async () => {
+    const nbPath = path.join(tmpDir, 'idxtest.notebook.json');
+    const nb = store.createNew('IdxTest', '/tmp');
+    const index: import('@notebook-ai/shared').NotebookIndex = {
+      version: 2,
+      metadata: nb.metadata,
+      cell_ids: ['c-1', 'c-2'],
+      slide: nb.slide,
+      annotations: [],
+      assets: nb.assets,
+    };
+    await store.saveIndex(nbPath, index);
+    const raw = await readFile(nbPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.version).toBe(2);
+    expect(parsed.cell_ids).toEqual(['c-1', 'c-2']);
+    const savedEntries = await readdir(tmpDir);
+    expect(savedEntries.some((e) => e.endsWith('.tmp'))).toBe(false);
+  });
+});
+
 // ── atomic write ────────────────────────────────────────────────────────────
 
 describe('save atomicity', () => {
