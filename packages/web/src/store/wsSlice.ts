@@ -903,23 +903,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
               // Clean up buffer
               delete (window as any)[bufferKey];
 
-              // Merge notebook (same as session_state)
-              set((state) => {
-                const updates: Partial<typeof state> = {};
-                const mergeInto = (localNb: Notebook): Notebook =>
-                  mergeServerCells(localNb, notebook.cells);
-                const updatedOpen = { ...state.openNotebooks };
-                for (const [nbId, entry] of Object.entries(updatedOpen)) {
-                  if (entry.sessionId === chunkMsg.session_id) {
-                    updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
-                  }
-                }
-                updates.openNotebooks = updatedOpen;
-                if (state.sessionId === chunkMsg.session_id && state.notebook) {
-                  updates.notebook = mergeInto(state.notebook);
-                }
-                return updates;
-              });
+              get().processServerState(chunkMsg.session_id, notebook);
             } catch (e) {
               console.error('[ws] Failed to reassemble chunked session_state:', e);
               delete (window as any)[bufferKey];
