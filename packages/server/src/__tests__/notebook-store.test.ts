@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, readdir, readFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { NotebookStore } from '../notebook-store.js';
@@ -238,5 +238,27 @@ describe('titleToFilename', () => {
   it('collapses multiple special characters into one hyphen', () => {
     expect(NotebookStore.titleToFilename('a   b   c')).toBe('a-b-c.notebook.json');
     expect(NotebookStore.titleToFilename('a---b---c')).toBe('a-b-c.notebook.json');
+  });
+});
+
+// ── atomic write ────────────────────────────────────────────────────────────
+
+describe('save atomicity', () => {
+  it('leaves no .tmp file on successful save', async () => {
+    const nb = store.createNew('Atomic', '/tmp');
+    const filePath = path.join(tmpDir, 'atomic.notebook.json');
+    await store.save(filePath, nb);
+    const entries = await readdir(tmpDir);
+    expect(entries.some((e) => e.endsWith('.tmp'))).toBe(false);
+    expect(entries).toContain('atomic.notebook.json');
+  });
+
+  it('final file is valid JSON after save', async () => {
+    const nb = store.createNew('ValidJSON', '/tmp');
+    const filePath = path.join(tmpDir, 'valid.notebook.json');
+    await store.save(filePath, nb);
+    const raw = await readFile(filePath, 'utf8');
+    expect(() => JSON.parse(raw)).not.toThrow();
+    expect(JSON.parse(raw).metadata.title).toBe('ValidJSON');
   });
 });

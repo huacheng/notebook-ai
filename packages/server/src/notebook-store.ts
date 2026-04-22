@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir } from 'fs/promises';
+import { readFile, writeFile, rename, readdir } from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import {
@@ -9,6 +9,7 @@ import {
 export class NotebookStore {
   /**
    * Validates and writes a notebook to disk as JSON.
+   * Uses atomic write-then-rename pattern to ensure data integrity.
    */
   async save(filePath: string, notebook: Notebook): Promise<void> {
     const validated = NotebookSchema.parse({
@@ -19,9 +20,13 @@ export class NotebookStore {
       },
     });
 
+    const tmpPath = `${filePath}.tmp`;
     try {
-      await writeFile(filePath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
+      await writeFile(tmpPath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
+      await rename(tmpPath, filePath);
     } catch (err) {
+      // Best-effort cleanup of orphaned tmp file
+      try { await writeFile(tmpPath, ''); } catch { /* ignore */ }
       throw new Error(`Failed to save notebook to "${filePath}": ${String(err)}`);
     }
   }
