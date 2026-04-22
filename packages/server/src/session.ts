@@ -1,4 +1,4 @@
-import { readFile, writeFile, appendFile } from 'fs/promises';
+import { readFile, appendFile } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
@@ -9,12 +9,14 @@ import { GitManager } from './git.js';
 import {
   NotebookSchema,
   type Notebook,
+  type NotebookIndex,
   type WSServerMessage,
   type CellOutput,
   type PromptImage,
   type PromptSegment,
   type ImageRef,
 } from '@notebook-ai/shared';
+import { NotebookStore } from './notebook-store.js';
 import { EventBuffer } from './event-buffer.js';
 import {
   updateCellStatus,
@@ -60,6 +62,20 @@ const RATE_LIMIT_PATTERNS = [
   /usage.?limit/i,
   /resource.?exhausted/i,
 ];
+
+// ── Per-cell storage helper ───────────────────────────────────────────────────
+
+/** Derives a NotebookIndex from the in-memory Notebook (no separate cache needed). */
+function toIndex(notebook: Notebook): NotebookIndex {
+  return {
+    version: 2 as const,
+    metadata: notebook.metadata,
+    cell_ids: notebook.cells.map((c) => c.id),
+    slide: notebook.slide,
+    annotations: notebook.annotations,
+    assets: notebook.assets,
+  };
+}
 
 // ── Claude settings model helper ─────────────────────────────────────────────
 
@@ -182,6 +198,8 @@ export class SessionManager {
   private sessions = new Map<string, NotebookSession>();
   /** Lock map to prevent concurrent createSession calls for the same notebook. */
   private _createLocks = new Map<string, Promise<NotebookSession>>();
+  /** Per-cell storage engine (v2 format). */
+  private store = new NotebookStore();
 
   /** Optional callback invoked after a successful auto-save to sync DB metadata. */
   onAutoSave?: (notebookDbId: string, cellCount: number) => void;
@@ -1223,19 +1241,30 @@ export class SessionManager {
     }, 1000);
   }
 
-  /** Best-effort auto-save: writes the in-memory notebook to disk and syncs DB metadata. */
+  /** Best-effort auto-save: writes only the active cell file + index to disk, and syncs DB metadata. */
   private async autoSave(session: NotebookSession): Promise<void> {
     try {
-      await writeFile(session.notebookPath, JSON.stringify(session.notebook, null, 2), 'utf-8');
+      // Write the running cell file (or last cell) — avoids full notebook write
+      const runningCell = session.notebook.cells.find((c) => c.status === 'running')
+        ?? session.notebook.cells[session.notebook.cells.length - 1];
+
+      if (runningCell) {
+        await this.store.saveCell(session.notebookPath, runningCell);
+      }
+
+      // Always sync index (<5KB) to persist metadata changes (model, git_repo, etc.)
+      await this.store.saveIndex(session.notebookPath, toIndex(session.notebook));
+
       if (session.notebookDbId) {
         this.onAutoSave?.(session.notebookDbId, session.notebook.cells.length);
       }
     } catch (err) {
-      console.error(`[session ${session.id}] auto-save failed:`, err);
-      // D3-fix: Notify frontend of save failure so user knows data may not be persisted
+      console.error(`[session ${session.id}] autoSave error:`, err);
+      // Notify client of autosave failure
       this.broadcast(session, {
         type: 'autosave_error',
-        error: 'Failed to save notebook. Please save manually.',
+        session_id: session.id,
+        error: String(err),
       });
       throw err; // Re-throw so caller can handle if needed
     }
@@ -1246,10 +1275,12 @@ export class SessionManager {
     const cell = session.notebook.cells.find((c) => c.id === cellId);
     const source = cell?.source ?? '';
     try {
-      // Write the notebook to disk BEFORE committing so the cell's execution
-      // state (outputs, status, duration_ms) is always included in the git
-      // commit — even when Claude didn't create any workspace files this turn.
-      await writeFile(session.notebookPath, JSON.stringify(session.notebook, null, 2), 'utf-8');
+      // Write only the completed cell file BEFORE committing so the cell's
+      // execution state (outputs, status, duration_ms) is always included in
+      // the git commit — avoids full-notebook write amplification.
+      if (cell) {
+        await this.store.saveCell(session.notebookPath, cell);
+      }
 
       const gitResult = await session.gitManager.commitCellExecution(cellId, source);
       if (gitResult) {
