@@ -223,7 +223,6 @@ export const NotebookIndexSchema = z.object({
   annotations: z.array(AnnotationSchema).default([]),
   assets: AssetsSchema.default({ intermediate_files: [] }),
 });
-export type NotebookIndex = z.infer<typeof NotebookIndexSchema>;
 
 // ─── Notebook (顶层文档) ───
 
@@ -1234,6 +1233,7 @@ export type Assets = z.infer<typeof AssetsSchema>;
 
 export type NotebookMetadata = z.infer<typeof NotebookMetadataSchema>;
 export type Notebook = z.infer<typeof NotebookSchema>;
+export type NotebookIndex = z.infer<typeof NotebookIndexSchema>;
 
 export type ExecuteRequest = z.infer<typeof ExecuteRequestSchema>;
 export type CellOutputMessage = z.infer<typeof CellOutputMessageSchema>;
