@@ -57,7 +57,7 @@ async function createProjectAndGetDefaultNb(title: string) {
 
 describe('DELETE default notebook — reset behaviour', () => {
   it('overwrites file with empty cells but preserves title and created', async () => {
-    const { projectId, projectPath, nbPath, relPath } = await createProjectAndGetDefaultNb('Reset');
+    const { projectId, nbPath, relPath } = await createProjectAndGetDefaultNb('Reset');
 
     // Read original notebook and capture created timestamp
     const originalContent = await readFile(nbPath, 'utf-8');
