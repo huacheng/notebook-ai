@@ -1145,10 +1145,8 @@ export function setupWebSocket(
             break;
           }
           try {
-            const cellIdSet = new Set(cell_ids);
-            session.notebook.cells = session.notebook.cells.filter(c => !cellIdSet.has(c.id));
-            // Per-cell removal (strict two-step: update index → unlink cell file)
-            let currentIndex: NotebookIndex = {
+            // Build initial index from current in-memory state (includes all cells, even to-be-removed)
+            let runningIndex: NotebookIndex = {
               version: 2 as const,
               metadata: session.notebook.metadata,
               cell_ids: session.notebook.cells.map((c) => c.id),
@@ -1156,26 +1154,33 @@ export function setupWebSocket(
               annotations: session.notebook.annotations,
               assets: session.notebook.assets,
             };
-            // Re-add removed ids so removeCell can properly clean up their files
-            const fullIndex: NotebookIndex = {
-              ...currentIndex,
-              cell_ids: [...currentIndex.cell_ids, ...cell_ids],
-            };
-            let runningIndex = fullIndex;
+
+            // Per-cell removal (strict two-step: update index → unlink cell file)
+            // Track only cells successfully removed from disk before mutating in-memory state
+            const successfullyRemoved: string[] = [];
             for (const cellId of cell_ids) {
-              runningIndex = await notebookStore.removeCell(session.notebookPath, runningIndex, cellId).catch((err) => {
+              try {
+                runningIndex = await notebookStore.removeCell(session.notebookPath, runningIndex, cellId);
+                successfullyRemoved.push(cellId);
+              } catch (err) {
                 console.error(`[ws] removeCell failed for ${cellId}:`, err);
-                return runningIndex;
-              });
+              }
             }
+
+            // Only mutate in-memory state for cells confirmed removed from disk
+            if (successfullyRemoved.length > 0) {
+              const removedSet = new Set(successfullyRemoved);
+              session.notebook.cells = session.notebook.cells.filter((c) => !removedSet.has(c.id));
+            }
+
             if (session.notebookDbId) {
               db.updateNotebook(session.notebookDbId, {
                 cell_count: session.notebook.cells.length,
                 updated_at: new Date().toISOString(),
               });
             }
-            // Broadcast to all subscribers for multi-device sync
-            sessionManager.broadcastToSession(session_id, { type: 'cells_removed', session_id, cell_ids });
+            // Only broadcast cells that were actually removed from disk
+            sessionManager.broadcastToSession(session_id, { type: 'cells_removed', session_id, cell_ids: successfullyRemoved });
 
             // Best-effort git commit — fire after cells_removed is already sent
             try {
