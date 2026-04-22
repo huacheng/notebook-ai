@@ -12,10 +12,19 @@
 # env file
 .env
 
-# large data files
-*.duckdb
+# database files
 *.db
+*.duckdb
+*.db-shm
+*.db-wal
+
+# parquet files
+*.parquet
 
 # runtime directories
 __pycache__/
 node_modules/
+target/
+
+# atomic write tmp files for cell storage
+.cells/**/*.tmp
