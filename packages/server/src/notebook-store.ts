@@ -94,9 +94,8 @@ export class NotebookStore {
     try {
       await this.saveIndex(notebookPath, newIndex);
     } catch (err) {
-      // Rollback: delete cell file
       try { await unlink(NotebookStore.cellPath(notebookPath, cell.id)); } catch { /* ignore */ }
-      throw err;
+      throw new Error(`Failed to update index for addCell; rolled back cell file: ${String(err)}`);
     }
     return newIndex;
   }
@@ -116,8 +115,8 @@ export class NotebookStore {
     // Step ②: unlink cell file (best-effort)
     try {
       await unlink(NotebookStore.cellPath(notebookPath, cellId));
-    } catch {
-      // Orphaned file; harmless (not referenced by index)
+    } catch (err) {
+      console.warn(`[NotebookStore] Failed to delete cell file for "${cellId}": ${String(err)}`);
     }
     return newIndex;
   }

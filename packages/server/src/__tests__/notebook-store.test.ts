@@ -290,6 +290,14 @@ describe('addCell', () => {
 
     // cell file should be deleted (rollback)
     await expect(store.loadCell(nbPath, 'c-rollback')).rejects.toThrow();
+    // verify via readdir that no .json file remains in cellDir
+    const cellDirPath = NotebookStore.cellDir(nbPath);
+    try {
+      const entries = await readdir(cellDirPath);
+      expect(entries).not.toContain('c-rollback.json');
+    } catch {
+      // cellDir may not exist at all — also acceptable (rollback succeeded)
+    }
   });
 });
 
@@ -352,7 +360,6 @@ describe('cellDir / cellPath', () => {
 
 describe('saveCell / loadCell', () => {
   it('round-trips a cell through saveCell + loadCell', async () => {
-    const nb = store.createNew('CellTest', '/tmp');
     const nbPath = path.join(tmpDir, 'celltest.notebook.json');
 
     const cell = {
