@@ -897,7 +897,7 @@ import type { NotebookIndex } from '@notebook-ai/shared';
 在 session.ts 中，在 `// ── Heartbeat Constants` 注释区域**之前**添加辅助函数：
 
 ```typescript
-function toIndex(notebook: import('@notebook-ai/shared').Notebook): import('@notebook-ai/shared').NotebookIndex {
+function toIndex(notebook: Notebook): NotebookIndex {
   return {
     version: 2 as const,
     metadata: notebook.metadata,
