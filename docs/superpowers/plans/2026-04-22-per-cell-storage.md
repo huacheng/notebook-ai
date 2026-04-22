@@ -188,7 +188,8 @@ describe('saveIndex', () => {
     const parsed = JSON.parse(raw);
     expect(parsed.version).toBe(2);
     expect(parsed.cell_ids).toEqual(['c-1', 'c-2']);
-    expect(entries => entries).not.toContain(`${path.basename(nbPath)}.tmp`);
+    const savedEntries = await readdir(tmpDir);
+    expect(savedEntries.some((e) => e.endsWith('.tmp'))).toBe(false);
   });
 });
 ```
@@ -917,20 +918,23 @@ function toIndex(notebook: import('@notebook-ai/shared').Notebook): import('@not
 }
 ```
 
-- [ ] **Step 4：修改 `autoSave()` 只写当前 cell**
+- [ ] **Step 4：修改 `autoSave()` 写当前 cell 文件 + index**
 
 将 `packages/server/src/session.ts` 的 `autoSave()` 方法（约第 1227 行）改为：
 
 ```typescript
   private async autoSave(session: NotebookSession): Promise<void> {
     try {
-      // Find the currently running cell (or last cell if none running)
+      // Write the running cell file (or last cell) — avoids full notebook write
       const runningCell = session.notebook.cells.find((c) => c.status === 'running')
         ?? session.notebook.cells[session.notebook.cells.length - 1];
 
       if (runningCell) {
         await this.store.saveCell(session.notebookPath, runningCell);
       }
+
+      // Always sync index (<5KB) to persist metadata changes (model, git_repo, etc.)
+      await this.store.saveIndex(session.notebookPath, toIndex(session.notebook));
 
       if (session.notebookDbId) {
         this.onAutoSave?.(session.notebookDbId, session.notebook.cells.length);
@@ -1037,21 +1041,26 @@ grep -n "execute_request\|createCell\|cell_id.*push\|cells.*push" /home/ubuntu/n
 
 - [ ] **Step 3：修改新增 cell 后立即持久化**
 
-在新 cell 添加到 `session.notebook.cells` 的代码**之后**，调用 `store.addCell` 的等效操作。
+在新 cell 添加到 `session.notebook.cells` 的代码**之后**，使用 `store.addCell()` 严格两步持久化（含回滚）：
 
-由于 session 内部直接 mutate `session.notebook.cells`，新增 cell 后立即持久化：
+由于 session 内部先 push newCell 进 `session.notebook.cells`，传入 `addCell` 时需传不含新 cell 的 index：
 
 ```typescript
-// 在 cells 数组 push 新 cell 之后，立即写磁盘
-// 注意：此处使用 saveCell + 更新 index 的组合，避免依赖 autoSave
-await this.store.saveCell(session.notebookPath, newCell).catch((err) => {
-  console.error(`[session ${session.id}] Failed to persist new cell:`, err);
+// 在 cells 数组 push 新 cell 之后，立即走严格两步持久化（含回滚）
+const indexBeforeAdd = toIndex({
+  ...session.notebook,
+  cells: session.notebook.cells.slice(0, -1), // exclude the just-pushed newCell
 });
-// 更新 index（全量 saveIndex，轻量 <5KB）
-const newIndex = toIndex(session.notebook);
-await this.store.saveIndex(session.notebookPath, newIndex).catch((err) => {
-  console.error(`[session ${session.id}] Failed to update index after addCell:`, err);
-});
+try {
+  await this.store.addCell(session.notebookPath, indexBeforeAdd, newCell);
+} catch (err) {
+  // Persistence failed: roll back in-memory state to stay consistent
+  session.notebook = {
+    ...session.notebook,
+    cells: session.notebook.cells.filter((c) => c.id !== newCell.id),
+  };
+  console.error(`[session ${session.id}] Failed to persist new cell, rolled back:`, err);
+}
 ```
 
 - [ ] **Step 4：找到 remove_cells 处理代码**
@@ -1191,7 +1200,7 @@ git commit -m "test(server): add list() v2 compatibility test"
 | `load()` 版本检测 + v1 自动迁移 | Task 4 |
 | 缺失 cell 文件跳过 + 更新 index | Task 4 |
 | 孤立 cell 文件清理 | Task 4 |
-| autoSave 只写当前 cell | Task 5 |
+| autoSave 写当前 cell 文件 + index（保证 metadata 持久化） | Task 5 |
 | tryGitCommit 只写当前 cell | Task 5 |
 | addCell 立即持久化 | Task 6 |
 | removeCell 走 per-cell 删除 | Task 6 |
