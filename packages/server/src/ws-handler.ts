@@ -54,6 +54,7 @@ import { promisify } from 'util';
 import {
   WSClientMessageSchema,
   type Notebook,
+  type NotebookIndex,
 } from '@notebook-ai/shared';
 import type { SessionManager } from './session.js';
 import { type NotebookDb, DEFAULT_ANNOTATION_MAX_AGE_DAYS } from './db.js';
@@ -1146,7 +1147,27 @@ export function setupWebSocket(
           try {
             const cellIdSet = new Set(cell_ids);
             session.notebook.cells = session.notebook.cells.filter(c => !cellIdSet.has(c.id));
-            await notebookStore.save(session.notebookPath, session.notebook);
+            // Per-cell removal (strict two-step: update index → unlink cell file)
+            let currentIndex: NotebookIndex = {
+              version: 2 as const,
+              metadata: session.notebook.metadata,
+              cell_ids: session.notebook.cells.map((c) => c.id),
+              slide: session.notebook.slide,
+              annotations: session.notebook.annotations,
+              assets: session.notebook.assets,
+            };
+            // Re-add removed ids so removeCell can properly clean up their files
+            const fullIndex: NotebookIndex = {
+              ...currentIndex,
+              cell_ids: [...currentIndex.cell_ids, ...cell_ids],
+            };
+            let runningIndex = fullIndex;
+            for (const cellId of cell_ids) {
+              runningIndex = await notebookStore.removeCell(session.notebookPath, runningIndex, cellId).catch((err) => {
+                console.error(`[ws] removeCell failed for ${cellId}:`, err);
+                return runningIndex;
+              });
+            }
             if (session.notebookDbId) {
               db.updateNotebook(session.notebookDbId, {
                 cell_count: session.notebook.cells.length,
@@ -1464,10 +1485,12 @@ export function setupWebSocket(
             }
             const { stdout } = await execFileAsync(
               'git', ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
-              { cwd: project.path, timeout: EXEC_TIMEOUT },
+              { cwd: project.path, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 },
             );
             const files: { path: string; additions: number; deletions: number }[] = [];
+            const MAX_FILES = 500;
             for (const line of stdout.split('\n')) {
+              if (files.length >= MAX_FILES) break;
               const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
               if (match) {
                 files.push({
@@ -1523,10 +1546,12 @@ export function setupWebSocket(
             const libDir = getLibraryDir();
             const { stdout } = await execFileAsync(
               'git', ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
-              { cwd: libDir, timeout: EXEC_TIMEOUT },
+              { cwd: libDir, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 },
             );
             const files: { path: string; additions: number; deletions: number }[] = [];
+            const MAX_FILES = 500;
             for (const line of stdout.split('\n')) {
+              if (files.length >= MAX_FILES) break;
               const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
               if (match) {
                 files.push({

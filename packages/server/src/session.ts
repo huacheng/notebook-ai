@@ -397,22 +397,33 @@ export class SessionManager {
     // Ensure the cell exists in the server-side notebook.
     const cellExists = session.notebook.cells.some((c) => c.id === cellId);
     if (!cellExists) {
+      const newCell = {
+        id: cellId,
+        type: 'prompt' as const,
+        source,
+        image_refs: imageRefs,  // Store image paths (not base64)
+        outputs: [],
+        execution_count: 0,
+        status: 'idle' as const,
+        created_at: new Date().toISOString(),
+      };
+      // Capture index before adding the new cell (for per-cell persistence)
+      const indexBeforeAdd = toIndex(session.notebook);
       session.notebook = {
         ...session.notebook,
-        cells: [
-          ...session.notebook.cells,
-          {
-            id: cellId,
-            type: 'prompt' as const,
-            source,
-            image_refs: imageRefs,  // Store image paths (not base64)
-            outputs: [],
-            execution_count: 0,
-            status: 'idle' as const,
-            created_at: new Date().toISOString(),
-          },
-        ],
+        cells: [...session.notebook.cells, newCell],
       };
+      // Persist new cell to disk (strict two-step: write cell → update index)
+      try {
+        await this.store.addCell(session.notebookPath, indexBeforeAdd, newCell);
+      } catch (err) {
+        // Persistence failed: roll back in-memory state
+        session.notebook = {
+          ...session.notebook,
+          cells: session.notebook.cells.filter((c) => c.id !== newCell.id),
+        };
+        console.error(`[session ${session.id}] Failed to persist new cell, rolled back:`, err);
+      }
       // Broadcast cell_created to all subscribers for multi-device sync
       const createdCell = session.notebook.cells.find((c) => c.id === cellId);
       this.broadcast(session, {

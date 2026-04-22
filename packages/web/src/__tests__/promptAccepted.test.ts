@@ -13,7 +13,7 @@ describe('prompt_accepted signal', () => {
     );
     // After sendPrompt call, there should be a prompt_accepted broadcast
     const execIdx = src.indexOf('async executeCell');
-    const execBlock = src.slice(execIdx, execIdx + 4000);
+    const execBlock = src.slice(execIdx, execIdx + 5000);
     expect(execBlock).toContain('prompt_accepted');
   });
 
