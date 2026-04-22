@@ -20,6 +20,51 @@ import { applyAutoStatus } from './autoStatusSlice';
 let _pendingWs: WebSocket | null = null;
 
 /**
+ * Merge server cells into a local (possibly paginated) notebook.
+ * - Drops local cells deleted on the server.
+ * - Updates remaining local cells with latest server content.
+ * - Appends cells that come AFTER the local tail in server order (new cells).
+ * - Fallback: if localLastId was deleted on server, appends all server-only cells.
+ */
+export const mergeServerCells = (
+  localNb: Notebook, serverCells: Cell[], metadata?: Notebook['metadata'],
+): Notebook => {
+  const serverCellMap = new Map(serverCells.map((c) => [c.id, c]));
+  const localCellIds = new Set(localNb.cells.map((c) => c.id));
+
+  // Update existing local cells with latest server content;
+  // drop local cells that no longer exist on the server.
+  const merged = localNb.cells
+    .filter((c) => serverCellMap.has(c.id))
+    .map((c) => serverCellMap.get(c.id)!);
+
+  // Find where the local tail sits in the server array
+  const localLastId = merged.length > 0 ? merged[merged.length - 1].id : null;
+
+  if (localLastId) {
+    const tailIdx = serverCells.findIndex((c) => c.id === localLastId);
+    if (tailIdx >= 0) {
+      // Normal path: append cells after local tail
+      for (let i = tailIdx + 1; i < serverCells.length; i++) {
+        merged.push(serverCells[i]);
+      }
+    } else {
+      // Fallback: localLastId was deleted on server — append all server-only cells
+      for (const sc of serverCells) {
+        if (!localCellIds.has(sc.id)) {
+          merged.push(sc);
+        }
+      }
+    }
+  } else if (serverCells.length > 0) {
+    // Local is empty — take all server cells
+    merged.push(...serverCells);
+  }
+
+  return { ...localNb, cells: merged, ...(metadata ? { metadata } : {}) };
+};
+
+/**
  * Safe WebSocket send - checks readyState before sending to avoid
  * "WebSocket is already in CLOSING or CLOSED state" errors.
  * Returns true if message was sent, false otherwise.
@@ -46,6 +91,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   | 'commands' | 'commandsLoaded' | 'setCommands'
   | 'appendPrompt'
   | 'pendingAutoCommand'
+  | 'processServerState'
 >> = (set, get) => ({
   ws: null,
   wsStatus: 'disconnected',
@@ -59,6 +105,25 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   commands: [] as Command[],
   commandsLoaded: false,
   pendingAutoCommand: null,
+
+  processServerState(sessionId: string, serverNb: Notebook) {
+    set((state) => {
+      const updates: Partial<typeof state> = {};
+      const mergeInto = (localNb: Notebook): Notebook =>
+        mergeServerCells(localNb, serverNb.cells, serverNb.metadata);
+      const updatedOpen = { ...state.openNotebooks };
+      for (const [nbId, entry] of Object.entries(updatedOpen)) {
+        if (entry.sessionId === sessionId) {
+          updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
+        }
+      }
+      updates.openNotebooks = updatedOpen;
+      if (state.sessionId === sessionId && state.notebook) {
+        updates.notebook = mergeInto(state.notebook);
+      }
+      return updates;
+    });
+  },
 
   async connectWebSocket() {
     // Clean up any pending (CONNECTING) WS from a previous call
@@ -187,37 +252,6 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
         stopPing();
         set({ wsStatus: 'disconnected', ws: null, latency: null });
       }
-    };
-
-    /**
-     * Merge server cells into a local (possibly paginated) notebook.
-     * - Updates existing local cells with server content (running cell outputs).
-     * - Appends only cells that come AFTER the local tail in server order
-     *   (truly new cells), ignoring older history cells not yet loaded.
-     */
-    const mergeServerCells = (
-      localNb: Notebook, serverCells: Cell[], metadata?: Notebook['metadata'],
-    ): Notebook => {
-      const serverCellMap = new Map(serverCells.map((c) => [c.id, c]));
-      // Update existing local cells with latest server content
-      const merged = localNb.cells.map((c) => serverCellMap.get(c.id) ?? c);
-      // Find where the local tail sits in the server array
-      const localLastId = localNb.cells.length > 0
-        ? localNb.cells[localNb.cells.length - 1].id : null;
-      if (localLastId) {
-        const tailIdx = serverCells.findIndex((c) => c.id === localLastId);
-        if (tailIdx >= 0) {
-          // Append only cells after the local tail (new cells created on other device)
-          for (let i = tailIdx + 1; i < serverCells.length; i++) {
-            merged.push(serverCells[i]);
-          }
-        }
-        // If localLastId not found in server (deleted?), don't append anything
-      } else if (serverCells.length > 0) {
-        // Local is empty — take all server cells
-        merged.push(...serverCells);
-      }
-      return { ...localNb, cells: merged, ...(metadata ? { metadata } : {}) };
     };
 
     ws.onmessage = (event: MessageEvent) => {

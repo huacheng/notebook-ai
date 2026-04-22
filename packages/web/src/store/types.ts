@@ -282,4 +282,5 @@ export interface NotebookStore {
   interruptCell(): void;
   submitToolResult(sessionId: string, toolUseId: string, content: string): void;
   updateToolResultLocal(sessionId: string, cellId: string, toolUseId: string, content: string): void;
+  processServerState(sessionId: string, serverNb: Notebook): void;
 }

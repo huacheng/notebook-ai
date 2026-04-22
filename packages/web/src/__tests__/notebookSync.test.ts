@@ -13,6 +13,70 @@ const dummyNotebook = (title: string) => ({
   assets: { intermediate_files: [] },
 } as any);
 
+// ── mergeServerCells fallback when localLastId deleted ──────────────────────
+
+describe('session_state merge: localLastId not found in server', () => {
+  const makeCell = (id: string) => ({
+    id,
+    type: 'prompt' as const,
+    source: `src-${id}`,
+    outputs: [],
+    execution_count: 0,
+    status: 'idle' as const,
+  });
+
+  it('appends server-only cells when localLastId was deleted on server', () => {
+    // Local has cell-A (now deleted on server) + cell-B
+    // Server has cell-B + cell-C + cell-D (new)
+    // Expected: cell-B, cell-C, cell-D (cell-A dropped, cell-C/D appended)
+    const localNb = {
+      ...dummyNotebook('test'),
+      cells: [makeCell('cell-A'), makeCell('cell-B')],
+    };
+    const serverCells = [makeCell('cell-B'), makeCell('cell-C'), makeCell('cell-D')];
+
+    useStore.setState({
+      notebook: localNb,
+      sessionId: 'session-1',
+      openNotebooks: {
+        'nb1': { notebook: localNb, sessionId: 'session-1', scrollY: 0, workspaceDir: null },
+      },
+      activeNotebookTabId: 'nb1',
+    });
+
+    const serverNb = { ...dummyNotebook('test'), cells: serverCells };
+    useStore.getState().processServerState('session-1', serverNb);
+
+    const state = useStore.getState();
+    const resultCells = state.notebook!.cells.map((c: any) => c.id);
+    expect(resultCells).toContain('cell-B');
+    expect(resultCells).toContain('cell-C');
+    expect(resultCells).toContain('cell-D');
+    expect(resultCells).not.toContain('cell-A');
+  });
+
+  it('handles normal case: local cell not deleted, new cells appended', () => {
+    const localNb = {
+      ...dummyNotebook('test'),
+      cells: [makeCell('cell-A'), makeCell('cell-B')],
+    };
+    const serverCells = [makeCell('cell-A'), makeCell('cell-B'), makeCell('cell-C')];
+    useStore.setState({
+      notebook: localNb,
+      sessionId: 'session-2',
+      openNotebooks: {
+        'nb2': { notebook: localNb, sessionId: 'session-2', scrollY: 0, workspaceDir: null },
+      },
+      activeNotebookTabId: 'nb2',
+    });
+    const serverNb = { ...dummyNotebook('test'), cells: serverCells };
+    useStore.getState().processServerState('session-2', serverNb);
+
+    const resultCells = useStore.getState().notebook!.cells.map((c: any) => c.id);
+    expect(resultCells).toEqual(['cell-A', 'cell-B', 'cell-C']);
+  });
+});
+
 describe('state.notebook ↔ openNotebooks bidirectional sync', () => {
   beforeEach(() => {
     // Reset store state
