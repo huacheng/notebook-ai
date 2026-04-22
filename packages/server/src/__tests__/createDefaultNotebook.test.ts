@@ -27,7 +27,8 @@ describe('createDefaultNotebook', () => {
     const nb = JSON.parse(raw);
     expect(nb.metadata.title).toBe('My Project');
     expect(nb.metadata.worktree_path).toBeUndefined();
-    expect(nb.cells).toEqual([]);
+    // v2 format: no cells array on disk; cell_ids is the canonical list
+    expect(nb.cell_ids).toEqual([]);
   });
 
   it('initializes .working, .deliverables and .MEMORY.md + .claude/settings.json', async () => {

@@ -77,7 +77,8 @@ describe('DELETE default notebook — reset behaviour', () => {
     const afterContent = await readFile(nbPath, 'utf-8');
     const after = JSON.parse(afterContent);
 
-    expect(after.cells).toEqual([]);
+    // v2 format: no cells array on disk; cell_ids is the canonical list
+    expect(after.cell_ids).toEqual([]);
     expect(after.metadata.title).toBe('Reset');
     expect(after.metadata.created).toBe(originalCreated);
   });

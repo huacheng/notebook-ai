@@ -63,7 +63,7 @@ describe('save and load', () => {
 
     expect(loaded.metadata.title).toBe('Roundtrip');
     expect(loaded.metadata.cwd).toBe('/tmp');
-    expect(loaded.version).toBe(1);
+    expect(loaded.version).toBe(2);
     expect(loaded.cells).toEqual([]);
   });
 
@@ -421,6 +421,149 @@ describe('saveIndex', () => {
   });
 });
 
+// ── save() v2 全量写 ──────────────────────────────────────────────────────────
+
+describe('save() v2 full write', () => {
+  it('creates cell files and index when saving notebook with cells', async () => {
+    const nb = store.createNew('SaveV2', '/tmp');
+    // Add two cells manually
+    const cells = [
+      { id: 'c-1', type: 'markdown' as const, source: '# Cell 1', execution_count: 0, status: 'idle' as const },
+      { id: 'c-2', type: 'markdown' as const, source: '# Cell 2', execution_count: 0, status: 'idle' as const },
+    ];
+    const nbWithCells = { ...nb, cells };
+    const nbPath = path.join(tmpDir, 'savev2.notebook.json');
+
+    await store.save(nbPath, nbWithCells);
+
+    // Index file should be version 2 with cell_ids
+    const raw = await readFile(nbPath, 'utf8');
+    const index = JSON.parse(raw);
+    expect(index.version).toBe(2);
+    expect(index.cell_ids).toEqual(['c-1', 'c-2']);
+    expect(index.cells).toBeUndefined();
+
+    // Cell files should exist
+    const c1 = await store.loadCell(nbPath, 'c-1');
+    expect(c1.source).toBe('# Cell 1');
+    const c2 = await store.loadCell(nbPath, 'c-2');
+    expect(c2.source).toBe('# Cell 2');
+  });
+
+  it('save is idempotent: re-saving overwrites cell files without error', async () => {
+    const nb = store.createNew('Idempotent', '/tmp');
+    const cells = [
+      { id: 'c-idem', type: 'markdown' as const, source: 'v1', execution_count: 0, status: 'idle' as const },
+    ];
+    const nbPath = path.join(tmpDir, 'idempotent.notebook.json');
+    await store.save(nbPath, { ...nb, cells });
+
+    const cells2 = [
+      { id: 'c-idem', type: 'markdown' as const, source: 'v2', execution_count: 0, status: 'idle' as const },
+    ];
+    await store.save(nbPath, { ...nb, cells: cells2 });
+
+    const loaded = await store.loadCell(nbPath, 'c-idem');
+    expect(loaded.source).toBe('v2');
+  });
+});
+
+// ── load() v1 auto-migration ──────────────────────────────────────────────────
+
+describe('load() v1 auto-migration', () => {
+  it('migrates v1 notebook to v2 on load', async () => {
+    const v1Notebook = {
+      version: 1,
+      metadata: { title: 'V1 Notebook', created: '2024-01-01T00:00:00Z', git_repo: false },
+      cells: [
+        { id: 'c-v1-1', type: 'markdown', source: '# Migrated', execution_count: 0, status: 'idle' },
+        { id: 'c-v1-2', type: 'markdown', source: '## Second', execution_count: 0, status: 'idle' },
+      ],
+      slide: { generated: false, sections: [] },
+      annotations: [],
+      assets: { intermediate_files: [] },
+    };
+    const nbPath = path.join(tmpDir, 'v1migrate.notebook.json');
+    await writeFile(nbPath, JSON.stringify(v1Notebook), 'utf8');
+
+    const loaded = await store.load(nbPath);
+
+    // In-memory result has full cells
+    expect(loaded.cells).toHaveLength(2);
+    expect(loaded.cells[0].id).toBe('c-v1-1');
+    expect(loaded.cells[1].id).toBe('c-v1-2');
+
+    // On-disk: index is now v2
+    const raw = await readFile(nbPath, 'utf8');
+    const index = JSON.parse(raw);
+    expect(index.version).toBe(2);
+    expect(index.cell_ids).toEqual(['c-v1-1', 'c-v1-2']);
+
+    // Cell files exist
+    const c1 = await store.loadCell(nbPath, 'c-v1-1');
+    expect(c1.source).toBe('# Migrated');
+  });
+});
+
+// ── load() v2 normal ──────────────────────────────────────────────────────────
+
+describe('load() v2', () => {
+  it('loads v2 notebook preserving cell order', async () => {
+    const nb = store.createNew('LoadV2', '/tmp');
+    const cells = [
+      { id: 'c-a', type: 'markdown' as const, source: 'A', execution_count: 0, status: 'idle' as const },
+      { id: 'c-b', type: 'markdown' as const, source: 'B', execution_count: 0, status: 'idle' as const },
+      { id: 'c-c', type: 'markdown' as const, source: 'C', execution_count: 0, status: 'idle' as const },
+    ];
+    const nbPath = path.join(tmpDir, 'loadv2.notebook.json');
+    await store.save(nbPath, { ...nb, cells });
+
+    const loaded = await store.load(nbPath);
+    expect(loaded.cells.map((c) => c.id)).toEqual(['c-a', 'c-b', 'c-c']);
+    expect(loaded.cells[1].source).toBe('B');
+  });
+
+  it('skips missing cell files and updates index (no throw)', async () => {
+    const nb = store.createNew('MissingCell', '/tmp');
+    const cells = [
+      { id: 'c-present', type: 'markdown' as const, source: 'here', execution_count: 0, status: 'idle' as const },
+    ];
+    const nbPath = path.join(tmpDir, 'missingcell.notebook.json');
+    await store.save(nbPath, { ...nb, cells });
+
+    // Manually inject a missing cell id into the index
+    const raw = JSON.parse(await readFile(nbPath, 'utf8'));
+    raw.cell_ids = ['c-present', 'c-ghost'];
+    await writeFile(nbPath, JSON.stringify(raw), 'utf8');
+
+    const loaded = await store.load(nbPath);
+    // c-ghost silently dropped
+    expect(loaded.cells.map((c) => c.id)).toEqual(['c-present']);
+
+    // Index on disk updated (c-ghost removed)
+    const updated = JSON.parse(await readFile(nbPath, 'utf8'));
+    expect(updated.cell_ids).toEqual(['c-present']);
+  });
+
+  it('deletes orphaned cell files on load', async () => {
+    const nb = store.createNew('Orphan', '/tmp');
+    const cells = [
+      { id: 'c-kept', type: 'markdown' as const, source: 'keep', execution_count: 0, status: 'idle' as const },
+    ];
+    const nbPath = path.join(tmpDir, 'orphan.notebook.json');
+    await store.save(nbPath, { ...nb, cells });
+
+    // Create an orphan cell file not referenced in index
+    const orphanPath = NotebookStore.cellPath(nbPath, 'c-orphan');
+    await writeFile(orphanPath, JSON.stringify({ id: 'c-orphan', type: 'markdown', source: 'orphan', execution_count: 0, status: 'idle' }), 'utf8');
+
+    await store.load(nbPath);
+
+    // Orphan file deleted
+    await expect(readFile(orphanPath, 'utf8')).rejects.toThrow();
+  });
+});
+
 // ── atomic write ────────────────────────────────────────────────────────────
 
 describe('save atomicity', () => {
@@ -459,8 +602,8 @@ describe('save atomicity', () => {
     const nb2 = store.createNew('New', '/tmp');
     const roPath = path.join(roDir, 'target.notebook.json');
 
-    // Saving into a read-only dir should throw (can't create tmp file)
-    await expect(store.save(roPath, nb2)).rejects.toThrow('Failed to write notebook tmp file');
+    // Saving into a read-only dir should throw (can't create cellDir or tmp file)
+    await expect(store.save(roPath, nb2)).rejects.toThrow();
 
     // Restore permissions so afterEach cleanup can remove the dir
     await chmod(roDir, 0o755);

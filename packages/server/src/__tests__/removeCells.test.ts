@@ -109,8 +109,16 @@ describe('remove_cells handler logic', () => {
     // Remove cell
     session.notebook.cells = session.notebook.cells.filter(c => c.id !== 'cell-1');
 
-    // Simulate save failure by saving to an invalid path
-    const badPath = path.join(tempDir, 'nonexistent-dir', 'nested', 'fail.notebook.json');
-    await expect(ns.save(badPath, session.notebook)).rejects.toThrow();
+    // Simulate save failure by saving to a read-only directory
+    const { mkdir: fsMkdir, chmod } = await import('fs/promises');
+    const roDir = path.join(tempDir, 'readonly-dir');
+    await fsMkdir(roDir);
+    await chmod(roDir, 0o555);
+    const badPath = path.join(roDir, 'fail.notebook.json');
+    try {
+      await expect(ns.save(badPath, session.notebook)).rejects.toThrow();
+    } finally {
+      await chmod(roDir, 0o755);
+    }
   });
 });

@@ -122,8 +122,8 @@ export class NotebookStore {
   }
 
   /**
-   * Validates and writes a notebook to disk as JSON.
-   * Uses atomic write-then-rename pattern to ensure data integrity.
+   * Validates and writes a notebook to disk as v2 format:
+   * cell files written in parallel, then index file (no cells array).
    */
   async save(filePath: string, notebook: Notebook): Promise<void> {
     const validated = NotebookSchema.parse({
@@ -134,23 +134,26 @@ export class NotebookStore {
       },
     });
 
-    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-    try {
-      await writeFile(tmpPath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
-    } catch (err) {
-      try { await unlink(tmpPath); } catch { /* ignore */ }
-      throw new Error(`Failed to write notebook tmp file "${tmpPath}": ${String(err)}`);
-    }
-    try {
-      await rename(tmpPath, filePath);
-    } catch (err) {
-      try { await unlink(tmpPath); } catch { /* ignore */ }
-      throw new Error(`Failed to rename "${tmpPath}" to "${filePath}": ${String(err)}`);
-    }
+    const cellDir = NotebookStore.cellDir(filePath);
+    await mkdir(cellDir, { recursive: true });
+
+    // Write all cell files in parallel
+    await Promise.all(validated.cells.map((cell) => this.saveCell(filePath, cell)));
+
+    // Write index (no cells array)
+    const index: NotebookIndex = {
+      version: 2,
+      metadata: validated.metadata,
+      cell_ids: validated.cells.map((c) => c.id),
+      slide: validated.slide,
+      annotations: validated.annotations,
+      assets: validated.assets,
+    };
+    await this.saveIndex(filePath, index);
   }
 
   /**
-   * Reads and validates a notebook from disk.
+   * Reads and validates a notebook from disk. Supports v1 (auto-migrates to v2) and v2 formats.
    */
   async load(filePath: string): Promise<Notebook> {
     let raw: string;
@@ -167,14 +170,105 @@ export class NotebookStore {
       throw new Error(`Failed to parse notebook JSON at "${filePath}": ${String(err)}`);
     }
 
+    const version = (parsed as Record<string, unknown>)?.version;
+
+    if (version === 1) {
+      return this.migrateV1ToV2(filePath, parsed);
+    }
+
+    if (version === 2) {
+      return this.loadV2(filePath, parsed);
+    }
+
     const result = NotebookSchema.safeParse(parsed);
     if (!result.success) {
       throw new Error(
         `Notebook at "${filePath}" failed schema validation: ${result.error.message}`,
       );
     }
-
     return result.data;
+  }
+
+  private async migrateV1ToV2(filePath: string, raw: unknown): Promise<Notebook> {
+    const result = NotebookSchema.safeParse(raw);
+    if (!result.success) {
+      throw new Error(
+        `v1 notebook at "${filePath}" failed schema validation: ${result.error.message}`,
+      );
+    }
+    const v1 = result.data;
+
+    const cellDir = NotebookStore.cellDir(filePath);
+    await mkdir(cellDir, { recursive: true });
+    await Promise.all(v1.cells.map((cell) => this.saveCell(filePath, cell)));
+
+    const index: NotebookIndex = {
+      version: 2,
+      metadata: v1.metadata,
+      cell_ids: v1.cells.map((c) => c.id),
+      slide: v1.slide,
+      annotations: v1.annotations,
+      assets: v1.assets,
+    };
+    await this.saveIndex(filePath, index);
+
+    return v1;
+  }
+
+  private async loadV2(filePath: string, raw: unknown): Promise<Notebook> {
+    const indexResult = NotebookIndexSchema.safeParse(raw);
+    if (!indexResult.success) {
+      throw new Error(
+        `v2 index at "${filePath}" failed schema validation: ${indexResult.error.message}`,
+      );
+    }
+    const index = indexResult.data;
+
+    const cellResults = await Promise.all(
+      index.cell_ids.map(async (cellId) => {
+        try {
+          return await this.loadCell(filePath, cellId);
+        } catch {
+          console.warn(`[NotebookStore] Missing cell file for "${cellId}" in "${filePath}"; skipping.`);
+          return null;
+        }
+      }),
+    );
+
+    const cells = cellResults.filter((c): c is NonNullable<typeof c> => c !== null);
+    const presentIds = new Set(cells.map((c) => c.id));
+
+    if (cells.length < index.cell_ids.length) {
+      const updatedIndex: NotebookIndex = { ...index, cell_ids: cells.map((c) => c.id) };
+      await this.saveIndex(filePath, updatedIndex).catch((err) => {
+        console.warn(`[NotebookStore] Failed to update index after dropping missing cells: ${err}`);
+      });
+    }
+
+    const cellDir = NotebookStore.cellDir(filePath);
+    try {
+      const entries = await readdir(cellDir);
+      await Promise.all(
+        entries
+          .filter((e) => e.endsWith('.json') && !presentIds.has(path.basename(e, '.json')))
+          .map(async (e) => {
+            const orphanPath = path.join(cellDir, e);
+            console.warn(`[NotebookStore] Deleting orphaned cell file: ${orphanPath}`);
+            await unlink(orphanPath).catch(() => {});
+          }),
+      );
+    } catch {
+      // cellDir may not exist (edge case); not an error
+    }
+
+    return NotebookSchema.parse({
+      version: 2,
+      metadata: index.metadata,
+      cells,
+      slide: index.slide,
+      annotations: index.annotations,
+      assets: index.assets,
+    });
   }
 
   /**
