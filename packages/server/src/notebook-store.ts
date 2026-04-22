@@ -1,4 +1,4 @@
-import { readFile, writeFile, rename, readdir } from 'fs/promises';
+import { readFile, writeFile, rename, unlink, readdir } from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import {
@@ -26,7 +26,7 @@ export class NotebookStore {
       await rename(tmpPath, filePath);
     } catch (err) {
       // Best-effort cleanup of orphaned tmp file
-      try { await writeFile(tmpPath, ''); } catch { /* ignore */ }
+      try { await unlink(tmpPath); } catch { /* ignore */ }
       throw new Error(`Failed to save notebook to "${filePath}": ${String(err)}`);
     }
   }
