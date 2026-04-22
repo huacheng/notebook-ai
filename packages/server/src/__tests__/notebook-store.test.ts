@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readdir, readFile } from 'fs/promises';
+import { mkdtemp, rm, writeFile, readdir, readFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { NotebookStore } from '../notebook-store.js';
-import type { Notebook } from '@notebook-ai/shared';
 
 let tmpDir: string;
 let store: NotebookStore;
@@ -104,7 +103,6 @@ describe('save and load', () => {
 
   it('updates the updated timestamp on save', async () => {
     const nb = store.createNew('Timestamp Test', '/tmp');
-    const originalUpdated = nb.metadata.updated;
 
     // Small delay to ensure different timestamp
     await new Promise((r) => setTimeout(r, 10));
