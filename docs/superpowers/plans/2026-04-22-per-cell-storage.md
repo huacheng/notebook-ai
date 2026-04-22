@@ -128,9 +128,6 @@ describe('saveCell / loadCell', () => {
   it('round-trips a cell through saveCell + loadCell', async () => {
     const nb = store.createNew('CellTest', '/tmp');
     const nbPath = path.join(tmpDir, 'celltest.notebook.json');
-    // mkdir .cells dir first
-    const { mkdir } = await import('fs/promises');
-    await mkdir(NotebookStore.cellDir(nbPath), { recursive: true });
 
     const cell = {
       id: 'c-test-1',
@@ -147,8 +144,6 @@ describe('saveCell / loadCell', () => {
 
   it('leaves no .tmp file after saveCell', async () => {
     const nbPath = path.join(tmpDir, 'celltest2.notebook.json');
-    const { mkdir } = await import('fs/promises');
-    await mkdir(NotebookStore.cellDir(nbPath), { recursive: true });
 
     const cell = {
       id: 'c-test-2',
@@ -246,6 +241,7 @@ import {
   async saveCell(notebookPath: string, cell: Cell): Promise<void> {
     const validated = CellSchema.parse(cell);
     const filePath = NotebookStore.cellPath(notebookPath, cell.id);
+    await mkdir(path.dirname(filePath), { recursive: true });
     const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     try {
       await writeFile(tmpPath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
@@ -351,8 +347,6 @@ describe('addCell', () => {
   it('adds cell file and updates index', async () => {
     const nbPath = path.join(tmpDir, 'addcell.notebook.json');
     const nb = store.createNew('AddCell', '/tmp');
-    const { mkdir } = await import('fs/promises');
-    await mkdir(NotebookStore.cellDir(nbPath), { recursive: true });
 
     const index = makeIndex(nb);
     const cell = makeCell('c-new');
@@ -370,10 +364,9 @@ describe('addCell', () => {
   it('rolls back cell file if index write fails', async () => {
     const nbPath = path.join(tmpDir, 'rollback.notebook.json');
     const nb = store.createNew('Rollback', '/tmp');
-    const { mkdir } = await import('fs/promises');
-    await mkdir(NotebookStore.cellDir(nbPath), { recursive: true });
 
     // Make index write fail by making nbPath a directory
+    const { mkdir } = await import('fs/promises');
     await mkdir(nbPath, { recursive: true });
 
     const index = makeIndex(nb);
@@ -399,8 +392,6 @@ describe('removeCell', () => {
   it('removes cell from index and deletes cell file', async () => {
     const nbPath = path.join(tmpDir, 'removecell.notebook.json');
     const nb = store.createNew('RemoveCell', '/tmp');
-    const { mkdir } = await import('fs/promises');
-    await mkdir(NotebookStore.cellDir(nbPath), { recursive: true });
 
     // Setup: add a cell first
     const index0: import('@notebook-ai/shared').NotebookIndex = {
