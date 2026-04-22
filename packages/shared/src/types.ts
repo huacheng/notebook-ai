@@ -213,10 +213,22 @@ export const NotebookMetadataSchema = z.object({
   model: z.string().optional(),
 });
 
+// ─── Notebook Index (v2 磁盘格式) ───
+
+export const NotebookIndexSchema = z.object({
+  version: z.literal(2),
+  metadata: NotebookMetadataSchema,
+  cell_ids: z.array(z.string()).default([]),
+  slide: SlideSchema.default({ generated: false, sections: [] }),
+  annotations: z.array(AnnotationSchema).default([]),
+  assets: AssetsSchema.default({ intermediate_files: [] }),
+});
+export type NotebookIndex = z.infer<typeof NotebookIndexSchema>;
+
 // ─── Notebook (顶层文档) ───
 
 export const NotebookSchema = z.object({
-  version: z.number().int().default(1),
+  version: z.union([z.literal(1), z.literal(2)]).default(1),
   metadata: NotebookMetadataSchema,
   cells: z.array(CellSchema).default([]),
   slide: SlideSchema.default({ generated: false, sections: [] }),
