@@ -41,6 +41,7 @@ describe('session_state frontend handler merges cells (preserves pagination)', (
     const startIdx = src.indexOf("case 'session_state':");
     const caseBlock = src.slice(startIdx, startIdx + 1200);
     expect(caseBlock).not.toContain('syncFullNotebook');
-    expect(caseBlock).toContain('mergeServerCells');
+    // After refactor, session_state delegates to processServerState (which calls mergeServerCells)
+    expect(caseBlock).toMatch(/mergeServerCells|processServerState/);
   });
 });

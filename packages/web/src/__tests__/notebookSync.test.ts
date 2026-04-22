@@ -16,6 +16,15 @@ const dummyNotebook = (title: string) => ({
 // ── mergeServerCells fallback when localLastId deleted ──────────────────────
 
 describe('session_state merge: localLastId not found in server', () => {
+  beforeEach(() => {
+    useStore.setState({
+      notebook: null,
+      openNotebooks: {},
+      activeNotebookTabId: null,
+      sessionId: null as any,
+    });
+  });
+
   const makeCell = (id: string) => ({
     id,
     type: 'prompt' as const,

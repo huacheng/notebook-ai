@@ -36,7 +36,14 @@ export const mergeServerCells = (
   // drop local cells that no longer exist on the server.
   const merged = localNb.cells
     .filter((c) => serverCellMap.has(c.id))
-    .map((c) => serverCellMap.get(c.id)!);
+    .map((c) => {
+      const serverCell = serverCellMap.get(c.id)!;
+      // Running cell has in-flight streaming outputs not yet persisted — preserve them.
+      if (c.status === 'running') {
+        return { ...serverCell, outputs: (c as any).outputs, status: c.status };
+      }
+      return serverCell;
+    });
 
   // Find where the local tail sits in the server array
   const localLastId = merged.length > 0 ? merged[merged.length - 1].id : null;
@@ -837,22 +844,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
           }
           if (syncMsg.session_id && syncMsg.notebook) {
-            set((state) => {
-              const updates: Partial<typeof state> = {};
-              const mergeInto = (localNb: Notebook): Notebook =>
-                mergeServerCells(localNb, syncMsg.notebook!.cells, syncMsg.notebook!.metadata);
-              const updatedOpen = { ...state.openNotebooks };
-              for (const [nbId, entry] of Object.entries(updatedOpen)) {
-                if (entry.sessionId === syncMsg.session_id) {
-                  updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
-                }
-              }
-              updates.openNotebooks = updatedOpen;
-              if (state.sessionId === syncMsg.session_id && state.notebook) {
-                updates.notebook = mergeInto(state.notebook);
-              }
-              return updates;
-            });
+            get().processServerState(syncMsg.session_id, syncMsg.notebook!);
           }
           break;
         }
@@ -872,22 +864,7 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
             }
           }
           if (stateMsg.session_id && stateMsg.notebook) {
-            set((state) => {
-              const updates: Partial<typeof state> = {};
-              const mergeInto = (localNb: Notebook): Notebook =>
-                mergeServerCells(localNb, stateMsg.notebook!.cells);
-              const updatedOpen = { ...state.openNotebooks };
-              for (const [nbId, entry] of Object.entries(updatedOpen)) {
-                if (entry.sessionId === stateMsg.session_id) {
-                  updatedOpen[nbId] = { ...entry, notebook: mergeInto(entry.notebook) };
-                }
-              }
-              updates.openNotebooks = updatedOpen;
-              if (state.sessionId === stateMsg.session_id && state.notebook) {
-                updates.notebook = mergeInto(state.notebook);
-              }
-              return updates;
-            });
+            get().processServerState(stateMsg.session_id, stateMsg.notebook!);
           }
           break;
         }
