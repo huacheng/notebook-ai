@@ -78,6 +78,50 @@ export class NotebookStore {
     }
   }
 
+  async addCell(
+    notebookPath: string,
+    index: NotebookIndex,
+    cell: Cell,
+  ): Promise<NotebookIndex> {
+    // Step ①: write cell file (atomic)
+    await this.saveCell(notebookPath, cell);
+
+    // Step ②: update index
+    const newIndex: NotebookIndex = {
+      ...index,
+      cell_ids: [...index.cell_ids, cell.id],
+    };
+    try {
+      await this.saveIndex(notebookPath, newIndex);
+    } catch (err) {
+      // Rollback: delete cell file
+      try { await unlink(NotebookStore.cellPath(notebookPath, cell.id)); } catch { /* ignore */ }
+      throw err;
+    }
+    return newIndex;
+  }
+
+  async removeCell(
+    notebookPath: string,
+    index: NotebookIndex,
+    cellId: string,
+  ): Promise<NotebookIndex> {
+    // Step ①: update index (remove id) — if this fails, cell file is preserved
+    const newIndex: NotebookIndex = {
+      ...index,
+      cell_ids: index.cell_ids.filter((id) => id !== cellId),
+    };
+    await this.saveIndex(notebookPath, newIndex);
+
+    // Step ②: unlink cell file (best-effort)
+    try {
+      await unlink(NotebookStore.cellPath(notebookPath, cellId));
+    } catch {
+      // Orphaned file; harmless (not referenced by index)
+    }
+    return newIndex;
+  }
+
   /**
    * Validates and writes a notebook to disk as JSON.
    * Uses atomic write-then-rename pattern to ensure data integrity.

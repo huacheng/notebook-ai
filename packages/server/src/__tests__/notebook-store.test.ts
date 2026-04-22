@@ -239,6 +239,97 @@ describe('titleToFilename', () => {
   });
 });
 
+// ── addCell ──────────────────────────────────────────────────────────────────
+
+describe('addCell', () => {
+  const makeCell = (id: string) => ({
+    id,
+    type: 'markdown' as const,
+    source: `# ${id}`,
+    execution_count: 0,
+    status: 'idle' as const,
+  });
+
+  const makeIndex = (nb: import('@notebook-ai/shared').Notebook): import('@notebook-ai/shared').NotebookIndex => ({
+    version: 2 as const,
+    metadata: nb.metadata,
+    cell_ids: [],
+    slide: nb.slide,
+    annotations: [],
+    assets: nb.assets,
+  });
+
+  it('adds cell file and updates index', async () => {
+    const nbPath = path.join(tmpDir, 'addcell.notebook.json');
+    const nb = store.createNew('AddCell', '/tmp');
+
+    const index = makeIndex(nb);
+    const cell = makeCell('c-new');
+    const newIndex = await store.addCell(nbPath, index, cell);
+
+    expect(newIndex.cell_ids).toContain('c-new');
+    // cell file exists
+    const cellData = await store.loadCell(nbPath, 'c-new');
+    expect(cellData.id).toBe('c-new');
+    // index file written
+    const raw = await readFile(nbPath, 'utf8');
+    expect(JSON.parse(raw).cell_ids).toContain('c-new');
+  });
+
+  it('rolls back cell file if index write fails', async () => {
+    const nbPath = path.join(tmpDir, 'rollback.notebook.json');
+    const nb = store.createNew('Rollback', '/tmp');
+
+    // Make index write fail by making nbPath a directory
+    const { mkdir } = await import('fs/promises');
+    await mkdir(nbPath, { recursive: true });
+
+    const index = makeIndex(nb);
+    const cell = makeCell('c-rollback');
+    await expect(store.addCell(nbPath, index, cell)).rejects.toThrow();
+
+    // cell file should be deleted (rollback)
+    await expect(store.loadCell(nbPath, 'c-rollback')).rejects.toThrow();
+  });
+});
+
+// ── removeCell ───────────────────────────────────────────────────────────────
+
+describe('removeCell', () => {
+  const makeCell = (id: string) => ({
+    id,
+    type: 'markdown' as const,
+    source: `# ${id}`,
+    execution_count: 0,
+    status: 'idle' as const,
+  });
+
+  it('removes cell from index and deletes cell file', async () => {
+    const nbPath = path.join(tmpDir, 'removecell.notebook.json');
+    const nb = store.createNew('RemoveCell', '/tmp');
+
+    // Setup: add a cell first
+    const index0: import('@notebook-ai/shared').NotebookIndex = {
+      version: 2,
+      metadata: nb.metadata,
+      cell_ids: [],
+      slide: nb.slide,
+      annotations: [],
+      assets: nb.assets,
+    };
+    const cell = makeCell('c-del');
+    const index1 = await store.addCell(nbPath, index0, cell);
+    expect(index1.cell_ids).toContain('c-del');
+
+    // Now remove
+    const index2 = await store.removeCell(nbPath, index1, 'c-del');
+    expect(index2.cell_ids).not.toContain('c-del');
+
+    // Cell file gone (best-effort, should be deleted)
+    await expect(store.loadCell(nbPath, 'c-del')).rejects.toThrow();
+  });
+});
+
 // ── per-cell path helpers ────────────────────────────────────────────────────
 
 describe('cellDir / cellPath', () => {
