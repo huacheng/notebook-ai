@@ -416,23 +416,23 @@ export class SessionManager {
       // Persist new cell to disk (strict two-step: write cell → update index)
       try {
         await this.store.addCell(session.notebookPath, indexBeforeAdd, newCell);
+        // Broadcast only after persistence confirmed — prevents ghost cells on other devices
+        this.broadcast(session, {
+          type: 'cell_created',
+          cell_id: cellId,
+          source,
+          image_refs: imageRefs,
+          created_at: newCell.created_at,
+        });
       } catch (err) {
-        // Persistence failed: roll back in-memory state
+        // Persistence failed: roll back in-memory state and abort execution
         session.notebook = {
           ...session.notebook,
           cells: session.notebook.cells.filter((c) => c.id !== newCell.id),
         };
         console.error(`[session ${session.id}] Failed to persist new cell, rolled back:`, err);
+        return;
       }
-      // Broadcast cell_created to all subscribers for multi-device sync
-      const createdCell = session.notebook.cells.find((c) => c.id === cellId);
-      this.broadcast(session, {
-        type: 'cell_created',
-        cell_id: cellId,
-        source,
-        image_refs: imageRefs,  // Include for multi-device sync
-        created_at: createdCell?.created_at,
-      });
     }
 
     session.notebook = updateCellStatus(session.notebook, cellId, 'running');
@@ -1271,13 +1271,11 @@ export class SessionManager {
       }
     } catch (err) {
       console.error(`[session ${session.id}] autoSave error:`, err);
-      // Notify client of autosave failure
       this.broadcast(session, {
         type: 'autosave_error',
         session_id: session.id,
         error: String(err),
       });
-      throw err; // Re-throw so caller can handle if needed
     }
   }
 
