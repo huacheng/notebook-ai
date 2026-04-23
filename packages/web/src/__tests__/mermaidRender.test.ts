@@ -36,6 +36,19 @@ describe('findMermaidBlocks', () => {
     container.innerHTML = '<p>No code here</p>';
     expect(findMermaidBlocks(container)).toEqual([]);
   });
+
+  it('finds Streamdown mermaid blocks via data-language attribute', () => {
+    // Streamdown wraps mermaid in <div data-streamdown="code-block" data-language="mermaid">
+    // with line-wrapped <span class="block"> elements inside <code>
+    container.innerHTML = `
+      <div data-streamdown="code-block" data-language="mermaid">
+        <pre><code><span class="block"><span>graph TD</span></span><span class="block"><span>A--&gt;B</span></span></code></pre>
+      </div>
+    `;
+    const blocks = findMermaidBlocks(container);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].source).toBe('graph TD\nA-->B');
+  });
 });
 
 describe('replaceMermaidBlock', () => {

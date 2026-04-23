@@ -24,17 +24,30 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Heavy renderers split into dedicated chunks for better caching and parallel load
+          katex: ['katex', 'rehype-katex', 'remark-math'],
+          mermaid: ['mermaid'],
+          markdown: ['react-markdown', 'streamdown', 'remark-gfm', 'remark-cjk-friendly', 'rehype-highlight'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 3003,
     https: loadHttpsConfig(),
     hmr: {
       timeout: 5000,
     },
     proxy: {
-      '/api': 'http://localhost:3002',
+      '/api': 'http://localhost:4003',
       '/ws': {
-        target: 'ws://localhost:3002',
+        target: 'ws://localhost:4003',
         ws: true,
       },
     },

@@ -5,24 +5,42 @@ import DOMPurify from 'dompurify';
 // ── Pure / DOM helpers (unit-testable) ───────────────────────────────────
 
 export interface MermaidBlock {
-  pre: HTMLPreElement;
+  /** Element to be replaced with rendered SVG (or error). */
+  pre: HTMLElement;
   source: string;
 }
 
-/** Scan container for `pre > code.language-mermaid` elements. */
+/**
+ * Scan container for mermaid code blocks. Recognizes two structures:
+ * 1. Standard: `<pre><code class="language-mermaid">...</code></pre>` (react-markdown + rehype-highlight)
+ * 2. Streamdown: `<div data-streamdown="code-block" data-language="mermaid">` with line-wrapped spans
+ */
 export function findMermaidBlocks(container: HTMLElement): MermaidBlock[] {
-  const codes = container.querySelectorAll<HTMLElement>('pre > code.language-mermaid');
   const blocks: MermaidBlock[] = [];
-  for (const code of codes) {
+
+  for (const code of container.querySelectorAll<HTMLElement>('pre > code.language-mermaid')) {
     const pre = code.parentElement as HTMLPreElement;
     blocks.push({ pre, source: code.textContent ?? '' });
   }
+
+  for (const wrapper of container.querySelectorAll<HTMLElement>(
+    '[data-streamdown="code-block"][data-language="mermaid"]',
+  )) {
+    const code = wrapper.querySelector('code');
+    if (!code) continue;
+    const lineSpans = code.querySelectorAll<HTMLElement>(':scope > span.block');
+    const source = lineSpans.length > 0
+      ? Array.from(lineSpans).map((s) => s.textContent ?? '').join('\n')
+      : code.textContent ?? '';
+    blocks.push({ pre: wrapper, source });
+  }
+
   return blocks;
 }
 
-/** Replace a <pre> with rendered SVG or error message. */
+/** Replace the matched mermaid block element with rendered SVG or error message. */
 export function replaceMermaidBlock(
-  pre: HTMLPreElement,
+  pre: HTMLElement,
   svgHtml: string | null,
   errorMsg?: string,
 ): void {

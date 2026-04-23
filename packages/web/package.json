@@ -1,6 +1,6 @@
 {
   "name": "@notebook-ai/web",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -20,6 +20,7 @@
     "docx-preview": "^0.3.7",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",
+    "katex": "^0.16.45",
     "lz4js": "^0.2.0",
     "mermaid": "^11.12.3",
     "react": "^19.0.0",
@@ -27,7 +28,10 @@
     "react-markdown": "^10.1.0",
     "react-pdf": "^10.4.0",
     "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "remark-cjk-friendly": "^2.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "streamdown": "^2.3.0",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.0"

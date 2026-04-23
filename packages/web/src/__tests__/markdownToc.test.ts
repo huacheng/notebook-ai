@@ -3,8 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { renderToString } from 'react-dom/server';
 import { extractHeadings, toSlug, headingComponents, MarkdownToc } from '../components/MarkdownToc';
 
 describe('extractHeadings', () => {
@@ -61,13 +60,12 @@ describe('toSlug', () => {
   });
 });
 
-// Helper: render a React element into a fresh DOM container
+// Helper: server-render a React element and parse into a DOM container.
+// Uses renderToString so we don't depend on React 19's `act` (undefined in
+// production builds and absent without IS_REACT_ACT_ENVIRONMENT setup).
 function renderToDOM(element: React.ReactElement): HTMLDivElement {
   const container = document.createElement('div');
-  document.body.appendChild(container);
-  act(() => {
-    createRoot(container).render(element);
-  });
+  container.innerHTML = renderToString(element);
   return container;
 }
 
