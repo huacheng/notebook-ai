@@ -27,15 +27,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // Only split mermaid: it's heavy (~540 KB) and standalone. Splitting
+        // unified-based packages (rehype-katex, remark-*, react-markdown,
+        // streamdown) across chunks causes TDZ "Cannot access X before
+        // initialization" errors due to shared transitive deps from `unified`.
         manualChunks: {
-          // Heavy renderers split into dedicated chunks for better caching and parallel load
-          katex: ['katex', 'rehype-katex', 'remark-math'],
           mermaid: ['mermaid'],
-          markdown: ['react-markdown', 'streamdown', 'remark-gfm', 'remark-cjk-friendly', 'rehype-highlight'],
         },
       },
     },
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1500,
   },
   server: {
     host: '0.0.0.0',
