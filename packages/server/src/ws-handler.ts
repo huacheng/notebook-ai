@@ -1351,7 +1351,7 @@ export function setupWebSocket(
           break;
         }
 
-        case 'notebook_open': {
+        case 'open_notebook': {
           const { request_id, path: nbPath, lazy } = msg;
           try {
             const result = await openNotebookByPath(nbPath, db, notebookStore, sessionManager);

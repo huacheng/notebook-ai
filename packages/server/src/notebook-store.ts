@@ -150,6 +150,17 @@ export class NotebookStore {
       assets: validated.assets,
     };
     await this.saveIndex(filePath, index);
+
+    // Remove orphaned cell files (cells no longer in this notebook)
+    const newIds = new Set(validated.cells.map((c) => c.id));
+    try {
+      const entries = await readdir(cellDir);
+      await Promise.all(
+        entries
+          .filter((e) => e.endsWith('.json') && !newIds.has(path.basename(e, '.json')))
+          .map((e) => unlink(path.join(cellDir, e)).catch(() => {})),
+      );
+    } catch { /* cellDir may be empty for a fresh notebook */ }
   }
 
   /**
@@ -212,7 +223,7 @@ export class NotebookStore {
     };
     await this.saveIndex(filePath, index);
 
-    return v1;
+    return { ...v1, version: 2 };
   }
 
   private async loadV2(filePath: string, raw: unknown): Promise<Notebook> {

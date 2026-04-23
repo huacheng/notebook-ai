@@ -79,9 +79,10 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
       return { opened: true, notebookId: opened.notebook_id };
     } else {
       // REST fallback
-      const res = await fetch(`/api/notebooks/open?path=${encodeURIComponent(notebookPath)}`, {
+      const res = await fetch('/api/notebooks/open-by-path', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ path: notebookPath }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();

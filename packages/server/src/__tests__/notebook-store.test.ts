@@ -466,6 +466,30 @@ describe('save() v2 full write', () => {
     const loaded = await store.loadCell(nbPath, 'c-idem');
     expect(loaded.source).toBe('v2');
   });
+
+  it('save() removes orphaned cell files when cells are removed', async () => {
+    const nb = store.createNew('Orphan Save', '/tmp');
+    const cells = [
+      { id: 'c-keep', type: 'markdown' as const, source: 'keep', execution_count: 0, status: 'idle' as const },
+      { id: 'c-drop', type: 'markdown' as const, source: 'drop', execution_count: 0, status: 'idle' as const },
+    ];
+    const nbPath = path.join(tmpDir, 'orphan-save.notebook.json');
+    await store.save(nbPath, { ...nb, cells });
+
+    // Verify both cell files exist
+    const cellDir = NotebookStore.cellDir(nbPath);
+    const before = await readdir(cellDir);
+    expect(before).toContain('c-keep.json');
+    expect(before).toContain('c-drop.json');
+
+    // Save again with c-drop removed
+    await store.save(nbPath, { ...nb, cells: [cells[0]] });
+
+    // c-drop.json must be deleted; c-keep.json must remain
+    const after = await readdir(cellDir);
+    expect(after).toContain('c-keep.json');
+    expect(after).not.toContain('c-drop.json');
+  });
 });
 
 // ── load() v1 auto-migration ──────────────────────────────────────────────────

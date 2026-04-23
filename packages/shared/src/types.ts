@@ -386,7 +386,7 @@ export const ChangeModelSchema = z.object({
 
 // Client → Server: notebook open via WebSocket (request-response)
 export const NotebookOpenSchema = z.object({
-  type: z.literal('notebook_open'),
+  type: z.literal('open_notebook'),
   request_id: z.string(),
   path: z.string(),
   lazy: z.boolean().optional(), // If true, return cell stubs instead of full cells
