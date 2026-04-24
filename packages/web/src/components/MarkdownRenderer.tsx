@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'katex/dist/katex.min.css';
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useMermaidRender } from '../hooks/useMermaidRender';
 import { preprocessMarkdown } from '../utils/markdownPreprocess';
 import { sharedRemarkPlugins, katexRehypePlugin } from '../utils/markdownPlugins';
@@ -17,9 +17,9 @@ function mermaidCodeBlock({ className, children, ...rest }: any) {
 const mdComponents = { code: mermaidCodeBlock, a: SafeLink };
 const rehypePlugins = [rehypeHighlight, katexRehypePlugin];
 
-export function MarkdownRenderer({ content, className }: { content: string; className?: string }) {
+function MarkdownRendererBase({ content, className }: { content: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const processed = preprocessMarkdown(content);
+  const processed = useMemo(() => preprocessMarkdown(content), [content]);
   useMermaidRender(ref, processed);
   return (
     <div className={`markdown-rendered${className ? ` ${className}` : ''}`} ref={ref}>
@@ -29,3 +29,6 @@ export function MarkdownRenderer({ content, className }: { content: string; clas
     </div>
   );
 }
+
+// memo: skip re-render when polling ticks fire with unchanged content (50ms interval in StreamingText).
+export const MarkdownRenderer = memo(MarkdownRendererBase);

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { Streamdown } from 'streamdown';
 import rehypeHighlight from 'rehype-highlight';
 import { useMermaidRender } from '../hooks/useMermaidRender';
@@ -25,9 +25,9 @@ const sdComponents = {
 
 const rehypePlugins = [rehypeHighlight, katexRehypePlugin];
 
-export function MarkdownBody({ content, className }: MarkdownBodyProps) {
+function MarkdownBodyBase({ content, className }: MarkdownBodyProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const processed = preprocessMarkdown(content);
+  const processed = useMemo(() => preprocessMarkdown(content), [content]);
   useMermaidRender(ref, processed);
   return (
     <div className={`markdown-body${className ? ` ${className}` : ''}`} ref={ref}>
@@ -37,3 +37,6 @@ export function MarkdownBody({ content, className }: MarkdownBodyProps) {
     </div>
   );
 }
+
+// memo: skip re-render when parent re-renders with same content/className
+export const MarkdownBody = memo(MarkdownBodyBase);
