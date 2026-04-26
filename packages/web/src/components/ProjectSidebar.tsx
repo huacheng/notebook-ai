@@ -10,6 +10,7 @@ import { validateTitle, MAX_TITLE_LENGTH } from '../utils/validateTitle';
 import { useWatcher } from '../hooks/useWatcher';
 import { NotebookDeleteModal } from './NotebookDeleteModal';
 import { getDeliverablesPath } from '../utils/deliverablesPath';
+import { cacheRemoveByPrefix } from '../utils/localCache';
 
 function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
   phase: 'creating' | 'done' | 'error';
@@ -203,6 +204,8 @@ function ProjectList() {
           onConfirm={() => deleteProject(deleteTarget.id)}
           onDone={() => {
             setDeleteTarget(null);
+            // Clear all cached file listings for this project
+            cacheRemoveByPrefix(`nb-filelist-/api/projects/${deleteTarget.id}`);
             const { activeProjectId, goBackToProjectList, fetchProjects, closeProjectFileTabs, closeProjectNotebookTabs } = useStore.getState();
             closeProjectFileTabs(deleteTarget.id);
             closeProjectNotebookTabs(deleteTarget.id);
@@ -520,7 +523,6 @@ function FileBrowser() {
   const goBackToProjectList = useStore(s => s.goBackToProjectList);
   const authToken = useStore(s => s.authToken);
   const openFileTab = useStore(s => s.openFileTab);
-  const importProjectNotebook = useStore(s => s.importProjectNotebook);
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
   const workspaceDir = useStore(s => s.workspaceDir);
 
@@ -529,18 +531,12 @@ function FileBrowser() {
   const sessionId = useStore(s => s.sessionId);
 
   const [l2Tab, setL2Tab] = useState<'files' | 'deliverables'>('files');
-  const [showNbCreate, setShowNbCreate] = useState(false);
-  const [nbTitle, setNbTitle] = useState('');
-  const [nbCreatePhase, setNbCreatePhase] = useState<CreatePhase>('idle');
-  const [nbCreateError, setNbCreateError] = useState('');
   const [nbMenuPath, setNbMenuPath] = useState<string | null>(null);
   const [nbMenuAnchorRect, setNbMenuAnchorRect] = useState<DOMRect | null>(null);
   const [nbRenameTarget, setNbRenameTarget] = useState<{ path: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ relPath: string; displayName: string; isWorktree: boolean; projectPath: string; isDefault?: boolean } | null>(null);
   const [currentSubPath, setCurrentSubPath] = useState('.');
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
-  const nbImportRef = useRef<HTMLInputElement>(null);
-  const isInsideNotebook = currentSubPath !== '.';
 
   const handleDeleteDone = useCallback(() => {
     if (!deleteTarget || !activeProjectId) return;
@@ -636,7 +632,7 @@ function FileBrowser() {
             }
             window.addEventListener('nb:notebook-opened', onOpened);
             window.addEventListener('nb:notebook-open-error', onError);
-            ws.send(JSON.stringify({ type: 'notebook_open', request_id: requestId, path: notebookPath }));
+            ws.send(JSON.stringify({ type: 'open_notebook', request_id: requestId, path: notebookPath }));
           });
           openTab(opened.notebook_id, opened.notebook, opened.session_id, opened.workspace_dir);
           const totalCells = opened.total_cells ?? opened.notebook.cells.length;
@@ -688,35 +684,6 @@ function FileBrowser() {
     useStore.setState({ workspaceDir: worktreePath });
     // Return undefined → FileSection still navigates into the directory
   }, [activeProjectPath]);
-
-  const nbTitleError = useMemo(() => validateTitle(nbTitle), [nbTitle]);
-  const canCreateNb = nbTitle.trim().length > 0 && !nbTitleError;
-
-  const handleCreateNotebook = () => {
-    if (!canCreateNb || !activeProjectId || nbCreatePhase === 'creating') return;
-    const title = nbTitle.trim();
-    runCreateFlow(
-      async () => { await useStore.getState().createNotebook(activeProjectId, title); },
-      {
-        setPhase: setNbCreatePhase,
-        setErrorMsg: setNbCreateError,
-        onDone: () => {
-          setNbTitle('');
-          setShowNbCreate(false);
-          setTimeout(() => {
-            setNbCreatePhase('idle');
-            setFileRefreshKey(k => k + 1);
-          }, 800);
-        },
-      },
-    );
-  };
-
-  const handleNbImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && activeProjectId) importProjectNotebook(activeProjectId, file);
-    e.target.value = '';
-  };
 
   const renderItemActions = useCallback((file: { name: string; type: string }, subPath: string) => {
     const isNbDir = file.type === 'directory' && (file as any).isNotebook;
@@ -812,8 +779,7 @@ function FileBrowser() {
                 || subPath.startsWith('.working/')
                 || subPath.endsWith('/.working')
                 || subPath.includes('/.working/')
-                || subPath === '.claude'
-                || subPath.startsWith('.claude/');
+                || subPath === '.claude';
             }}
           />
         </>
@@ -832,51 +798,6 @@ function FileBrowser() {
             openFileTab({ path: relPath, source: 'deliverables', sessionId: sessionId ?? '', projectId: activeProjectId ?? undefined });
           }}
         />
-      )}
-      {l2Tab === 'files' && !isInsideNotebook && (
-        <>
-          <input
-            ref={nbImportRef}
-            type="file"
-            accept=".notebook.json,.json,.zip"
-            style={{ display: 'none' }}
-            onChange={handleNbImport}
-          />
-          {showNbCreate ? (
-            <div className="project-create-form-wrap">
-              <div className="project-create-form">
-                <input
-                  autoFocus
-                  value={nbTitle}
-                  onChange={e => setNbTitle(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleCreateNotebook(); if (e.key === 'Escape') setShowNbCreate(false); }}
-                  placeholder={t('sidebar.notebookName')}
-                  disabled={nbCreatePhase === 'creating'}
-                  maxLength={MAX_TITLE_LENGTH}
-                  className={nbTitleError ? 'input-error' : ''}
-                />
-                <button onClick={handleCreateNotebook} disabled={nbCreatePhase === 'creating' || !canCreateNb}>
-                  {t('sidebar.create')}
-                </button>
-              </div>
-              {nbTitleError && <div className="create-form-error">{nbTitleError}</div>}
-            </div>
-          ) : (
-            <div className="project-actions-bar">
-              <button className="project-action-btn" onClick={() => setShowNbCreate(true)}>{t('sidebar.new')}</button>
-              <button className="project-action-btn" onClick={() => nbImportRef.current?.click()}>{t('sidebar.import')}</button>
-            </div>
-          )}
-
-          {nbCreatePhase !== 'idle' && (
-            <CreateOverlay
-              phase={nbCreatePhase as 'creating' | 'done' | 'error'}
-              label="Notebook"
-              errorMsg={nbCreateError}
-              onDismiss={() => setNbCreatePhase('idle')}
-            />
-          )}
-        </>
       )}
 
       {/* Notebook delete modal — rendered at FileBrowser level so file list refreshes don't unmount it */}
