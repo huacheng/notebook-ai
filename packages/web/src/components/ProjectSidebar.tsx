@@ -778,8 +778,7 @@ function FileBrowser() {
                 || subPath === '.working'
                 || subPath.startsWith('.working/')
                 || subPath.endsWith('/.working')
-                || subPath.includes('/.working/')
-                || subPath === '.claude';
+                || subPath.includes('/.working/');
             }}
           />
         </>
