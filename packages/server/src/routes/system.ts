@@ -92,17 +92,6 @@ async function checkTaskAiPlugin(): Promise<PreflightAlert | null> {
   return null;
 }
 
-async function checkCronScheduled(): Promise<PreflightAlert | null> {
-  try {
-    const { stdout } = await exec('crontab -l 2>/dev/null');
-    if (stdout.includes('task-ai:scheduled')) {
-      return null; // cron is configured
-    }
-  } catch {
-    // crontab -l fails if no crontab exists
-  }
-  return { id: 'cron-task-ai', severity: 'info', message: 'task-ai scheduled maintenance cron is not configured.', action: '/api/system/install-cron' };
-}
 
 export function createSystemRouter(): IRouter {
   const router = Router();
@@ -113,7 +102,6 @@ export function createSystemRouter(): IRouter {
     const alerts: PreflightAlert[] = [];
     const results = await Promise.allSettled([
       checkTaskAiPlugin(),
-      checkCronScheduled(),
     ]);
     for (const r of results) {
       if (r.status === 'fulfilled' && r.value) alerts.push(r.value);

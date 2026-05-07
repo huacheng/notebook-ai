@@ -70,10 +70,10 @@ describe('openNotebookByPath', () => {
     const mockResponse = {
       ok: true,
       json: () => Promise.resolve({
-        notebook_id: 'nb-2',
+        notebookId: 'nb-2',      // camelCase — matches actual server response
         notebook: { cells: [] },
-        session_id: 's2',
-        workspace_dir: '/projects/test',
+        sessionId: 's2',
+        workspaceDir: '/projects/test',
       }),
     };
     globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
@@ -144,10 +144,10 @@ describe('openNotebookByPath', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        notebook_id: 'nb-new',
+        notebookId: 'nb-new',
         notebook: { cells: [] },
-        session_id: 'snew',
-        workspace_dir: '/proj/b',
+        sessionId: 'snew',
+        workspaceDir: '/proj/b',
       }),
     });
 
@@ -160,10 +160,10 @@ describe('openNotebookByPath', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        notebook_id: 'nb-paged',
+        notebookId: 'nb-paged',
         notebook: { cells: [{ id: 'c1' }, { id: 'c2' }] },
-        session_id: 's-paged',
-        workspace_dir: '/proj/paged',
+        sessionId: 's-paged',
+        workspaceDir: '/proj/paged',
         totalCells: 100,
       }),
     });
@@ -182,10 +182,10 @@ describe('openNotebookByPath', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        notebook_id: 'nb-small',
+        notebookId: 'nb-small',
         notebook: { cells: [{ id: 'c1' }] },
-        session_id: 's-small',
-        workspace_dir: '/proj/small',
+        sessionId: 's-small',
+        workspaceDir: '/proj/small',
         totalCells: 1,
       }),
     });
@@ -238,10 +238,10 @@ describe('openNotebookByPath', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        notebook_id: 'nb-edge',
+        notebookId: 'nb-edge',
         notebook: { cells: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }] },
-        session_id: 's-edge',
-        workspace_dir: '/proj/edge',
+        sessionId: 's-edge',
+        workspaceDir: '/proj/edge',
         totalCells: 1, // Less than cells.length (3)
       }),
     });

@@ -1,5 +1,5 @@
 import path from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { generateSlug, initWorkspaceMemory } from './workspace.js';
 import { NotebookStore } from './notebook-store.js';
 import { GitManager } from './git.js';
@@ -54,6 +54,7 @@ export async function createDefaultNotebook(
 
   mkdirSync(`${projectPath}/.working`, { recursive: true });
   mkdirSync(`${projectPath}/.deliverables`, { recursive: true });
+  writeFileSync(`${projectPath}/.deliverables/.keep`, '', 'utf-8');
   await initTaskWorkingDir({ worktreePath: projectPath, nbSlug, title, branchName });
 
   await initWorkspaceMemory(projectPath, undefined, {

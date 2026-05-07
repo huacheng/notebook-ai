@@ -7,14 +7,14 @@ import { describe, it, expect } from 'vitest';
 describe('NotebookOpen WS schemas', () => {
   it('NotebookOpenSchema accepts a valid message', async () => {
     const { NotebookOpenSchema } = await import('@notebook-ai/shared');
-    const msg = { type: 'notebook_open', request_id: 'abc-123', path: '/home/test/my.notebook.json' };
+    const msg = { type: 'open_notebook', request_id: 'abc-123', path: '/home/test/my.notebook.json' };
     const result = NotebookOpenSchema.safeParse(msg);
     expect(result.success).toBe(true);
   });
 
   it('NotebookOpenSchema rejects missing request_id', async () => {
     const { NotebookOpenSchema } = await import('@notebook-ai/shared');
-    const msg = { type: 'notebook_open', path: '/home/test/my.notebook.json' };
+    const msg = { type: 'open_notebook', path: '/home/test/my.notebook.json' };
     const result = NotebookOpenSchema.safeParse(msg);
     expect(result.success).toBe(false);
   });

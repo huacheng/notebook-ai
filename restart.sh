@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# restart.sh — Restart notebook-ai server (ports 3000 + 3002)
+# restart.sh — Restart notebook-ai server (ports 3003 + 4003)
 # Usage: ./restart.sh [--dev]
 #   --dev   Run development server with hot reload
 #   (default) Build and run production version
@@ -10,7 +10,7 @@ if [[ "${1:-}" == "--dev" ]]; then
   PROD_MODE=false
 fi
 
-PORTS="3000 3002"
+PORTS="3003 4003"
 
 echo "==> Stopping notebook-ai processes..."
 for port in $PORTS; do
@@ -107,30 +107,30 @@ if $PROD_MODE; then
   pnpm run build
 
   echo "==> Starting production server..."
-  # Backend serves both API and static files in production mode (single port 3000)
-  NODE_ENV=production PORT=3000 nohup node packages/server/dist/index.js > /tmp/notebook-prod.log 2>&1 &
+  # Backend serves both API and static files in production mode (single port 3003)
+  NODE_ENV=production PORT=3003 nohup node packages/server/dist/index.js > /tmp/notebook-prod-v2.log 2>&1 &
 
-  LOG_FILE="/tmp/notebook-prod.log"
+  LOG_FILE="/tmp/notebook-prod-v2.log"
   MODE_MSG="Production"
 else
   echo "==> Starting notebook-ai dev server..."
-  PORT=3002 nohup pnpm dev > /tmp/notebook-dev.log 2>&1 &
+  PORT=4003 nohup pnpm dev > /tmp/notebook-dev.log 2>&1 &
   LOG_FILE="/tmp/notebook-dev.log"
   MODE_MSG="Development"
 fi
 
 # Wait for backend to be ready (up to 15s)
 if $PROD_MODE; then
-  WAIT_PORT=3000
-  FINAL_MSG="==> notebook-ai ($MODE_MSG) is running.  URL: https://localhost:3000"
+  WAIT_PORT=3003
+  FINAL_MSG="==> notebook-ai ($MODE_MSG) is running.  URL: https://localhost:3003"
 else
-  WAIT_PORT=3002
-  FINAL_MSG="==> notebook-ai ($MODE_MSG) is running.  Frontend: https://localhost:3000  Backend: :3002"
+  WAIT_PORT=4003
+  FINAL_MSG="==> notebook-ai ($MODE_MSG) is running.  Frontend: https://localhost:3003  Backend: :4003"
 fi
 
 echo -n "==> Waiting for backend on :$WAIT_PORT"
 for i in $(seq 1 30); do
-  if curl -sk --max-time 1 https://localhost:3000/api/auth/status >/dev/null 2>&1; then
+  if curl -sk --max-time 1 https://localhost:3003/api/auth/status >/dev/null 2>&1; then
     echo " OK"
     echo "$FINAL_MSG"
     exit 0

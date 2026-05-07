@@ -7007,6 +7007,13 @@ button:focus-visible {
   padding: 4px 0;
 }
 
+.git-commit-files-truncated {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 6px 0 2px;
+  font-style: italic;
+}
+
 .git-file-row {
   display: flex;
   align-items: center;

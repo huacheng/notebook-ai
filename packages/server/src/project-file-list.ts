@@ -72,17 +72,24 @@ export async function computeProjectFileList(
       if (existsSync(nbFile)) {
         f.isNotebook = true;
         try {
-          const raw = await readFile(nbFile, 'utf-8');
-          const parsed = JSON.parse(raw);
-          if (parsed.metadata?.title) f.title = parsed.metadata.title;
+          const nbStat = await stat(nbFile);
+          if (nbStat.size <= 20 * 1024 * 1024) { // skip if > 20 MB
+            const raw = await readFile(nbFile, 'utf-8');
+            const parsed = JSON.parse(raw);
+            if (parsed.metadata?.title) f.title = parsed.metadata.title;
+          }
         } catch { /* ignore read errors */ }
       }
     } else if (f.name.endsWith('.notebook.json')) {
       // Read title for .notebook.json files inside notebook directories
       try {
-        const raw = await readFile(path.join(dirTarget, f.name), 'utf-8');
-        const parsed = JSON.parse(raw);
-        if (parsed.metadata?.title) f.title = parsed.metadata.title;
+        const nbPath = path.join(dirTarget, f.name);
+        const nbStat = await stat(nbPath);
+        if (nbStat.size <= 20 * 1024 * 1024) { // skip if > 20 MB
+          const raw = await readFile(nbPath, 'utf-8');
+          const parsed = JSON.parse(raw);
+          if (parsed.metadata?.title) f.title = parsed.metadata.title;
+        }
       } catch { /* ignore read errors */ }
     }
   }
@@ -103,9 +110,13 @@ export async function computeProjectFileList(
             // Read title from .notebook.json metadata
             let title: string | undefined;
             try {
-              const raw = await readFile(path.join(wtPath, nbFileName), 'utf-8');
-              const parsed = JSON.parse(raw);
-              if (parsed.metadata?.title) title = parsed.metadata.title;
+              const wtNbPath = path.join(wtPath, nbFileName);
+              const wtNbStat = await stat(wtNbPath);
+              if (wtNbStat.size <= 20 * 1024 * 1024) { // skip if > 20 MB
+                const raw = await readFile(wtNbPath, 'utf-8');
+                const parsed = JSON.parse(raw);
+                if (parsed.metadata?.title) title = parsed.metadata.title;
+              }
             } catch { /* ignore read errors */ }
             result.files.push({
               name: wt.name,

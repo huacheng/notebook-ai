@@ -321,6 +321,7 @@ export function createProjectsRouter(
       // Create directories inside worktree (notebook's sole home)
       await mkdir(path.join(worktreePath, '.working'), { recursive: true });
       await mkdir(path.join(worktreePath, '.deliverables'), { recursive: true });
+      await writeFile(path.join(worktreePath, '.deliverables', '.keep'), '', 'utf-8');
 
       // Initialize task-ai working directory files (within worktree)
       await initTaskWorkingDir({ worktreePath, nbSlug, title, branchName });
@@ -675,14 +676,19 @@ export function createProjectsRouter(
       // Extract to temp directory
       const { mkdtemp } = await import('fs/promises');
       tmpExtract = await mkdtemp(path.join(os.tmpdir(), 'nb-import-extract-'));
-      // Validate archive entries before extraction to prevent tar-slip (path traversal)
-      const { stdout: listing } = await execFileAsync('tar', ['tzf', file.path], { timeout: 30_000 });
-      for (const entry of listing.trim().split('\n')) {
+      // Validate archive entries before extraction to prevent tar-slip and tar bomb
+      const { stdout: listing } = await execFileAsync('tar', ['tzf', file.path], { timeout: 30_000, maxBuffer: 10 * 1024 * 1024 });
+      const entries = listing.trim().split('\n').filter(Boolean);
+      const MAX_ENTRIES = 50_000;
+      if (entries.length > MAX_ENTRIES) {
+        throw new Error(`Archive contains too many files (${entries.length} > ${MAX_ENTRIES})`);
+      }
+      for (const entry of entries) {
         if (entry.includes('..') || path.isAbsolute(entry)) {
           throw new Error('Archive contains unsafe path');
         }
       }
-      await execFileAsync('tar', ['xzf', file.path, '-C', tmpExtract]);
+      await execFileAsync('tar', ['xzf', file.path, '-C', tmpExtract], { timeout: 60_000 });
 
       // Derive title from uploaded filename: "my-project.tar.gz" → "my-project"
       const orig = file.originalname || 'imported-project';
@@ -1017,8 +1023,11 @@ export function createProjectsRouter(
       const project = db.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ error: 'not found' });
 
+      console.log(`[project-delete] start id=${project.id} path=${project.path}`);
+
       // Close active sessions for all notebooks in this project
       const notebooks = db.listProjectNotebooks(project.id);
+      console.log(`[project-delete] closing sessions for ${notebooks.length} notebook(s)`);
       for (const nb of notebooks) {
         const activeSession = db.getActiveSession(nb.id);
         if (activeSession) {
@@ -1030,18 +1039,28 @@ export function createProjectsRouter(
       try {
         const git = new GitManager(project.path);
         const worktrees = await git.listWorktrees();
-        for (const wt of worktrees) {
-          if (wt.path !== project.path) {
-            await git.removeWorktree(wt.path).catch(() => {});
-          }
+        const linked = worktrees.filter(wt => wt.path !== project.path);
+        console.log(`[project-delete] removing ${linked.length} worktree(s)`);
+        for (const wt of linked) {
+          await git.removeWorktree(wt.path).catch((e: unknown) => {
+            console.warn(`[project-delete] removeWorktree failed for ${wt.path}:`, e);
+          });
         }
-      } catch (_err: unknown) { /* git repo may not exist */ }
+      } catch (wtErr: unknown) {
+        console.warn(`[project-delete] listWorktrees failed (git repo may not exist):`, wtErr);
+      }
 
       // Delete DB records (cascades notebooks → sessions)
       db.deleteProject(project.id);
+      console.log(`[project-delete] db record deleted`);
 
       // Remove project directory from disk
-      await rm(project.path, { recursive: true, force: true }).catch(() => {});
+      try {
+        await rm(project.path, { recursive: true, force: true });
+        console.log(`[project-delete] directory removed: ${project.path}`);
+      } catch (rmErr: unknown) {
+        console.error(`[project-delete] rm failed for ${project.path}:`, rmErr);
+      }
 
       res.json({ ok: true });
     } catch (err: unknown) {

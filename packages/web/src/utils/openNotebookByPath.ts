@@ -92,14 +92,14 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
         const decompressed = lz4.decompress(compressed);
         notebook = JSON.parse(new TextDecoder().decode(decompressed));
       }
-      openTab(data.notebook_id, notebook, data.session_id, data.workspace_dir);
-      setActiveNotebookTab(data.notebook_id);
+      openTab(data.notebookId, notebook, data.sessionId, data.workspaceDir);
+      setActiveNotebookTab(data.notebookId);
       // Calculate cellsOffset from totalCells (camelCase from REST), clamp to 0
       const totalCells = data.totalCells ?? notebook.cells.length;
       const cellsOffset = Math.max(0, totalCells - notebook.cells.length);
       // Note: useWebSocket hook auto-subscribes when openNotebooks changes
       useStore.setState({ notebookLoading: false, cellsOffset, loadingOlderCells: false });
-      return { opened: true, notebookId: data.notebook_id };
+      return { opened: true, notebookId: data.notebookId };
     }
   } catch (err: any) {
     // D3-1: surface error to user

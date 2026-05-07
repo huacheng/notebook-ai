@@ -1085,7 +1085,7 @@ function buildBundle(
     ? `
 <div id="replay-panel" class="replay-panel" style="display:none">
   <strong>Replay:</strong>
-  <input id="replay-url" type="text" placeholder="ws://localhost:3002/ws?sessionId=..." value="ws://localhost:3002/ws" />
+  <input id="replay-url" type="text" placeholder="ws://localhost:4003/ws?sessionId=..." value="ws://localhost:4003/ws" />
   <button id="replay-btn" class="replay-btn">Run</button>
   <span id="replay-status" class="replay-status">Enter server URL and click Run to replay notebook.</span>
   <span id="replay-progress" class="replay-progress"></span>

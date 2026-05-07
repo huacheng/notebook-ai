@@ -56,17 +56,17 @@ app.use(express.json({ limit: '25mb' }));  // Match WebSocket maxPayload for bas
 
 // Build ALLOWED_ORIGINS dynamically from all network interfaces
 const ALLOWED_ORIGINS = new Set([
-  'https://localhost:3000',
-  'http://localhost:3000',
-  'https://127.0.0.1:3000',
-  'http://127.0.0.1:3000',
+  'https://localhost:3003',
+  'http://localhost:3003',
+  'https://127.0.0.1:3003',
+  'http://127.0.0.1:3003',
 ]);
 // Add all local IPs (including external) to allowed origins
 for (const ifaces of Object.values(os.networkInterfaces())) {
   for (const iface of ifaces ?? []) {
     if (iface.family === 'IPv4') {
-      ALLOWED_ORIGINS.add(`https://${iface.address}:3000`);
-      ALLOWED_ORIGINS.add(`http://${iface.address}:3000`);
+      ALLOWED_ORIGINS.add(`https://${iface.address}:3003`);
+      ALLOWED_ORIGINS.add(`http://${iface.address}:3003`);
     }
   }
 }
@@ -98,10 +98,12 @@ if (process.env['NODE_ENV'] === 'production') {
   app.use('/assets', express.static(path.join(webDistPath, 'assets'), {
     maxAge: '1y',
     immutable: true,
+    dotfiles: 'deny',
   }));
   // Other static files (favicon, manifest, etc.): short cache
   app.use(express.static(webDistPath, {
     maxAge: '5m',
+    dotfiles: 'deny',
     setHeaders(res, filePath) {
       // index.html must never be cached so new deploys take effect immediately
       if (filePath.endsWith('index.html')) {
@@ -125,7 +127,7 @@ app.use(authMiddleware);
 const sessionManager = new SessionManager();
 const notebookStore = new NotebookStore();
 const db = new NotebookDb();
-const workspaceRoot = process.env['NB_WORKSPACES_ROOT'] ?? path.join(os.homedir(), 'nb-workspaces');
+const workspaceRoot = process.env['NB_WORKSPACES_ROOT'] ?? path.join(os.homedir(), 'nb-workspaces-v2');
 
 // Wire session manager to task-auto daemon for recovery signals
 setSessionManager(sessionManager);
@@ -327,7 +329,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ── Start ────────────────────────────────────────────────────────────────────
 
-const PORT = process.env['PORT'] ?? 3002;
+const PORT = process.env['PORT'] ?? 4003;
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   importExistingNotebooks().catch((err) => console.error('[import] Error:', err));

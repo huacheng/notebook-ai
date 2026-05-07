@@ -372,7 +372,7 @@ async function openNotebookViaWs(
 
     ws.send(
       JSON.stringify({
-        type: 'notebook_open',
+        type: 'open_notebook',
         request_id: requestId,
         path: notebookPath,
         lazy, // Request lazy mode

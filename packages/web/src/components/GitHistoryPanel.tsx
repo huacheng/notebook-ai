@@ -378,29 +378,36 @@ const CommitItem = memo(function CommitItem({
             ) : files.length === 0 ? (
               <div className="git-commit-files-empty">No files changed</div>
             ) : (
-              files.map((f) => (
-                <div key={f.path}>
-                  <div
-                    onClick={() => handleFileClick(f.path)}
-                    className="git-file-row"
-                  >
-                    <span className="git-file-additions">+{f.additions}</span>
-                    <span className="git-file-deletions">-{f.deletions}</span>
-                    <span className={`git-file-path${diffFile === f.path ? ' git-file-path--active' : ''}`}>
-                      {f.path}
-                    </span>
-                  </div>
-                  {diffFile === f.path && (
-                    <div className="git-file-diff-container">
-                      {loadingDiff ? (
-                        <div className="git-diff-loading">Loading...</div>
-                      ) : (
-                        <DiffView diff={diffContent} />
-                      )}
+              <>
+                {files.map((f) => (
+                  <div key={f.path}>
+                    <div
+                      onClick={() => handleFileClick(f.path)}
+                      className="git-file-row"
+                    >
+                      <span className="git-file-additions">+{f.additions}</span>
+                      <span className="git-file-deletions">-{f.deletions}</span>
+                      <span className={`git-file-path${diffFile === f.path ? ' git-file-path--active' : ''}`}>
+                        {f.path}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))
+                    {diffFile === f.path && (
+                      <div className="git-file-diff-container">
+                        {loadingDiff ? (
+                          <div className="git-diff-loading">Loading...</div>
+                        ) : (
+                          <DiffView diff={diffContent} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {files.length >= 500 && (
+                  <div className="git-commit-files-truncated">
+                    Showing first 500 files only
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

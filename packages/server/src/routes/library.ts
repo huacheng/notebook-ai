@@ -240,7 +240,7 @@ export function createLibraryRouter(): IRouter {
       const args = ['log', '--topo-order', `--pretty=format:${format}`, `--skip=${skip}`, `-${limit + 1}`];
       if (stats) args.splice(3, 0, '--numstat');
 
-      const { stdout } = await execFile('git', args, { cwd, timeout: EXEC_TIMEOUT });
+      const { stdout } = await execFile('git', args, { cwd, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
 
       const commits: CommitInfo[] = [];
       const blocks = stdout.split(SEP).filter((b) => b.trim());
@@ -360,11 +360,13 @@ export function createLibraryRouter(): IRouter {
       const { stdout } = await execFile(
         'git',
         ['diff-tree', '--no-commit-id', '-r', '--numstat', commit],
-        { cwd, timeout: EXEC_TIMEOUT },
+        { cwd, timeout: EXEC_TIMEOUT, maxBuffer: 10 * 1024 * 1024 },
       );
 
+      const MAX_FILES = 500;
       const files: CommitFile[] = [];
       for (const line of stdout.split('\n')) {
+        if (files.length >= MAX_FILES) break;
         const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
         if (match) {
           files.push({

@@ -3,7 +3,7 @@
 ## Rules
 
 - Playwright: only launch when the user explicitly requests it. Never start Playwright proactively for testing.
-- notebook-ai uses ports **3000** (Vite frontend) and **3002** (backend API). Restart only needs to handle these two ports. Use `./restart.sh` to restart.
+- notebook-ai uses ports **3003** (Vite frontend) and **4003** (backend API). Restart only needs to handle these two ports. Use `./restart.sh` to restart.
 - When the user says "continue" or "继续", resume the previous session's implementation plan from where it left off. Do NOT start unrelated tasks.
 - When asked to initialize, set up, or run a known skill/command, execute it directly. Do NOT spend time exploring the environment first.
 
