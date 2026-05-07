@@ -36,7 +36,7 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
   useStore.setState({ notebookLoading: true });
 
   try {
-    const { ws, openNotebookTab: openTab, authToken: token } = useStore.getState();
+    const { ws, openNotebookTab: openTab } = useStore.getState();
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
@@ -81,7 +81,8 @@ export async function openNotebookByPath(notebookPath: string): Promise<OpenNote
       // REST fallback
       const res = await fetch('/api/notebooks/open-by-path', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ path: notebookPath }),
       });
       if (!res.ok) throw new Error(await res.text());

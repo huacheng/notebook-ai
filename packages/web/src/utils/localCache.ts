@@ -50,6 +50,15 @@ export function cacheRemove(key: string): void {
   localStorage.removeItem(key);
 }
 
+export function cacheRemoveByPrefix(prefix: string): void {
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefix)) keys.push(k);
+  }
+  for (const k of keys) localStorage.removeItem(k);
+}
+
 function evictExpired(): void {
   const now = Date.now();
   const keys: string[] = [];

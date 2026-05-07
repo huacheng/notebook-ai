@@ -266,9 +266,9 @@ describe('cells_loaded WS message — wsSlice handler dispatch', () => {
       OPEN: 1,
       send: () => {},
       close: () => {},
-      set onopen(fn: any) { /* ignore */ },
-      set onclose(fn: any) { /* ignore */ },
-      set onerror(fn: any) { /* ignore */ },
+      set onopen(_fn: any) { /* ignore */ },
+      set onclose(_fn: any) { /* ignore */ },
+      set onerror(_fn: any) { /* ignore */ },
       set onmessage(fn: any) { capturedOnMessage = fn; },
     };
 
@@ -276,6 +276,10 @@ describe('cells_loaded WS message — wsSlice handler dispatch', () => {
     const OriginalWebSocket = globalThis.WebSocket;
     (globalThis as any).WebSocket = function () { return mockWs; } as any;
     (globalThis as any).WebSocket.OPEN = 1;
+
+    // Monkey-patch fetch to simulate ws-ticket failing (no server), so connectWebSocket falls back to direct WS
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () => { throw new Error('no server'); };
 
     // Also need window.location for connectWebSocket
     if (typeof globalThis.window === 'undefined') {
@@ -287,8 +291,8 @@ describe('cells_loaded WS message — wsSlice handler dispatch', () => {
     }
 
     try {
-      // Call connectWebSocket — this registers onmessage on our mock
-      state.connectWebSocket();
+      // Call connectWebSocket and await — now async due to ws-ticket fetch
+      await state.connectWebSocket();
 
       expect(capturedOnMessage).not.toBeNull();
 
@@ -319,6 +323,7 @@ describe('cells_loaded WS message — wsSlice handler dispatch', () => {
       expect(state.loadingOlderCells).toBe(false);
     } finally {
       (globalThis as any).WebSocket = OriginalWebSocket;
+      (globalThis as any).fetch = origFetch;
       (globalThis as any).performance = origPerf;
     }
   });

@@ -47,11 +47,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     let lastErr: unknown;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const headers: Record<string, string> = {};
-        const token = get().authToken;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const res = await fetch('/api/notebooks/list', { headers });
+        const res = await fetch('/api/notebooks/list', { credentials: 'same-origin' });
         if (res.ok) {
           const data = (await res.json()) as { notebooks: NotebookListItem[] };
           const notebooks = data.notebooks.map((item) => {
@@ -84,8 +80,6 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
 
   async createNewNotebook(title: string) {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const token = get().authToken;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     set({ sessionNotice: null });
     const tempId = crypto.randomUUID();
@@ -102,6 +96,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       const res = await fetch('/api/notebooks/create', {
         method: 'POST',
         headers,
+        credentials: 'same-origin',
         body: JSON.stringify({ title }),
       });
       if (!res.ok) {
@@ -159,14 +154,10 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       });
     }
 
-    const headers: Record<string, string> = {};
-    const token = get().authToken;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     try {
       const res = await fetch(`/api/notebooks/${encodeURIComponent(notebookId)}/restore`, {
         method: 'POST',
-        headers,
+        credentials: 'same-origin',
       });
       if (!res.ok) {
         const err = (await res.json()) as { error: string };
@@ -236,10 +227,6 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   },
 
   async deleteNotebook(notebookId: string) {
-    const headers: Record<string, string> = {};
-    const token = get().authToken;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     set((state) => ({
       notebookList: state.notebookList.filter((n) => n.id !== notebookId),
     }));
@@ -264,7 +251,7 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     try {
       const res = await fetch(`/api/notebooks/${encodeURIComponent(notebookId)}`, {
         method: 'DELETE',
-        headers,
+        credentials: 'same-origin',
       });
       if (!res.ok && res.status !== 404) {
         console.error('[store] deleteNotebook failed:', res.status);
@@ -292,14 +279,11 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
 
     cacheSet(`nb-title-${notebookId}`, newTitle);
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const token = get().authToken;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     try {
       await fetch(`/api/notebooks/${encodeURIComponent(notebookId)}`, {
         method: 'PATCH',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ title: newTitle }),
       });
       cacheRemove(`nb-title-${notebookId}`);
@@ -319,12 +303,9 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
       if (file.name.endsWith('.zip')) {
         const formData = new FormData();
         formData.append('file', file);
-        const headers: Record<string, string> = {};
-        const token = get().authToken;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
         const extractRes = await fetch('/api/notebooks/extract-zip', {
           method: 'POST',
-          headers,
+          credentials: 'same-origin',
           body: formData,
         });
         if (!extractRes.ok) {
@@ -343,14 +324,11 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     const title = imported.metadata?.title || 'Imported Notebook';
     set({ creatingNotebook: false, sessionNotice: null });
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const token = get().authToken;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     try {
       const res = await fetch('/api/notebooks/create', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ title }),
       });
       if (!res.ok) return;
@@ -380,7 +358,8 @@ export const createSidebarSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
 
       await fetch(`/api/notebooks/${encodeURIComponent(data.notebookId)}/import-content`, {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify(importedWithMeta),
       });
 

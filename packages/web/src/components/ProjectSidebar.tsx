@@ -56,8 +56,8 @@ function CreateOverlay({ phase, label, errorMsg, onDismiss }: {
 
 
 
-function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequestDelete, onRequestRename, anchorRect }: {
-  projectId: string; projectSlug: string; authToken: string | null;
+function ProjectItemMenu({ projectId, projectSlug, onClose, onRequestDelete, onRequestRename, anchorRect }: {
+  projectId: string; projectSlug: string;
   onClose: () => void; onRequestDelete: () => void; onRequestRename: () => void;
   anchorRect?: DOMRect;
 }) {
@@ -75,7 +75,7 @@ function ProjectItemMenu({ projectId, projectSlug, authToken, onClose, onRequest
   const handleExport = async () => {
     const url = `/api/projects/${projectId}/files/zip`;
     const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      credentials: 'same-origin',
     });
     if (!res.ok) return;
     const blob = await res.blob();
@@ -107,7 +107,6 @@ function ProjectList() {
   const t = useT();
   const { projects, projectsLoading, createProject, setActiveProject, importProject } = useStore();
   const deleteProject = useStore(s => s.deleteProject);
-  const authToken = useStore(s => s.authToken);
   const [newTitle, setNewTitle] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -184,7 +183,6 @@ function ProjectList() {
               <ProjectItemMenu
                 projectId={p.id}
                 projectSlug={p.slug}
-                authToken={authToken}
                 anchorRect={menuAnchorRect ?? undefined}
                 onClose={() => { setMenuOpenId(null); setMenuAnchorRect(null); }}
                 onRequestDelete={() => setDeleteTarget({ id: p.id, title: p.title })}
@@ -224,10 +222,8 @@ function ProjectList() {
           onConfirm={async (newName) => {
             const res = await fetch(`/api/projects/${renameTarget.id}`, {
               method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-              },
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
               body: JSON.stringify({ title: newName }),
             });
             if (!res.ok) {
@@ -455,8 +451,8 @@ function RenameModal({ currentName, label = 'Item', onCancel, onConfirm, onDone 
   );
 }
 
-function NotebookItemMenu({ relPath, baseUrl, authToken, showExport, isDefault, onClose, onRequestRename, onRequestDelete, anchorRect }: {
-  relPath: string; baseUrl: string; authToken: string | null; showExport?: boolean; isDefault?: boolean;
+function NotebookItemMenu({ relPath, baseUrl, showExport, isDefault, onClose, onRequestRename, onRequestDelete, anchorRect }: {
+  relPath: string; baseUrl: string; showExport?: boolean; isDefault?: boolean;
   onClose: () => void; onRequestRename?: () => void;
   onRequestDelete?: () => void;
   anchorRect?: DOMRect;
@@ -486,7 +482,7 @@ function NotebookItemMenu({ relPath, baseUrl, authToken, showExport, isDefault, 
   const handleExport = async () => {
     const url = `${baseUrl}/files/zip?path=${encodeURIComponent(relPath)}`;
     const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      credentials: 'same-origin',
     });
     if (!res.ok) return;
     const blob = await res.blob();
@@ -521,7 +517,6 @@ function FileBrowser() {
   const activeProjectId = useStore(s => s.activeProjectId);
   const activeProjectPath = useStore(s => s.activeProjectPath);
   const goBackToProjectList = useStore(s => s.goBackToProjectList);
-  const authToken = useStore(s => s.authToken);
   const openFileTab = useStore(s => s.openFileTab);
   const deleteProjectNotebook = useStore(s => s.deleteProjectNotebook);
   const workspaceDir = useStore(s => s.workspaceDir);
@@ -610,7 +605,7 @@ function FileBrowser() {
       useStore.getState().deactivateFileTab();
       useStore.setState({ notebookLoading: true, gitTabOpen: false });
       try {
-        const { ws, openNotebookTab: openTab, authToken: token } = useStore.getState();
+        const { ws, openNotebookTab: openTab } = useStore.getState();
 
         // Try WS first, fallback to REST
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -643,10 +638,8 @@ function FileBrowser() {
           // REST fallback
           const res = await fetch('/api/notebooks/open-by-path', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify({ path: notebookPath }),
           });
           if (res.ok) {
@@ -711,7 +704,6 @@ function FileBrowser() {
           <NotebookItemMenu
             relPath={relPath}
             baseUrl={`/api/projects/${activeProjectId}`}
-            authToken={authToken}
             showExport={isNbDir}
             isDefault={!!(file as any).is_default}
             anchorRect={nbMenuAnchorRect ?? undefined}
@@ -728,7 +720,7 @@ function FileBrowser() {
         )}
       </div>
     );
-  }, [nbMenuPath, nbMenuAnchorRect, activeProjectId, authToken]);
+  }, [nbMenuPath, nbMenuAnchorRect, activeProjectId]);
 
   return (
     <div className="file-browser">
@@ -761,7 +753,6 @@ function FileBrowser() {
           <FileSection
             key={activeProjectId ?? 'root'}
             baseUrl={`/api/projects/${activeProjectId}`}
-            authToken={authToken}
             startPath={currentSubPath}
             allowNavigateAbove
             onFileClick={handleFileClick}
@@ -787,7 +778,6 @@ function FileBrowser() {
         <FileSection
           key={delivPath}
           baseUrl={`/api/projects/${activeProjectId}`}
-          authToken={authToken}
           showDownloadAll
           initialPath={delivPath}
           refreshKey={delivRefreshKey}
@@ -830,10 +820,8 @@ function FileBrowser() {
           onConfirm={async (newName) => {
             const res = await fetch(`/api/projects/${activeProjectId}/notebooks/rename`, {
               method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-              },
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
               body: JSON.stringify({
                 notebookPath: `${activeProjectPath}/${nbRenameTarget.path}`,
                 title: newName,
@@ -859,7 +847,6 @@ export function ProjectSidebar() {
   const sidebarLevel = useStore(s => s.sidebarLevel);
   const leftSidebarSplitRatio = useStore(s => s.leftSidebarSplitRatio);
   const setLeftSidebarSplitRatio = useStore(s => s.setLeftSidebarSplitRatio);
-  const authToken = useStore(s => s.authToken);
   const workspaceDir = useStore(s => s.workspaceDir);
   const sessionId = useStore(s => s.sessionId);
   const openFileTab = useStore(s => s.openFileTab);
@@ -925,7 +912,6 @@ export function ProjectSidebar() {
         {libraryTab === 'files' && (
           <FileSection
             baseUrl="/api/library"
-            authToken={authToken}
             refreshKey={libraryRefreshKey}
             showDownloadAll
             dropLabel={t('sidebar.dropToLibrary')}

@@ -79,13 +79,10 @@ export function WelcomeScreen() {
     if (result.sessionId) {
       // Open the notebook after creation — fetch the notebook data
       try {
-        const authToken = useStore.getState().authToken;
         const res = await fetch(`/api/notebooks/open-by-path`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ path: result.notebookPath }),
         });
         if (res.ok) {

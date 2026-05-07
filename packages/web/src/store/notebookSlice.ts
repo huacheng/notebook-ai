@@ -330,13 +330,9 @@ export const createNotebookSlice: StateCreator<NotebookStore, [], [], Pick<Noteb
 
     set({ slideLoading: true });
     try {
-      const headers: Record<string, string> = {};
-      const token = get().authToken;
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const res = await fetch(
         `/api/notebooks/${encodeURIComponent(sessionId)}/generate-slide`,
-        { method: 'POST', headers },
+        { method: 'POST', credentials: 'same-origin' },
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: 'Unknown error' }));

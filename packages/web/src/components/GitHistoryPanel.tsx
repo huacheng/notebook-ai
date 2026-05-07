@@ -271,12 +271,11 @@ const DiffView = memo(function DiffView({ diff }: { diff: string }) {
 // ---------------------------------------------------------------------------
 
 const CommitItem = memo(function CommitItem({
-  commit, projectId, source, token, laneNode, maxLanes,
+  commit, projectId, source, laneNode, maxLanes,
 }: {
   commit: CommitInfo;
   projectId?: string;
   source?: 'library';
-  token: string | null;
   laneNode: LaneNode | undefined;
   maxLanes: number;
 }) {
@@ -298,8 +297,8 @@ const CommitItem = memo(function CommitItem({
     errorEvent: isLibrary ? 'nb:library-git-commit-files-error' : 'nb:git-commit-files-error',
     extractData: (d) => d.files as CommitFile[],
     restFallback: isLibrary
-      ? () => fetchLibraryGitCommitFiles(token, commit.hash)
-      : () => fetchGitCommitFiles(projectId!, token, commit.hash),
+      ? () => fetchLibraryGitCommitFiles(commit.hash)
+      : () => fetchGitCommitFiles(projectId!, commit.hash),
     initialValue: commit.files,
     errorValue: [],
     allowRetry: true,
@@ -317,8 +316,8 @@ const CommitItem = memo(function CommitItem({
     errorEvent: isLibrary ? 'nb:library-git-diff-error' : 'nb:git-diff-error',
     extractData: (d) => d.diff as string,
     restFallback: isLibrary
-      ? () => fetchLibraryGitDiff(token, commit.hash, diffFile ?? undefined)
-      : () => fetchGitDiff(projectId!, token, commit.hash, diffFile ?? undefined),
+      ? () => fetchLibraryGitDiff(commit.hash, diffFile ?? undefined)
+      : () => fetchGitDiff(projectId!, commit.hash, diffFile ?? undefined),
     initialValue: '',
     errorValue: 'Failed to load diff',
     deps: [diffFile, projectId, source, commit.hash],
@@ -414,7 +413,6 @@ const CommitItem = memo(function CommitItem({
 // ---------------------------------------------------------------------------
 
 export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
-  const authToken = useStore((s) => s.authToken);
   const isLibrary = source === 'library';
   const cacheId = isLibrary ? '__library__' : projectId!;
 
@@ -437,8 +435,8 @@ export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
 
   useEffect(() => {
     const fetchBranches = isLibrary
-      ? () => fetchLibraryGitBranches(authToken)
-      : () => fetchGitBranches(projectId!, authToken);
+      ? () => fetchLibraryGitBranches()
+      : () => fetchGitBranches(projectId!);
 
     fetchBranches()
       .then(({ current, branches: list }) => {
@@ -446,7 +444,7 @@ export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
         setBranches(list);
       })
       .catch(() => {});
-  }, [projectId, isLibrary, authToken]);
+  }, [projectId, isLibrary]);
 
   // Persist to cache whenever commits or branches change
   const commitsRef = useRef(commits);
@@ -470,7 +468,7 @@ export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
 
       if (isLibrary) {
         // Library mode: use REST API (no WebSocket support for library yet)
-        resp = await fetchLibraryGitLog(authToken, { page: p });
+        resp = await fetchLibraryGitLog({ page: p });
       } else {
         // Project mode: Try WS for simple queries (no file/branch filter) — avoids HTTP overhead
         const ws = useStore.getState().ws;
@@ -513,13 +511,13 @@ export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
             });
           } catch {
             // WS failed — fallback to REST
-            resp = await fetchGitLog(projectId!, authToken, {
+            resp = await fetchGitLog(projectId!, {
               page: p,
               all: all || undefined,
             });
           }
         } else {
-          resp = await fetchGitLog(projectId!, authToken, {
+          resp = await fetchGitLog(projectId!, {
             page: p,
             file: file || undefined,
             all: all || undefined,
@@ -550,7 +548,7 @@ export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, isLibrary, authToken, persistCache]);
+  }, [projectId, isLibrary, persistCache]);
 
   useEffect(() => {
     loadPage(1, search, false, allBranches, selectedBranch);
@@ -671,7 +669,6 @@ export function GitHistoryPanel({ projectId, source }: GitHistoryPanelProps) {
             commit={c}
             projectId={projectId}
             source={source}
-            token={authToken}
             laneNode={laneMap.get(c.hash)}
             maxLanes={maxLanes}
           />

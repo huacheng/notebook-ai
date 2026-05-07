@@ -30,9 +30,8 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   fetchProjects: async () => {
     set({ projectsLoading: true });
     try {
-      const token = get().authToken;
       const res = await fetch('/api/projects', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'same-origin',
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const projects = await res.json();
@@ -52,13 +51,10 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   },
 
   createProject: async (title: string) => {
-    const token = get().authToken;
     const res = await fetch('/api/projects', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ title }),
     });
     if (!res.ok) {
@@ -70,10 +66,9 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   },
 
   deleteProject: async (projectId: string) => {
-    const token = get().authToken;
     const res = await fetch(`/api/projects/${projectId}`, {
       method: 'DELETE',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'same-origin',
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: 'Delete failed' }));
@@ -85,25 +80,23 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   },
 
   importProject: async (file: File) => {
-    const token = get().authToken;
     const form = new FormData();
     form.append('archive', file);
     const res = await fetch('/api/projects/import', {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'same-origin',
       body: form,
     });
     if (res.ok) await get().fetchProjects();
   },
 
   deleteProjectNotebook: async (projectId: string, notebookRelPath: string, merge = false) => {
-    const token = get().authToken;
     const mergeParam = merge ? '&merge=true' : '';
     const res = await fetch(
       `/api/projects/${projectId}/notebooks/by-path?path=${encodeURIComponent(notebookRelPath)}${mergeParam}`,
       {
         method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'same-origin',
       },
     );
     if (!res.ok) {
@@ -122,12 +115,6 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   },
 
   importProjectNotebook: async (projectId: string, file: File) => {
-    const token = get().authToken;
-    const headers = (extra?: Record<string, string>) => ({
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...extra,
-    });
-
     // Parse the file
     let notebook: any;
     try {
@@ -136,7 +123,7 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
         form.append('file', file);
         const extractRes = await fetch('/api/notebooks/extract-zip', {
           method: 'POST',
-          headers: headers(),
+          credentials: 'same-origin',
           body: form,
         });
         if (!extractRes.ok) return;
@@ -151,7 +138,8 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     // Create notebook in project
     const createRes = await fetch(`/api/projects/${projectId}/notebooks`, {
       method: 'POST',
-      headers: headers({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ title }),
     });
     if (!createRes.ok) return;
@@ -161,7 +149,8 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
     // Import content
     await fetch(`/api/notebooks/${encodeURIComponent(data.notebookId)}/import-content`, {
       method: 'POST',
-      headers: headers({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         ...notebook,
         metadata: { ...notebook.metadata, title, updated: new Date().toISOString() },
@@ -203,13 +192,10 @@ export const createProjectSlice: StateCreator<NotebookStore, [], [], Pick<Notebo
   },
 
   createNotebook: async (projectId: string, title: string) => {
-    const token = get().authToken;
     const res = await fetch(`/api/projects/${projectId}/notebooks`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ title }),
     });
     if (!res.ok) {

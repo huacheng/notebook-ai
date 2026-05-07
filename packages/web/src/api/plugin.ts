@@ -1,8 +1,5 @@
-function authHeaders(token: string | null): Record<string, string> {
-  const h: Record<string, string> = {};
-  if (token) h['Authorization'] = `Bearer ${token}`;
-  return h;
-}
+const FETCH_OPTS: RequestInit = { credentials: 'same-origin' };
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export interface MarketplaceInfo {
   name: string;
@@ -30,16 +27,17 @@ export interface PluginStatusResponse {
   installed: Record<string, InstalledEntry>;
 }
 
-export async function fetchPluginStatus(token: string | null): Promise<PluginStatusResponse> {
-  const res = await fetch('/api/plugin/status', { headers: authHeaders(token) });
+export async function fetchPluginStatus(): Promise<PluginStatusResponse> {
+  const res = await fetch('/api/plugin/status', FETCH_OPTS);
   if (!res.ok) throw new Error(`Plugin status failed: ${res.status}`);
   return res.json();
 }
 
-export async function installPlugin(token: string | null, key: string): Promise<void> {
+export async function installPlugin(key: string): Promise<void> {
   const res = await fetch('/api/plugin/install', {
     method: 'POST',
-    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    headers: JSON_HEADERS,
+    credentials: 'same-origin',
     body: JSON.stringify({ plugin: key }),
   });
   if (!res.ok) {
@@ -48,10 +46,11 @@ export async function installPlugin(token: string | null, key: string): Promise<
   }
 }
 
-export async function uninstallPlugin(token: string | null, key: string): Promise<void> {
+export async function uninstallPlugin(key: string): Promise<void> {
   const res = await fetch('/api/plugin/uninstall', {
     method: 'POST',
-    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    headers: JSON_HEADERS,
+    credentials: 'same-origin',
     body: JSON.stringify({ plugin: key }),
   });
   if (!res.ok) {
@@ -60,10 +59,11 @@ export async function uninstallPlugin(token: string | null, key: string): Promis
   }
 }
 
-export async function addMarketplace(token: string | null, source: string): Promise<void> {
+export async function addMarketplace(source: string): Promise<void> {
   const res = await fetch('/api/plugin/marketplace/add', {
     method: 'POST',
-    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    headers: JSON_HEADERS,
+    credentials: 'same-origin',
     body: JSON.stringify({ source }),
   });
   if (!res.ok) {
@@ -72,10 +72,11 @@ export async function addMarketplace(token: string | null, source: string): Prom
   }
 }
 
-export async function removeMarketplace(token: string | null, name: string): Promise<void> {
+export async function removeMarketplace(name: string): Promise<void> {
   const res = await fetch('/api/plugin/marketplace/remove', {
     method: 'POST',
-    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    headers: JSON_HEADERS,
+    credentials: 'same-origin',
     body: JSON.stringify({ name }),
   });
   if (!res.ok) {
@@ -84,10 +85,11 @@ export async function removeMarketplace(token: string | null, name: string): Pro
   }
 }
 
-export async function updateMarketplace(token: string | null, name?: string): Promise<void> {
+export async function updateMarketplace(name?: string): Promise<void> {
   const res = await fetch('/api/plugin/marketplace/update', {
     method: 'POST',
-    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    headers: JSON_HEADERS,
+    credentials: 'same-origin',
     body: JSON.stringify(name ? { name } : {}),
   });
   if (!res.ok) {
@@ -101,10 +103,11 @@ export interface UpdateResult {
   steps: string[];
 }
 
-export async function updatePlugin(token: string | null, key: string): Promise<UpdateResult> {
+export async function updatePlugin(key: string): Promise<UpdateResult> {
   const res = await fetch('/api/plugin/update', {
     method: 'POST',
-    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    headers: JSON_HEADERS,
+    credentials: 'same-origin',
     body: JSON.stringify({ plugin: key }),
   });
   if (!res.ok) {

@@ -260,8 +260,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async checkPluginStatus() {
     set({ pluginLoading: true });
     try {
-      const { authToken } = get();
-      const status = await fetchPluginStatus(authToken);
+      const status = await fetchPluginStatus();
       set({ pluginStatus: status, pluginLoading: false });
     } catch {
       set({ pluginLoading: false });
@@ -271,12 +270,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async installPlugin(key: string) {
     set({ pluginActionKey: key, pluginOverlay: `plugin.installing|${key.split('@')[0]}` });
     try {
-      const { authToken } = get();
-      await apiInstallPlugin(authToken, key);
+      await apiInstallPlugin(key);
       // Restart all open notebooks to pick up plugin changes
       restartAllNotebooks(get);
       // Refresh plugin status
-      const status = await fetchPluginStatus(authToken);
+      const status = await fetchPluginStatus();
       set({ pluginStatus: status, pluginActionKey: null, pluginOverlay: null });
     } catch {
       set({ pluginActionKey: null, pluginOverlay: null });
@@ -286,10 +284,9 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async uninstallPlugin(key: string) {
     set({ pluginActionKey: key, pluginOverlay: `plugin.uninstalling|${key.split('@')[0]}` });
     try {
-      const { authToken } = get();
-      await apiUninstallPlugin(authToken, key);
+      await apiUninstallPlugin(key);
       restartAllNotebooks(get);
-      const status = await fetchPluginStatus(authToken);
+      const status = await fetchPluginStatus();
       set({ pluginStatus: status, pluginActionKey: null, pluginOverlay: null });
     } catch {
       set({ pluginActionKey: null, pluginOverlay: null });
@@ -299,9 +296,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async addMarketplace(source: string) {
     set({ pluginOverlay: `plugin.addingMarket|${source}` });
     try {
-      const { authToken } = get();
-      await apiAddMarketplace(authToken, source);
-      const status = await fetchPluginStatus(authToken);
+      await apiAddMarketplace(source);
+      const status = await fetchPluginStatus();
       set({ pluginStatus: status, pluginOverlay: null });
     } catch {
       set({ pluginOverlay: null });
@@ -311,9 +307,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async removeMarketplace(name: string) {
     set({ pluginOverlay: `plugin.removingMarket|${name}` });
     try {
-      const { authToken } = get();
-      await apiRemoveMarketplace(authToken, name);
-      const status = await fetchPluginStatus(authToken);
+      await apiRemoveMarketplace(name);
+      const status = await fetchPluginStatus();
       set({ pluginStatus: status, pluginOverlay: null });
     } catch {
       set({ pluginOverlay: null });
@@ -323,10 +318,9 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async updateMarketplace(name?: string) {
     set({ pluginOverlay: name ? `plugin.updatingMarket|${name}` : 'plugin.updatingAll' });
     try {
-      const { authToken } = get();
-      await apiUpdateMarketplace(authToken, name);
+      await apiUpdateMarketplace(name);
       restartAllNotebooks(get);
-      const status = await fetchPluginStatus(authToken);
+      const status = await fetchPluginStatus();
       set({ pluginStatus: status, pluginOverlay: null });
     } catch {
       set({ pluginOverlay: null });
@@ -336,12 +330,11 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   async updatePlugin(key: string) {
     set({ pluginActionKey: key, pluginOverlay: `plugin.updatingPlugin|${key.split('@')[0]}` });
     try {
-      const { authToken } = get();
-      const result = await apiUpdatePlugin(authToken, key);
+      const result = await apiUpdatePlugin(key);
       const stepsLog = result.steps?.join('\n') ?? '';
       if (result.ok) {
         restartAllNotebooks(get);
-        const status = await fetchPluginStatus(authToken);
+        const status = await fetchPluginStatus();
         set({
           pluginStatus: status,
           pluginActionKey: null,
@@ -401,12 +394,12 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   closeLoginPanel() {
     set({ loginPanelOpen: false, loginPhase: 'options', loginUrl: null, loginError: null });
     // Cancel any in-progress login
-    fetch('/api/auth/claude/login-cancel', { method: 'POST', headers: { Authorization: `Bearer ${get().authToken}` } }).catch(() => {});
+    fetch('/api/auth/claude/login-cancel', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
   },
 
   async fetchClaudeStatus() {
     try {
-      const res = await fetch('/api/auth/claude/status', { headers: { Authorization: `Bearer ${get().authToken}` } });
+      const res = await fetch('/api/auth/claude/status', { credentials: 'same-origin' });
       const data = await res.json();
       set({ loginStatus: data });
     } catch {
@@ -419,7 +412,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     try {
       const res = await fetch('/api/auth/claude/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${get().authToken}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ method }),
       });
       const data = await res.json();
@@ -441,7 +435,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
       if (loginPhase !== 'code') return; // stopped
       try {
         const res = await fetch('/api/auth/claude/login-poll', {
-          headers: { Authorization: `Bearer ${get().authToken}` },
+          credentials: 'same-origin',
         });
         const data = await res.json();
         if (data.pending) {
@@ -462,7 +456,8 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     try {
       await fetch('/api/auth/claude/login-code', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${get().authToken}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ code }),
       });
       // Result will come via polling — don't change phase here
@@ -472,7 +467,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
   },
 
   claudeLoginCancel() {
-    fetch('/api/auth/claude/login-cancel', { method: 'POST', headers: { Authorization: `Bearer ${get().authToken}` } }).catch(() => {});
+    fetch('/api/auth/claude/login-cancel', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
     set({ loginPhase: 'options', loginUrl: null, loginError: null });
   },
 
@@ -481,7 +476,7 @@ export const createUiSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     try {
       const res = await fetch('/api/auth/claude/logout', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${get().authToken}` },
+        credentials: 'same-origin',
       });
       const data = await res.json();
       if (data.success) {

@@ -44,7 +44,6 @@ export function MobileNotebookView() {
   const activeProjectId = useStore((s) => s.activeProjectId);
   const activeProjectPath = useStore((s) => s.activeProjectPath);
   const workspaceDir = useStore((s) => s.workspaceDir);
-  const authToken = useStore((s) => s.authToken);
 
   // Refresh keys for file sections
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState(0);
@@ -226,7 +225,7 @@ export function MobileNotebookView() {
             {activeProjectId ? (
               <FileSection
                 baseUrl={`/api/projects/${activeProjectId}`}
-                authToken={authToken}
+
                 onFileClick={handleWorkspaceFileClick}
                 refreshKey={workspaceRefreshKey}
                 noDeleteFilter={(name, subPath) => name === '.MEMORY.md' || name === '.status.json' || name === '.working' || name === '.claude' || subPath?.startsWith('.claude/')}
@@ -242,7 +241,6 @@ export function MobileNotebookView() {
           <div className="mobile-drawer-section mobile-drawer-file-section">
             <FileSection
               baseUrl="/api/library"
-              authToken={authToken}
               onFileClick={handleLibraryFileClick}
               refreshKey={libraryRefreshKey}
               workspaceDir={workspaceDir}
@@ -264,7 +262,7 @@ export function MobileNotebookView() {
             {activeProjectId ? (
               <FileSection
                 baseUrl={`/api/projects/${activeProjectId}`}
-                authToken={authToken}
+
                 onFileClick={handleDelivFileClick}
                 initialPath={delivPath}
                 refreshKey={delivRefreshKey}

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useStore } from '../store';
 import { fetchGitLog, fetchGitDiff, fetchLibraryGitLog, fetchLibraryGitDiff } from '../api/git';
 import type { CommitInfo } from '../api/git';
 import { useT } from '../i18n';
@@ -25,7 +24,6 @@ function relTime(iso: string): string {
 
 export function SidebarGitLog({ source, projectId }: SidebarGitLogProps) {
   const t = useT();
-  const authToken = useStore(s => s.authToken);
 
   const [commits, setCommits] = useState<CommitInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,9 +42,9 @@ export function SidebarGitLog({ source, projectId }: SidebarGitLogProps) {
     setError(null);
     try {
       const res = source === 'library'
-        ? await fetchLibraryGitLog(authToken, { page: pageNum, limit: 30 })
+        ? await fetchLibraryGitLog({ page: pageNum, limit: 30 })
         : projectId
-          ? await fetchGitLog(projectId, authToken, { page: pageNum, limit: 30 })
+          ? await fetchGitLog(projectId, { page: pageNum, limit: 30 })
           : null;
 
       if (res) {
@@ -59,7 +57,7 @@ export function SidebarGitLog({ source, projectId }: SidebarGitLogProps) {
     } finally {
       setLoading(false);
     }
-  }, [source, projectId, authToken]);
+  }, [source, projectId]);
 
   useEffect(() => {
     loadCommits(1);
@@ -76,9 +74,9 @@ export function SidebarGitLog({ source, projectId }: SidebarGitLogProps) {
     setDiffLoading(true);
     try {
       const d = source === 'library'
-        ? await fetchLibraryGitDiff(authToken, hash)
+        ? await fetchLibraryGitDiff(hash)
         : projectId
-          ? await fetchGitDiff(projectId, authToken, hash)
+          ? await fetchGitDiff(projectId, hash)
           : '';
       setDiff(d);
     } catch {
@@ -86,7 +84,7 @@ export function SidebarGitLog({ source, projectId }: SidebarGitLogProps) {
     } finally {
       setDiffLoading(false);
     }
-  }, [source, projectId, authToken, selectedHash]);
+  }, [source, projectId, selectedHash]);
 
   const handleLoadMore = () => {
     if (!loading && hasMore) {
