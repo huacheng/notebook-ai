@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { NotebookDb } from './db.js';
 import { SessionCache, type SessionToken } from './session-cache.js';
+import { requireAuth, extractToken, COOKIE_NAME } from './auth-helpers.js';
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -368,20 +369,11 @@ export function handleVerify(req: Request, res: Response): void {
   // - Token is 64-char random string, brute-force is infeasible
   // - Token expiry is normal (browser refresh, session restart)
   // - Frontend only calls this once per page load
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ ok: false });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  const session = validateSessionToken(token);
-  if (!session) {
-    res.status(401).json({ ok: false });
-    return;
-  }
-
-  res.json({ ok: true, userId: session.userId, email: session.email });
+  // /verify is a boolean check — body is { ok: bool }, not { error }.
+  // Other endpoints (ws-ticket, middleware) carry an error message.
+  const r = requireAuth(req);
+  if (!r.ok) { res.status(r.status).json({ ok: false }); return; }
+  res.json({ ok: true, userId: r.session.userId, email: r.session.email });
 }
 
 // ── WS ticket endpoint ─────────────────────────────────────────────────────
@@ -395,20 +387,9 @@ export function handleWsTicket(req: Request, res: Response): void {
   // - Requires valid session token (already authenticated)
   // - Token is 64-char random string, can't be guessed
   // - Only called when establishing WebSocket connection
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authorization required.' });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  const session = validateSessionToken(token);
-  if (!session) {
-    res.status(401).json({ error: 'Invalid or expired token.' });
-    return;
-  }
-
-  res.json({ ticket: createWsTicket(session.userId) });
+  const r = requireAuth(req);
+  if (!r.ok) { res.status(r.status).json({ error: r.error }); return; }
+  res.json({ ticket: createWsTicket(r.session.userId) });
 }
 
 // ── Logout endpoint ─────────────────────────────────────────────────────────
@@ -488,7 +469,6 @@ export function handleAuthStatus(_req: Request, res: Response): void {
  * except the auth endpoints themselves and health check.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Always allow auth endpoints and health check.
   if (
     req.path === '/api/auth/login' ||
     req.path === '/api/auth/login-token' ||
@@ -498,29 +478,17 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     req.path === '/api/auth/ws-ticket' ||
     req.path === '/api/auth/logout' ||
     req.path === '/api/health'
-  ) {
-    next();
+  ) { next(); return; }
+
+  const r = requireAuth(req);
+  if (!r.ok) {
+    if (extractToken(req)) res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.status(r.status).json({ error: r.error });
     return;
   }
-
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authorization required.' });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  const session = validateSessionToken(token);
-  if (!session) {
-    res.status(401).json({ error: 'Invalid or expired token.' });
-    return;
-  }
-
-  // Attach user info to request for downstream handlers
   (req as Request & { user?: { userId: string; email: string } }).user = {
-    userId: session.userId,
-    email: session.email,
+    userId: r.session.userId,
+    email: r.session.email,
   };
-
   next();
 }
