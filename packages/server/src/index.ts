@@ -55,6 +55,9 @@ const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
 app.use(compression());
 app.use(express.json({ limit: '25mb' }));  // Match WebSocket maxPayload for base64 images
+// Cookie parser MUST be mounted before any /api/auth route handler reads req.cookies.
+app.use(cookieParser());
+app.use(csrfMiddleware);
 
 // Build ALLOWED_ORIGINS dynamically from all network interfaces
 const ALLOWED_ORIGINS = new Set([
@@ -118,10 +121,6 @@ if (process.env['NODE_ENV'] === 'production') {
     res.sendFile(path.join(webDistPath, 'index.html'));
   });
 }
-
-// Cookie parser — must run before csrfMiddleware reads req.cookies.
-app.use(cookieParser());
-app.use(csrfMiddleware);
 
 // Auth middleware — protects all API routes below this point.
 app.use(authMiddleware);

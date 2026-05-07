@@ -46,11 +46,8 @@ export default defineConfig({
       timeout: 5000,
     },
     proxy: {
-      '/api': 'http://localhost:4003',
-      '/ws': {
-        target: 'ws://localhost:4003',
-        ws: true,
-      },
+      '/api': { target: 'https://localhost:4003', changeOrigin: true, secure: false },
+      '/ws': { target: 'wss://localhost:4003', ws: true, changeOrigin: true, secure: false },
     },
   },
 });

@@ -30,7 +30,14 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
         const check = await fetch('/api/auth/verify', {
           credentials: 'same-origin',
         });
-        if (!check.ok) {
+        if (check.ok) {
+          const verified = (await check.json()) as { ok: boolean; userId?: string; email?: string };
+          if (verified.ok && verified.userId) {
+            set({ userId: verified.userId, email: verified.email ?? null });
+          } else {
+            set({ userId: null, email: null });
+          }
+        } else {
           set({ userId: null, email: null });
         }
       }
