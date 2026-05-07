@@ -1,8 +1,19 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { CookieOptions } from 'express';
 import crypto from 'crypto';
 import { NotebookDb } from './db.js';
 import { SessionCache, type SessionToken } from './session-cache.js';
 import { requireAuth, extractToken, COOKIE_NAME } from './auth-helpers.js';
+
+const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+
+const COOKIE_OPTS: CookieOptions = {
+  httpOnly: true,
+  secure: process.env['NODE_ENV'] === 'production',
+  sameSite: 'lax',
+  path: '/',
+  maxAge: COOKIE_MAX_AGE_MS,
+};
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -355,7 +366,9 @@ export async function handleLogin(req: Request, res: Response): Promise<void> {
   const token = createSessionToken(user.id, user.email);
 
   clearFailures(ip);
-  res.json({ ok: true, token, userId: user.id, email: user.email });
+  // Token is delivered ONLY via Set-Cookie (HttpOnly, browser-only path).
+  res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
+  res.json({ ok: true, userId: user.id, email: user.email });
 }
 
 // ── Token verify endpoint ───────────────────────────────────────────────────
@@ -451,6 +464,8 @@ export async function handleTokenLogin(req: Request, res: Response): Promise<voi
   // Create session token (reuse existing session infrastructure)
   const sessionToken = createSessionToken('token-user', 'token@local');
   clearFailures(ip);
+  res.cookie(COOKIE_NAME, sessionToken, COOKIE_OPTS);
+  // Token also returned in JSON body for backward compat with curl / NB_AUTH_TOKEN automation.
   res.json({ ok: true, token: sessionToken, userId: 'token-user', email: 'token@local' });
 }
 
