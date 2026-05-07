@@ -24,7 +24,9 @@ import commandsRouter from './routes/commands.js';
 import { createTaskAutoRouter, recoverDaemons, setSessionManager } from './routes/task-auto.js';
 import { setupWebSocket } from './ws-handler.js';
 import { authMiddleware } from './auth.js';
+import { csrfMiddleware } from './csrf.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
+import cookieParser from 'cookie-parser';
 import multer from 'multer';
 
 // ── App setup ────────────────────────────────────────────────────────────────
@@ -116,6 +118,10 @@ if (process.env['NODE_ENV'] === 'production') {
     res.sendFile(path.join(webDistPath, 'index.html'));
   });
 }
+
+// Cookie parser — must run before csrfMiddleware reads req.cookies.
+app.use(cookieParser());
+app.use(csrfMiddleware);
 
 // Auth middleware — protects all API routes below this point.
 app.use(authMiddleware);
