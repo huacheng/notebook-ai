@@ -23,7 +23,7 @@ import { createSystemRouter } from './routes/system.js';
 import commandsRouter from './routes/commands.js';
 import { createTaskAutoRouter, recoverDaemons, setSessionManager } from './routes/task-auto.js';
 import { setupWebSocket } from './ws-handler.js';
-import { authMiddleware } from './auth.js';
+import { authMiddleware, sessionCache } from './auth.js';
 import { csrfMiddleware } from './csrf.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
 import cookieParser from 'cookie-parser';
@@ -155,7 +155,7 @@ sessionManager.startProcessMonitor();
 // ── REST: Health ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', session: sessionCache.getStats() });
 });
 
 // ── REST: Routers ────────────────────────────────────────────────────────────
