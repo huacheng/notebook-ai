@@ -409,14 +409,12 @@ export function handleWsTicket(req: Request, res: Response): void {
 
 /**
  * POST /api/auth/logout — revoke session token.
- * Header: Authorization: Bearer <token>
+ * Header: Authorization: Bearer <token>  OR  Cookie: nb-auth-token=<token>
  */
 export function handleLogout(req: Request, res: Response): void {
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-    revokeSessionToken(token);
-  }
+  const token = extractToken(req);
+  if (token) revokeSessionToken(token);
+  res.clearCookie(COOKIE_NAME, { path: '/' });
   res.json({ ok: true });
 }
 
