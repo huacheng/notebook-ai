@@ -7,12 +7,15 @@ import path from 'path';
  */
 
 const authPath = path.resolve(__dirname, '../auth.ts');
+const sessionCachePath = path.resolve(__dirname, '../session-cache.ts');
 
 describe('Email-based Registration', () => {
   let src: string;
+  let sessionCacheSrc: string;
 
   beforeAll(() => {
     src = readFileSync(authPath, 'utf-8');
+    sessionCacheSrc = readFileSync(sessionCachePath, 'utf-8');
   });
 
   // ── Registration should use email ──────────────────────────────────────────
@@ -48,7 +51,10 @@ describe('Email-based Registration', () => {
   // ── Session token should store email ───────────────────────────────────────
 
   it('SessionToken interface should have email field', () => {
-    expect(src).toMatch(/interface\s+SessionToken[\s\S]*?email\s*:/);
+    // SessionToken is now defined in session-cache.ts and imported into auth.ts
+    const hasLocalInterface = /interface\s+SessionToken[\s\S]*?email\s*:/.test(src);
+    const hasImportedInterface = /interface\s+SessionToken[\s\S]*?email\s*:/.test(sessionCacheSrc);
+    expect(hasLocalInterface || hasImportedInterface).toBe(true);
   });
 
   it('createSessionToken should accept email parameter', () => {

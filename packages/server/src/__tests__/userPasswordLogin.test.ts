@@ -60,7 +60,8 @@ describe('Email/Password Login - Auth Module', () => {
   // ── Session token management ───────────────────────────────────────────────
 
   it('should have session tokens storage', () => {
-    expect(src).toMatch(/sessionTokens|activeSessions/);
+    // sessionTokens (legacy in-memory map) OR sessionCache (delegated SessionCache)
+    expect(src).toMatch(/sessionTokens|activeSessions|sessionCache/);
   });
 
   it('should have createSessionToken function', () => {

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { NotebookDb } from './db.js';
+import { SessionCache, type SessionToken } from './session-cache.js';
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -81,67 +82,22 @@ setInterval(() => {
 }, 10 * 60_000);
 
 // ── Session token management ─────────────────────────────────────────────────
+// Delegated to SessionCache. The wrapper exports below preserve the external
+// API used elsewhere in the codebase.
 
-const SESSION_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // 7 days
-
-interface SessionToken {
-  userId: string;
-  email: string;
-  expiresAt: number;
-}
-
-const sessionTokens = new Map<string, SessionToken>();
+export const sessionCache = new SessionCache({ getDb: () => getDb() });
 
 export function createSessionToken(userId: string, email: string): string {
-  const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + SESSION_TOKEN_TTL_MS;
-  sessionTokens.set(token, { userId, email, expiresAt });
-  // Persist to database so token survives server restarts
-  try { getDb().upsertSessionToken(token, userId, email, expiresAt); } catch { /* db not ready */ }
-  return token;
+  return sessionCache.create(userId, email);
 }
 
 export function validateSessionToken(token: string): SessionToken | null {
-  // Check in-memory cache first
-  const cached = sessionTokens.get(token);
-  if (cached) {
-    if (Date.now() >= cached.expiresAt) {
-      sessionTokens.delete(token);
-      try { getDb().deleteSessionToken(token); } catch { /* ignore */ }
-      return null;
-    }
-    return cached;
-  }
-  // Fall back to database lookup (token created before restart)
-  try {
-    const row = getDb().getSessionToken(token);
-    if (!row) return null;
-    if (Date.now() >= row.expiresAt) {
-      getDb().deleteSessionToken(token);
-      return null;
-    }
-    // Re-hydrate into in-memory cache
-    const session: SessionToken = { userId: row.userId, email: row.email, expiresAt: row.expiresAt };
-    sessionTokens.set(token, session);
-    return session;
-  } catch {
-    return null;
-  }
+  return sessionCache.validate(token);
 }
 
 export function revokeSessionToken(token: string): void {
-  sessionTokens.delete(token);
-  try { getDb().deleteSessionToken(token); } catch { /* ignore */ }
+  sessionCache.revoke(token);
 }
-
-// Cleanup expired sessions every 30 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, session] of sessionTokens) {
-    if (now >= session.expiresAt) sessionTokens.delete(token);
-  }
-  try { getDb().deleteExpiredSessionTokens(); } catch { /* ignore */ }
-}, 30 * 60_000);
 
 // ── WS one-time ticket ──────────────────────────────────────────────────────
 
