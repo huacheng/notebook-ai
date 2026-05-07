@@ -60,7 +60,8 @@ describe('Email/Password Login - Auth Module', () => {
   // ── Session token management ───────────────────────────────────────────────
 
   it('should have session tokens storage', () => {
-    expect(src).toMatch(/sessionTokens|activeSessions/);
+    // sessionTokens (legacy in-memory map) OR sessionCache (delegated SessionCache)
+    expect(src).toMatch(/sessionTokens|activeSessions|sessionCache/);
   });
 
   it('should have createSessionToken function', () => {
@@ -81,32 +82,35 @@ describe('Email/Password Login - Auth Module', () => {
     expect(block).not.toContain('NB_AUTH_TOKEN');
   });
 
-  it('authMiddleware should use validateSessionToken', () => {
+  it('authMiddleware should use session token validation (via requireAuth or validateSessionToken)', () => {
     const start = src.indexOf('function authMiddleware');
     const end = src.indexOf('\n}', start + 50);
     const block = src.slice(start, end > 0 ? end + 1 : start + 1500);
 
-    expect(block).toContain('validateSessionToken');
+    // After Task 4 refactor, validation is delegated to requireAuth (auth-helpers.ts)
+    expect(block).toMatch(/validateSessionToken|requireAuth/);
   });
 
   // ── Verify endpoint should use session tokens ──────────────────────────────
 
-  it('handleVerify should use validateSessionToken', () => {
+  it('handleVerify should use session token validation (via requireAuth or validateSessionToken)', () => {
     const start = src.indexOf('function handleVerify');
     const end = src.indexOf('\n// ──', start + 1);
     const block = src.slice(start, end > 0 ? end : start + 1500);
 
-    expect(block).toContain('validateSessionToken');
+    // After Task 4 refactor, validation is delegated to requireAuth (auth-helpers.ts)
+    expect(block).toMatch(/validateSessionToken|requireAuth/);
   });
 
   // ── WS ticket should use session tokens ────────────────────────────────────
 
-  it('handleWsTicket should use validateSessionToken', () => {
+  it('handleWsTicket should use session token validation (via requireAuth or validateSessionToken)', () => {
     const start = src.indexOf('function handleWsTicket');
     const end = src.indexOf('\n// ──', start + 1);
     const block = src.slice(start, end > 0 ? end : start + 1500);
 
-    expect(block).toContain('validateSessionToken');
+    // After Task 4 refactor, validation is delegated to requireAuth (auth-helpers.ts)
+    expect(block).toMatch(/validateSessionToken|requireAuth/);
   });
 
   // ── Auth status should always return authEnabled: true ─────────────────────

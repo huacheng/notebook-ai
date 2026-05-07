@@ -80,10 +80,9 @@ function MobileDeleteModal({ name, label = 'Notebook', onCancel, onConfirm, onDo
 }
 
 /** Mobile dropdown menu for notebook actions */
-function MobileNotebookMenu({ projectId, relPath, authToken, onClose, onRequestRename, onRequestDelete }: {
+function MobileNotebookMenu({ projectId, relPath, onClose, onRequestRename, onRequestDelete }: {
   projectId: string;
   relPath: string;
-  authToken: string | null;
   onClose: () => void;
   onRequestRename: () => void;
   onRequestDelete: () => void;
@@ -104,9 +103,7 @@ function MobileNotebookMenu({ projectId, relPath, authToken, onClose, onRequestR
 
   const handleExport = async () => {
     const url = `/api/projects/${projectId}/files/zip?path=${encodeURIComponent(relPath)}`;
-    const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-    });
+    const res = await fetch(url, { credentials: 'same-origin' });
     if (!res.ok) return;
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -321,7 +318,6 @@ export function MobileNotebooksList() {
   const projects = useStore((s) => s.projects);
   const setMobileView = useStore((s) => s.setMobileView);
   const deleteProjectNotebook = useStore((s) => s.deleteProjectNotebook);
-  const authToken = useStore((s) => s.authToken);
 
   const [notebooks, setNotebooks] = useState<NotebookEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -344,7 +340,7 @@ export function MobileNotebooksList() {
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${activeProjectId}/notebooks`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        credentials: 'same-origin',
       });
       if (res.ok) {
         const data = await res.json();
@@ -359,7 +355,7 @@ export function MobileNotebooksList() {
 
   useEffect(() => {
     fetchNotebooks();
-  }, [activeProjectId, authToken]);
+  }, [activeProjectId]);
 
   const handleBack = () => {
     setMobileView('projects');
@@ -428,7 +424,6 @@ export function MobileNotebooksList() {
                   <MobileNotebookMenu
                     projectId={activeProjectId}
                     relPath={nb.path}
-                    authToken={authToken}
                     onClose={() => setMenuOpenPath(null)}
                     onRequestRename={() => setRenameTarget({ path: nb.path, name: nb.name })}
                     onRequestDelete={() => setDeleteTarget({ path: nb.path, name: nb.name })}
@@ -455,10 +450,8 @@ export function MobileNotebooksList() {
           onConfirm={async (newName) => {
             const res = await fetch(`/api/projects/${activeProjectId}/notebooks/rename`, {
               method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-              },
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
               body: JSON.stringify({
                 notebookPath: renameTarget.path,
                 title: newName,

@@ -154,31 +154,25 @@ export const createWsSlice: StateCreator<NotebookStore, [], [], Pick<NotebookSto
     set({ wsStatus: 'connecting', ws: null, latency: null });
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = get().authToken;
 
     let wsUrl: string;
-    if (token) {
-      try {
-        const res = await fetch('/api/auth/ws-ticket', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          // D3: If auth fails (401/403), clear token and stop — don't enter reconnect loop
-          if (res.status === 401 || res.status === 403) {
-            sessionStorage.removeItem('nb-auth-token');
-            set({ wsStatus: 'disconnected', authToken: null });
-            return;
-          }
-          throw new Error('ticket fetch failed');
+    try {
+      const res = await fetch('/api/auth/ws-ticket', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        // D3: If auth fails (401/403), stop — don't enter reconnect loop
+        if (res.status === 401 || res.status === 403) {
+          set({ wsStatus: 'disconnected' });
+          return;
         }
-        const { ticket } = await res.json() as { ticket: string };
-        wsUrl = `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
-      } catch {
-        set({ wsStatus: 'disconnected' });
-        return;
+        throw new Error('ticket fetch failed');
       }
-    } else {
+      const { ticket } = await res.json() as { ticket: string };
+      wsUrl = `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
+    } catch {
+      // If no ticket endpoint (auth not required), connect directly
       wsUrl = `${protocol}//${window.location.host}/ws`;
     }
 

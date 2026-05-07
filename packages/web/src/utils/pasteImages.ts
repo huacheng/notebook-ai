@@ -66,14 +66,11 @@ export async function extractImagesFromClipboard(
 export async function uploadPromptImage(
   sessionId: string,
   image: PastedImage,
-  authToken?: string | null,
 ): Promise<ImageRef> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
   const res = await fetch(`/api/notebooks/${sessionId}/files/prompt-image`, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     body: JSON.stringify({ media_type: image.media_type, data: image.data }),
   });
 

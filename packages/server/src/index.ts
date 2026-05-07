@@ -23,8 +23,10 @@ import { createSystemRouter } from './routes/system.js';
 import commandsRouter from './routes/commands.js';
 import { createTaskAutoRouter, recoverDaemons, setSessionManager } from './routes/task-auto.js';
 import { setupWebSocket } from './ws-handler.js';
-import { authMiddleware } from './auth.js';
+import { authMiddleware, sessionCache } from './auth.js';
+import { csrfMiddleware } from './csrf.js';
 import { GitWatcher, FileWatcher } from './watcher.js';
+import cookieParser from 'cookie-parser';
 import multer from 'multer';
 
 // ── App setup ────────────────────────────────────────────────────────────────
@@ -53,6 +55,9 @@ const wss = new WebSocketServer({ server, maxPayload: 25 * 1024 * 1024 });
 
 app.use(compression());
 app.use(express.json({ limit: '25mb' }));  // Match WebSocket maxPayload for base64 images
+// Cookie parser MUST be mounted before any /api/auth route handler reads req.cookies.
+app.use(cookieParser());
+app.use(csrfMiddleware);
 
 // Build ALLOWED_ORIGINS dynamically from all network interfaces
 const ALLOWED_ORIGINS = new Set([
@@ -151,7 +156,7 @@ sessionManager.startProcessMonitor();
 // ── REST: Health ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', session: sessionCache.getStats() });
 });
 
 // ── REST: Routers ────────────────────────────────────────────────────────────

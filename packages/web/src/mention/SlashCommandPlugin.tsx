@@ -32,14 +32,13 @@ export const SlashCommandPlugin: MentionPlugin<SlashItem> = {
   trigger: '/',
 
   fetchItems: async (query: string) => {
-    const { commands, commandsLoaded, setCommands, authToken, language } = useStore.getState();
+    const { commands, commandsLoaded, setCommands, language } = useStore.getState();
     const t = createT(language);
 
     let cmds = commands;
     if (!commandsLoaded) {
       try {
         const headers: Record<string, string> = {};
-        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
         const res = await fetch('/api/commands', { headers });
         if (res.ok) {
           const data = await res.json();

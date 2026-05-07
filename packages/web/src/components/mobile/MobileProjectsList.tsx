@@ -236,10 +236,9 @@ function MobileCreateModal({ label, onCancel, onConfirm, onDone }: {
 }
 
 /** Mobile dropdown menu for project actions */
-function MobileProjectMenu({ projectId, projectSlug, authToken, onClose, onRequestRename, onRequestDelete }: {
+function MobileProjectMenu({ projectId, projectSlug, onClose, onRequestRename, onRequestDelete }: {
   projectId: string;
   projectSlug: string;
-  authToken: string | null;
   onClose: () => void;
   onRequestRename: () => void;
   onRequestDelete: () => void;
@@ -260,9 +259,7 @@ function MobileProjectMenu({ projectId, projectSlug, authToken, onClose, onReque
 
   const handleExport = async () => {
     const url = `/api/projects/${projectId}/files/zip`;
-    const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-    });
+    const res = await fetch(url, { credentials: 'same-origin' });
     if (!res.ok) return;
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -315,7 +312,6 @@ export function MobileProjectsList() {
   const setMobileView = useStore((s) => s.setMobileView);
   const createProject = useStore((s) => s.createProject);
   const deleteProject = useStore((s) => s.deleteProject);
-  const authToken = useStore((s) => s.authToken);
 
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
@@ -382,7 +378,6 @@ export function MobileProjectsList() {
                   <MobileProjectMenu
                     projectId={project.id}
                     projectSlug={project.slug}
-                    authToken={authToken}
                     onClose={() => setMenuOpenId(null)}
                     onRequestRename={() => setRenameTarget({ id: project.id, title: project.title })}
                     onRequestDelete={() => setDeleteTarget({ id: project.id, title: project.title })}
@@ -409,10 +404,8 @@ export function MobileProjectsList() {
           onConfirm={async (newName) => {
             const res = await fetch(`/api/projects/${renameTarget.id}`, {
               method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-              },
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
               body: JSON.stringify({ title: newName }),
             });
             if (!res.ok) {

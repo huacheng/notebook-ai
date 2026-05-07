@@ -34,17 +34,14 @@ interface PromptImageProps {
 }
 
 function PromptImage({ sessionId, path, index }: PromptImageProps) {
-  const authToken = useStore((s) => s.authToken);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
 
   useEffect(() => {
     let revoked = false;
     const url = `/api/notebooks/${encodeURIComponent(sessionId)}/files/download?path=${encodeURIComponent(path)}`;
-    const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-    fetch(url, { headers })
+    fetch(url, { credentials: 'same-origin' })
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load image: ${res.status}`);
         return res.blob();
@@ -61,7 +58,7 @@ function PromptImage({ sessionId, path, index }: PromptImageProps) {
       revoked = true;
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-  }, [sessionId, path, authToken]);
+  }, [sessionId, path]);
 
   const handleClose = useCallback(() => setShowLightbox(false), []);
 

@@ -1,6 +1,19 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { CookieOptions } from 'express';
 import crypto from 'crypto';
 import { NotebookDb } from './db.js';
+import { SessionCache, type SessionToken } from './session-cache.js';
+import { requireAuth, extractToken, COOKIE_NAME } from './auth-helpers.js';
+
+const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+
+const COOKIE_OPTS: CookieOptions = {
+  httpOnly: true,
+  secure: process.env['NODE_ENV'] === 'production',
+  sameSite: 'lax',
+  path: '/',
+  maxAge: COOKIE_MAX_AGE_MS,
+};
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -81,67 +94,22 @@ setInterval(() => {
 }, 10 * 60_000);
 
 // ── Session token management ─────────────────────────────────────────────────
+// Delegated to SessionCache. The wrapper exports below preserve the external
+// API used elsewhere in the codebase.
 
-const SESSION_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // 7 days
-
-interface SessionToken {
-  userId: string;
-  email: string;
-  expiresAt: number;
-}
-
-const sessionTokens = new Map<string, SessionToken>();
+export const sessionCache = new SessionCache({ getDb: () => getDb() });
 
 export function createSessionToken(userId: string, email: string): string {
-  const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + SESSION_TOKEN_TTL_MS;
-  sessionTokens.set(token, { userId, email, expiresAt });
-  // Persist to database so token survives server restarts
-  try { getDb().upsertSessionToken(token, userId, email, expiresAt); } catch { /* db not ready */ }
-  return token;
+  return sessionCache.create(userId, email);
 }
 
 export function validateSessionToken(token: string): SessionToken | null {
-  // Check in-memory cache first
-  const cached = sessionTokens.get(token);
-  if (cached) {
-    if (Date.now() >= cached.expiresAt) {
-      sessionTokens.delete(token);
-      try { getDb().deleteSessionToken(token); } catch { /* ignore */ }
-      return null;
-    }
-    return cached;
-  }
-  // Fall back to database lookup (token created before restart)
-  try {
-    const row = getDb().getSessionToken(token);
-    if (!row) return null;
-    if (Date.now() >= row.expiresAt) {
-      getDb().deleteSessionToken(token);
-      return null;
-    }
-    // Re-hydrate into in-memory cache
-    const session: SessionToken = { userId: row.userId, email: row.email, expiresAt: row.expiresAt };
-    sessionTokens.set(token, session);
-    return session;
-  } catch {
-    return null;
-  }
+  return sessionCache.validate(token);
 }
 
 export function revokeSessionToken(token: string): void {
-  sessionTokens.delete(token);
-  try { getDb().deleteSessionToken(token); } catch { /* ignore */ }
+  sessionCache.revoke(token);
 }
-
-// Cleanup expired sessions every 30 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, session] of sessionTokens) {
-    if (now >= session.expiresAt) sessionTokens.delete(token);
-  }
-  try { getDb().deleteExpiredSessionTokens(); } catch { /* ignore */ }
-}, 30 * 60_000);
 
 // ── WS one-time ticket ──────────────────────────────────────────────────────
 
@@ -398,7 +366,9 @@ export async function handleLogin(req: Request, res: Response): Promise<void> {
   const token = createSessionToken(user.id, user.email);
 
   clearFailures(ip);
-  res.json({ ok: true, token, userId: user.id, email: user.email });
+  // Token is delivered ONLY via Set-Cookie (HttpOnly, browser-only path).
+  res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
+  res.json({ ok: true, userId: user.id, email: user.email });
 }
 
 // ── Token verify endpoint ───────────────────────────────────────────────────
@@ -412,20 +382,11 @@ export function handleVerify(req: Request, res: Response): void {
   // - Token is 64-char random string, brute-force is infeasible
   // - Token expiry is normal (browser refresh, session restart)
   // - Frontend only calls this once per page load
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ ok: false });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  const session = validateSessionToken(token);
-  if (!session) {
-    res.status(401).json({ ok: false });
-    return;
-  }
-
-  res.json({ ok: true, userId: session.userId, email: session.email });
+  // /verify is a boolean check — body is { ok: bool }, not { error }.
+  // Other endpoints (ws-ticket, middleware) carry an error message.
+  const r = requireAuth(req);
+  if (!r.ok) { res.status(r.status).json({ ok: false }); return; }
+  res.json({ ok: true, userId: r.session.userId, email: r.session.email });
 }
 
 // ── WS ticket endpoint ─────────────────────────────────────────────────────
@@ -439,34 +400,21 @@ export function handleWsTicket(req: Request, res: Response): void {
   // - Requires valid session token (already authenticated)
   // - Token is 64-char random string, can't be guessed
   // - Only called when establishing WebSocket connection
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authorization required.' });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  const session = validateSessionToken(token);
-  if (!session) {
-    res.status(401).json({ error: 'Invalid or expired token.' });
-    return;
-  }
-
-  res.json({ ticket: createWsTicket(session.userId) });
+  const r = requireAuth(req);
+  if (!r.ok) { res.status(r.status).json({ error: r.error }); return; }
+  res.json({ ticket: createWsTicket(r.session.userId) });
 }
 
 // ── Logout endpoint ─────────────────────────────────────────────────────────
 
 /**
  * POST /api/auth/logout — revoke session token.
- * Header: Authorization: Bearer <token>
+ * Header: Authorization: Bearer <token>  OR  Cookie: nb-auth-token=<token>
  */
 export function handleLogout(req: Request, res: Response): void {
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-    revokeSessionToken(token);
-  }
+  const token = extractToken(req);
+  if (token) revokeSessionToken(token);
+  res.clearCookie(COOKIE_NAME, { path: '/' });
   res.json({ ok: true });
 }
 
@@ -514,6 +462,8 @@ export async function handleTokenLogin(req: Request, res: Response): Promise<voi
   // Create session token (reuse existing session infrastructure)
   const sessionToken = createSessionToken('token-user', 'token@local');
   clearFailures(ip);
+  res.cookie(COOKIE_NAME, sessionToken, COOKIE_OPTS);
+  // Token also returned in JSON body for backward compat with curl / NB_AUTH_TOKEN automation.
   res.json({ ok: true, token: sessionToken, userId: 'token-user', email: 'token@local' });
 }
 
@@ -532,7 +482,6 @@ export function handleAuthStatus(_req: Request, res: Response): void {
  * except the auth endpoints themselves and health check.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Always allow auth endpoints and health check.
   if (
     req.path === '/api/auth/login' ||
     req.path === '/api/auth/login-token' ||
@@ -542,29 +491,17 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     req.path === '/api/auth/ws-ticket' ||
     req.path === '/api/auth/logout' ||
     req.path === '/api/health'
-  ) {
-    next();
+  ) { next(); return; }
+
+  const r = requireAuth(req);
+  if (!r.ok) {
+    if (extractToken(req)) res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.status(r.status).json({ error: r.error });
     return;
   }
-
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authorization required.' });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  const session = validateSessionToken(token);
-  if (!session) {
-    res.status(401).json({ error: 'Invalid or expired token.' });
-    return;
-  }
-
-  // Attach user info to request for downstream handlers
   (req as Request & { user?: { userId: string; email: string } }).user = {
-    userId: session.userId,
-    email: session.email,
+    userId: r.session.userId,
+    email: r.session.email,
   };
-
   next();
 }

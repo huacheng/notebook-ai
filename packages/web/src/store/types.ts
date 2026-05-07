@@ -20,7 +20,8 @@ import type { AutoStatusState, AutoStatusMessage } from './autoStatusSlice';
  */
 export interface NotebookStore {
   // ── Auth state ─────────────────────────────────────────────────────────
-  authToken: string | null;
+  userId: string | null;
+  email: string | null;
   authRequired: boolean | null;
   authMode: 'token' | 'password' | null;
   authError: string | null;

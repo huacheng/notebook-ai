@@ -2,23 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-const src = readFileSync(
+const sliceSrc = readFileSync(
   path.resolve(__dirname, '../store/authSlice.ts'),
   'utf-8',
 );
 
-/**
- * P1-7: authToken stored in localStorage is accessible to any XSS.
- * sessionStorage limits exposure to the current tab and clears on close.
- */
-describe('authToken storage (P1-7)', () => {
-  it('should not use localStorage for auth token', () => {
-    expect(src).not.toContain("localStorage.getItem('nb-auth-token')");
-    expect(src).not.toContain("localStorage.setItem('nb-auth-token'");
-    expect(src).not.toContain("localStorage.removeItem('nb-auth-token')");
+describe('Auth token storage', () => {
+  it('does not persist auth token in localStorage', () => {
+    expect(sliceSrc).not.toContain("localStorage.setItem('nb-auth-token'");
+    expect(sliceSrc).not.toContain("localStorage.getItem('nb-auth-token')");
   });
 
-  it('should use sessionStorage for auth token', () => {
-    expect(src).toContain("sessionStorage");
+  it('does not persist auth token in sessionStorage (now HttpOnly cookie)', () => {
+    expect(sliceSrc).not.toContain("sessionStorage.setItem('nb-auth-token'");
+    expect(sliceSrc).not.toContain("sessionStorage.getItem('nb-auth-token')");
   });
 });

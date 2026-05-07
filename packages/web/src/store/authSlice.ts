@@ -2,12 +2,14 @@ import type { StateCreator } from 'zustand';
 import type { NotebookStore } from './types';
 
 export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookStore,
-  | 'authToken' | 'authRequired' | 'authMode' | 'authError' | 'authRetryAfter' | 'authLoading' | 'authVerifying'
+  | 'userId' | 'email'
+  | 'authRequired' | 'authMode' | 'authError' | 'authRetryAfter' | 'authLoading' | 'authVerifying'
   | 'preflightAlerts' | 'preflightDismissed'
   | 'checkAuthStatus' | 'login' | 'loginWithToken' | 'logout' | 'register' | 'clearAuthError'
   | 'fetchPreflight' | 'dismissPreflightAlert' | 'installCron'
 >> = (set, get) => ({
-  authToken: sessionStorage.getItem('nb-auth-token'),
+  userId: null,
+  email: null,
   authRequired: null,
   authMode: null,
   authError: null,
@@ -25,15 +27,18 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       set({ authRequired: data.authEnabled, authMode: data.authMode ?? 'password' });
 
       if (data.authEnabled) {
-        const token = get().authToken;
-        if (token) {
-          const check = await fetch('/api/auth/verify', {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (!check.ok) {
-            sessionStorage.removeItem('nb-auth-token');
-            set({ authToken: null });
+        const check = await fetch('/api/auth/verify', {
+          credentials: 'same-origin',
+        });
+        if (check.ok) {
+          const verified = (await check.json()) as { ok: boolean; userId?: string; email?: string };
+          if (verified.ok && verified.userId) {
+            set({ userId: verified.userId, email: verified.email ?? null });
+          } else {
+            set({ userId: null, email: null });
           }
+        } else {
+          set({ userId: null, email: null });
         }
       }
     } catch {
@@ -49,6 +54,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
@@ -56,9 +62,8 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
         set({ authError: data.error, authRetryAfter: data.retryAfter ?? 0, authLoading: false });
         return;
       }
-      const data = (await res.json()) as { token: string };
-      sessionStorage.setItem('nb-auth-token', data.token);
-      set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
+      const data = (await res.json()) as { userId: string; email: string; token: string };
+      set({ userId: data.userId, email: data.email, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
     } catch {
       set({ authError: 'Failed to connect to server.', authLoading: false });
     }
@@ -70,6 +75,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       const res = await fetch('/api/auth/login-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ token }),
       });
       if (!res.ok) {
@@ -77,17 +83,19 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
         set({ authError: data.error, authRetryAfter: data.retryAfter ?? 0, authLoading: false });
         return;
       }
-      const data = (await res.json()) as { token: string };
-      sessionStorage.setItem('nb-auth-token', data.token);
-      set({ authToken: data.token, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
+      const data = (await res.json()) as { userId: string; email: string; token: string };
+      set({ userId: data.userId, email: data.email, authError: null, authRetryAfter: 0, authLoading: false, authVerifying: false });
     } catch {
       set({ authError: 'Failed to connect to server.', authLoading: false });
     }
   },
 
   logout() {
-    sessionStorage.removeItem('nb-auth-token');
-    set({ authToken: null });
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+    }).catch(() => { /* ignore */ });
+    set({ userId: null, email: null });
     get().disconnectWebSocket();
   },
 
@@ -97,6 +105,7 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ username, password, inviteCode }),
       });
       if (!res.ok) {
@@ -118,9 +127,8 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
 
   async fetchPreflight() {
     try {
-      const token = get().authToken;
       const res = await fetch('/api/system/preflight', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'same-origin',
       });
       if (res.ok) {
         const data = (await res.json()) as { alerts: Array<{ id: string; severity: string; message: string; action?: string }> };
@@ -137,10 +145,9 @@ export const createAuthSlice: StateCreator<NotebookStore, [], [], Pick<NotebookS
 
   async installCron() {
     try {
-      const token = get().authToken;
       const res = await fetch('/api/system/install-cron', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'same-origin',
       });
       if (res.ok) {
         // Refresh preflight to clear the alert

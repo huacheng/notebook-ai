@@ -216,7 +216,6 @@ function TypeBadge({ name }: { name: string }) {
 
 export interface FileSectionProps {
   baseUrl: string;
-  authToken: string | null;
   showDownloadAll?: boolean;
   dropLabel?: string;
   /** If provided, drag paths are computed relative to this directory (library mode). */
@@ -248,7 +247,6 @@ export interface FileSectionProps {
 
 export function FileSection({
   baseUrl,
-  authToken,
   showDownloadAll = false,
   dropLabel = 'Drop to upload',
   workspaceDir,
@@ -320,11 +318,9 @@ export function FileSection({
     }
     setError(null);
     try {
-      const h: Record<string, string> = {};
-      if (authToken) h['Authorization'] = `Bearer ${authToken}`;
       const res = await fetch(
         `${baseUrl}/files?path=${encodeURIComponent(path)}`,
-        { headers: h },
+        { credentials: 'same-origin' },
       );
       if (!fetchGuard.isCurrent(id)) return; // stale — discard
       if (!res.ok) { if (!silent) setError(((await res.json()) as { error: string }).error); return; }
@@ -339,7 +335,7 @@ export function FileSection({
       if (!silent) setError(String(err));
     }
     finally { if (!silent && fetchGuard.isCurrent(id)) setLoading(false); }
-  }, [baseUrl, authToken, fetchGuard]);
+  }, [baseUrl, fetchGuard]);
 
   useEffect(() => { const p = startPath ?? initialPath; setSubPath(p); fetchFiles(p); }, [baseUrl]); // eslint-disable-line
 
@@ -374,9 +370,9 @@ export function FileSection({
     };
     xhr.onerror = () => { setUploading(false); setError('Upload failed — network error'); };
     xhr.open('POST', `${baseUrl}/files?path=${encodeURIComponent(subPath)}`);
-    if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+    xhr.withCredentials = true;
     xhr.send(formData);
-  }, [baseUrl, authToken, subPath, fetchFiles]);
+  }, [baseUrl, subPath, fetchFiles]);
 
   const { isDragOver, dropProps } = useDropZone(uploadFileList);
 
@@ -387,11 +383,10 @@ export function FileSection({
   async function submitCreate() {
     const name = newName.trim(); if (!name) { setCreating(null); return; }
     const endpoint = creating === 'file' ? 'new-file' : 'mkdir';
-    const h: Record<string, string> = {}; if (authToken) h['Authorization'] = `Bearer ${authToken}`;
     try {
       const res = await fetch(
         `${baseUrl}/files/${endpoint}?path=${encodeURIComponent(subPath)}&name=${encodeURIComponent(name)}`,
-        { method: 'POST', headers: h },
+        { method: 'POST', credentials: 'same-origin' },
       );
       if (!res.ok) setError(((await res.json()) as { error: string }).error);
       else fetchFiles(subPath);
@@ -404,9 +399,8 @@ export function FileSection({
     setConfirmDelete(null);
     const fp = subPath === '.' ? name : `${subPath}/${name}`;
     const url = `${baseUrl}/files?path=${encodeURIComponent(fp)}`;
-    const h: Record<string, string> = {}; if (authToken) h['Authorization'] = `Bearer ${authToken}`;
     try {
-      const res = await fetch(url, { method: 'DELETE', headers: h });
+      const res = await fetch(url, { method: 'DELETE', credentials: 'same-origin' });
       if (!res.ok) {
         const text = await res.text();
         try {
@@ -443,7 +437,6 @@ export function FileSection({
 
   async function triggerDl(url: string, filename?: string) {
     const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     try {
       const res = await fetch(url, { headers });
       if (!res.ok) {

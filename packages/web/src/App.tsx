@@ -358,7 +358,7 @@ export default function App() {
   const language = useStore((s) => s.language);
   const t = useMemo(() => createT(language), [language]);
   const authRequired = useStore((s) => s.authRequired);
-  const authToken = useStore((s) => s.authToken);
+  const userId = useStore((s) => s.userId);
   const authMode = useStore((s) => s.authMode);
   const authError = useStore((s) => s.authError);
   const authLoading = useStore((s) => s.authLoading);
@@ -387,8 +387,8 @@ export default function App() {
     );
   }
 
-  // Auth required but no token — show login page based on authMode
-  if (authRequired && !authToken) {
+  // Auth required but not logged in — show login page based on authMode
+  if (authRequired && !userId) {
     return (
       <I18nProvider value={t}>
         {authMode === 'token' ? (

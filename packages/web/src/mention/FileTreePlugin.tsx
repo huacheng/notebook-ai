@@ -1,11 +1,9 @@
 import type { MentionPlugin, FileEntry } from './types';
 import { useStore } from '../store';
 
-async function fetchFiles(sessionId: string, authToken: string | null, subPath: string): Promise<FileEntry[]> {
-  const headers: Record<string, string> = {};
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+async function fetchFiles(sessionId: string, subPath: string): Promise<FileEntry[]> {
   const url = `/api/notebooks/${encodeURIComponent(sessionId)}/files?path=${encodeURIComponent(subPath)}`;
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.files ?? []).map((f: { name: string; path: string; isDir: boolean }) => ({
@@ -19,9 +17,9 @@ export const FileTreePlugin: MentionPlugin<FileEntry> = {
   trigger: '@',
 
   fetchItems: async (query: string) => {
-    const { sessionId, authToken } = useStore.getState();
+    const { sessionId} = useStore.getState();
     if (!sessionId) return [];
-    const files = await fetchFiles(sessionId, authToken, '.');
+    const files = await fetchFiles(sessionId, '.');
     const q = query.toLowerCase();
     return files.filter(f => f.name.toLowerCase().includes(q));
   },
@@ -38,8 +36,8 @@ export const FileTreePlugin: MentionPlugin<FileEntry> = {
   isNavigable: (entry: FileEntry) => entry.isDir,
 
   onNavigate: async (dir: FileEntry) => {
-    const { sessionId, authToken } = useStore.getState();
+    const { sessionId} = useStore.getState();
     if (!sessionId) return [];
-    return fetchFiles(sessionId, authToken, dir.path);
+    return fetchFiles(sessionId, dir.path);
   },
 };

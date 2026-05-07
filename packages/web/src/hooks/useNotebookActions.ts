@@ -40,7 +40,6 @@ export interface UseNotebookActionsOptions {
  * Hook providing unified notebook operations for desktop and mobile.
  */
 export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
-  const authToken = useStore((s) => s.authToken);
   const ws = useStore((s) => s.ws);
   const openNotebookTab = useStore((s) => s.openNotebookTab);
 
@@ -63,7 +62,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         }
 
         // REST fallback
-        const result = await openNotebookViaRest(notebookPath, authToken);
+        const result = await openNotebookViaRest(notebookPath);
         onSuccess?.();
         return result;
       } catch (err) {
@@ -72,7 +71,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         throw error;
       }
     },
-    [ws, authToken, onStart, onSuccess, onError]
+    [ws, onStart, onSuccess, onError]
   );
 
   /**
@@ -110,10 +109,8 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
       try {
         const res = await fetch(`/api/projects/${projectId}/notebooks`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ title }),
         });
 
@@ -131,7 +128,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         throw error;
       }
     },
-    [authToken, onStart, onSuccess, onError]
+    [onStart, onSuccess, onError]
   );
 
   /**
@@ -162,10 +159,8 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
       try {
         const res = await fetch(`/api/notebooks/${encodeURIComponent(notebookId)}`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ title: newTitle }),
         });
 
@@ -181,7 +176,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         throw error;
       }
     },
-    [authToken, onStart, onSuccess, onError]
+    [onStart, onSuccess, onError]
   );
 
   /**
@@ -195,10 +190,8 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
       try {
         const res = await fetch(`/api/projects/${projectId}/notebooks/rename`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ notebookPath, title: newTitle }),
         });
 
@@ -214,7 +207,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         throw error;
       }
     },
-    [authToken, onStart, onSuccess, onError]
+    [onStart, onSuccess, onError]
   );
 
   /**
@@ -227,7 +220,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
       try {
         const res = await fetch(`/api/notebooks/${encodeURIComponent(notebookId)}`, {
           method: 'DELETE',
-          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+          credentials: 'same-origin',
         });
 
         if (!res.ok) {
@@ -242,7 +235,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         throw error;
       }
     },
-    [authToken, onStart, onSuccess, onError]
+    [onStart, onSuccess, onError]
   );
 
   /**
@@ -257,7 +250,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
           `/api/projects/${projectId}/notebooks/by-path?path=${encodeURIComponent(notebookPath)}`,
           {
             method: 'DELETE',
-            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+            credentials: 'same-origin',
           }
         );
 
@@ -273,7 +266,7 @@ export function useNotebookActions(options: UseNotebookActionsOptions = {}) {
         throw error;
       }
     },
-    [authToken, onStart, onSuccess, onError]
+    [onStart, onSuccess, onError]
   );
 
   return {
@@ -386,14 +379,11 @@ async function openNotebookViaWs(
  */
 async function openNotebookViaRest(
   notebookPath: string,
-  authToken: string | null
 ): Promise<NotebookOpenResult> {
   const res = await fetch('/api/notebooks/open-by-path', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     body: JSON.stringify({ path: notebookPath }),
   });
 

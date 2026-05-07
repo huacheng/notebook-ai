@@ -45,7 +45,6 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
   const activeNotebookTabId = useStore((s) => s.activeNotebookTabId);
   const sessionId = useStore((s) => s.sessionId);
   const notebook = useStore((s) => s.notebook);
-  const authToken = useStore((s) => s.authToken);
   const pendingSuggestions = useStore((s) => s.pendingSuggestions);
   const clearPendingSuggestions = useStore((s) => s.clearPendingSuggestions);
 
@@ -159,7 +158,7 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
       try {
         const uploaded: ImageRef[] = [];
         for (const img of pasted) {
-          const ref = await uploadPromptImage(sessionId, img, authToken);
+          const ref = await uploadPromptImage(sessionId, img);
           uploaded.push(ref);
         }
         setImages((prev) => [...prev, ...uploaded].slice(0, MAX_IMAGES));
@@ -242,7 +241,6 @@ export function InputBar({ mobile = false, editMode = false }: InputBarProps) {
       const formData = new FormData();
       for (const file of Array.from(files)) formData.append('files', file);
       const headers: Record<string, string> = {};
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
       const res = await fetch(`/api/notebooks/${sessionId}/files`, { method: 'POST', body: formData, headers });
 
       if (!res.ok) {

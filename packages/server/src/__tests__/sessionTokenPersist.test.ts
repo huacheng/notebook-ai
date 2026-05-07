@@ -6,8 +6,8 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const authSrc = () =>
-  fs.readFileSync(path.resolve(__dirname, '../auth.ts'), 'utf-8');
+const sessionCacheSrc = () =>
+  fs.readFileSync(path.resolve(__dirname, '../session-cache.ts'), 'utf-8');
 
 const dbSrc = () =>
   fs.readFileSync(path.resolve(__dirname, '../db.ts'), 'utf-8');
@@ -20,20 +20,21 @@ describe('Session token persistence', () => {
   });
 
   it('auth.ts should persist tokens to database on create', () => {
-    const src = authSrc();
-    // createSessionToken should write to db, not just in-memory Map
-    expect(src).toMatch(/insertToken|upsertSessionToken|saveSessionToken/);
+    // Since Task 3, persistence is delegated to SessionCache.
+    // The call to upsertSessionToken lives in session-cache.ts.
+    const cacheSrc = sessionCacheSrc();
+    expect(cacheSrc).toMatch(/insertToken|upsertSessionToken|saveSessionToken/);
   });
 
   it('auth.ts should load tokens from database on validate', () => {
-    const src = authSrc();
-    // validateSessionToken should fall back to db lookup
-    expect(src).toMatch(/getSessionToken|loadSessionToken|findToken/);
+    // Since Task 3, DB lookup is delegated to SessionCache.
+    const cacheSrc = sessionCacheSrc();
+    expect(cacheSrc).toMatch(/getSessionToken|loadSessionToken|findToken/);
   });
 
   it('auth.ts should delete tokens from database on revoke', () => {
-    const src = authSrc();
-    // revokeSessionToken should also delete from db
-    expect(src).toMatch(/deleteSessionToken|removeToken/);
+    // Since Task 3, DB deletion is delegated to SessionCache.
+    const cacheSrc = sessionCacheSrc();
+    expect(cacheSrc).toMatch(/deleteSessionToken|removeToken/);
   });
 });
